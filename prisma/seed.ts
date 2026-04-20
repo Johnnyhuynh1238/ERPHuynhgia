@@ -74,12 +74,14 @@ async function upsertUser(input: SeedUserInput, passwordHash: string) {
       phone: input.phone ?? null,
       role: input.role,
       isActive: true,
+      mustChangePassword: true,
     },
     update: {
       passwordHash,
       fullName: input.fullName,
       role: input.role,
       isActive: true,
+      mustChangePassword: true,
       phone: input.phone ?? null,
     },
   });
