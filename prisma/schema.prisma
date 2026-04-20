@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  engineer
+  foreman
+  accountant
+}
+
+enum ProjectStatus {
+  planning
+  in_progress
+  completed
+  paused
+}
+
+enum TaskPhase {
+  P1_CHUAN_BI
+  P2_MONG
+  P3_KHUNG_TRET
+  P4_KHUNG_LAU
+  P5_ME_XAY_TO
+  P6_OP_LAT
+  P7_SON_BA
+  P8_LAP_TB
+  P9_BAN_GIAO
+}
+
+enum TaskStatus {
+  not_started
+  in_progress
+  done
+  inspected
+  delayed
+  na
+}
+
+enum TaskLogType {
+  status_change
+  note
+  photo_uploaded
+  assignment_change
+}
+
+enum PaymentStatus {
+  not_collected
+  request_sent
+  collected
+  customer_late
+}
+
+enum ProjectMemberRole {
+  engineer
+  foreman
+  accountant
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  phone        String
+  role         UserRole
+  isActive     Boolean  @default(true) @map("is_active")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  managedProjects     Project[]       @relation("ProjectManager")
+  engineeredProjects  Project[]       @relation("MainEngineer")
+  assignedEngineerFor Task[]          @relation("AssignedEngineer")
+  assignedForemanFor  Task[]          @relation("AssignedForeman")
+  taskLogs            TaskLog[]
+  taskPhotos          TaskPhoto[]
+  projectMembers      ProjectMember[]
+  addedProjectMembers ProjectMember[] @relation("ProjectMemberAddedBy")
+
+  @@map("users")
+}
+
+model Project {
+  id               String        @id @default(uuid()) @db.Uuid
+  code             String        @unique
+  name             String
+  customerName     String        @map("customer_name")
+  customerPhone    String        @map("customer_phone")
+  address          String
+  areaM2           Decimal       @map("area_m2") @db.Decimal(12, 2)
+  unitPrice        Decimal       @map("unit_price") @db.Decimal(15, 2)
+  contractValue    Decimal       @map("contract_value") @db.Decimal(15, 2)
+  startDate        DateTime      @map("start_date") @db.Date
+  expectedEndDate  DateTime      @map("expected_end_date") @db.Date
+  actualEndDate    DateTime?     @map("actual_end_date") @db.Date
+  projectManagerId String        @map("project_manager_id") @db.Uuid
+  mainEngineerId   String        @map("main_engineer_id") @db.Uuid
+  status           ProjectStatus @default(planning)
+  notes            String?
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  projectManager   User              @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  mainEngineer     User              @relation("MainEngineer", fields: [mainEngineerId], references: [id])
+  tasks            Task[]
+  paymentSchedules PaymentSchedule[]
+  projectMembers   ProjectMember[]
+
+  @@map("projects")
+}
+
+model TaskTemplate {
+  id                  String    @id @default(uuid()) @db.Uuid
+  code                String
+  phase               TaskPhase
+  name                String
+  defaultOffsetDays   Int       @map("default_offset_days")
+  defaultDurationDays Int       @map("default_duration_days")
+  defaultTeam         String    @map("default_team")
+  defaultInspector    String    @map("default_inspector")
+  materialsNeeded     String    @map("materials_needed") @db.Text
+  proposerRole        String    @map("proposer_role")
+  ordererRole         String    @map("orderer_role")
+  receiverRole        String    @map("receiver_role")
+  qcChecklist         String    @map("qc_checklist") @db.Text
+  isMilestone         Boolean   @default(false) @map("is_milestone")
+  displayOrder        Int       @map("display_order")
+  templateCategory    String    @map("template_category")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  tasks Task[]
+
+  @@map("task_templates")
+}
+
+model Task {
+  id                 String     @id @default(uuid()) @db.Uuid
+  projectId          String     @map("project_id") @db.Uuid
+  templateId         String     @map("template_id") @db.Uuid
+  code               String
+  phase              TaskPhase
+  name               String
+  offsetDays         Int        @map("offset_days")
+  durationDays       Int        @map("duration_days")
+  plannedStartDate   DateTime   @map("planned_start_date") @db.Date
+  plannedEndDate     DateTime   @map("planned_end_date") @db.Date
+  actualStartDate    DateTime?  @map("actual_start_date") @db.Date
+  actualEndDate      DateTime?  @map("actual_end_date") @db.Date
+  assignedEngineerId String?    @map("assigned_engineer_id") @db.Uuid
+  assignedForemanId  String?    @map("assigned_foreman_id") @db.Uuid
+  inspectorName      String     @map("inspector_name")
+  materialsNeeded    String     @map("materials_needed") @db.Text
+  qcChecklist        String     @map("qc_checklist") @db.Text
+  isMilestone        Boolean    @default(false) @map("is_milestone")
+  status             TaskStatus @default(not_started)
+  notes              String?    @db.Text
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  project          Project      @relation(fields: [projectId], references: [id])
+  template         TaskTemplate @relation(fields: [templateId], references: [id])
+  assignedEngineer User?        @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id])
+  assignedForeman  User?        @relation("AssignedForeman", fields: [assignedForemanId], references: [id])
+  taskLogs         TaskLog[]
+  taskPhotos       TaskPhoto[]
+
+  @@index([projectId, phase, code])
+  @@map("tasks")
+}
+
+model TaskLog {
+  id        String      @id @default(uuid()) @db.Uuid
+  taskId    String      @map("task_id") @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  logType   TaskLogType @map("log_type")
+  oldValue  String?     @map("old_value")
+  newValue  String?     @map("new_value")
+  content   String      @db.Text
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_logs")
+}
+
+model TaskPhoto {
+  id           String    @id @default(uuid()) @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  uploadedBy   String    @map("uploaded_by") @db.Uuid
+  photoUrl     String    @map("photo_url")
+  thumbnailUrl String    @map("thumbnail_url")
+  caption      String?
+  fileSizeKb   Int       @map("file_size_kb")
+  takenAt      DateTime? @map("taken_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [uploadedBy], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_photos")
+}
+
+model PaymentSchedule {
+  id                   String        @id @default(uuid()) @db.Uuid
+  projectId            String        @map("project_id") @db.Uuid
+  phaseNumber          Int           @map("phase_number")
+  milestoneDescription String        @map("milestone_description")
+  percent              Decimal       @db.Decimal(5, 2)
+  amount               Decimal       @db.Decimal(15, 2)
+  expectedDate         DateTime      @map("expected_date") @db.Date
+  dayOffset            Int           @map("day_offset")
+  status               PaymentStatus @default(not_collected)
+  actualPaidDate       DateTime?     @map("actual_paid_date") @db.Date
+  actualPaidAmount     Decimal?      @map("actual_paid_amount") @db.Decimal(15, 2)
+  notes                String?       @db.Text
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, phaseNumber])
+  @@map("payment_schedules")
+}
+
+model ProjectMember {
+  id            String            @id @default(uuid()) @db.Uuid
+  projectId     String            @map("project_id") @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  roleInProject ProjectMemberRole @map("role_in_project")
+  addedAt       DateTime          @default(now()) @map("added_at")
+  addedBy       String            @map("added_by") @db.Uuid
+
+  project     Project @relation(fields: [projectId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
+  addedByUser User    @relation("ProjectMemberAddedBy", fields: [addedBy], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
+}
