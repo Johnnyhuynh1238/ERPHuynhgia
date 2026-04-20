@@ -1,9 +1,22 @@
+import { redirect } from "next/navigation";
 import { ProtectedLayout } from "@/components/protected-layout";
+import { getCurrentUser } from "@/lib/auth-helpers";
+import { AdminUsersClient } from "./_components/admin-users-client";
 
-export default function UsersPage() {
+export default async function UsersPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (user.role !== "admin") {
+    redirect("/?denied=1");
+  }
+
   return (
     <ProtectedLayout>
-      <h1 className="text-xl font-semibold text-[#1F4E79]">Quản lý User</h1>
+      <AdminUsersClient currentUserId={user.id} />
     </ProtectedLayout>
   );
 }
