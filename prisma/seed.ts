@@ -56,7 +56,7 @@ function parsePhase(value: string): TaskPhase {
 }
 
 async function seedAdmin() {
-  const passwordHash = await bcrypt.hash("ChangeMe", 12);
+  const passwordHash = await bcrypt.hash("ChangeMe@2026", 12);
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@congty.vn" },
