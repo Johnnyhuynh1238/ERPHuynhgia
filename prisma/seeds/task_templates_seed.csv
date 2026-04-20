@@ -1,0 +1,225 @@
+"code","phase","name","default_offset_days","default_duration_days","default_team","default_inspector","materials_needed","proposer_role","orderer_role","receiver_role","qc_checklist","is_milestone","display_order","template_category"
+"1.01","P1_CHUAN_BI","Kick-off với chủ nhà, bàn giao mặt bằng, chốt bản vẽ cuối","0","1","GĐ + Chủ nhà","GĐ","Biên bản bàn giao mặt bằng, bản vẽ in giấy A3","GĐ","GĐ","GĐ","• Có đủ bản vẽ kiến trúc + kết cấu + ME
+• Có giấy phép xây dựng
+• Ký biên bản kick-off","false","1","nha_pho_1t1l"
+"1.02","P1_CHUAN_BI","Khảo sát đo đạc hiện trạng, cắm mốc cao độ chuẩn","1","1","KS","KS","Máy thủy bình, thước thép, sơn đánh dấu","KS","KS","KS","• Đo lại kích thước đất so với bản vẽ
+• Cắm 2 mốc cao độ ±0.00 ở vị trí dễ nhìn
+• Chụp ảnh 360° hiện trạng","false","2","nha_pho_1t1l"
+"1.03","P1_CHUAN_BI","Lắp rào tôn kín công trường + biển công trình","1","2","Đội nề","KS","Tôn B40 + khung sắt + biển nhựa in bạt","KS","GĐ","KS","• Rào kín toàn công trường (không hở)
+• Biển công trình ghi tên CTy, SĐT, giấy phép XD
+• Không cản trở lối đi công cộng","false","3","nha_pho_1t1l"
+"1.04","P1_CHUAN_BI","Lắp điện - nước công trường + WC di động","2","2","Đội điện nước","KS","Đồng hồ điện tạm, dây điện 3 pha, ống nước mềm, WC di động (thuê)","KS","GĐ","KS","• Đồng hồ điện công trường riêng (xin được từ điện lực)
+• Có CB chống giật
+• WC di động ký HĐ thuê theo tháng","false","4","nha_pho_1t1l"
+"1.05","P1_CHUAN_BI","Ép cọc BTCT (nếu có trong HĐ)","4","3","NCC ép cọc + KS","KS + Chủ nhà","Cọc BTCT theo bản vẽ, biên bản ép cọc đối chứng","KS","GĐ","KS","• Đúng số lượng, đúng đường kính
+• Tải ép đạt ≥ 1.5 × tải thiết kế
+• Có biên bản ép cọc đối chứng lưu hồ sơ","false","5","nha_pho_1t1l"
+"2.01","P2_MONG","Đào đất hố móng","7","2","Đội nề","KS","Thuê máy đào mini (nếu cần) + nhân công","KS","GĐ","KS","• Đào đúng độ sâu theo bản vẽ
+• Không làm sập mép đất (chống sạt)
+• Đất thải đổ đúng nơi quy định","false","6","nha_pho_1t1l"
+"2.02","P2_MONG","Đổ bê tông lót móng (M100, dày 100mm)","9","1","Đội nề","KS","Xi măng, cát, đá 1×2 (trộn tại chỗ M100)","KS","GĐ","KS","• Đáy móng đầm chặt, phẳng, không nước
+• Lớp lót dày đủ 100mm
+• Chờ ≥ 24h mới thi công lớp trên","false","7","nha_pho_1t1l"
+"2.03","P2_MONG","Đan thép đáy móng + đà kiềng","10","3","Đội nề (thợ sắt)","KS","Thép D12/D16/D22 theo bản vẽ, dây buộc, viên kê","KS","GĐ","KS","• Đúng đường kính thép theo bản vẽ
+• Khoảng cách thép đai đúng (thường 150-200)
+• Có viên kê BT 50mm đáy, 30mm cạnh
+• Mối buộc chắc 100% nút giao","false","8","nha_pho_1t1l"
+"2.04","P2_MONG","Lắp cốp pha thành móng + đà kiềng","13","2","Đội nề","KS","Cốp pha tôn/gỗ phủ phim, đinh, dây thép","KS","GĐ","KS","• Cốp pha kín, không hở
+• Vuông góc, không phình khi đổ
+• Có chống xiên đủ","false","9","nha_pho_1t1l"
+"2.05","P2_MONG","Đi ống điện/nước xuyên móng (nếu có)","14","1","Đội điện nước","KS","Ống PVC chờ, dây thép cố định","KS","GĐ","KS","• Đúng vị trí theo bản vẽ ME
+• Bịt 2 đầu ống tránh BT lọt vào
+• Cố định chắc tránh xô lệch","false","10","nha_pho_1t1l"
+"2.06","P2_MONG","NGHIỆM THU CỐT THÉP MÓNG (điểm dừng)","15","1","KS + Đội trưởng","GĐ + Chủ nhà (mời)","Biên bản nghiệm thu BM03 + máy ảnh","KS","-","KS","• Chạy qua checklist giai đoạn 1 (15 mục)
+• Chụp ảnh toàn bộ cốt thép trước khi đổ
+• Ký BB - chưa ký KHÔNG được đổ BT","true","11","nha_pho_1t1l"
+"2.07","P2_MONG","Đổ bê tông móng (M250, thương phẩm)","16","1","Đội nề + Xe BT","KS","Bê tông thương phẩm M250, máy bơm (nếu cần), mẫu thử","KS","GĐ","KS","• Kiểm phiếu giao hàng đúng mác
+• Slump test 7-10cm
+• Đúc 3 mẫu thử 150×150×150
+• Đầm kỹ, không rỗ","false","12","nha_pho_1t1l"
+"2.08","P2_MONG","Dưỡng hộ + tháo cốp pha móng","17","4","Đội nề","KS","Bao tải/mùn cưa để giữ ẩm, nước tưới","KS","-","KS","• Tưới nước giữ ẩm 3-5 ngày
+• Tháo cốp pha khi BT đạt cường độ (≥3 ngày)
+• Kiểm bề mặt BT không rỗ","false","13","nha_pho_1t1l"
+"3.01","P3_KHUNG_TRET","Đan thép + cốp pha cột tầng trệt","21","3","Đội nề (thợ sắt)","KS","Thép cột D14/D16, thép đai D8, cốp pha cột","KS","GĐ","KS","• Chiều dài neo thép chờ ≥40d
+• Đai dày ở đầu cột (chống động đất)
+• Cốp pha thẳng đứng, đủ chống","false","14","nha_pho_1t1l"
+"3.02","P3_KHUNG_TRET","Đổ bê tông cột tầng trệt","26","1","Đội nề + Xe BT","KS","Bê tông M250, que đầm","KS","GĐ","KS","• Đổ từng đợt 40-50cm, đầm kỹ
+• Không đổ quá cao 1 lần (phân tầng)
+• Đúc mẫu thử","false","15","nha_pho_1t1l"
+"3.03","P3_KHUNG_TRET","Xây tường bao tầng trệt (phần chính)","27","5","Đội nề","KS","Gạch xây (tuynel/block), xi măng, cát","KS","GĐ","KS","• Mạch đều 8-12mm, đầy
+• Hàng xây thẳng, dùng dây căng
+• Để chừa các lỗ ME theo bản vẽ","false","16","nha_pho_1t1l"
+"3.04","P3_KHUNG_TRET","Lắp cốp pha đáy sàn tầng 1","32","3","Đội nề","KS","Cốp pha tôn/phim, chống sắt/gỗ","KS","GĐ","KS","• Chống đều 1-1.2m/cái
+• Cốp pha phẳng, kín
+• Cao độ đúng (dùng máy thủy bình)","false","17","nha_pho_1t1l"
+"3.05","P3_KHUNG_TRET","Đan thép sàn tầng 1 (2 lớp)","35","3","Đội nề (thợ sắt)","KS","Thép D10/D12, viên kê, con kê lớp trên","KS","GĐ","KS","• Đúng đường kính + khoảng cách
+• Có viên kê 15-20mm đáy
+• Có con kê giữ lớp trên đúng vị trí
+• Thép mũ cột đủ chiều dài","false","18","nha_pho_1t1l"
+"3.06","P3_KHUNG_TRET","Đi ống ME âm sàn tầng 1","37","2","Đội điện nước","KS","Ống điện PVC, ống thoát PVC, kẽm buộc","KS","GĐ","KS","• Đúng vị trí đèn/công tắc theo bản vẽ
+• Ống không đè lên cốt thép chính
+• Cố định chắc, không nổi lên khi đổ BT","false","19","nha_pho_1t1l"
+"3.07","P3_KHUNG_TRET","NGHIỆM THU THÉP + ME SÀN T1 (điểm dừng)","39","1","KS + Đội trưởng","GĐ + Chủ nhà (mời)","BB nghiệm thu + máy ảnh","KS","-","KS","• Chạy checklist giai đoạn 2 (13 mục)
+• Chụp ảnh toàn bộ cốt thép + ME
+• Ký BB trước khi đổ BT","true","20","nha_pho_1t1l"
+"3.08","P3_KHUNG_TRET","Đổ bê tông sàn tầng 1 (M250)","40","1","Đội nề + Xe BT + Bơm","KS","Bê tông M250 (tính m³ chuẩn + 5% dự phòng)","KS","GĐ","KS","• Đổ liên tục, không ngắt đoạn
+• Đầm kỹ khắp mặt sàn
+• Đúc mẫu thử
+• San phẳng, cán nền","false","21","nha_pho_1t1l"
+"3.09","P3_KHUNG_TRET","Dưỡng hộ sàn tầng 1","41","1","Đội nề","KS","Bao tải + nước tưới","KS","-","KS","• Tưới nước 3 lần/ngày × 7 ngày
+• Không cho đi lại trong 24h
+• Không đặt vật nặng trong 7 ngày","false","22","nha_pho_1t1l"
+"4.01","P4_KHUNG_LAU","Đan thép + cốp pha cột tầng lầu","42","3","Đội nề","KS","Thép cột, cốp pha","KS","GĐ","KS","• Thép nối vào thép chờ đúng mối hàn/buộc
+• Đai dày ở đầu cột
+• Cốp pha thẳng đứng","false","23","nha_pho_1t1l"
+"4.02","P4_KHUNG_LAU","Đổ bê tông cột tầng lầu","45","1","Đội nề + Xe BT","KS","Bê tông M250","KS","GĐ","KS","• Slump test, đúc mẫu
+• Đầm kỹ, không rỗ
+• Không đổ quá cao 1 đợt","false","24","nha_pho_1t1l"
+"4.03","P4_KHUNG_LAU","Xây tường trệt (hoàn thiện phần còn lại)","46","4","Đội nề","KS","Gạch xây, vữa xi măng cát","KS","GĐ","KS","• Thẳng, vuông góc
+• Mạch vữa đầy
+• Chừa ô cửa đúng kích thước","false","25","nha_pho_1t1l"
+"4.04","P4_KHUNG_LAU","Xây tường tầng lầu","50","5","Đội nề","KS","Gạch xây, vữa","KS","GĐ","KS","• Thẳng, vuông
+• Mạch đều đầy
+• Chừa ô cửa, ô ME","false","26","nha_pho_1t1l"
+"4.05","P4_KHUNG_LAU","Lắp cốp pha đáy sàn mái","55","3","Đội nề","KS","Cốp pha, chống","KS","GĐ","KS","• Tạo độ dốc mái ≥1% về ống thoát
+• Chống đều, chắc
+• Cốp pha phẳng, kín","false","27","nha_pho_1t1l"
+"4.06","P4_KHUNG_LAU","Đan thép sàn mái (2 lớp, đủ thép)","58","3","Đội nề (thợ sắt)","KS","Thép, viên kê, con kê","KS","GĐ","KS","• Không bớt thép (sàn mái chịu tải nhiệt)
+• Lớp trên có con kê
+• Thép mũ cột đủ","false","28","nha_pho_1t1l"
+"4.07","P4_KHUNG_LAU","Đi ống ME âm sàn mái","60","1","Đội điện nước","KS","Ống PVC","KS","GĐ","KS","• Đúng vị trí đèn, quạt
+• Không đè cốt thép
+• Bịt đầu ống","false","29","nha_pho_1t1l"
+"4.08","P4_KHUNG_LAU","NGHIỆM THU SÀN MÁI (điểm dừng)","61","1","KS + Đội trưởng","GĐ + Chủ nhà (mời dự cất nóc)","BB nghiệm thu + máy ảnh","KS","-","KS","• Checklist giai đoạn 3
+• Đặc biệt: độ dốc mái, thép lớp trên đầy đủ
+• Chụp ảnh trước đổ","true","30","nha_pho_1t1l"
+"4.09","P4_KHUNG_LAU","Đổ bê tông sàn mái - CẤT NÓC","62","1","Đội nề + Xe BT + Bơm","KS + Chủ nhà","Bê tông M250, lễ vật cúng cất nóc (chủ nhà lo)","KS","GĐ","KS","• Đổ liên tục, đầm kỹ
+• Đúc mẫu
+• Cán phẳng, tạo độ dốc
+• Lộc cho thợ (CN chuẩn bị)","false","31","nha_pho_1t1l"
+"5.01","P5_ME_XAY_TO","Dưỡng hộ sàn mái","63","3","Đội nề","KS","Bao tải + nước","KS","-","KS","• Tưới 3 lần/ngày × 7 ngày
+• Không cho đi lại trong 48h","false","32","nha_pho_1t1l"
+"5.02","P5_ME_XAY_TO","Xây tường ngăn trong (cả 2 tầng)","63","5","Đội nề","KS","Gạch, vữa","KS","GĐ","KS","• Đúng vị trí bản vẽ
+• Thẳng, vuông, mạch đều
+• Chừa cửa, ô ME","false","33","nha_pho_1t1l"
+"5.03","P5_ME_XAY_TO","Cắt rãnh + đi ống điện âm tường","66","4","Đội điện nước","KS","Máy cắt tường, ống điện PVC, dây điện, đế ổ cắm/công tắc","KS","GĐ","KS","• Đúng vị trí ổ cắm (cao 300mm), công tắc (cao 1200-1400mm)
+• Rãnh sâu đủ, ống chôn hết
+• Đế ổ âm tường phẳng","false","34","nha_pho_1t1l"
+"5.04","P5_ME_XAY_TO","Đi ống cấp nước âm tường","69","2","Đội điện nước","KS","Ống nước PPR/HDPE, co, tê, van","KS","GĐ","KS","• Ống cấp KHÔNG âm sàn (chỉ âm tường)
+• Cố định chắc, không xê dịch
+• Chờ đủ đầu ra (lavabo, vòi sen, bếp)","false","35","nha_pho_1t1l"
+"5.05","P5_ME_XAY_TO","Đi ống thoát nước (WC, bếp, ban công)","70","2","Đội điện nước","KS","Ống PVC D60/D90/D110, co, tê","KS","GĐ","KS","• Độ dốc thoát 2-3%
+• Nối kín, không rò
+• Hố ga đúng vị trí","false","36","nha_pho_1t1l"
+"5.06","P5_ME_XAY_TO","TEST ÁP LỰC ỐNG NƯỚC (điểm dừng)","72","1","Đội điện nước + KS","KS","Máy test áp lực + đồng hồ","KS","-","KS","• Bơm áp 6 bar, giữ 24h
+• Áp tụt <5% = đạt
+• Nếu rò → tìm điểm rò, sửa, test lại","true","37","nha_pho_1t1l"
+"5.07","P5_ME_XAY_TO","Trám vá chân ống + vá rãnh ME","72","2","Đội nề","KS","Vữa xi măng + phụ gia","KS","GĐ","KS","• Trám đầy, không hở
+• Không làm nổi ống
+• Bề mặt phẳng trước khi tô","false","38","nha_pho_1t1l"
+"5.08","P5_ME_XAY_TO","Tô trát trong (2 tầng)","74","6","Đội nề","KS","Xi măng + cát mịn + phụ gia tô","KS","GĐ","KS","• Dày 15-20mm, đều
+• Kiểm thước nhôm 2m, sai ≤5mm
+• Góc trong vuông
+• Không nứt chân chim","false","39","nha_pho_1t1l"
+"5.09","P5_ME_XAY_TO","Tô trát ngoài","77","5","Đội nề","KS","Xi măng + cát + phụ gia","KS","GĐ","KS","• Dày đều
+• Thẳng, không gồ ghề
+• Xử lý giáp ranh nhà kế bên cẩn thận","false","40","nha_pho_1t1l"
+"5.10","P5_ME_XAY_TO","Chống thấm sàn WC (2 lớp)","80","2","Đội nề (thợ chuyên CT)","KS","Sika Top Seal/Flexseal + lưới gia cường","KS","GĐ","KS","• 2 lớp, tràn chân tường ≥300mm
+• Lưới gia cường ở góc sàn-tường
+• Khô mới quét lớp 2","false","41","nha_pho_1t1l"
+"5.11","P5_ME_XAY_TO","Chống thấm ban công + sân thượng + mái","82","2","Đội nề (thợ chuyên CT)","KS","Sơn chống thấm + lưới thủy tinh","KS","GĐ","KS","• 2 lớp + lưới gia cường
+• Tràn chân tường ≥300mm
+• Đặc biệt kỹ ở cổ ống thoát","false","42","nha_pho_1t1l"
+"5.12","P5_ME_XAY_TO","TEST NGÂM NƯỚC CHỐNG THẤM (quan trọng!)","84","2","KS","KS","Bịt ống thoát tạm + nước","KS","-","KS","• Đổ nước cao 30-50mm trên sàn WC/BC/mái
+• Để 48h
+• Kiểm tầng dưới xem có thấm
+• Có thấm → làm lại TRƯỚC ốp lát","true","43","nha_pho_1t1l"
+"5.13","P5_ME_XAY_TO","NGHIỆM THU PHẦN THÔ + CHỐNG THẤM (điểm dừng)","86","1","KS + GĐ + Chủ nhà","GĐ + Chủ nhà (BẮT BUỘC)","BB nghiệm thu BM03 + checklist 17 mục","KS","-","KS","• Checklist giai đoạn 4 (17 mục) - kỹ lưỡng
+• Quan trọng: sau đây sẽ bị che bởi ốp lát
+• Chủ nhà ký mới làm tiếp","true","44","nha_pho_1t1l"
+"6.01","P6_OP_LAT","Ốp gạch tường WC (toàn bộ WC)","87","3","Đội ốp lát","KS","Gạch ốp 300×600 (chủ nhà chọn), keo dán, zoăng chít mạch","KS","Chủ nhà mua / GĐ","KS","• Phẳng (thước 2m, sai ≤2mm)
+• Mạch đều 1.5-2mm, thẳng
+• Gõ không rỗng
+• Cắt gạch ở góc thẳng, không sứt","false","45","nha_pho_1t1l"
+"6.02","P6_OP_LAT","Lát nền WC + ban công (có độ dốc)","90","2","Đội ốp lát","KS","Gạch lát sàn chống trượt, keo, zoăng","KS","Chủ nhà mua","KS","• Độ dốc 2-3% về ống thoát
+• Test đổ nước → chảy hết
+• Không rỗng, mạch đều","false","46","nha_pho_1t1l"
+"6.03","P6_OP_LAT","Lát nền tầng trệt","88","4","Đội ốp lát","KS","Gạch lát 600×600 hoặc 800×800 (chủ nhà chọn)","KS","Chủ nhà mua","KS","• Phẳng, không gồ ghề
+• Mạch đều, thẳng
+• Gõ không rỗng 100% viên
+• Cân chỉnh chân tường","false","47","nha_pho_1t1l"
+"6.04","P6_OP_LAT","Lát nền tầng lầu","91","4","Đội ốp lát","KS","Gạch lát (chủ nhà chọn)","KS","Chủ nhà mua","KS","• Phẳng, mạch đều
+• Gõ không rỗng
+• Chỗ giáp cầu thang thẳng","false","48","nha_pho_1t1l"
+"6.05","P6_OP_LAT","Ốp bậc cầu thang + mũi thang","94","2","Đội ốp lát","KS","Gạch bậc (chủ nhà chọn), gạch mũi chống trượt","KS","Chủ nhà mua","KS","• Mũi thang thẳng, đồng bộ
+• Cổ thang đứng
+• Bậc đều không lệch","false","49","nha_pho_1t1l"
+"6.06","P6_OP_LAT","Ốp lát sân thượng (nếu có)","95","2","Đội ốp lát","KS","Gạch lát ngoài trời","KS","Chủ nhà mua","KS","• Độ dốc về thoát nước
+• Mạch đều, kín
+• Chịu thời tiết","false","50","nha_pho_1t1l"
+"6.07","P6_OP_LAT","Chít mạch (grout) toàn bộ","97","2","Đội ốp lát","KS","Keo chà ron (zoăng) đúng màu gạch","KS","GĐ mua","KS","• Đầy mạch, không lõm
+• Không trào ra bề mặt
+• Cùng màu đều toàn nhà
+• Lau sạch bề mặt gạch","false","51","nha_pho_1t1l"
+"6.08","P6_OP_LAT","NGHIỆM THU ỐP LÁT (điểm dừng)","99","1","KS + Đội trưởng","GĐ + Chủ nhà (mời)","BB nghiệm thu + checklist 9 mục","KS","-","KS","• Checklist giai đoạn 5 (9 mục)
+• Gõ toàn bộ viên - không rỗng
+• Lưu gạch dự phòng 5%","true","52","nha_pho_1t1l"
+"7.01","P7_SON_BA","Bả matit trần + tường - lớp 1","100","2","Đội sơn","KS","Bột bả matit (nội thất), giấy nhám","KS","GĐ mua","KS","• Bề mặt trước bả: sạch bụi, khô
+• Bả đều, không để lõm lớn
+• Khô mới bả lớp sau","false","53","nha_pho_1t1l"
+"7.02","P7_SON_BA","Bả matit lớp 2 + xả nhám tinh","102","2","Đội sơn","KS","Bột bả + giấy nhám P180/P240","KS","GĐ mua","KS","• Xả nhám mịn, không xước sâu
+• Kiểm tra bằng đèn rọi nghiêng
+• Vệ sinh bụi sạch trước sơn","false","54","nha_pho_1t1l"
+"7.03","P7_SON_BA","Sơn lót","104","1","Đội sơn","KS","Sơn lót nội thất (chủ nhà chọn brand)","KS","Chủ nhà/GĐ mua","KS","• 1 lớp lót đủ che màu
+• Đều, không vệt
+• Khô tối thiểu 4h mới sơn phủ","false","55","nha_pho_1t1l"
+"7.04","P7_SON_BA","Sơn phủ nội thất lớp 1","105","2","Đội sơn","KS","Sơn nước nội thất (chủ nhà chọn màu)","KS","Chủ nhà/GĐ mua","KS","• Đều, không vệt cọ
+• Đi theo chiều từ cao xuống thấp
+• Dán băng keo ranh giới màu","false","56","nha_pho_1t1l"
+"7.05","P7_SON_BA","Sơn phủ nội thất lớp 2 (hoàn thiện)","107","2","Đội sơn","KS","Sơn nước (cùng màu lớp 1)","KS","-","KS","• Đều màu, không loang
+• Không vệt, không chảy
+• Lưu 1 hộp sơn mỗi màu cho chủ nhà","false","57","nha_pho_1t1l"
+"7.06","P7_SON_BA","Sơn ngoại thất","107","3","Đội sơn","KS","Sơn ngoại thất (chống thời tiết)","KS","Chủ nhà/GĐ mua","KS","• Đều, không vệt
+• Phủ kín chân tường
+• Dán bảo vệ khung cửa, gạch","false","58","nha_pho_1t1l"
+"7.07","P7_SON_BA","NGHIỆM THU SƠN","110","1","KS","KS + Chủ nhà","BB nghiệm thu + checklist 8 mục","KS","-","KS","• Checklist giai đoạn 6
+• Chụp ảnh rọi đèn nghiêng
+• Touch-up ngay nếu phát hiện lỗi","true","59","nha_pho_1t1l"
+"8.01","P8_LAP_TB","Lắp cửa đi + cửa sổ + khung cửa","111","2","Đội lắp cửa","KS","Cửa nhôm/gỗ (chủ nhà chọn), bản lề, khóa, silicon","KS","Chủ nhà mua","KS","• Mở đóng êm, không kẹt
+• Khóa hoạt động
+• Silicon viền kín, không hở
+• Không cong vênh","false","60","nha_pho_1t1l"
+"8.02","P8_LAP_TB","Lắp tay vịn cầu thang + lan can ban công","112","2","Đội lắp cửa/sắt","KS","Tay vịn (inox/gỗ), lan can (chủ nhà chọn)","KS","Chủ nhà mua","KS","• Chắc, không rung lắc
+• Cao ≥900mm tay vịn, ≥1100mm lan can
+• Khoảng cách thanh đứng ≤110mm (an toàn trẻ)","false","61","nha_pho_1t1l"
+"8.03","P8_LAP_TB","Lắp thiết bị điện (công tắc, ổ cắm, đèn, tủ điện)","113","2","Đội điện nước","KS","Công tắc, ổ cắm, đèn (chủ nhà chọn), MCB, tủ điện","KS","Chủ nhà mua","KS","• Phẳng tường, bắt vít chắc
+• Test từng mạch có điện
+• Dán nhãn từng CB
+• Tủ điện gọn, dây rõ ràng","false","62","nha_pho_1t1l"
+"8.04","P8_LAP_TB","Lắp thiết bị vệ sinh (bồn cầu, lavabo, vòi, sen)","114","2","Đội điện nước","KS","Bồn cầu, lavabo, vòi, sen (chủ nhà chọn), silicon","KS","Chủ nhà mua","KS","• Không rò rỉ
+• Xả nước mạnh
+• Silicon đều, kín
+• Gắn chắc, không lắc
+• Test nóng-lạnh (nếu có)","false","63","nha_pho_1t1l"
+"8.05","P8_LAP_TB","Lắp thiết bị bếp (nếu có trong gói)","115","1","Đội điện nước","KS","Bếp, máy hút mùi, bồn rửa (chủ nhà mua)","KS","Chủ nhà mua","KS","• Bồn rửa thoát tốt, silicon kín
+• Bếp gas/điện test hoạt động
+• Hút mùi chạy êm","false","64","nha_pho_1t1l"
+"8.06","P8_LAP_TB","Test toàn bộ hệ thống (điện + nước + thiết bị)","116","1","KS + Đội ĐN","KS","Đồng hồ đo điện, đồng hồ nước","KS","-","KS","• Bật từng CB: đèn nào, ổ nào sáng
+• Mở từng vòi: nước chảy, không rò
+• Xả WC, xả sàn - thoát hết
+• Ghi số công tơ","false","65","nha_pho_1t1l"
+"9.01","P9_BAN_GIAO","Vệ sinh công nghiệp toàn công trình","117","1","Team vệ sinh (thuê)","KS","Dịch vụ vệ sinh chuyên nghiệp (~1.5-2.5 triệu)","KS","GĐ","KS","• Lau kính, cửa
+• Tẩy vết sơn, xi măng khỏi sàn gạch
+• Hút bụi, lau sàn toàn nhà
+• Dọn rác công trường","false","66","nha_pho_1t1l"
+"9.02","P9_BAN_GIAO","KS đi kiểm lỗi - lập snag list nội bộ","118","1","KS + GĐ","KS","Giấy, bút, máy ảnh, checklist BM07","KS","-","KS","• Đi từng phòng, chi tiết
+• Ghi mọi lỗi (dù nhỏ)
+• Chụp ảnh đánh dấu
+• Giao thầu phụ sửa","false","67","nha_pho_1t1l"
+"9.03","P9_BAN_GIAO","Thầu phụ sửa snag list","118","2","Các đội thầu phụ","KS","Vật tư lẻ theo lỗi (sơn touch-up, silicon...)","KS","GĐ","KS","• Sửa 100% lỗi trong list
+• KS verify từng mục
+• Không bỏ sót mục nào","false","68","nha_pho_1t1l"
+"9.04","P9_BAN_GIAO","NGHIỆM THU TỔNG THỂ + BÀN GIAO CHỦ NHÀ","119","1","GĐ + KS + Chủ nhà","GĐ + Chủ nhà (CHÍNH THỨC)","Biên bản bàn giao BM07, chìa khóa, hồ sơ hoàn công","GĐ","-","GĐ","• Đi từng phòng cùng chủ nhà (~2 tiếng)
+• Bàn giao đủ hồ sơ (bản vẽ, bảo hành, SĐT)
+• Ký biên bản 3 bản
+• Nhận đợt thanh toán cuối","true","69","nha_pho_1t1l"
