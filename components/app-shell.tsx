@@ -20,20 +20,24 @@ type MenuItem = {
 const ROLE_MENUS: Record<string, MenuItem[]> = {
   admin: [
     { label: "Dashboard", href: "/" },
+    { label: "Hồ sơ", href: "/profile" },
     { label: "Dự án", href: "/projects" },
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/templates" },
   ],
   engineer: [
     { label: "Dashboard", href: "/" },
+    { label: "Hồ sơ", href: "/profile" },
     { label: "Dự án của tôi", href: "/projects" },
   ],
   foreman: [
     { label: "Dashboard", href: "/" },
+    { label: "Hồ sơ", href: "/profile" },
     { label: "Công việc của đội", href: "/projects" },
   ],
   accountant: [
     { label: "Dashboard", href: "/" },
+    { label: "Hồ sơ", href: "/profile" },
     { label: "Dự án", href: "/projects" },
     { label: "Thanh toán", href: "/payments" },
   ],
