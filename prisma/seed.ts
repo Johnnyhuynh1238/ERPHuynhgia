@@ -264,18 +264,6 @@ async function seedDemoProject(userIds: { adminId: string; engineerId: string; f
         roleInProject: ProjectMemberRole.engineer,
         addedBy: userIds.adminId,
       },
-      {
-        projectId: project.id,
-        userId: userIds.foremanId,
-        roleInProject: ProjectMemberRole.foreman,
-        addedBy: userIds.adminId,
-      },
-      {
-        projectId: project.id,
-        userId: userIds.accountantId,
-        roleInProject: ProjectMemberRole.accountant,
-        addedBy: userIds.adminId,
-      },
     ],
   });
 

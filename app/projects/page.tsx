@@ -1,9 +1,13 @@
 import { ProtectedLayout } from "@/components/protected-layout";
+import { getCurrentUser } from "@/lib/auth-helpers";
+import { ProjectsClient } from "./_components/projects-client";
 
-export default function ProjectsPage() {
+export default async function ProjectsPage() {
+  const user = await getCurrentUser();
+
   return (
     <ProtectedLayout>
-      <h1 className="text-xl font-semibold text-[#1F4E79]">Dự án</h1>
+      <ProjectsClient currentRole={(user?.role as string) || ""} />
     </ProtectedLayout>
   );
 }
