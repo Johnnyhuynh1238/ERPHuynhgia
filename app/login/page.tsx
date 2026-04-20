@@ -1,68 +1,32 @@
-"use client";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { LoginForm } from "./_components/login-form";
 
-import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
+type LoginPageProps = {
+  searchParams?: {
+    callbackUrl?: string;
+    error?: string;
+  };
+};
 
-export default function LoginPage() {
-  const [email, setEmail] = useState("admin@congty.vn");
-  const [password, setPassword] = useState("ChangeMe@2026");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const params = useSearchParams();
-  const router = useRouter();
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const session = await auth();
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const callbackUrl = params.get("callbackUrl") || "/";
-
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
-
-    setLoading(false);
-
-    if (!res || res.error) {
-      setError("Email hoặc mật khẩu không đúng");
-      return;
-    }
-
-    router.push(res.url || callbackUrl);
+  if (session?.user) {
+    redirect("/");
   }
+
+  const callbackUrl = searchParams?.callbackUrl || "/";
+  const hasCredentialError = searchParams?.error === "CredentialsSignin";
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md items-center px-4">
-      <form onSubmit={onSubmit} className="w-full rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="mb-4 text-xl font-semibold text-[#1F4E79]">Đăng nhập ERP Huỳnh Gia</h1>
+      <div className="w-full rounded-xl border bg-white p-6 shadow-sm">
+        <h1 className="mb-2 text-xl font-semibold text-[#1F4E79]">Đăng nhập ERP Huỳnh Gia</h1>
+        <p className="mb-6 text-sm text-slate-500">Nhập email và mật khẩu để vào hệ thống.</p>
 
-        <label className="mb-1 block text-sm">Email</label>
-        <input
-          className="mb-3 w-full rounded-md border px-3 py-2 text-sm"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <label className="mb-1 block text-sm">Mật khẩu</label>
-        <input
-          type="password"
-          className="mb-4 w-full rounded-md border px-3 py-2 text-sm"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        {error ? <div className="mb-3 text-sm text-red-600">{error}</div> : null}
-
-        <Button type="submit" disabled={loading} className="w-full bg-[#1F4E79] hover:bg-[#163a5b]">
-          {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-        </Button>
-      </form>
+        <LoginForm callbackUrl={callbackUrl} hasCredentialError={hasCredentialError} />
+      </div>
     </div>
   );
 }
