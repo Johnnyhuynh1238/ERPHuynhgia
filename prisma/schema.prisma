@@ -133,6 +133,7 @@ model TaskTemplate {
   isMilestone         Boolean   @default(false) @map("is_milestone")
   displayOrder        Int       @map("display_order")
   templateCategory    String    @map("template_category")
+  isActive            Boolean   @default(true) @map("is_active")
   createdAt           DateTime  @default(now()) @map("created_at")
 
   tasks Task[]
