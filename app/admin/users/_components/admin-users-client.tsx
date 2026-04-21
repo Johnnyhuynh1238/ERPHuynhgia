@@ -9,7 +9,7 @@ type UserItem = {
   fullName: string;
   email: string;
   phone: string | null;
-  role: "admin" | "engineer" | "foreman" | "accountant";
+  role: "admin" | "engineer" | "foreman" | "accountant" | "construction_manager";
   isActive: boolean;
   mustChangePassword: boolean;
   createdAt: string;
@@ -28,6 +28,7 @@ const roleLabel: Record<UserItem["role"], string> = {
   engineer: "KS",
   foreman: "Đội trưởng",
   accountant: "Kế toán",
+  construction_manager: "Trưởng phòng thi công",
 };
 
 const roleBadgeClass: Record<UserItem["role"], string> = {
@@ -35,6 +36,7 @@ const roleBadgeClass: Record<UserItem["role"], string> = {
   engineer: "bg-blue-100 text-blue-700",
   foreman: "bg-amber-100 text-amber-700",
   accountant: "bg-emerald-100 text-emerald-700",
+  construction_manager: "bg-purple-100 text-purple-700",
 };
 
 function formatDate(dateIso: string) {
@@ -299,6 +301,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
             <option value="engineer">KS</option>
             <option value="foreman">Đội trưởng</option>
             <option value="accountant">Kế toán</option>
+            <option value="construction_manager">Trưởng phòng thi công</option>
           </select>
 
           <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -442,6 +445,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 <option value="engineer">KS</option>
                 <option value="foreman">Đội trưởng</option>
                 <option value="accountant">Kế toán</option>
+                <option value="construction_manager">Trưởng phòng thi công</option>
               </select>
 
               <div className="space-y-2">
@@ -514,6 +518,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 <option value="engineer">KS</option>
                 <option value="foreman">Đội trưởng</option>
                 <option value="accountant">Kế toán</option>
+                <option value="construction_manager">Trưởng phòng thi công</option>
               </select>
 
               <select

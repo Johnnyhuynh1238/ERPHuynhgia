@@ -11,6 +11,7 @@ enum UserRole {
   engineer
   foreman
   accountant
+  construction_manager
 }
 
 enum ProjectStatus {
@@ -59,6 +60,7 @@ enum ProjectMemberRole {
   engineer
   foreman
   accountant
+  construction_manager
 }
 
 model User {
@@ -144,7 +146,7 @@ model TaskTemplate {
 model Task {
   id                 String     @id @default(uuid()) @db.Uuid
   projectId          String     @map("project_id") @db.Uuid
-  templateId         String     @map("template_id") @db.Uuid
+  templateId         String?    @map("template_id") @db.Uuid
   code               String
   phase              TaskPhase
   name               String
@@ -159,22 +161,28 @@ model Task {
   team               String?    @map("team")
   inspectorName      String     @map("inspector_name")
   materialsNeeded    String     @map("materials_needed") @db.Text
+  proposerRole       String     @map("proposer_role")
+  ordererRole        String     @map("orderer_role")
+  receiverRole       String     @map("receiver_role")
   qcChecklist        String     @map("qc_checklist") @db.Text
   isMilestone        Boolean    @default(false) @map("is_milestone")
   status             TaskStatus @default(not_started)
+  isActive           Boolean    @default(true) @map("is_active")
+  displayOrder       Int?       @map("display_order")
   notes              String?    @db.Text
   qcProgress         Json?      @map("qc_progress")
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
-  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  template         TaskTemplate @relation(fields: [templateId], references: [id])
-  assignedEngineer User?        @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
-  assignedForeman  User?        @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template         TaskTemplate? @relation(fields: [templateId], references: [id])
+  assignedEngineer User?         @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
+  assignedForeman  User?         @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
   taskLogs         TaskLog[]
   taskPhotos       TaskPhoto[]
 
-  @@index([projectId, phase, code])
+  @@unique([projectId, code])
+  @@index([projectId, isActive, displayOrder, code])
   @@index([status])
   @@map("tasks")
 }

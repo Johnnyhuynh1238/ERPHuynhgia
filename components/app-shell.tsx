@@ -23,7 +23,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ", href: "/profile" },
     { label: "Dự án", href: "/projects" },
     { label: "User", href: "/admin/users" },
-    { label: "Template", href: "/templates" },
+    { label: "Template", href: "/admin/templates" },
   ],
   engineer: [
     { label: "Dashboard", href: "/" },
@@ -40,6 +40,10 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ", href: "/profile" },
     { label: "Dự án", href: "/projects" },
     { label: "Thanh toán", href: "/payments" },
+  ],
+  construction_manager: [
+    { label: "Dashboard", href: "/" },
+    { label: "Dự án", href: "/projects" },
   ],
 };
 
@@ -99,13 +103,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/dev-smoke-test"
-              onClick={() => setOpenSidebar(false)}
-              className="block rounded-md px-3 py-2 text-xs text-slate-500 hover:bg-slate-100"
-            >
-              Dev smoke test
-            </Link>
+
           </nav>
         </aside>
 

@@ -77,11 +77,15 @@ export async function GET(request: Request) {
   const managerFilter = searchParams.get("projectManagerId") || "";
   const engineerFilter = searchParams.get("mainEngineerId") || "";
 
-  const isAdminLike = user.role === UserRole.admin || user.role === UserRole.accountant;
+  const canViewAllProjects =
+    user.role === UserRole.admin ||
+    user.role === UserRole.accountant ||
+    user.role === UserRole.construction_manager;
+  const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
 
   const andClauses: Prisma.ProjectWhereInput[] = [];
 
-  if (!isAdminLike) {
+  if (!canViewAllProjects) {
     andClauses.push({
       OR: [
         { projectManagerId: user.id },
@@ -112,11 +116,11 @@ export async function GET(request: Request) {
     andClauses.push({ status: statusFilter });
   }
 
-  if (isAdminLike && managerFilter) {
+  if (canViewAllProjects && managerFilter) {
     andClauses.push({ projectManagerId: managerFilter });
   }
 
-  if (isAdminLike && engineerFilter) {
+  if (canViewAllProjects && engineerFilter) {
     andClauses.push({ mainEngineerId: engineerFilter });
   }
 
@@ -152,6 +156,7 @@ export async function GET(request: Request) {
       by: ["projectId"],
       where: {
         projectId: { in: ids },
+        isActive: true,
         status: TaskStatus.inspected,
       },
       _count: { projectId: true },
@@ -160,6 +165,7 @@ export async function GET(request: Request) {
       by: ["projectId"],
       where: {
         projectId: { in: ids },
+        isActive: true,
         NOT: { status: TaskStatus.na },
       },
       _count: { projectId: true },
@@ -181,7 +187,7 @@ export async function GET(request: Request) {
       customerName: p.customerName,
       customerPhone: p.customerPhone,
       address: p.address,
-      contractValue: isAdminLike ? Number(p.contractValue) : null,
+      contractValue: canViewFinancial ? Number(p.contractValue) : null,
       startDate: p.startDate,
       expectedEndDate: p.expectedEndDate,
       status: p.status,
@@ -196,7 +202,7 @@ export async function GET(request: Request) {
     mainEngineers: [] as { id: string; fullName: string }[],
   };
 
-  if (isAdminLike) {
+  if (canViewAllProjects) {
     const [projectManagers, mainEngineers] = await Promise.all([
       prisma.user.findMany({
         where: { role: UserRole.admin, isActive: true },
@@ -228,7 +234,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let adminUser;
   try {
-    adminUser = await requireRole([UserRole.admin]);
+    adminUser = await requireRole(["admin"]);
   } catch (error) {
     const mapped = mapAuthError(error instanceof Error ? error.message : "UNKNOWN");
     return mapped || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
@@ -341,11 +347,17 @@ export async function POST(request: Request) {
             actualEndDate: null,
             assignedEngineerId: parsed.data.mainEngineerId,
             assignedForemanId: null,
+            team: template.defaultTeam,
             inspectorName: template.defaultInspector,
             materialsNeeded: template.materialsNeeded,
+            proposerRole: template.proposerRole,
+            ordererRole: template.ordererRole,
+            receiverRole: template.receiverRole,
             qcChecklist: template.qcChecklist,
             isMilestone: template.isMilestone,
             status: TaskStatus.not_started,
+            isActive: true,
+            displayOrder: template.displayOrder,
             notes: null,
           };
         }),

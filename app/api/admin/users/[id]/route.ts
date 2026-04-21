@@ -25,7 +25,7 @@ function mapAuthError(error: unknown) {
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   let adminUser;
   try {
-    adminUser = await requireRole([UserRole.admin]);
+    adminUser = await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-helpers";
 
@@ -16,7 +15,7 @@ function mapAuthError(error: unknown) {
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

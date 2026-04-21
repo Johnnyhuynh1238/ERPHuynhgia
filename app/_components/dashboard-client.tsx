@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
 
-type Role = "admin" | "engineer" | "foreman" | "accountant";
+type Role = "admin" | "engineer" | "foreman" | "accountant" | "construction_manager";
 
 type TaskLite = {
   id: string;
@@ -104,6 +104,9 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     admin_delayed: <ShieldAlert className="h-4 w-4" />,
     admin_in_progress: <Hammer className="h-4 w-4" />,
     admin_payment_due: <DollarSign className="h-4 w-4" />,
+    cm_projects: <FolderKanban className="h-4 w-4" />,
+    cm_delayed: <ShieldAlert className="h-4 w-4" />,
+    cm_in_progress: <Hammer className="h-4 w-4" />,
     engineer_today: <ListTodo className="h-4 w-4" />,
     engineer_delayed: <AlertTriangle className="h-4 w-4" />,
     engineer_next3: <Clock3 className="h-4 w-4" />,
@@ -133,7 +136,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         ))}
       </div>
 
-      {data.role === "admin" ? (
+      {data.role === "admin" || data.role === "construction_manager" ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>

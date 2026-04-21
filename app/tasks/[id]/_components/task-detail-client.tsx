@@ -6,7 +6,6 @@ import { useDropzone } from "react-dropzone";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/vi";
-import { TaskStatus } from "@prisma/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PHASE_COLOR, PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
@@ -20,7 +19,7 @@ type TaskDetail = {
   phase: keyof typeof PHASE_LABEL;
   name: string;
   isMilestone: boolean;
-  status: TaskStatus;
+  status: "not_started" | "in_progress" | "done" | "inspected" | "delayed" | "na";
   plannedStartDate: string;
   plannedEndDate: string;
   actualStartDate: string | null;
@@ -118,7 +117,7 @@ export function TaskDetailClient({
   const [logs, setLogs] = useState<TaskLog[]>(initialLogs);
   const [photos, setPhotos] = useState<TaskPhoto[]>(initialPhotos);
 
-  const [status, setStatus] = useState<TaskStatus>(initialTask.status);
+  const [status, setStatus] = useState<TaskDetail["status"]>(initialTask.status);
   const [naReason, setNaReason] = useState("");
   const [note, setNote] = useState("");
 
@@ -146,24 +145,29 @@ export function TaskDetailClient({
 
   const canChangeStatus =
     currentUserRole === "admin" ||
+    currentUserRole === "construction_manager" ||
     currentUserId === task.project.projectManagerId ||
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id ||
     currentUserId === task.assignedForeman?.id;
 
-  const canInspect = currentUserRole === "admin" || currentUserId === task.project.mainEngineerId;
+  const canInspect =
+    currentUserRole === "admin" ||
+    currentUserRole === "construction_manager" ||
+    currentUserId === task.project.mainEngineerId;
   const canEditDates =
     currentUserRole === "admin" ||
-    currentUserId === task.project.mainEngineerId ||
-    currentUserId === task.assignedEngineer?.id ||
-    currentUserId === task.assignedForeman?.id;
-  const canAssign = currentUserRole === "admin";
+    currentUserRole === "construction_manager" ||
+    currentUserId === task.project.projectManagerId;
+  const canAssign = currentUserRole === "admin" || currentUserRole === "construction_manager";
   const canUpdateQc =
     currentUserRole === "admin" ||
+    currentUserRole === "construction_manager" ||
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id;
   const canUploadPhoto =
     currentUserRole === "admin" ||
+    currentUserRole === "construction_manager" ||
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id ||
     currentUserId === task.assignedForeman?.id;
@@ -187,7 +191,7 @@ export function TaskDetailClient({
   }
 
   async function submitStatus() {
-    if (status === TaskStatus.na && !naReason.trim()) {
+    if (status === "na" && !naReason.trim()) {
       toast.error("Vui lòng nhập lý do khi chuyển NA");
       return;
     }
@@ -484,7 +488,7 @@ export function TaskDetailClient({
           <div className="rounded-xl border bg-white p-4">
             <h3 className="mb-3 font-semibold">Section E - Đổi trạng thái</h3>
             <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
-              <select className="rounded border px-3 py-2 text-sm" disabled={!canChangeStatus} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
+              <select className="rounded border px-3 py-2 text-sm" disabled={!canChangeStatus} value={status} onChange={(e) => setStatus(e.target.value as TaskDetail["status"])}>
                 {Object.entries(STATUS_LABEL).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
@@ -499,8 +503,8 @@ export function TaskDetailClient({
                 onChange={(e) => setNaReason(e.target.value)}
               />
             </div>
-            {!canInspect && status === TaskStatus.inspected ? (
-              <p className="mt-2 text-xs text-red-600">Chỉ admin hoặc KS chính mới được nghiệm thu.</p>
+            {!canInspect && status === "inspected" ? (
+              <p className="mt-2 text-xs text-red-600">Chỉ admin, trưởng phòng thi công hoặc KS chính mới được nghiệm thu.</p>
             ) : null}
             {canChangeStatus ? (
               <Button className="mt-3 bg-[#1F4E79] hover:bg-[#163a5b]" onClick={submitStatus}>

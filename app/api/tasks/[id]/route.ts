@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { TaskLogType, TaskStatus, UserRole } from "@prisma/client";
+import { TaskLogType, TaskPhase, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
@@ -12,7 +12,7 @@ import {
 } from "@/lib/task-permissions";
 
 const patchSchema = z.object({
-  section: z.enum(["status", "dates", "assignment", "qc"]),
+  section: z.enum(["status", "dates", "assignment", "qc", "meta"]),
   payload: z.record(z.string(), z.any()),
 });
 
@@ -38,10 +38,31 @@ const qcSchema = z.object({
   checkedIndexes: z.array(z.number()),
 });
 
+const metaSchema = z.object({
+  name: z.string().trim().min(3).optional(),
+  phase: z.nativeEnum(TaskPhase).optional(),
+  offsetDays: z.number().int().min(0).optional(),
+  durationDays: z.number().int().min(1).optional(),
+  team: z.string().trim().nullable().optional(),
+  inspectorName: z.string().trim().min(1).optional(),
+  materialsNeeded: z.string().trim().min(1).optional(),
+  qcChecklist: z.string().trim().min(1).optional(),
+  isMilestone: z.boolean().optional(),
+  proposerRole: z.string().trim().min(1).optional(),
+  ordererRole: z.string().trim().min(1).optional(),
+  receiverRole: z.string().trim().min(1).optional(),
+});
+
 function normalizeDate(raw: string | null | undefined) {
   if (!raw) return null;
   const [year, month, day] = raw.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+function addDays(baseDate: Date, offsetDays: number) {
+  const d = new Date(baseDate);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d;
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -155,7 +176,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     if (payload.data.status === TaskStatus.inspected && !canInspectTask(task, { id: user.id, role: user.role })) {
-      return NextResponse.json({ message: "Chỉ admin hoặc KS chính mới được nghiệm thu" }, { status: 403 });
+      return NextResponse.json({ message: "Chỉ admin, trưởng phòng thi công hoặc KS chính mới được nghiệm thu" }, { status: 403 });
     }
 
     const naReason = (payload.data.notes || payload.data.note || "").trim();
@@ -215,8 +236,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (parsed.data.section === "assignment") {
-    if (user.role !== UserRole.admin) {
-      return NextResponse.json({ message: "Chỉ admin được phép sửa phân công" }, { status: 403 });
+    if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager) {
+      return NextResponse.json({ message: "Chỉ admin hoặc trưởng phòng thi công được phép sửa phân công" }, { status: 403 });
     }
 
     const payload = assignmentSchema.safeParse(parsed.data.payload);
@@ -246,6 +267,63 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ task: updated, message: "Đã cập nhật phân công" });
   }
 
+  if (parsed.data.section === "meta") {
+    if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager) {
+      return NextResponse.json({ message: "Không có quyền sửa thông tin task" }, { status: 403 });
+    }
+
+    const payload = metaSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu task không hợp lệ" }, { status: 400 });
+    }
+
+    const offsetDays = payload.data.offsetDays ?? task.offsetDays;
+    const durationDays = payload.data.durationDays ?? task.durationDays;
+
+    const project = await prisma.project.findUnique({
+      where: { id: task.projectId },
+      select: { id: true, startDate: true },
+    });
+
+    if (!project) {
+      return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+    }
+
+    const plannedStartDate = addDays(project.startDate, offsetDays);
+    const plannedEndDate = addDays(plannedStartDate, durationDays - 1);
+
+    const updated = await prisma.task.update({
+      where: { id: params.id },
+      data: {
+        name: payload.data.name ?? task.name,
+        phase: payload.data.phase ?? task.phase,
+        offsetDays,
+        durationDays,
+        plannedStartDate,
+        plannedEndDate,
+        team: payload.data.team === undefined ? task.team : payload.data.team,
+        inspectorName: payload.data.inspectorName ?? task.inspectorName,
+        materialsNeeded: payload.data.materialsNeeded ?? task.materialsNeeded,
+        qcChecklist: payload.data.qcChecklist ?? task.qcChecklist,
+        isMilestone: payload.data.isMilestone ?? task.isMilestone,
+        proposerRole: payload.data.proposerRole ?? task.proposerRole,
+        ordererRole: payload.data.ordererRole ?? task.ordererRole,
+        receiverRole: payload.data.receiverRole ?? task.receiverRole,
+      },
+    });
+
+    await prisma.taskLog.create({
+      data: {
+        taskId: task.id,
+        userId: user.id,
+        logType: TaskLogType.note,
+        content: "Đã sửa thông tin task",
+      },
+    });
+
+    return NextResponse.json({ task: updated, message: "Đã cập nhật thông tin task" });
+  }
+
   const payload = qcSchema.safeParse(parsed.data.payload);
   if (!payload.success) {
     return NextResponse.json({ message: "Dữ liệu checklist không hợp lệ" }, { status: 400 });
@@ -265,4 +343,46 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   });
 
   return NextResponse.json({ task: updated, message: "Đã cập nhật checklist" });
+}
+
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  const { task, allowed } = await getTaskWithAccess(params.id, { id: user.id, role: user.role });
+  if (!task) {
+    return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
+  }
+  if (!allowed) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager) {
+    return NextResponse.json({ message: "Không có quyền xóa task" }, { status: 403 });
+  }
+
+  if (!task.isActive) {
+    return NextResponse.json({ message: "Task đã bị xóa trước đó" }, { status: 400 });
+  }
+
+  await prisma.task.update({
+    where: { id: task.id },
+    data: {
+      isActive: false,
+      displayOrder: null,
+    },
+  });
+
+  await prisma.taskLog.create({
+    data: {
+      taskId: task.id,
+      userId: user.id,
+      logType: TaskLogType.note,
+      content: "Đã xóa task khỏi tiến độ dự án",
+    },
+  });
+
+  return NextResponse.json({ message: "Đã xóa task" });
 }

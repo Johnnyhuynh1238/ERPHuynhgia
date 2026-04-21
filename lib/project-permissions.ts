@@ -1,7 +1,10 @@
 import { Prisma, UserRole } from "@prisma/client";
 
 export function buildProjectAccessWhere(user: { id: string; role: string }): Prisma.ProjectWhereInput {
-  const isAdminLike = user.role === UserRole.admin || user.role === UserRole.accountant;
+  const isAdminLike =
+    user.role === UserRole.admin ||
+    user.role === UserRole.accountant ||
+    user.role === UserRole.construction_manager;
 
   if (isAdminLike) {
     return {};

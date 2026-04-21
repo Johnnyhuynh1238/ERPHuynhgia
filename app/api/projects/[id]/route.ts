@@ -88,7 +88,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN";
     if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });

@@ -16,7 +16,7 @@ function mapAuthError(error: unknown) {
 
 export async function GET() {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

@@ -39,11 +39,12 @@ export async function GET() {
       prisma.project.count({ where: { status: "in_progress" } }),
       prisma.task.count({
         where: {
+          isActive: true,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
           plannedEndDate: { lt: today },
         },
       }),
-      prisma.task.count({ where: { status: TaskStatus.in_progress } }),
+      prisma.task.count({ where: { isActive: true, status: TaskStatus.in_progress } }),
       prisma.paymentSchedule.count({
         where: {
           status: PaymentStatus.not_collected,
@@ -52,6 +53,7 @@ export async function GET() {
       }),
       prisma.task.findMany({
         where: {
+          isActive: true,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
           plannedEndDate: { lt: today },
         },
@@ -88,6 +90,7 @@ export async function GET() {
     const [todayTasks, delayedTasks, next3Tasks, projectsCount, upcomingMilestones] = await Promise.all([
       prisma.task.findMany({
         where: {
+          isActive: true,
           assignedEngineerId: user.id,
           plannedStartDate: { lte: today },
           plannedEndDate: { gte: today },
@@ -99,12 +102,14 @@ export async function GET() {
         where: {
           assignedEngineerId: user.id,
           plannedEndDate: { lt: today },
+          isActive: true,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
         },
         include: { project: { select: { id: true, code: true, name: true } } },
       }),
       prisma.task.findMany({
         where: {
+          isActive: true,
           assignedEngineerId: user.id,
           plannedStartDate: { gt: today, lte: in3Days },
         },
@@ -117,6 +122,7 @@ export async function GET() {
       }),
       prisma.task.findMany({
         where: {
+          isActive: true,
           assignedEngineerId: user.id,
           isMilestone: true,
           plannedStartDate: { gte: today, lte: in7Days },
@@ -146,6 +152,7 @@ export async function GET() {
     const [weekTasks, milestoneSoon] = await Promise.all([
       prisma.task.findMany({
         where: {
+          isActive: true,
           assignedForemanId: user.id,
           plannedStartDate: { gte: today, lte: in7Days },
         },
@@ -154,6 +161,7 @@ export async function GET() {
       }),
       prisma.task.findMany({
         where: {
+          isActive: true,
           assignedForemanId: user.id,
           isMilestone: true,
           plannedStartDate: { gte: today, lte: in7Days },
@@ -182,6 +190,51 @@ export async function GET() {
         weekTasks,
         upcomingMilestones: milestoneSoon,
         materialsCount: materialsSet.size,
+      },
+    });
+  }
+
+  if (user.role === UserRole.construction_manager) {
+    const [projectInProgress, totalDelayed, inProgressToday, delayedTasks, recentProjects] = await Promise.all([
+      prisma.project.count({ where: { status: "in_progress" } }),
+      prisma.task.count({
+        where: {
+          isActive: true,
+          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+          plannedEndDate: { lt: today },
+        },
+      }),
+      prisma.task.count({ where: { isActive: true, status: TaskStatus.in_progress } }),
+      prisma.task.findMany({
+        where: {
+          isActive: true,
+          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+          plannedEndDate: { lt: today },
+        },
+        include: {
+          project: { select: { id: true, code: true, name: true } },
+          assignedEngineer: { select: { id: true, fullName: true } },
+        },
+        orderBy: { plannedEndDate: "desc" },
+        take: 10,
+      }),
+      prisma.project.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, code: true, name: true, createdAt: true },
+      }),
+    ]);
+
+    return NextResponse.json({
+      role: user.role,
+      cards: [
+        { key: "cm_projects", label: "Dự án đang thi công", value: projectInProgress, tone: "good" },
+        { key: "cm_delayed", label: "Task trễ toàn hệ thống", value: totalDelayed, tone: totalDelayed > 0 ? "danger" : "good" },
+        { key: "cm_in_progress", label: "Task đang làm", value: inProgressToday, tone: "info" },
+      ],
+      admin: {
+        delayedTasks,
+        recentProjects,
       },
     });
   }

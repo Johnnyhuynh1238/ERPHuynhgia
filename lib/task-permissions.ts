@@ -5,15 +5,55 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 type UserCtx = { id: string; role: string };
 
 type TaskCtx = {
+  id: string;
+  projectId: string;
   assignedEngineerId: string | null;
   assignedForemanId: string | null;
+  isActive: boolean;
+  actualStartDate: Date | null;
+  actualEndDate: Date | null;
+  status: string;
+  notes: string | null;
+  team: string | null;
+  inspectorName: string;
+  name: string;
+  phase: string;
+  offsetDays: number;
+  durationDays: number;
+  qcChecklist: string;
+  materialsNeeded: string;
+  isMilestone: boolean;
+  proposerRole: string;
+  ordererRole: string;
+  receiverRole: string;
   project: { projectManagerId: string; mainEngineerId: string };
 };
 
 export async function getTaskWithAccess(taskId: string, user: UserCtx) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    include: {
+    select: {
+      id: true,
+      projectId: true,
+      assignedEngineerId: true,
+      assignedForemanId: true,
+      isActive: true,
+      actualStartDate: true,
+      actualEndDate: true,
+      status: true,
+      notes: true,
+      team: true,
+      inspectorName: true,
+      name: true,
+      phase: true,
+      offsetDays: true,
+      durationDays: true,
+      qcChecklist: true,
+      materialsNeeded: true,
+      isMilestone: true,
+      proposerRole: true,
+      ordererRole: true,
+      receiverRole: true,
       project: {
         select: {
           id: true,
@@ -47,7 +87,10 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
     return { task, allowed: false };
   }
 
-  const isAdminLike = user.role === UserRole.admin || user.role === UserRole.accountant;
+  const isAdminLike =
+    user.role === UserRole.admin ||
+    user.role === UserRole.accountant ||
+    user.role === UserRole.construction_manager;
   const isProjectOwner = user.id === task.project.projectManagerId || user.id === task.project.mainEngineerId;
 
   if (isAdminLike || isProjectOwner) {
@@ -58,30 +101,29 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
 }
 
 export function canChangeStatus(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin) return true;
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
   if (user.id === task.project.mainEngineerId || user.id === task.project.projectManagerId) return true;
   return task.assignedEngineerId === user.id || task.assignedForemanId === user.id;
 }
 
 export function canInspectTask(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin) return true;
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
   return user.id === task.project.mainEngineerId;
 }
 
 export function canEditActualDates(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin) return true;
-  if (user.id === task.project.mainEngineerId) return true;
-  return task.assignedEngineerId === user.id || task.assignedForemanId === user.id;
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
+  return user.id === task.project.projectManagerId;
 }
 
 export function canUpdateQc(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin) return true;
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
   if (user.id === task.project.mainEngineerId) return true;
   return task.assignedEngineerId === user.id;
 }
 
 export function canUploadPhoto(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin) return true;
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
   if (user.id === task.project.mainEngineerId) return true;
   return task.assignedEngineerId === user.id || task.assignedForemanId === user.id;
 }
