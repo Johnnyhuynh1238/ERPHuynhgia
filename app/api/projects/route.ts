@@ -46,14 +46,13 @@ function mapAuthError(message: string) {
 
 function addDays(baseDate: Date, offsetDays: number) {
   const d = new Date(baseDate);
-  d.setDate(d.getDate() + offsetDays);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
   return d;
 }
 
 function normalizeDateStart(raw: string) {
-  const date = new Date(raw);
-  date.setHours(0, 0, 0, 0);
-  return date;
+  const [year, month, day] = raw.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 }
 
 function parseProjectStatus(input: string | null) {

@@ -1,20 +1,58 @@
-import { ProtectedLayout } from "@/components/protected-layout";
+import { notFound, redirect } from "next/navigation";
+import { UserRole } from "@prisma/client";
+import { getCurrentUser } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { ProjectInfoClient } from "./_components/project-info-client";
 
-type ProjectDetailProps = {
-  params: {
-    id: string;
-  };
-};
+export default async function ProjectInfoPage({ params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    redirect("/login");
+  }
 
-export default function ProjectDetailPlaceholder({ params }: ProjectDetailProps) {
+  const accessWhere = buildProjectAccessWhere({ id: user.id, role: user.role });
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id: params.id,
+      ...accessWhere,
+    },
+    include: {
+      projectManager: {
+        select: { id: true, fullName: true, email: true },
+      },
+      mainEngineer: {
+        select: { id: true, fullName: true, email: true },
+      },
+    },
+  });
+
+  if (!project) {
+    const exists = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
+    if (!exists) notFound();
+    redirect("/projects?denied=1");
+  }
+
+  const [admins, engineers] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: UserRole.admin, isActive: true },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { role: UserRole.engineer, isActive: true },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: "asc" },
+    }),
+  ]);
+
   return (
-    <ProtectedLayout>
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Chi tiết dự án</h1>
-        <div className="rounded-lg border bg-white p-4 text-sm text-slate-600">
-          Trang chi tiết dự án ({params.id}) - sẽ build ở Bước 9.
-        </div>
-      </div>
-    </ProtectedLayout>
+    <ProjectInfoClient
+      project={JSON.parse(JSON.stringify(project))}
+      admins={admins}
+      engineers={engineers}
+      isAdmin={user.role === UserRole.admin}
+    />
   );
 }
