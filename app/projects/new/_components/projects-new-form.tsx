@@ -15,20 +15,18 @@ const formSchema = z.object({
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.coerce.number().min(1, "Diện tích phải > 0"),
-  unitPrice: z.coerce.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
+  areaM2: z.number().min(1, "Diện tích phải > 0"),
+  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   templateCategory: z.literal("nha_pho_1t1l"),
   projectManagerId: z.string().uuid("Vui lòng chọn GĐ quản lý"),
   mainEngineerId: z.string().uuid("Vui lòng chọn KS chính"),
-  members: z
-    .array(
-      z.object({
-        userId: z.string().uuid("Vui lòng chọn user"),
-        roleInProject: z.enum(["engineer", "foreman", "accountant"]),
-      }),
-    )
-    .default([]),
+  members: z.array(
+    z.object({
+      userId: z.string().uuid("Vui lòng chọn user"),
+      roleInProject: z.enum(["engineer", "foreman", "accountant"]),
+    }),
+  ),
 });
 
 type FormValues = z.infer<typeof formSchema>;

@@ -155,12 +155,14 @@ model Task {
   actualEndDate      DateTime?  @map("actual_end_date") @db.Date
   assignedEngineerId String?    @map("assigned_engineer_id") @db.Uuid
   assignedForemanId  String?    @map("assigned_foreman_id") @db.Uuid
+  team               String?    @map("team")
   inspectorName      String     @map("inspector_name")
   materialsNeeded    String     @map("materials_needed") @db.Text
   qcChecklist        String     @map("qc_checklist") @db.Text
   isMilestone        Boolean    @default(false) @map("is_milestone")
   status             TaskStatus @default(not_started)
   notes              String?    @db.Text
+  qcProgress         Json?      @map("qc_progress")
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 

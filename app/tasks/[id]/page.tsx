@@ -1,17 +1,102 @@
 import Link from "next/link";
-import { ProtectedLayout } from "@/components/protected-layout";
+import { notFound, redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import { getTaskWithAccess } from "@/lib/task-permissions";
+import { TaskDetailClient } from "./_components/task-detail-client";
 
-export default function TaskDetailPlaceholder({ params }: { params: { id: string } }) {
+export default async function TaskDetailPage({ params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    redirect("/login");
+  }
+
+  const { task, allowed } = await getTaskWithAccess(params.id, { id: user.id, role: user.role });
+
+  if (!task) {
+    notFound();
+  }
+
+  if (!allowed) {
+    redirect("/projects?denied=task");
+  }
+
+  const [detail, logs, photos, engineers, foremen] = await Promise.all([
+    prisma.task.findUnique({
+      where: { id: params.id },
+      include: {
+        project: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            projectManagerId: true,
+            mainEngineerId: true,
+          },
+        },
+        template: {
+          select: {
+            proposerRole: true,
+            ordererRole: true,
+            receiverRole: true,
+          },
+        },
+        assignedEngineer: { select: { id: true, fullName: true, email: true } },
+        assignedForeman: { select: { id: true, fullName: true, email: true } },
+      },
+    }),
+    prisma.taskLog.findMany({
+      where: { taskId: params.id },
+      include: {
+        user: { select: { id: true, fullName: true, email: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    prisma.taskPhoto.findMany({
+      where: { taskId: params.id },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.findMany({
+      where: { role: "engineer", isActive: true },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { role: "foreman", isActive: true },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: "asc" },
+    }),
+  ]);
+
+  if (!detail) notFound();
+
   return (
-    <ProtectedLayout>
-      <div className="space-y-3 rounded-xl border bg-white p-4">
-        <h1 className="text-xl font-semibold text-[#1F4E79]">Chi tiết task</h1>
-        <p className="text-sm text-slate-600">Task ID: {params.id}</p>
-        <p className="text-sm text-slate-600">Chi tiết task - sẽ build ở Bước 9.3.</p>
-        <Link href="/projects" className="text-sm text-[#1F4E79] underline">
-          Quay lại danh sách dự án
+    <div className="space-y-4">
+      <div className="text-sm text-slate-500">
+        <Link href={`/projects/${detail.project.id}`} className="hover:underline">
+          Dự án {detail.project.code}
         </Link>
+        <span className="mx-2">&gt;</span>
+        <Link href={`/projects/${detail.project.id}/tasks`} className="hover:underline">
+          Tiến độ
+        </Link>
+        <span className="mx-2">&gt;</span>
+        <span>Task {detail.code}</span>
       </div>
-    </ProtectedLayout>
+
+      <TaskDetailClient
+        initialTask={JSON.parse(JSON.stringify(detail))}
+        initialLogs={JSON.parse(JSON.stringify(logs))}
+        initialPhotos={JSON.parse(JSON.stringify(photos))}
+        engineers={engineers}
+        foremen={foremen}
+        currentUserId={user.id}
+        currentUserRole={user.role}
+      />
+    </div>
   );
 }
