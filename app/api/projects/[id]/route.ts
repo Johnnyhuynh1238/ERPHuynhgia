@@ -73,7 +73,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
 
-  return NextResponse.json({ project });
+  const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
+
+  return NextResponse.json({
+    project: canViewFinancial
+      ? project
+      : {
+          ...project,
+          unitPrice: null,
+          contractValue: null,
+        },
+  });
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {

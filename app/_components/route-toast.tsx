@@ -12,6 +12,11 @@ export function RouteToast({ denied }: { denied?: string }) {
 
     if (denied === "task") {
       toast.error("Bạn không có quyền xem task này");
+      return;
+    }
+
+    if (denied === "payments") {
+      toast.error("Không có quyền xem lịch thanh toán");
     }
   }, [denied]);
 

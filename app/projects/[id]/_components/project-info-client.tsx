@@ -12,8 +12,8 @@ type ProjectData = {
   customerPhone: string;
   address: string;
   areaM2: number;
-  unitPrice: number;
-  contractValue: number;
+  unitPrice: number | null;
+  contractValue: number | null;
   startDate: string;
   expectedEndDate: string;
   actualEndDate: string | null;
@@ -41,11 +41,13 @@ function formatMoney(v: number) {
 export function ProjectInfoClient({
   project,
   isAdmin,
+  canViewFinancial,
   admins,
   engineers,
 }: {
   project: ProjectData;
   isAdmin: boolean;
+  canViewFinancial: boolean;
   admins: OptionUser[];
   engineers: OptionUser[];
 }) {
@@ -64,7 +66,7 @@ export function ProjectInfoClient({
   const [projectForm, setProjectForm] = useState({
     name: project.name,
     areaM2: String(project.areaM2),
-    unitPrice: String(project.unitPrice),
+    unitPrice: String(project.unitPrice ?? ""),
     startDate: project.startDate.slice(0, 10),
     actualEndDate: project.actualEndDate ? project.actualEndDate.slice(0, 10) : "",
     status: project.status,
@@ -179,8 +181,8 @@ export function ProjectInfoClient({
         <div className="grid gap-2 text-sm md:grid-cols-2">
           <div>Tên dự án: {data.name}</div>
           <div>Diện tích: {data.areaM2} m²</div>
-          <div>Đơn giá: {formatMoney(data.unitPrice)}</div>
-          <div>Giá trị HĐ: {formatMoney(data.contractValue)}</div>
+          {canViewFinancial ? <div>Đơn giá: {formatMoney(data.unitPrice ?? 0)}</div> : null}
+          {canViewFinancial ? <div>Giá trị HĐ: {formatMoney(data.contractValue ?? 0)}</div> : null}
           <div>Khởi công: {formatDate(data.startDate)}</div>
           <div>Bàn giao dự kiến: {formatDate(data.expectedEndDate)}</div>
           <div>Bàn giao thực tế: {formatDate(data.actualEndDate)}</div>

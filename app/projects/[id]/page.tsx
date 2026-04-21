@@ -47,12 +47,25 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
     }),
   ]);
 
+  const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
+
   return (
     <ProjectInfoClient
-      project={JSON.parse(JSON.stringify(project))}
+      project={JSON.parse(
+        JSON.stringify(
+          canViewFinancial
+            ? project
+            : {
+                ...project,
+                unitPrice: null,
+                contractValue: null,
+              },
+        ),
+      )}
       admins={admins}
       engineers={engineers}
       isAdmin={user.role === UserRole.admin}
+      canViewFinancial={canViewFinancial}
     />
   );
 }

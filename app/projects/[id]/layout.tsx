@@ -63,11 +63,12 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   }
 
   const isAdmin = user.role === UserRole.admin;
+  const canViewPayments = user.role === UserRole.admin || user.role === UserRole.accountant;
 
   const tabs = [
     { label: "Thông tin chung", href: `/projects/${params.id}` },
     { label: "Tiến độ", href: `/projects/${params.id}/tasks` },
-    { label: "Lịch thanh toán", href: `/projects/${params.id}/payments` },
+    ...(canViewPayments ? [{ label: "Lịch thanh toán", href: `/projects/${params.id}/payments` }] : []),
     ...(isAdmin ? [{ label: "Thành viên", href: `/projects/${params.id}/members` }] : []),
   ];
 

@@ -12,7 +12,7 @@ type ProjectItem = {
   customerName: string;
   customerPhone: string;
   address: string;
-  contractValue: number;
+  contractValue: number | null;
   startDate: string;
   expectedEndDate: string;
   status: "planning" | "in_progress" | "completed" | "paused";
@@ -88,6 +88,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
   }, [status, managerId, engineerId]);
 
   const isAdminLike = currentRole === "admin" || currentRole === "accountant";
+  const canViewFinancial = isAdminLike;
 
   async function loadProjects() {
     setLoading(true);
@@ -200,7 +201,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
                 <th className="px-3 py-2">Tên dự án</th>
                 <th className="px-3 py-2">Chủ nhà + SĐT</th>
                 <th className="px-3 py-2">Địa chỉ</th>
-                <th className="px-3 py-2">Giá trị HĐ</th>
+                {canViewFinancial ? <th className="px-3 py-2">Giá trị HĐ</th> : null}
                 <th className="px-3 py-2">Khởi công</th>
                 <th className="px-3 py-2">Bàn giao dự kiến</th>
                 <th className="px-3 py-2">Trạng thái</th>
@@ -211,13 +212,13 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={10}>
+                  <td className="px-3 py-6 text-center text-slate-500" colSpan={canViewFinancial ? 10 : 9}>
                     Đang tải dữ liệu...
                   </td>
                 </tr>
               ) : projects.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={10}>
+                  <td className="px-3 py-10 text-center text-slate-500" colSpan={canViewFinancial ? 10 : 9}>
                     <div className="mb-2 text-2xl">📁</div>
                     <div>{emptyText}</div>
                     {currentRole === "admin" ? (
@@ -237,7 +238,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
                       <div className="text-xs text-slate-500">{project.customerPhone}</div>
                     </td>
                     <td className="px-3 py-2">{project.address}</td>
-                    <td className="px-3 py-2">{formatMoney(project.contractValue)}</td>
+                    {canViewFinancial ? <td className="px-3 py-2">{formatMoney(project.contractValue ?? 0)}</td> : null}
                     <td className="px-3 py-2">{formatDate(project.startDate)}</td>
                     <td className="px-3 py-2">{formatDate(project.expectedEndDate)}</td>
                     <td className="px-3 py-2">

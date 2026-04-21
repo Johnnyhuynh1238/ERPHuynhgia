@@ -181,7 +181,7 @@ export async function GET(request: Request) {
       customerName: p.customerName,
       customerPhone: p.customerPhone,
       address: p.address,
-      contractValue: Number(p.contractValue),
+      contractValue: isAdminLike ? Number(p.contractValue) : null,
       startDate: p.startDate,
       expectedEndDate: p.expectedEndDate,
       status: p.status,
