@@ -37,3 +37,5 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+.env.production
+backups/*.sql.gz
