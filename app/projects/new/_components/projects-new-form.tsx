@@ -13,6 +13,7 @@ const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 const formSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
+  customerIdNumber: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
   areaM2: z.number().min(1, "Diện tích phải > 0"),
@@ -24,7 +25,7 @@ const formSchema = z.object({
   members: z.array(
     z.object({
       userId: z.string().uuid("Vui lòng chọn user"),
-      roleInProject: z.enum(["engineer", "foreman", "accountant"]),
+      roleInProject: z.enum(["engineer", "foreman", "accountant", "construction_manager"]),
     }),
   ),
 });
@@ -78,6 +79,7 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
     defaultValues: {
       customerName: "",
       customerPhone: "",
+      customerIdNumber: "",
       address: "",
       name: "",
       areaM2: 0,
@@ -201,6 +203,11 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
             {form.formState.errors.customerPhone ? (
               <p className="mt-1 text-xs text-red-600">{form.formState.errors.customerPhone.message}</p>
             ) : null}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">CMND/CCCD (tuỳ chọn)</label>
+            <input className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("customerIdNumber")} />
           </div>
         </div>
 
@@ -347,6 +354,7 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
                   <option value="engineer">engineer</option>
                   <option value="foreman">foreman</option>
                   <option value="accountant">accountant</option>
+                  <option value="construction_manager">construction_manager</option>
                 </select>
 
                 <Button type="button" variant="outline" onClick={() => membersFieldArray.remove(idx)}>
@@ -361,7 +369,7 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitDisabled} className="bg-[#1F4E79] hover:bg-[#163a5b]">
+        <Button type="submit" disabled={isSubmitDisabled} className="bg-orange-500 hover:bg-orange-600">
           {submitting ? "Đang tạo dự án..." : "Tạo dự án"}
         </Button>
       </div>

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma, ProjectStatus, ProjectMemberRole, TaskStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -16,6 +17,7 @@ const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 const createProjectSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
+  customerIdNumber: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
   areaM2: z.number().min(1, "Diện tích phải > 0"),
@@ -232,9 +234,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let adminUser;
+  let actorUser;
   try {
-    adminUser = await requireRole(["admin"]);
+    actorUser = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     const mapped = mapAuthError(error instanceof Error ? error.message : "UNKNOWN");
     return mapped || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
@@ -304,6 +306,9 @@ export async function POST(request: Request) {
           name: parsed.data.name,
           customerName: parsed.data.customerName,
           customerPhone: parsed.data.customerPhone,
+          customerIdNumber: parsed.data.customerIdNumber || null,
+          customerPortalToken: randomUUID(),
+          customerPortalEnabled: true,
           address: parsed.data.address,
           areaM2: parsed.data.areaM2,
           unitPrice: parsed.data.unitPrice,
@@ -355,6 +360,7 @@ export async function POST(request: Request) {
             receiverRole: template.receiverRole,
             qcChecklist: template.qcChecklist,
             isMilestone: template.isMilestone,
+            visibleToCustomer: template.isMilestone,
             status: TaskStatus.not_started,
             isActive: true,
             displayOrder: template.displayOrder,
@@ -400,7 +406,7 @@ export async function POST(request: Request) {
             projectId: project.id,
             userId,
             roleInProject,
-            addedBy: adminUser.id,
+            addedBy: actorUser.id,
           })),
         });
       }

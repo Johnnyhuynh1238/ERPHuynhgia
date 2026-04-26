@@ -16,7 +16,7 @@ function mapAuthError(error: unknown) {
 
 export async function GET() {
   try {
-    await requireRole(["admin"]);
+    await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }
@@ -33,7 +33,7 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    admins: users.filter((u) => u.role === UserRole.admin),
+    admins: users.filter((u) => u.role === UserRole.admin || u.role === UserRole.construction_manager),
     engineers: users.filter((u) => u.role === UserRole.engineer),
     members: users,
   });

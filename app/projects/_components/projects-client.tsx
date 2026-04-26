@@ -130,7 +130,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-[#f0f2ff]">Danh sách dự án</h1>
-          {currentRole === "admin" ? (
+          {currentRole === "admin" || currentRole === "construction_manager" ? (
             <Link href="/projects/new">
               <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]">Tạo mới</Button>
             </Link>
