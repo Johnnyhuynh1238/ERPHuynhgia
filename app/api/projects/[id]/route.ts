@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { PaymentStatus, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
@@ -6,13 +8,14 @@ import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 const updateSchema = z.object({
-  section: z.enum(["owner", "project", "assignment"]),
+  section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal"]),
   payload: z.record(z.string(), z.any()),
 });
 
 const ownerSchema = z.object({
   customerName: z.string().trim().min(2),
   customerPhone: z.string().trim().min(10),
+  customerIdNumber: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5),
 });
 
@@ -31,6 +34,15 @@ const assignmentSchema = z.object({
   mainEngineerId: z.string().uuid(),
 });
 
+const reportingSchema = z.object({
+  goLiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+});
+
+const customerPortalSchema = z.object({
+  customerPortalPassword: z.string().trim().optional().nullable(),
+  customerPortalEnabled: z.boolean().optional(),
+});
+
 function addDays(baseDate: Date, offsetDays: number) {
   const d = new Date(baseDate);
   d.setUTCDate(d.getUTCDate() + offsetDays);
@@ -38,6 +50,12 @@ function addDays(baseDate: Date, offsetDays: number) {
 }
 
 function normalizeDate(raw: string) {
+  const [year, month, day] = raw.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+function normalizeNullableDate(raw: string | null) {
+  if (!raw) return null;
   const [year, month, day] = raw.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 }
@@ -87,14 +105,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  try {
-    await requireRole(["admin"]);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "UNKNOWN";
-    if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
-    if (msg === "403_FORBIDDEN") return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
-    return NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
   }
+
+  const isAdmin = user.role === UserRole.admin;
+  const isConstructionManager = user.role === UserRole.construction_manager;
 
   const body = await request.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
@@ -119,6 +136,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       data: {
         customerName: payload.data.customerName,
         customerPhone: payload.data.customerPhone,
+        customerIdNumber: payload.data.customerIdNumber || null,
         address: payload.data.address,
       },
     });
@@ -162,6 +180,64 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật phân công" });
+  }
+
+  if (parsed.data.section === "reporting") {
+    if (!isAdmin) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+
+    const payload = reportingSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu cấu hình báo cáo không hợp lệ" }, { status: 400 });
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: params.id },
+      data: {
+        goLiveDate: normalizeNullableDate(payload.data.goLiveDate),
+      },
+    });
+
+    return NextResponse.json({ project: updated, message: "Đã cập nhật ngày go-live" });
+  }
+
+  if (parsed.data.section === "customer_portal") {
+    if (!isAdmin && !isConstructionManager) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+    const payload = customerPortalSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu cổng chủ nhà không hợp lệ" }, { status: 400 });
+    }
+
+    const updateData: {
+      customerPortalPassword?: string | null;
+      customerPortalEnabled?: boolean;
+      customerPortalToken?: string;
+    } = {};
+
+    if (payload.data.customerPortalPassword !== undefined) {
+      const raw = (payload.data.customerPortalPassword || "").trim();
+      updateData.customerPortalPassword = raw ? await bcrypt.hash(raw, 10) : null;
+    }
+
+    if (payload.data.customerPortalEnabled !== undefined) {
+      updateData.customerPortalEnabled = payload.data.customerPortalEnabled;
+    }
+
+    if ((parsed.data.payload as { resetToken?: boolean }).resetToken) {
+      updateData.customerPortalToken = randomUUID();
+      await prisma.customerSession.deleteMany({ where: { projectId: params.id } });
+      await prisma.customerLoginAttempt.deleteMany({ where: { projectId: params.id } });
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: params.id },
+      data: updateData,
+    });
+
+    return NextResponse.json({ project: updated, message: "Đã cập nhật cổng chủ nhà" });
   }
 
   const payload = projectSchema.safeParse(parsed.data.payload);

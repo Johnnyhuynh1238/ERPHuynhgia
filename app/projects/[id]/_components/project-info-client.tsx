@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -10,6 +10,9 @@ type ProjectData = {
   name: string;
   customerName: string;
   customerPhone: string;
+  customerIdNumber?: string | null;
+  customerPortalToken?: string | null;
+  customerPortalEnabled?: boolean;
   address: string;
   areaM2: number;
   unitPrice: number | null;
@@ -63,6 +66,8 @@ export function ProjectInfoClient({
   isAdmin,
   isConstructionManager,
   canViewFinancial,
+  currentUserRole,
+  currentUserId,
   admins,
   engineers,
   todaySiteRest,
@@ -71,6 +76,8 @@ export function ProjectInfoClient({
   isAdmin: boolean;
   isConstructionManager: boolean;
   canViewFinancial: boolean;
+  currentUserRole: string;
+  currentUserId: string;
   admins: OptionUser[];
   engineers: OptionUser[];
   todaySiteRest: SiteRestData | null;
@@ -83,10 +90,12 @@ export function ProjectInfoClient({
   const [showAssignmentEdit, setShowAssignmentEdit] = useState(false);
   const [showGoLiveEdit, setShowGoLiveEdit] = useState(false);
   const [showSiteRestModal, setShowSiteRestModal] = useState(false);
+  const [portalPassword, setPortalPassword] = useState("");
 
   const [ownerForm, setOwnerForm] = useState({
     customerName: project.customerName,
     customerPhone: project.customerPhone,
+    customerIdNumber: project.customerIdNumber || "",
     address: project.address,
   });
 
@@ -112,6 +121,18 @@ export function ProjectInfoClient({
   });
 
   const canManageSiteStatus = isAdmin || isConstructionManager;
+  const canManageCustomerPortal = isAdmin || isConstructionManager;
+  const canViewCommentInbox = ["admin", "construction_manager", "engineer"].includes(currentUserRole);
+  const [commentItems, setCommentItems] = useState<Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    readByStaff: boolean;
+    task: { id: string; code: string; name: string } | null;
+    eveningReport: { id: string; reportDate: string } | null;
+    replies: Array<{ id: string; content: string; createdAt: string; author: { id: string; fullName: string } }>;
+  }>>([]);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
   async function reloadProject() {
     const [projectRes, restRes] = await Promise.all([
@@ -273,6 +294,97 @@ export function ProjectInfoClient({
     await reloadProject();
   }
 
+  async function loadComments() {
+    if (!canViewCommentInbox) return;
+    const res = await fetch(`/api/projects/${data.id}/customer-comments`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray(json.comments)) {
+      setCommentItems(json.comments);
+    }
+  }
+
+  async function markCommentRead(commentId: string) {
+    const res = await fetch(`/api/customer-comments/${commentId}/mark-read`, { method: "PATCH" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không thể đánh dấu đã đọc");
+      return;
+    }
+    setCommentItems((prev) => prev.map((c) => (c.id === commentId ? { ...c, readByStaff: true } : c)));
+  }
+
+  async function replyComment(commentId: string) {
+    const content = (replyDrafts[commentId] || "").trim();
+    if (!content) return;
+
+    const res = await fetch(`/api/customer-comments/${commentId}/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không thể phản hồi");
+      return;
+    }
+
+    setReplyDrafts((prev) => ({ ...prev, [commentId]: "" }));
+    await loadComments();
+  }
+
+  async function toggleCustomerPortalEnabled(enabled: boolean) {
+    const res = await fetch(`/api/projects/${data.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: "customer_portal", payload: { customerPortalEnabled: enabled } }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không thể cập nhật cổng chủ nhà");
+      return;
+    }
+
+    toast.success("Đã cập nhật trạng thái cổng chủ nhà");
+    await reloadProject();
+  }
+
+  async function savePortalPassword() {
+    const res = await fetch(`/api/projects/${data.id}/customer-portal/password`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: portalPassword }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không thể đổi mật khẩu");
+      return;
+    }
+
+    toast.success("Đã đổi mật khẩu cổng chủ nhà");
+    setPortalPassword("");
+  }
+
+  async function resetPortalLink() {
+    const ok = window.confirm("Reset sẽ vô hiệu link cũ + sinh link mới. Tiếp tục?");
+    if (!ok) return;
+
+    const res = await fetch(`/api/projects/${data.id}/customer-portal/reset`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      toast.error(json.message || "Không thể reset link");
+      return;
+    }
+
+    toast.success("Đã reset link chủ nhà");
+    await reloadProject();
+  }
+
+  useEffect(() => {
+    loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.id, canViewCommentInbox]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
@@ -287,7 +399,48 @@ export function ProjectInfoClient({
         <div className="grid gap-2 text-sm">
           <div>Tên: {data.customerName}</div>
           <div>SĐT: {data.customerPhone}</div>
+          <div>CCCD: {data.customerIdNumber || "-"}</div>
           <div>Địa chỉ: {data.address}</div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">Cổng chủ nhà</h2>
+        </div>
+        <div className="space-y-2 text-sm">
+          <div>
+            Link: {data.customerPortalToken ? (
+              <a className="text-orange-300 underline" href={`/cn/${data.customerPortalToken}`} target="_blank" rel="noreferrer">
+                /cn/{data.customerPortalToken}
+              </a>
+            ) : "-"}
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Trạng thái:</span>
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 text-xs ${data.customerPortalEnabled ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}
+              onClick={() => toggleCustomerPortalEnabled(!data.customerPortalEnabled)}
+              disabled={!canManageCustomerPortal}
+            >
+              {data.customerPortalEnabled ? "Đang bật" : "Đang tắt"}
+            </button>
+          </div>
+          {canManageCustomerPortal ? (
+            <>
+              <div className="flex gap-2">
+                <input
+                  value={portalPassword}
+                  onChange={(e) => setPortalPassword(e.target.value)}
+                  placeholder="Đặt mật khẩu mới (4 số hoặc text)"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                />
+                <Button variant="outline" onClick={savePortalPassword}>Đổi pass</Button>
+              </div>
+              <Button variant="outline" onClick={resetPortalLink}>Reset link mới</Button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -399,6 +552,53 @@ export function ProjectInfoClient({
         <div className="text-sm text-[#d9def3]">{data.notes || "Chưa có ghi chú"}</div>
       </div>
 
+      {canViewCommentInbox ? (
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+          <h2 className="mb-3 font-semibold">Inbox Cổng chủ nhà</h2>
+          <div className="space-y-3">
+            {commentItems.length === 0 ? <div className="text-sm text-[#8892b0]">Chưa có bình luận nào</div> : null}
+            {commentItems.map((comment) => (
+              <div key={comment.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
+                <div className="mb-1 flex items-center justify-between text-xs text-[#8892b0]">
+                  <span>
+                    {comment.task ? `${comment.task.code} · ${comment.task.name}` : comment.eveningReport ? `Nhật ký ${new Date(comment.eveningReport.reportDate).toLocaleDateString("vi-VN")}` : "Bình luận"}
+                  </span>
+                  <span>{new Date(comment.createdAt).toLocaleString("vi-VN")}</span>
+                </div>
+                <div className="text-sm">{comment.content}</div>
+
+                <div className="mt-2 space-y-1">
+                  {comment.replies.map((reply) => (
+                    <div key={reply.id} className="rounded border border-[#39405f] bg-[#1c2233] p-2 text-xs">
+                      <span className="font-semibold">{reply.author.fullName}: </span>
+                      {reply.content}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={replyDrafts[comment.id] || ""}
+                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [comment.id]: e.target.value }))}
+                    className="w-full rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs"
+                    placeholder="Phản hồi cho chủ nhà..."
+                  />
+                  <Button variant="outline" onClick={() => replyComment(comment.id)}>Gửi</Button>
+                </div>
+
+                {!comment.readByStaff ? (
+                  <Button variant="outline" className="mt-2" onClick={() => markCommentRead(comment.id)}>
+                    Đánh dấu đã đọc
+                  </Button>
+                ) : (
+                  <div className="mt-2 text-xs text-emerald-300">Đã đọc</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {showOwnerEdit ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
           <div className="w-full max-w-xl rounded-2xl bg-[#1a1d2e] p-4">
@@ -413,6 +613,12 @@ export function ProjectInfoClient({
                 className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={ownerForm.customerPhone}
                 onChange={(e) => setOwnerForm((p) => ({ ...p, customerPhone: e.target.value }))}
+              />
+              <input
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                value={ownerForm.customerIdNumber}
+                placeholder="CCCD/CMND"
+                onChange={(e) => setOwnerForm((p) => ({ ...p, customerIdNumber: e.target.value }))}
               />
               <textarea
                 className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
