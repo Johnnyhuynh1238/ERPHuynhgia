@@ -21,10 +21,10 @@ const statusLabel: Record<ProjectStatus, string> = {
 };
 
 const statusBadgeClass: Record<ProjectStatus, string> = {
-  planning: "bg-slate-200 text-slate-700",
-  in_progress: "bg-blue-100 text-blue-700",
-  completed: "bg-indigo-100 text-indigo-700",
-  paused: "bg-amber-100 text-amber-700",
+  planning: "bg-slate-500/15 text-slate-300",
+  in_progress: "bg-blue-500/15 text-blue-300",
+  completed: "bg-emerald-500/15 text-emerald-300",
+  paused: "bg-amber-500/15 text-amber-300",
 };
 
 export default async function ProjectLayout({ children, params }: ProjectLayoutProps) {
@@ -66,9 +66,12 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   const canViewPayments = user.role === UserRole.admin || user.role === UserRole.accountant;
   const canViewMembers = user.role === UserRole.admin || user.role === UserRole.construction_manager;
 
+  const canViewConstructionLog = user.role !== UserRole.accountant;
+
   const tabs = [
     { label: "Thông tin chung", href: `/projects/${params.id}` },
     { label: "Tiến độ", href: `/projects/${params.id}/tasks` },
+    ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),
     ...(canViewPayments ? [{ label: "Lịch thanh toán", href: `/projects/${params.id}/payments` }] : []),
     ...(canViewMembers ? [{ label: "Thành viên", href: `/projects/${params.id}/members` }] : []),
   ];
@@ -76,19 +79,19 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   return (
     <ProtectedLayout>
       <div className="space-y-4">
-        <div className="rounded-xl border bg-white p-4">
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs text-slate-500">{project.code}</div>
-              <h1 className="text-2xl font-semibold text-[#1F4E79]">{project.name}</h1>
-              <div className="text-sm text-slate-600">Chủ nhà: {project.customerName}</div>
+              <div className="text-xs text-[#8892b0]">{project.code}</div>
+              <h1 className="text-xl font-bold text-[#f0f2ff]">{project.name}</h1>
+              <div className="text-sm text-[#8892b0]">Chủ nhà: {project.customerName}</div>
             </div>
-            <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusBadgeClass[project.status]}`}>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
               {statusLabel[project.status]}
             </span>
           </div>
 
-          <div className="mt-4 border-t pt-3">
+          <div className="mt-4 border-t border-[#252840] pt-3">
             <ProjectTabsNav tabs={tabs} />
           </div>
         </div>

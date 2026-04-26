@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
 type ProjectItem = {
@@ -33,30 +32,26 @@ type ProjectsResponse = {
   };
 };
 
-const statusLabel: Record<ProjectItem["status"], string> = {
-  planning: "Planning",
-  in_progress: "Đang thi công",
-  completed: "Hoàn thành",
-  paused: "Tạm ngưng",
-};
-
-const statusBadgeClass: Record<ProjectItem["status"], string> = {
-  planning: "bg-slate-200 text-slate-700",
-  in_progress: "bg-blue-100 text-blue-700",
-  completed: "bg-indigo-100 text-indigo-700",
-  paused: "bg-amber-100 text-amber-700",
-};
-
-function formatDate(dateIso: string) {
-  const date = new Date(dateIso);
-  const d = String(date.getDate()).padStart(2, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
+function fmtDate(dateIso: string) {
+  const d = new Date(dateIso);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = d.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
-function formatMoney(value: number) {
-  return `${Math.round(value).toLocaleString("vi-VN")} đ`;
+function statusChip(status: ProjectItem["status"]) {
+  if (status === "in_progress") return "bg-blue-500/15 text-blue-300";
+  if (status === "completed") return "bg-emerald-500/15 text-emerald-300";
+  if (status === "paused") return "bg-amber-500/15 text-amber-300";
+  return "bg-slate-500/15 text-slate-300";
+}
+
+function statusLabel(status: ProjectItem["status"]) {
+  if (status === "in_progress") return "Đang thi công";
+  if (status === "completed") return "Hoàn thành";
+  if (status === "paused") return "Tạm ngưng";
+  return "Planning";
 }
 
 export function ProjectsClient({ currentRole }: { currentRole: string }) {
@@ -87,8 +82,10 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
     setPage(1);
   }, [status, managerId, engineerId]);
 
-  const isAdminLike = currentRole === "admin" || currentRole === "accountant";
-  const canViewFinancial = isAdminLike;
+  const canViewAllProjects =
+    currentRole === "admin" ||
+    currentRole === "accountant" ||
+    currentRole === "construction_manager";
 
   async function loadProjects() {
     setLoading(true);
@@ -124,33 +121,31 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
   }, [page, search, status, managerId, engineerId]);
 
   const emptyText = useMemo(() => {
-    if (isAdminLike) {
-      return "Chưa có dự án nào. Anh có thể tạo dự án đầu tiên.";
-    }
-    return "Bạn chưa được phân công vào dự án nào. Liên hệ quản lý.";
-  }, [isAdminLike]);
+    if (canViewAllProjects) return "Chưa có dự án nào.";
+    return "Bạn chưa được phân công vào dự án nào.";
+  }, [canViewAllProjects]);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Danh sách dự án</h1>
-        {currentRole === "admin" ? (
-          <Link href="/projects/new">
-            <Button className="bg-[#1F4E79] hover:bg-[#163a5b]">Tạo dự án mới</Button>
-          </Link>
-        ) : null}
-      </div>
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-[#f0f2ff]">Danh sách dự án</h1>
+          {currentRole === "admin" ? (
+            <Link href="/projects/new">
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]">Tạo mới</Button>
+            </Link>
+          ) : null}
+        </div>
 
-      <div className="rounded-xl border bg-white p-4">
-        <div className="mb-4 grid gap-3 md:grid-cols-5">
+        <div className="mt-3 grid gap-2">
           <input
-            placeholder="Search mã/tên/chủ nhà/địa chỉ"
-            className="rounded-md border px-3 py-2 text-sm md:col-span-2"
+            placeholder="Tìm mã / tên / chủ nhà / địa chỉ"
+            className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
 
-          <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">Tất cả trạng thái</option>
             <option value="planning">Planning</option>
             <option value="in_progress">Đang thi công</option>
@@ -158,127 +153,72 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
             <option value="paused">Tạm ngưng</option>
           </select>
 
-          {isAdminLike ? (
-            <select
-              className="rounded-md border px-3 py-2 text-sm"
-              value={managerId}
-              onChange={(e) => setManagerId(e.target.value)}
-            >
-              <option value="">Tất cả GĐ quản lý</option>
-              {projectManagers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div />
-          )}
+          {canViewAllProjects ? (
+            <>
+              <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+                <option value="">Tất cả GĐ quản lý</option>
+                {projectManagers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                ))}
+              </select>
 
-          {isAdminLike ? (
-            <select
-              className="rounded-md border px-3 py-2 text-sm"
-              value={engineerId}
-              onChange={(e) => setEngineerId(e.target.value)}
-            >
-              <option value="">Tất cả KS chính</option>
-              {mainEngineers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div />
-          )}
+              <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={engineerId} onChange={(e) => setEngineerId(e.target.value)}>
+                <option value="">Tất cả KS chính</option>
+                {mainEngineers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                ))}
+              </select>
+            </>
+          ) : null}
         </div>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-sm">
-            <thead>
-              <tr className="border-b bg-slate-50 text-left text-slate-600">
-                <th className="px-3 py-2">Mã dự án</th>
-                <th className="px-3 py-2">Tên dự án</th>
-                <th className="px-3 py-2">Chủ nhà + SĐT</th>
-                <th className="px-3 py-2">Địa chỉ</th>
-                {canViewFinancial ? <th className="px-3 py-2">Giá trị HĐ</th> : null}
-                <th className="px-3 py-2">Khởi công</th>
-                <th className="px-3 py-2">Bàn giao dự kiến</th>
-                <th className="px-3 py-2">Trạng thái</th>
-                <th className="px-3 py-2">Tiến độ</th>
-                <th className="px-3 py-2">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={canViewFinancial ? 10 : 9}>
-                    Đang tải dữ liệu...
-                  </td>
-                </tr>
-              ) : projects.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={canViewFinancial ? 10 : 9}>
-                    <div className="mb-2 text-2xl">📁</div>
-                    <div>{emptyText}</div>
-                    {currentRole === "admin" ? (
-                      <Link className="mt-2 inline-block text-[#1F4E79] underline" href="/projects/new">
-                        Tạo dự án đầu tiên
-                      </Link>
-                    ) : null}
-                  </td>
-                </tr>
-              ) : (
-                projects.map((project) => (
-                  <tr key={project.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 font-medium text-[#1F4E79]">{project.code}</td>
-                    <td className="px-3 py-2">{project.name}</td>
-                    <td className="px-3 py-2">
-                      <div>{project.customerName}</div>
-                      <div className="text-xs text-slate-500">{project.customerPhone}</div>
-                    </td>
-                    <td className="px-3 py-2">{project.address}</td>
-                    {canViewFinancial ? <td className="px-3 py-2">{formatMoney(project.contractValue ?? 0)}</td> : null}
-                    <td className="px-3 py-2">{formatDate(project.startDate)}</td>
-                    <td className="px-3 py-2">{formatDate(project.expectedEndDate)}</td>
-                    <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
-                        {statusLabel[project.status]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <Progress value={project.progressPercent} className="w-28" />
-                        <span>{project.progressPercent}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link href={`/projects/${project.id}`}>
-                        <Button variant="outline" className="h-8">
-                          Xem chi tiết
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-          <div>{total ? `Tổng ${total} dự án` : "Không có dự án"}</div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-              Trang trước
-            </Button>
-            <span>
-              {page}/{totalPages}
-            </span>
-            <Button variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-              Trang sau
-            </Button>
+      <div className="space-y-3">
+        {loading ? (
+          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Đang tải dữ liệu...</div>
+        ) : projects.length === 0 ? (
+          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+            <div className="mb-2 text-2xl">📁</div>
+            <div>{emptyText}</div>
           </div>
+        ) : (
+          projects.map((project, idx) => (
+            <Link
+              key={project.id}
+              href={`/projects/${project.id}`}
+              className={`block rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 transition hover:border-[#fb923c]/60 slide-up delay-${(idx % 6) + 1}`}
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs text-[#8892b0]">{project.code}</div>
+                  <div className="text-sm font-bold text-[#f0f2ff]">{project.name}</div>
+                </div>
+                <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusChip(project.status)}`}>{statusLabel(project.status)}</span>
+              </div>
+
+              <div className="text-xs text-[#8892b0]">{project.address}</div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-[#8892b0]">
+                <span>Khởi công: {fmtDate(project.startDate)}</span>
+                <span>{Math.round(project.progressPercent)}%</span>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-[#252840]">
+                <div className="h-1.5 rounded-full bg-[#f97316]" style={{ width: `${Math.max(0, Math.min(100, project.progressPercent))}%` }} />
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0]">
+        <div>{total ? `Tổng ${total} dự án` : "Không có dự án"}</div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="h-8 border-[#2d3249] bg-[#13151f]" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            Trước
+          </Button>
+          <span>{page}/{totalPages}</span>
+          <Button variant="outline" className="h-8 border-[#2d3249] bg-[#13151f]" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+            Sau
+          </Button>
         </div>
       </div>
     </div>

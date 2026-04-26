@@ -17,10 +17,23 @@ type ProjectData = {
   startDate: string;
   expectedEndDate: string;
   actualEndDate: string | null;
+  goLiveDate: string | null;
   status: "planning" | "in_progress" | "completed" | "paused";
   notes: string | null;
   projectManager: { id: string; fullName: string; email: string };
   mainEngineer: { id: string; fullName: string; email: string };
+};
+
+type SiteRestData = {
+  id: string;
+  restDate: string;
+  reason: "SUNDAY" | "HOLIDAY" | "STORM" | "OTHER";
+  note: string | null;
+  createdAt: string;
+  declaredByUser: {
+    id: string;
+    fullName: string;
+  };
 };
 
 type OptionUser = { id: string; fullName: string; email: string };
@@ -38,24 +51,38 @@ function formatMoney(v: number) {
   return `${Math.round(v).toLocaleString("vi-VN")} đ`;
 }
 
+function reasonLabel(reason: SiteRestData["reason"]) {
+  if (reason === "SUNDAY") return "Nghỉ Chủ nhật";
+  if (reason === "HOLIDAY") return "Nghỉ lễ";
+  if (reason === "STORM") return "Mưa bão";
+  return "Khác";
+}
+
 export function ProjectInfoClient({
   project,
   isAdmin,
+  isConstructionManager,
   canViewFinancial,
   admins,
   engineers,
+  todaySiteRest,
 }: {
   project: ProjectData;
   isAdmin: boolean;
+  isConstructionManager: boolean;
   canViewFinancial: boolean;
   admins: OptionUser[];
   engineers: OptionUser[];
+  todaySiteRest: SiteRestData | null;
 }) {
   const [data, setData] = useState(project);
+  const [todayRest, setTodayRest] = useState(todaySiteRest);
 
   const [showOwnerEdit, setShowOwnerEdit] = useState(false);
   const [showProjectEdit, setShowProjectEdit] = useState(false);
   const [showAssignmentEdit, setShowAssignmentEdit] = useState(false);
+  const [showGoLiveEdit, setShowGoLiveEdit] = useState(false);
+  const [showSiteRestModal, setShowSiteRestModal] = useState(false);
 
   const [ownerForm, setOwnerForm] = useState({
     customerName: project.customerName,
@@ -78,11 +105,29 @@ export function ProjectInfoClient({
     mainEngineerId: project.mainEngineer.id,
   });
 
+  const [goLiveDateInput, setGoLiveDateInput] = useState(project.goLiveDate ? project.goLiveDate.slice(0, 10) : "");
+  const [siteRestForm, setSiteRestForm] = useState({
+    reason: "SUNDAY" as SiteRestData["reason"],
+    note: "",
+  });
+
+  const canManageSiteStatus = isAdmin || isConstructionManager;
+
   async function reloadProject() {
-    const res = await fetch(`/api/projects/${data.id}`, { cache: "no-store" });
-    const json = await res.json();
-    if (res.ok && json.project) {
-      setData(json.project);
+    const [projectRes, restRes] = await Promise.all([
+      fetch(`/api/projects/${data.id}`, { cache: "no-store" }),
+      fetch(`/api/projects/${data.id}/site-rest-today`, { cache: "no-store" }),
+    ]);
+
+    const projectJson = await projectRes.json().catch(() => ({}));
+    if (projectRes.ok && projectJson.project) {
+      setData(projectJson.project);
+      setGoLiveDateInput(projectJson.project.goLiveDate ? projectJson.project.goLiveDate.slice(0, 10) : "");
+    }
+
+    const restJson = await restRes.json().catch(() => ({}));
+    if (restRes.ok) {
+      setTodayRest(restJson.siteRestDay || null);
     }
   }
 
@@ -151,9 +196,86 @@ export function ProjectInfoClient({
     await reloadProject();
   }
 
+  async function submitGoLive() {
+    const payloadDate = goLiveDateInput || null;
+    const res = await fetch(`/api/projects/${data.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: "reporting", payload: { goLiveDate: payloadDate } }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Cập nhật go-live thất bại");
+      return;
+    }
+
+    if (payloadDate) {
+      toast.success(`Hệ thống báo cáo đã kích hoạt cho dự án này từ ${formatDate(payloadDate)}`);
+    } else {
+      toast.success("Đã gỡ ngày go-live");
+    }
+
+    setShowGoLiveEdit(false);
+    await reloadProject();
+  }
+
+  async function setGoLiveToday() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    setGoLiveDateInput(`${yyyy}-${mm}-${dd}`);
+    setShowGoLiveEdit(true);
+  }
+
+  async function submitSiteRest() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+
+    const res = await fetch(`/api/projects/${data.id}/site-rest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        restDate: `${yyyy}-${mm}-${dd}`,
+        reason: siteRestForm.reason,
+        note: siteRestForm.note || null,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không thể đánh dấu nghỉ");
+      return;
+    }
+
+    toast.success("Đã đánh dấu công trường nghỉ hôm nay");
+    setShowSiteRestModal(false);
+    setSiteRestForm({ reason: "SUNDAY", note: "" });
+    await reloadProject();
+  }
+
+  async function removeSiteRest() {
+    if (!todayRest) return;
+    const ok = window.confirm("Xác nhận hủy đánh dấu công trường nghỉ hôm nay?");
+    if (!ok) return;
+
+    const res = await fetch(`/api/projects/${data.id}/site-rest/${todayRest.id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      toast.error(json.message || "Không thể hủy đánh dấu nghỉ");
+      return;
+    }
+
+    toast.success("Đã hủy đánh dấu công trường nghỉ");
+    await reloadProject();
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Thông tin chủ nhà</h2>
           {isAdmin ? (
@@ -169,7 +291,7 @@ export function ProjectInfoClient({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Thông tin dự án</h2>
           {isAdmin ? (
@@ -191,7 +313,7 @@ export function ProjectInfoClient({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Phân công</h2>
           {isAdmin ? (
@@ -210,28 +332,90 @@ export function ProjectInfoClient({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">Cấu hình hệ thống báo cáo</h2>
+          {isAdmin ? (
+            <div className="flex items-center gap-2">
+              {!data.goLiveDate ? (
+                <Button variant="outline" onClick={setGoLiveToday}>
+                  Set Go-live hôm nay
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={() => setShowGoLiveEdit(true)}>
+                Chỉnh sửa
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        <div className="space-y-2 text-sm">
+          <div>
+            Go-live: <span className="font-medium">{formatDate(data.goLiveDate)}</span>
+          </div>
+          {!data.goLiveDate ? (
+            <div className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300">
+              Chưa go-live, báo cáo chưa kích hoạt
+            </div>
+          ) : (
+            <div className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
+              Đang áp dụng từ {formatDate(data.goLiveDate)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">Trạng thái công trường hôm nay</h2>
+          {canManageSiteStatus ? (
+            todayRest ? (
+              <Button variant="outline" onClick={removeSiteRest}>
+                Hủy đánh dấu nghỉ
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setShowSiteRestModal(true)}>
+                Đánh dấu công trường nghỉ hôm nay
+              </Button>
+            )
+          ) : null}
+        </div>
+        <div className="text-sm">
+          {todayRest ? (
+            <div className="space-y-1">
+              <div className="inline-flex rounded-full bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-300">
+                Nghỉ - {reasonLabel(todayRest.reason)}
+              </div>
+              {todayRest.note ? <div>Ghi chú: {todayRest.note}</div> : null}
+              <div className="text-xs text-[#8892b0]">Khai báo bởi {todayRest.declaredByUser.fullName}</div>
+            </div>
+          ) : (
+            <div className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">Đang hoạt động</div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <h2 className="mb-3 font-semibold">Ghi chú dự án</h2>
-        <div className="text-sm text-slate-700">{data.notes || "Chưa có ghi chú"}</div>
+        <div className="text-sm text-[#d9def3]">{data.notes || "Chưa có ghi chú"}</div>
       </div>
 
       {showOwnerEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-xl rounded-2xl bg-[#1a1d2e] p-4">
             <h3 className="mb-3 font-semibold">Sửa thông tin chủ nhà</h3>
             <div className="space-y-3">
               <input
-                className="w-full rounded border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={ownerForm.customerName}
                 onChange={(e) => setOwnerForm((p) => ({ ...p, customerName: e.target.value }))}
               />
               <input
-                className="w-full rounded border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={ownerForm.customerPhone}
                 onChange={(e) => setOwnerForm((p) => ({ ...p, customerPhone: e.target.value }))}
               />
               <textarea
-                className="w-full rounded border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 rows={2}
                 value={ownerForm.address}
                 onChange={(e) => setOwnerForm((p) => ({ ...p, address: e.target.value }))}
@@ -241,7 +425,7 @@ export function ProjectInfoClient({
               <Button variant="outline" onClick={() => setShowOwnerEdit(false)}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={submitOwner}>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitOwner}>
                 Lưu
               </Button>
             </div>
@@ -250,41 +434,41 @@ export function ProjectInfoClient({
       ) : null}
 
       {showProjectEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-2xl rounded-2xl bg-[#1a1d2e] p-4">
             <h3 className="mb-3 font-semibold">Sửa thông tin dự án</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <input
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.name}
                 onChange={(e) => setProjectForm((p) => ({ ...p, name: e.target.value }))}
               />
               <input
                 type="number"
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.areaM2}
                 onChange={(e) => setProjectForm((p) => ({ ...p, areaM2: e.target.value }))}
               />
               <input
                 type="number"
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.unitPrice}
                 onChange={(e) => setProjectForm((p) => ({ ...p, unitPrice: e.target.value }))}
               />
               <input
                 type="date"
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.startDate}
                 onChange={(e) => setProjectForm((p) => ({ ...p, startDate: e.target.value }))}
               />
               <input
                 type="date"
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.actualEndDate}
                 onChange={(e) => setProjectForm((p) => ({ ...p, actualEndDate: e.target.value }))}
               />
               <select
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.status}
                 onChange={(e) => setProjectForm((p) => ({ ...p, status: e.target.value as ProjectData['status'] }))}
               >
@@ -294,7 +478,7 @@ export function ProjectInfoClient({
                 <option value="paused">paused</option>
               </select>
               <textarea
-                className="md:col-span-2 rounded border px-3 py-2 text-sm"
+                className="md:col-span-2 rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 rows={2}
                 value={projectForm.notes}
                 onChange={(e) => setProjectForm((p) => ({ ...p, notes: e.target.value }))}
@@ -304,7 +488,7 @@ export function ProjectInfoClient({
               <Button variant="outline" onClick={() => setShowProjectEdit(false)}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={submitProject}>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitProject}>
                 Lưu
               </Button>
             </div>
@@ -313,12 +497,12 @@ export function ProjectInfoClient({
       ) : null}
 
       {showAssignmentEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-xl rounded-2xl bg-[#1a1d2e] p-4">
             <h3 className="mb-3 font-semibold">Sửa phân công</h3>
             <div className="space-y-3">
               <select
-                className="w-full rounded border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={assignmentForm.projectManagerId}
                 onChange={(e) => setAssignmentForm((p) => ({ ...p, projectManagerId: e.target.value }))}
               >
@@ -330,7 +514,7 @@ export function ProjectInfoClient({
               </select>
 
               <select
-                className="w-full rounded border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={assignmentForm.mainEngineerId}
                 onChange={(e) => setAssignmentForm((p) => ({ ...p, mainEngineerId: e.target.value }))}
               >
@@ -345,8 +529,66 @@ export function ProjectInfoClient({
               <Button variant="outline" onClick={() => setShowAssignmentEdit(false)}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={submitAssignment}>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitAssignment}>
                 Lưu
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showGoLiveEdit ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-md rounded-2xl bg-[#1a1d2e] p-4">
+            <h3 className="mb-3 font-semibold">Cập nhật ngày go-live</h3>
+            <input
+              type="date"
+              className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+              value={goLiveDateInput}
+              onChange={(e) => setGoLiveDateInput(e.target.value)}
+            />
+            <p className="mt-2 text-xs text-[#8892b0]">Để trống nếu muốn gỡ go-live.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowGoLiveEdit(false)}>
+                Hủy
+              </Button>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitGoLive}>
+                Lưu
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showSiteRestModal ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-md rounded-2xl bg-[#1a1d2e] p-4">
+            <h3 className="mb-3 font-semibold">Đánh dấu công trường nghỉ hôm nay</h3>
+            <div className="space-y-3">
+              <select
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                value={siteRestForm.reason}
+                onChange={(e) => setSiteRestForm((prev) => ({ ...prev, reason: e.target.value as SiteRestData["reason"] }))}
+              >
+                <option value="SUNDAY">Nghỉ Chủ nhật</option>
+                <option value="HOLIDAY">Nghỉ lễ</option>
+                <option value="STORM">Mưa bão</option>
+                <option value="OTHER">Khác</option>
+              </select>
+              <textarea
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                rows={3}
+                placeholder="Ghi chú (không bắt buộc)"
+                value={siteRestForm.note}
+                onChange={(e) => setSiteRestForm((prev) => ({ ...prev, note: e.target.value }))}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowSiteRestModal(false)}>
+                Hủy
+              </Button>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitSiteRest}>
+                Xác nhận
               </Button>
             </div>
           </div>
