@@ -32,11 +32,11 @@ const roleLabel: Record<UserItem["role"], string> = {
 };
 
 const roleBadgeClass: Record<UserItem["role"], string> = {
-  admin: "bg-rose-100 text-rose-700",
-  engineer: "bg-blue-100 text-blue-700",
-  foreman: "bg-amber-100 text-amber-700",
-  accountant: "bg-emerald-100 text-emerald-700",
-  construction_manager: "bg-purple-100 text-purple-700",
+  admin: "bg-rose-500/15 text-rose-300",
+  engineer: "bg-blue-500/15 text-blue-300",
+  foreman: "bg-amber-500/15 text-amber-300",
+  accountant: "bg-emerald-500/15 text-emerald-300",
+  construction_manager: "bg-purple-500/15 text-purple-300",
 };
 
 function formatDate(dateIso: string) {
@@ -267,14 +267,14 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Quản lý user</h1>
-        <Button type="button" className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={() => setShowAddModal(true)}>
+        <h1 className="text-xl font-bold text-[#f0f2ff]">Quản lý user</h1>
+        <Button type="button" className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={() => setShowAddModal(true)}>
           Thêm user
         </Button>
       </div>
 
       {latestTempPassword ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <div className="font-medium">Password tạm mới tạo/reset</div>
           <div>Email: {latestTempPassword.email}</div>
           <div className="flex items-center gap-2">
@@ -286,16 +286,16 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
         </div>
       ) : null}
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-4 grid gap-3 md:grid-cols-4">
           <input
             placeholder="Tìm theo tên hoặc email"
-            className="rounded-md border px-3 py-2 text-sm"
+            className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
 
-          <select className="rounded-md border px-3 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value)}>
+          <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="all">Tất cả role</option>
             <option value="admin">Admin</option>
             <option value="engineer">KS</option>
@@ -304,19 +304,19 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
             <option value="construction_manager">Trưởng phòng thi công</option>
           </select>
 
-          <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">Tất cả trạng thái</option>
             <option value="active">Đang hoạt động</option>
             <option value="inactive">Đã vô hiệu</option>
           </select>
 
-          <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-600">Sắp xếp: mới nhất trước</div>
+          <div className="rounded-xl border border-[#2d3249] bg-[#13151f] bg-[#171a27] px-3 py-2 text-sm text-[#8892b0]">Sắp xếp: mới nhất trước</div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
             <thead>
-              <tr className="border-b bg-slate-50 text-left text-slate-600">
+              <tr className="border-b border-[#252840] bg-[#171a27] text-left text-[#8892b0]">
                 <th className="px-3 py-2">Họ tên</th>
                 <th className="px-3 py-2">Email</th>
                 <th className="px-3 py-2">SĐT</th>
@@ -329,19 +329,19 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={7}>
+                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={7}>
                     Đang tải dữ liệu...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={7}>
+                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={7}>
                     Không có user phù hợp.
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="border-b last:border-b-0">
+                  <tr key={user.id} className="border-b border-[#252840] last:border-b border-[#252840]-0">
                     <td className="px-3 py-2">{user.fullName}</td>
                     <td className="px-3 py-2">{user.email}</td>
                     <td className="px-3 py-2">{user.phone || "-"}</td>
@@ -352,11 +352,11 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                     </td>
                     <td className="px-3 py-2">
                       {user.isActive ? (
-                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-300">
                           Đang hoạt động
                         </span>
                       ) : (
-                        <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700">
+                        <span className="rounded-full bg-slate-500/15 px-2 py-1 text-xs font-medium text-slate-300">
                           Đã vô hiệu
                         </span>
                       )}
@@ -394,7 +394,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
         </div>
 
         <div className="mt-4 flex items-center justify-between text-sm">
-          <div className="text-slate-600">{paginationLabel}</div>
+          <div className="text-[#8892b0]">{paginationLabel}</div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={() => setPage((p) => p - 1)} disabled={!canPrev}>
               Trang trước
@@ -410,19 +410,19 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
       </div>
 
       {showAddModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-lg rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5">
             <h2 className="mb-4 text-lg font-semibold">Thêm user</h2>
             <form className="space-y-3" onSubmit={handleCreateUser}>
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 placeholder="Họ tên"
                 value={addForm.fullName}
                 onChange={(e) => setAddForm((prev) => ({ ...prev, fullName: e.target.value }))}
                 required
               />
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 placeholder="Email"
                 type="email"
                 value={addForm.email}
@@ -430,14 +430,14 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 required
               />
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 placeholder="Số điện thoại (tùy chọn)"
                 value={addForm.phone}
                 onChange={(e) => setAddForm((prev) => ({ ...prev, phone: e.target.value }))}
               />
 
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={addForm.role}
                 onChange={(e) => setAddForm((prev) => ({ ...prev, role: e.target.value }))}
               >
@@ -452,7 +452,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 <label className="block text-sm font-medium">Password tạm</label>
                 <div className="flex gap-2">
                   <input
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                     value={addForm.tempPassword}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, tempPassword: e.target.value }))}
                     required
@@ -467,7 +467,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 </div>
               </div>
 
-              <div className="rounded-md border bg-slate-50 p-3 text-sm text-slate-600">
+              <div className="rounded-xl border border-[#2d3249] bg-[#13151f] bg-[#171a27] p-3 text-sm text-[#8892b0]">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" disabled />
                   Gửi email thông báo (Tính năng email sẽ làm sau)
@@ -478,7 +478,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
                   Hủy
                 </Button>
-                <Button type="submit" className="bg-[#1F4E79] hover:bg-[#163a5b]" disabled={creating}>
+                <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={creating}>
                   {creating ? "Đang tạo..." : "Tạo user"}
                 </Button>
               </div>
@@ -488,28 +488,28 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
       ) : null}
 
       {showEditModal && selectedUser ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-lg rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5">
             <h2 className="mb-1 text-lg font-semibold">Sửa user</h2>
-            <p className="mb-4 text-sm text-slate-500">Email: {selectedUser.email} (không cho sửa)</p>
+            <p className="mb-4 text-sm text-[#8892b0]">Email: {selectedUser.email} (không cho sửa)</p>
 
             <form className="space-y-3" onSubmit={handleUpdateUser}>
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 placeholder="Họ tên"
                 value={editForm.fullName}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))}
                 required
               />
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 placeholder="Số điện thoại"
                 value={editForm.phone}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
               />
 
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={editForm.role}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
                 disabled={selectedUser.id === currentUserId}
@@ -522,7 +522,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
               </select>
 
               <select
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={editForm.isActive ? "active" : "inactive"}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, isActive: e.target.value === "active" }))}
                 disabled={selectedUser.id === currentUserId}
@@ -540,7 +540,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                   <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
                     Hủy
                   </Button>
-                  <Button type="submit" className="bg-[#1F4E79] hover:bg-[#163a5b]" disabled={updating}>
+                  <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={updating}>
                     {updating ? "Đang lưu..." : "Lưu thay đổi"}
                   </Button>
                 </div>

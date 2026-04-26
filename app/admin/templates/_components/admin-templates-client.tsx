@@ -286,7 +286,7 @@ export function AdminTemplatesClient() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Quản lý task templates</h1>
+        <h1 className="text-xl font-bold text-[#f0f2ff]">Quản lý task templates</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={openCreate}>
             Thêm template mới
@@ -294,12 +294,12 @@ export function AdminTemplatesClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm">Template category</label>
             <select
-              className="w-full rounded border px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               disabled
@@ -318,12 +318,12 @@ export function AdminTemplatesClient() {
           </label>
         </div>
 
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="mt-3 rounded-xl border border-[#2d3249] bg-[#13151f] border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
           Mẫu công tác này dùng khi tạo dự án mới. Sửa KHÔNG ảnh hưởng các dự án đã tạo.
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <h2 className="mb-2 font-semibold">Import từ CSV</h2>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -334,16 +334,16 @@ export function AdminTemplatesClient() {
           <Button variant="outline" onClick={previewImport}>
             Preview import
           </Button>
-          <Button onClick={confirmImport} disabled={importing} className="bg-[#1F4E79] hover:bg-[#163a5b]">
+          <Button onClick={confirmImport} disabled={importing} className="bg-[#f97316] text-black hover:bg-[#fb923c]">
             {importing ? "Đang import..." : "Confirm import"}
           </Button>
         </div>
 
         {previewRows.length ? (
-          <div className="mt-3 max-h-48 overflow-auto rounded border">
+          <div className="mt-3 max-h-48 overflow-auto rounded-xl border border-[#2d3249] bg-[#13151f]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-slate-50 text-left">
+                <tr className="border-b border-[#252840] bg-[#171a27] text-left">
                   <th className="px-2 py-1">Action</th>
                   <th className="px-2 py-1">Code</th>
                   <th className="px-2 py-1">Phase</th>
@@ -353,7 +353,7 @@ export function AdminTemplatesClient() {
               </thead>
               <tbody>
                 {previewRows.map((r, idx) => (
-                  <tr key={`${r.code}-${idx}`} className="border-b last:border-0">
+                  <tr key={`${r.code}-${idx}`} className="border-b border-[#252840] last:border-0">
                     <td className="px-2 py-1">{r.action}</td>
                     <td className="px-2 py-1">{r.code}</td>
                     <td className="px-2 py-1">{r.phase}</td>
@@ -367,11 +367,11 @@ export function AdminTemplatesClient() {
         ) : null}
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
-              <tr className="border-b bg-slate-50 text-slate-600">
+              <tr className="border-b border-[#252840] bg-[#171a27] text-[#8892b0]">
                 <th className="px-3 py-2">Order</th>
                 <th className="px-3 py-2">Mã</th>
                 <th className="px-3 py-2">Giai đoạn</th>
@@ -387,13 +387,13 @@ export function AdminTemplatesClient() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={10}>
+                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={10}>
                     Đang tải...
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-slate-500" colSpan={10}>
+                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={10}>
                     Không có template.
                   </td>
                 </tr>
@@ -401,7 +401,7 @@ export function AdminTemplatesClient() {
                 rows.map((row) => (
                   <tr
                     key={row.id}
-                    className={`border-b ${row.isMilestone ? "bg-red-50" : ""} ${!row.isActive ? "opacity-60" : ""}`}
+                    className={`border-b border-[#252840] ${row.isMilestone ? "bg-red-50" : ""} ${!row.isActive ? "opacity-60" : ""}`}
                   >
                     <td className="px-3 py-2">{row.displayOrder}</td>
                     <td className="px-3 py-2 font-medium">{row.code}</td>
@@ -441,10 +441,10 @@ export function AdminTemplatesClient() {
       </div>
 
       {editing || creating ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
             <h3 className="mb-2 text-lg font-semibold">{creating ? "Thêm template mới" : "Sửa template"}</h3>
-            <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+            <div className="mb-3 rounded-xl border border-[#2d3249] bg-[#13151f] border-red-500/30 bg-red-500/10 p-2 text-sm text-red-300">
               ⚠️ Thay đổi template CHỈ áp dụng cho dự án TẠO MỚI sau khi sửa. Dự án hiện tại KHÔNG bị ảnh hưởng.
             </div>
 
@@ -452,7 +452,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Mã</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.code}
                   disabled={!creating}
                   onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
@@ -462,7 +462,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Giai đoạn</label>
                 <select
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.phase}
                   onChange={(e) => setForm((p) => ({ ...p, phase: e.target.value as TaskPhase }))}
                 >
@@ -477,7 +477,7 @@ export function AdminTemplatesClient() {
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm">Tên công tác</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
                 />
@@ -487,7 +487,7 @@ export function AdminTemplatesClient() {
                 <label className="mb-1 block text-sm">Default offset days</label>
                 <input
                   type="number"
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.defaultOffsetDays}
                   onChange={(e) => setForm((p) => ({ ...p, defaultOffsetDays: e.target.value }))}
                 />
@@ -498,7 +498,7 @@ export function AdminTemplatesClient() {
                 <input
                   type="number"
                   min={1}
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.defaultDurationDays}
                   onChange={(e) => setForm((p) => ({ ...p, defaultDurationDays: e.target.value }))}
                 />
@@ -507,7 +507,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Đội</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.defaultTeam}
                   onChange={(e) => setForm((p) => ({ ...p, defaultTeam: e.target.value }))}
                 />
@@ -516,7 +516,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Nghiệm thu</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.defaultInspector}
                   onChange={(e) => setForm((p) => ({ ...p, defaultInspector: e.target.value }))}
                 />
@@ -526,7 +526,7 @@ export function AdminTemplatesClient() {
                 <label className="mb-1 block text-sm">Materials needed</label>
                 <textarea
                   rows={2}
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.materialsNeeded}
                   onChange={(e) => setForm((p) => ({ ...p, materialsNeeded: e.target.value }))}
                 />
@@ -535,7 +535,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Proposer role</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.proposerRole}
                   onChange={(e) => setForm((p) => ({ ...p, proposerRole: e.target.value }))}
                 />
@@ -544,7 +544,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Orderer role</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.ordererRole}
                   onChange={(e) => setForm((p) => ({ ...p, ordererRole: e.target.value }))}
                 />
@@ -553,7 +553,7 @@ export function AdminTemplatesClient() {
               <div>
                 <label className="mb-1 block text-sm">Receiver role</label>
                 <input
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.receiverRole}
                   onChange={(e) => setForm((p) => ({ ...p, receiverRole: e.target.value }))}
                 />
@@ -564,7 +564,7 @@ export function AdminTemplatesClient() {
                 <input
                   type="number"
                   min={1}
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.displayOrder}
                   onChange={(e) => setForm((p) => ({ ...p, displayOrder: e.target.value }))}
                 />
@@ -575,7 +575,7 @@ export function AdminTemplatesClient() {
                 <textarea
                   rows={4}
                   placeholder="Mỗi dòng 1 mục, bắt đầu bằng • "
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                   value={form.qcChecklist}
                   onChange={(e) => setForm((p) => ({ ...p, qcChecklist: e.target.value }))}
                 />
@@ -595,7 +595,7 @@ export function AdminTemplatesClient() {
               <Button variant="outline" onClick={closeModal}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={saveTemplate} disabled={saving}>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={saveTemplate} disabled={saving}>
                 {saving ? "Đang lưu..." : "Lưu"}
               </Button>
             </div>
