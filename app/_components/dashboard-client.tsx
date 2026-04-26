@@ -32,6 +32,8 @@ type TaskLite = {
   isMilestone: boolean;
   project: { id: string; code: string; name: string };
   assignedEngineer?: { id: string; fullName: string | null } | null;
+  reportGroup?: "overdue" | "running" | "starting";
+  morningDecision?: "WORK" | "PAUSE" | null;
 };
 
 type PaymentLite = {
@@ -52,9 +54,71 @@ type DashboardData = {
   admin?: {
     delayedTasks: TaskLite[];
     recentProjects: ProjectLite[];
+    missingMorning?: Array<{
+      projectId: string;
+      projectCode: string;
+      projectName: string;
+      engineerId: string;
+      engineerName: string;
+    }>;
+    missingEvening?: Array<{
+      projectId: string;
+      projectCode: string;
+      projectName: string;
+      engineerId: string;
+      engineerName: string;
+    }>;
+    issueProjects?: Array<{
+      projectId: string;
+      projectCode: string;
+      projectName: string;
+      underCount: number;
+    }>;
+    topKpi?: Array<{
+      userId: string;
+      fullName: string;
+      email: string;
+      projectCount: number;
+      score: number;
+      rank: string;
+    }>;
+    bottomKpi?: Array<{
+      userId: string;
+      fullName: string;
+      email: string;
+      projectCount: number;
+      score: number;
+      rank: string;
+    }>;
   };
   engineer?: {
     todayTasks: TaskLite[];
+    taskGroups?: {
+      overdue: TaskLite[];
+      running: TaskLite[];
+      starting: TaskLite[];
+    };
+    reportStatus?: Array<{
+      projectId: string;
+      projectCode: string;
+      projectName: string;
+      isActive: boolean;
+      isRestDay: boolean;
+      restReason: string | null;
+      morningLabel: string;
+      morningTone: "good" | "warn" | "danger" | "info";
+      eveningLabel: string;
+      eveningTone: "good" | "warn" | "danger" | "info";
+      morningSubmitted: boolean;
+      eveningSubmitted: boolean;
+    }>;
+    kpiMonth?: {
+      score: number;
+      rank: string;
+      projectId: string | null;
+      projectCode: string | null;
+      projectName: string | null;
+    } | null;
     upcomingMilestones: TaskLite[];
   };
   foreman?: {
@@ -75,6 +139,13 @@ function toneClass(tone: "good" | "warn" | "danger" | "info") {
   return "text-slate-700";
 }
 
+function toneBadge(tone: "good" | "warn" | "danger" | "info") {
+  if (tone === "good") return "bg-emerald-100 text-emerald-700";
+  if (tone === "warn") return "bg-amber-100 text-amber-700";
+  if (tone === "danger") return "bg-red-100 text-red-700";
+  return "bg-slate-100 text-slate-700";
+}
+
 function fmtDate(dateIso: string) {
   const d = new Date(dateIso);
   const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -83,17 +154,123 @@ function fmtDate(dateIso: string) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-function fmtMoney(v: number) {
-  return `${Math.round(v).toLocaleString("vi-VN")} đ`;
+function fmtMoney(value: number) {
+  return `${Math.round(value).toLocaleString("vi-VN")} đ`;
+}
+
+function rankClass(rank: string) {
+  if (rank === "A") return "bg-emerald-100 text-emerald-700";
+  if (rank === "B") return "bg-blue-100 text-blue-700";
+  if (rank === "C") return "bg-amber-100 text-amber-700";
+  return "bg-red-100 text-red-700";
+}
+
+function morningDecisionLabel(value: "WORK" | "PAUSE" | null | undefined) {
+  if (value === "WORK") return "WORK";
+  if (value === "PAUSE") return "PAUSE";
+  return "-";
+}
+
+function TaskGroupBadge({ group }: { group: "overdue" | "running" | "starting" | undefined }) {
+  if (group === "overdue") {
+    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">TRỄ HẠN</span>;
+  }
+  if (group === "running") {
+    return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">ĐANG CHẠY</span>;
+  }
+  if (group === "starting") {
+    return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">SẮP BẮT ĐẦU</span>;
+  }
+  return null;
 }
 
 function EmptyState({ text, href, action }: { text: string; href: string; action: string }) {
   return (
-    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-slate-600">
+    <div className="rounded-xl border border-dashed border-[#3a3f58] bg-[#171a27] p-6 text-center text-sm text-[#8892b0]">
       <p className="mb-3">{text}</p>
       <Link href={href} className="inline-flex">
         <Button variant="outline">{action}</Button>
       </Link>
+    </div>
+  );
+}
+
+function ReportStatusCard({
+  rows,
+}: {
+  rows: NonNullable<DashboardData["engineer"]>["reportStatus"];
+}) {
+  if (!rows || rows.length === 0) {
+    return <EmptyState text="Không có dự án báo cáo hôm nay." href="/reports/morning" action="Vào báo cáo" />;
+  }
+
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.projectId} className="rounded-xl border border-[#2d3249] bg-[#171a27] p-3 text-sm">
+          <div className="mb-1 font-medium">
+            {row.projectCode} - {row.projectName}
+          </div>
+          <div className="mb-2 flex flex-wrap gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-xs ${toneBadge(row.morningTone)}`}>Sáng: {row.morningLabel}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs ${toneBadge(row.eveningTone)}`}>Chiều: {row.eveningLabel}</span>
+          </div>
+          {row.isActive && !row.isRestDay ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/reports/morning/${row.projectId}`}>
+                <Button variant="outline" size="sm">
+                  Báo cáo sáng
+                </Button>
+              </Link>
+              <Link href={`/reports/evening/${row.projectId}`}>
+                <Button variant="outline" size="sm">
+                  Báo cáo chiều
+                </Button>
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TaskGroupsCard({
+  groups,
+}: {
+  groups: NonNullable<NonNullable<DashboardData["engineer"]>["taskGroups"]>;
+}) {
+  const renderGroup = (title: string, rows: TaskLite[], group: "overdue" | "running" | "starting") => (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1 text-sm font-semibold text-slate-700">
+        {group === "overdue" ? <AlertTriangle className="h-4 w-4 text-red-600" /> : null}
+        <span>{title}</span>
+      </div>
+      {rows.length ? (
+        rows.map((task) => (
+          <div key={task.id} className="rounded-xl border border-[#2d3249] bg-[#171a27] p-2">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <TaskGroupBadge group={task.reportGroup} />
+              <Link href={`/tasks/${task.id}`} className="text-sm font-medium text-[#f0f2ff] hover:underline">
+                {task.code} - {task.name}
+              </Link>
+            </div>
+            <div className="text-xs text-[#8892b0]">
+              {task.project.code} • Hạn: {fmtDate(task.plannedEndDate)} • Sáng: {morningDecisionLabel(task.morningDecision)}
+            </div>
+          </div>
+        ))
+      ) : (
+        <div className="rounded-xl border border-dashed border-[#3a3f58] p-2 text-xs text-[#8892b0]">Không có task.</div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {renderGroup("TRỄ HẠN", groups.overdue, "overdue")}
+      {renderGroup("ĐANG CHẠY", groups.running, "running")}
+      {renderGroup("SẮP BẮT ĐẦU", groups.starting, "starting")}
     </div>
   );
 }
@@ -104,13 +281,21 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     admin_delayed: <ShieldAlert className="h-4 w-4" />,
     admin_in_progress: <Hammer className="h-4 w-4" />,
     admin_payment_due: <DollarSign className="h-4 w-4" />,
+    admin_missing_morning: <Clock3 className="h-4 w-4" />,
+    admin_missing_evening: <Clock3 className="h-4 w-4" />,
+    admin_issue_projects: <AlertTriangle className="h-4 w-4" />,
     cm_projects: <FolderKanban className="h-4 w-4" />,
     cm_delayed: <ShieldAlert className="h-4 w-4" />,
     cm_in_progress: <Hammer className="h-4 w-4" />,
+    cm_missing_morning: <Clock3 className="h-4 w-4" />,
+    cm_missing_evening: <Clock3 className="h-4 w-4" />,
+    cm_issue_projects: <AlertTriangle className="h-4 w-4" />,
     engineer_today: <ListTodo className="h-4 w-4" />,
     engineer_delayed: <AlertTriangle className="h-4 w-4" />,
     engineer_next3: <Clock3 className="h-4 w-4" />,
     engineer_projects: <Briefcase className="h-4 w-4" />,
+    engineer_report_today: <Bell className="h-4 w-4" />,
+    engineer_kpi_month: <TrendingUp className="h-4 w-4" />,
     foreman_week: <CalendarClock className="h-4 w-4" />,
     foreman_materials: <Wrench className="h-4 w-4" />,
     accountant_due7: <Bell className="h-4 w-4" />,
@@ -119,120 +304,309 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     accountant_expected_month: <TrendingUp className="h-4 w-4" />,
   };
 
+  const cardAnchorMap: Record<string, string> = {
+    admin_missing_morning: "#missing-morning-list",
+    cm_missing_morning: "#missing-morning-list",
+    admin_missing_evening: "#missing-evening-list",
+    cm_missing_evening: "#missing-evening-list",
+    admin_issue_projects: "#issue-projects-list",
+    cm_issue_projects: "#issue-projects-list",
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {data.cards.map((card) => (
-          <Card key={card.key}>
-            <CardHeader className="pb-1">
-              <CardTitle className="flex items-center gap-2">
-                {iconMap[card.key] || <Briefcase className="h-4 w-4" />} {card.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold ${toneClass(card.tone)}`}>{card.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-3 grid-cols-2">
+        {data.cards.map((card) => {
+          const anchor = cardAnchorMap[card.key];
+          const cardNode = (
+            <Card className={`border-[#252840] bg-[#1a1d2e] ${anchor ? "cursor-pointer transition-colors hover:bg-[#22263a]" : ""}`}>
+              <CardHeader className="pb-1">
+                <CardTitle className="flex items-center gap-2">
+                  {iconMap[card.key] || <Briefcase className="h-4 w-4" />} {card.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${toneClass(card.tone)}`}>{card.value}</div>
+              </CardContent>
+            </Card>
+          );
+
+          if (anchor) {
+            return (
+              <Link key={card.key} href={anchor} className="block rounded-xl">
+                {cardNode}
+              </Link>
+            );
+          }
+
+          return <div key={card.key}>{cardNode}</div>;
+        })}
       </div>
 
       {data.role === "admin" || data.role === "construction_manager" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 10 task trễ mới nhất</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.admin?.delayedTasks?.length ? (
-                <div className="space-y-2">
-                  {data.admin.delayedTasks.map((t) => (
-                    <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded border p-2 hover:bg-slate-50">
-                      <div className="text-sm font-medium">{t.code} - {t.name}</div>
-                      <div className="text-xs text-slate-600">
-                        {t.project.code} • KS: {t.assignedEngineer?.fullName || "-"} • Hạn: {fmtDate(t.plannedEndDate)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Chưa có task trễ." href="/projects" action="Xem dự án" />
-              )}
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 10 task trễ mới nhất</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.delayedTasks?.length ? (
+                  <div className="space-y-2">
+                    {data.admin.delayedTasks.map((task) => (
+                      <Link key={task.id} href={`/tasks/${task.id}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                        <div className="text-sm font-medium">
+                          {task.code} - {task.name}
+                        </div>
+                        <div className="text-xs text-[#8892b0]">
+                          {task.project.code} • KS: {task.assignedEngineer?.fullName || "-"} • Hạn: {fmtDate(task.plannedEndDate)}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState text="Chưa có task trễ." href="/projects" action="Xem dự án" />
+                )}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>5 dự án gần đây</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.admin?.recentProjects?.length ? (
-                <div className="space-y-2">
-                  {data.admin.recentProjects.map((p) => (
-                    <Link key={p.id} href={`/projects/${p.id}`} className="block rounded border p-2 hover:bg-slate-50">
-                      <div className="text-sm font-medium">{p.code} - {p.name}</div>
-                      <div className="text-xs text-slate-600">Tạo: {fmtDate(p.createdAt)}</div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Chưa có dự án nào." href="/projects/new" action="Tạo dự án" />
-              )}
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>5 dự án gần đây</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.recentProjects?.length ? (
+                  <div className="space-y-2">
+                    {data.admin.recentProjects.map((project) => (
+                      <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                        <div className="text-sm font-medium">
+                          {project.code} - {project.name}
+                        </div>
+                        <div className="text-xs text-[#8892b0]">Tạo: {fmtDate(project.createdAt)}</div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState text="Chưa có dự án nào." href="/projects/new" action="Tạo dự án" />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4">
+            <Card id="missing-morning-list">
+              <CardHeader>
+                <CardTitle>KS chưa báo cáo sáng hôm nay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.missingMorning?.length ? (
+                  <div className="space-y-2 text-sm">
+                    {data.admin.missingMorning.map((row) => (
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/morning/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                        <div className="font-medium">{row.engineerName}</div>
+                        <div className="text-xs text-[#8892b0]">
+                          {row.projectCode} - {row.projectName}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#8892b0]">Không có KS nào thiếu báo cáo sáng.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card id="missing-evening-list">
+              <CardHeader>
+                <CardTitle>KS chưa báo cáo chiều hôm nay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.missingEvening?.length ? (
+                  <div className="space-y-2 text-sm">
+                    {data.admin.missingEvening.map((row) => (
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/evening/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                        <div className="font-medium">{row.engineerName}</div>
+                        <div className="text-xs text-[#8892b0]">
+                          {row.projectCode} - {row.projectName}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#8892b0]">Không có KS nào thiếu báo cáo chiều.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card id="issue-projects-list">
+              <CardHeader>
+                <CardTitle>Dự án có vấn đề hôm nay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.issueProjects?.length ? (
+                  <div className="space-y-2 text-sm">
+                    {data.admin.issueProjects.map((row) => (
+                      <Link key={row.projectId} href={`/projects/${row.projectId}/construction-log`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                        <div className="font-medium">
+                          {row.projectCode} - {row.projectName}
+                        </div>
+                        <div className="text-xs text-[#8892b0]">UNDER hôm nay: {row.underCount}</div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#8892b0]">Không có dự án bị UNDER hôm nay.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 3 KS KPI cao nhất tháng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.topKpi?.length ? (
+                  <div className="space-y-2 text-sm">
+                    {data.admin.topKpi.map((row) => (
+                      <div key={row.userId} className="rounded-xl border border-[#2d3249] bg-[#171a27] p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="font-medium">{row.fullName}</div>
+                            <div className="text-xs text-[#8892b0]">{row.email}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{row.score.toFixed(2)}</div>
+                            <span className={`rounded-full px-2 py-0.5 text-xs ${rankClass(row.rank)}`}>{row.rank}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#8892b0]">Chưa có dữ liệu KPI.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Bottom 3 KS KPI thấp nhất tháng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.admin?.bottomKpi?.length ? (
+                  <div className="space-y-2 text-sm">
+                    {data.admin.bottomKpi.map((row) => (
+                      <div key={row.userId} className="rounded-xl border border-[#2d3249] bg-[#171a27] p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="font-medium">{row.fullName}</div>
+                            <div className="text-xs text-[#8892b0]">{row.email}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{row.score.toFixed(2)}</div>
+                            <span className={`rounded-full px-2 py-0.5 text-xs ${rankClass(row.rank)}`}>{row.rank}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#8892b0]">Chưa có dữ liệu KPI.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       ) : null}
 
       {data.role === "engineer" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Task hôm nay của bạn</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.engineer?.todayTasks?.length ? (
-                <div className="space-y-2">
-                  {data.engineer.todayTasks.map((t) => (
-                    <div key={t.id} className="rounded border p-2">
-                      <div className="mb-1 flex items-center justify-between">
-                        <Link href={`/tasks/${t.id}`} className="text-sm font-medium hover:underline">
-                          {t.code} - {t.name}
-                        </Link>
-                        <span className={`rounded-full px-2 py-1 text-xs ${STATUS_CLASS[t.status]}`}>{STATUS_LABEL[t.status]}</span>
-                      </div>
-                      <div className="text-xs text-slate-600">{t.project.code} • Hạn: {fmtDate(t.plannedEndDate)}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Bạn chưa có công việc nào hôm nay." href="/projects" action="Xem tiến độ" />
-              )}
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Báo cáo hôm nay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ReportStatusCard rows={data.engineer?.reportStatus} />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Milestone sắp đến 7 ngày</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.engineer?.upcomingMilestones?.length ? (
-                <div className="space-y-2">
-                  {data.engineer.upcomingMilestones.map((t) => (
-                    <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded border border-red-200 bg-red-50 p-2">
-                      <div className="text-sm font-medium">{t.code} - {t.name}</div>
-                      <div className="text-xs text-red-700">{t.project.code} • {fmtDate(t.plannedStartDate)}</div>
+            <Card>
+              <CardHeader>
+                <CardTitle>KPI tháng này</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.engineer?.kpiMonth ? (
+                  <div className="space-y-3">
+                    <div className="text-4xl font-bold text-orange-300">{data.engineer.kpiMonth.score.toFixed(2)}</div>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-sm ${rankClass(data.engineer.kpiMonth.rank)}`}>
+                      Hạng {data.engineer.kpiMonth.rank}
+                    </span>
+                    <div className="text-sm text-[#8892b0]">
+                      {data.engineer.kpiMonth.projectCode && data.engineer.kpiMonth.projectName
+                        ? `${data.engineer.kpiMonth.projectCode} - ${data.engineer.kpiMonth.projectName}`
+                        : "Không có dự án KPI"}
+                    </div>
+                    <Link href="/my-kpi" className="inline-flex">
+                      <Button variant="outline">Xem chi tiết</Button>
                     </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Không có milestone sắp đến." href="/projects" action="Xem dự án" />
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                ) : (
+                  <EmptyState text="Chưa có dữ liệu KPI tháng này." href="/my-kpi" action="Xem KPI" />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Task hôm nay (theo nhóm)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TaskGroupsCard
+                  groups={
+                    data.engineer?.taskGroups || {
+                      overdue: [],
+                      running: [],
+                      starting: [],
+                    }
+                  }
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Milestone sắp đến 7 ngày</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.engineer?.upcomingMilestones?.length ? (
+                  <div className="space-y-2">
+                    {data.engineer.upcomingMilestones.map((task) => (
+                      <Link key={task.id} href={`/tasks/${task.id}`} className="block rounded-xl border border-red-500/40 bg-red-500/10 p-2">
+                        <div className="text-sm font-medium">
+                          {task.code} - {task.name}
+                        </div>
+                        <div className="text-xs text-red-300">
+                          {task.project.code} • {fmtDate(task.plannedStartDate)}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState text="Không có milestone sắp đến." href="/projects" action="Xem dự án" />
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       ) : null}
 
       {data.role === "foreman" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Task tuần này của đội</CardTitle>
@@ -240,10 +614,14 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <CardContent>
               {data.foreman?.weekTasks?.length ? (
                 <div className="space-y-2">
-                  {data.foreman.weekTasks.map((t) => (
-                    <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded border p-2 hover:bg-slate-50">
-                      <div className="text-sm font-medium">{t.code} - {t.name}</div>
-                      <div className="text-xs text-slate-600">{fmtDate(t.plannedStartDate)} → {fmtDate(t.plannedEndDate)}</div>
+                  {data.foreman.weekTasks.map((task) => (
+                    <Link key={task.id} href={`/tasks/${task.id}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <div className="text-sm font-medium">
+                        {task.code} - {task.name}
+                      </div>
+                      <div className="text-xs text-[#8892b0]">
+                        {fmtDate(task.plannedStartDate)} → {fmtDate(task.plannedEndDate)}
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -260,10 +638,14 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <CardContent>
               {data.foreman?.upcomingMilestones?.length ? (
                 <div className="space-y-2">
-                  {data.foreman.upcomingMilestones.map((t) => (
-                    <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded border border-amber-200 bg-amber-50 p-2">
-                      <div className="text-sm font-medium">{t.code} - {t.name}</div>
-                      <div className="text-xs text-amber-700">{t.project.code} • {fmtDate(t.plannedStartDate)}</div>
+                  {data.foreman.upcomingMilestones.map((task) => (
+                    <Link key={task.id} href={`/tasks/${task.id}`} className="block rounded-xl border border-amber-500/40 bg-amber-500/10 p-2">
+                      <div className="text-sm font-medium">
+                        {task.code} - {task.name}
+                      </div>
+                      <div className="text-xs text-amber-300">
+                        {task.project.code} • {fmtDate(task.plannedStartDate)}
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -276,7 +658,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       ) : null}
 
       {data.role === "accountant" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Lịch thanh toán sắp đến</CardTitle>
@@ -284,10 +666,12 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <CardContent>
               {data.accountant?.upcomingPayments?.length ? (
                 <div className="space-y-2">
-                  {data.accountant.upcomingPayments.map((p) => (
-                    <Link key={p.id} href={`/projects/${p.project.id}/payments`} className="block rounded border p-2 hover:bg-slate-50">
-                      <div className="text-sm font-medium">{p.project.code} - Đợt {p.phaseNumber}</div>
-                      <div className="text-xs text-slate-600">{fmtDate(p.expectedDate)} • {fmtMoney(p.amount)}</div>
+                  {data.accountant.upcomingPayments.map((payment) => (
+                    <Link key={payment.id} href={`/projects/${payment.project.id}/payments`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <div className="text-sm font-medium">{payment.project.code} - Đợt {payment.phaseNumber}</div>
+                      <div className="text-xs text-[#8892b0]">
+                        {fmtDate(payment.expectedDate)} • {fmtMoney(payment.amount)}
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -304,10 +688,12 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <CardContent>
               {data.accountant?.latePayments?.length ? (
                 <div className="space-y-2">
-                  {data.accountant.latePayments.map((p) => (
-                    <Link key={p.id} href={`/projects/${p.project.id}/payments`} className="block rounded border border-red-200 bg-red-50 p-2">
-                      <div className="text-sm font-medium">{p.project.code} - Đợt {p.phaseNumber}</div>
-                      <div className="text-xs text-red-700">Quá hạn {fmtDate(p.expectedDate)} • {fmtMoney(p.amount)}</div>
+                  {data.accountant.latePayments.map((payment) => (
+                    <Link key={payment.id} href={`/projects/${payment.project.id}/payments`} className="block rounded-xl border border-red-500/40 bg-red-500/10 p-2">
+                      <div className="text-sm font-medium">{payment.project.code} - Đợt {payment.phaseNumber}</div>
+                      <div className="text-xs text-red-300">
+                        Quá hạn {fmtDate(payment.expectedDate)} • {fmtMoney(payment.amount)}
+                      </div>
                     </Link>
                   ))}
                 </div>
