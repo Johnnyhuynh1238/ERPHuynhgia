@@ -30,7 +30,7 @@ export default async function ProjectsNewPage() {
 
         <h1 className="text-2xl font-semibold text-[#1F4E79]">Tạo dự án mới</h1>
 
-        <ProjectsNewForm currentUserId={user.id} currentUserRole={user.role} currentUserName={user.fullName} />
+        <ProjectsNewForm currentUserId={user.id} currentUserRole={user.role} currentUserName={user.name ?? ""} />
       </div>
     </ProtectedLayout>
   );

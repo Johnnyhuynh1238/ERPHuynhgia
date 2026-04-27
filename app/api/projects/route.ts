@@ -273,6 +273,8 @@ export async function POST(request: Request) {
   }
 
   const contractValue = isConstructionManager ? null : Math.round(areaM2 * unitPrice);
+  const contractValueForCreate =
+    contractValue !== null && contractValue !== undefined ? new Prisma.Decimal(contractValue) : null;
   const projectManagerId = isConstructionManager ? actorUser.id : parsed.data.projectManagerId;
 
   if (!projectManagerId) {
@@ -333,7 +335,7 @@ export async function POST(request: Request) {
           address: parsed.data.address,
           areaM2,
           unitPrice,
-          contractValue,
+          contractValue: contractValueForCreate ?? new Prisma.Decimal(0),
           startDate,
           expectedEndDate,
           projectManagerId,
