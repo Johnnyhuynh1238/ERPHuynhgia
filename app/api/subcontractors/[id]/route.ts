@@ -38,6 +38,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           },
         },
       },
+      contracts: {
+        select: {
+          evaluations: {
+            select: {
+              willHireAgain: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -45,10 +54,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không tìm thấy thầu phụ" }, { status: 404 });
   }
 
+  const evaluations = subcontractor.contracts.flatMap((contract) => contract.evaluations);
+  const evaluationCount = evaluations.length;
+  const hireAgainCount = evaluations.filter((x) => x.willHireAgain).length;
+
   return NextResponse.json({
     subcontractor: {
       ...serializeSubcontractor(subcontractor),
       specialties: subcontractor.specialties.map((m) => m.specialty),
+      evaluationCount,
+      hireAgainRate: evaluationCount > 0 ? Math.round((hireAgainCount / evaluationCount) * 100) : 0,
     },
   });
 }

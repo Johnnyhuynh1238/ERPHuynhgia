@@ -26,6 +26,7 @@ export default async function SubContractDetailPage({ params }: { params: { id: 
         contractId={params.id}
         canWrite={["admin", "construction_manager"].includes(user.role)}
         currentRole={user.role}
+        currentUserId={user.id}
       />
     </ProtectedLayout>
   );

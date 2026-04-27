@@ -23,12 +23,32 @@ export default async function SubcontractorDetailPage({ params }: { params: { id
           },
         },
       },
+      contracts: {
+        select: {
+          evaluations: {
+            select: {
+              willHireAgain: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (!subcontractor) {
     notFound();
   }
+
+  const evaluations = subcontractor.contracts.flatMap((contract) => contract.evaluations);
+  const evaluationCount = evaluations.length;
+  const hireAgainCount = evaluations.filter((x) => x.willHireAgain).length;
+
+  const payload = {
+    ...serializeSubcontractor(subcontractor),
+    specialties: subcontractor.specialties.map((m) => m.specialty),
+    evaluationCount,
+    hireAgainRate: evaluationCount > 0 ? Math.round((hireAgainCount / evaluationCount) * 100) : 0,
+  };
 
   return (
     <ProtectedLayout>
@@ -39,14 +59,7 @@ export default async function SubcontractorDetailPage({ params }: { params: { id
           <span>{subcontractor.code}</span>
         </div>
 
-        <SubcontractorDetailClient
-          subcontractor={JSON.parse(
-            JSON.stringify({
-              ...serializeSubcontractor(subcontractor),
-              specialties: subcontractor.specialties.map((m) => m.specialty),
-            }),
-          )}
-        />
+        <SubcontractorDetailClient subcontractor={JSON.parse(JSON.stringify(payload))} />
       </div>
     </ProtectedLayout>
   );

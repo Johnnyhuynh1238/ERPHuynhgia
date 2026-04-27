@@ -77,15 +77,31 @@ export async function GET(request: Request) {
           },
         },
       },
+      contracts: {
+        select: {
+          evaluations: {
+            select: {
+              willHireAgain: true,
+            },
+          },
+        },
+      },
     },
     orderBy: [{ isActive: "desc" }, { status: "asc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json({
-    subcontractors: subcontractors.map((item) => ({
-      ...serializeSubcontractor(item),
-      specialties: item.specialties.map((m) => m.specialty),
-    })),
+    subcontractors: subcontractors.map((item) => {
+      const evaluations = item.contracts.flatMap((contract) => contract.evaluations);
+      const evaluationCount = evaluations.length;
+      const hireAgainCount = evaluations.filter((x) => x.willHireAgain).length;
+      return {
+        ...serializeSubcontractor(item),
+        specialties: item.specialties.map((m) => m.specialty),
+        evaluationCount,
+        hireAgainRate: evaluationCount > 0 ? Math.round((hireAgainCount / evaluationCount) * 100) : 0,
+      };
+    }),
   });
 }
 

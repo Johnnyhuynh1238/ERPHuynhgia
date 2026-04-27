@@ -34,6 +34,8 @@ type SubcontractorItem = {
   isActive: boolean;
   avgRating: number | null;
   totalContracts: number;
+  evaluationCount: number;
+  hireAgainRate: number;
   specialties: Specialty[];
   updatedAt: string;
 };
@@ -323,6 +325,21 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
                   <Phone className="h-3.5 w-3.5" /> {item.phone}
                 </a>
                 {item.altPhone ? <a href={`tel:${item.altPhone}`} className="text-xs text-[#a4acc8]">{item.altPhone}</a> : null}
+              </div>
+
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
+                  <div className="text-[#8892b0]">ĐTB</div>
+                  <div className="font-semibold text-[#f0f2ff]">{item.avgRating ? item.avgRating.toFixed(2) : "-"}</div>
+                </div>
+                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
+                  <div className="text-[#8892b0]">Lượt đánh giá</div>
+                  <div className="font-semibold text-[#f0f2ff]">{item.evaluationCount}</div>
+                </div>
+                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
+                  <div className="text-[#8892b0]">Hire lại</div>
+                  <div className="font-semibold text-[#f0f2ff]">{item.hireAgainRate}%</div>
+                </div>
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1">

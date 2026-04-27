@@ -192,13 +192,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
         },
       });
 
+      const totalContracts = await tx.subContract.count({
+        where: { subcontractorId: payload.subcontractorId },
+      });
+
       await tx.subcontractor.update({
         where: { id: payload.subcontractorId },
-        data: {
-          totalContracts: {
-            increment: 1,
-          },
-        },
+        data: { totalContracts },
       });
 
       return row;

@@ -107,73 +107,118 @@ export async function GET() {
   if (user.role === UserRole.admin || user.role === UserRole.construction_manager) {
     const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
 
-    const [projectInProgress, totalDelayed, inProgressToday, paymentDue7, delayedTasks, recentProjects, reportProjectsRaw] =
-      await Promise.all([
-        prisma.project.count({ where: { ...projectAccess, status: "in_progress" } }),
-        prisma.task.count({
-          where: {
-            isActive: true,
-            status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-            plannedEndDate: { lt: today },
-            project: projectAccess,
-          },
-        }),
-        prisma.task.count({
-          where: {
-            isActive: true,
-            status: TaskStatus.in_progress,
-            project: projectAccess,
-          },
-        }),
-        user.role === UserRole.admin
-          ? prisma.paymentSchedule.count({
-              where: {
-                status: PaymentStatus.not_collected,
-                expectedDate: { gte: today, lte: in7Days },
-              },
-            })
-          : Promise.resolve(0),
-        prisma.task.findMany({
-          where: {
-            isActive: true,
-            status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-            plannedEndDate: { lt: today },
-            project: projectAccess,
-          },
-          include: {
-            project: { select: { id: true, code: true, name: true } },
-            assignedEngineer: { select: { id: true, fullName: true } },
-          },
-          orderBy: { plannedEndDate: "desc" },
-          take: 10,
-        }),
-        prisma.project.findMany({
-          where: projectAccess,
-          orderBy: { createdAt: "desc" },
-          take: 5,
-          select: { id: true, code: true, name: true, createdAt: true },
-        }),
-        prisma.project.findMany({
-          where: {
-            ...projectAccess,
-            status: { in: ["planning", "in_progress", "paused"] },
-            goLiveDate: { not: null, lte: today },
-          },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            mainEngineerId: true,
-            mainEngineer: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
+    const [
+      projectInProgress,
+      totalDelayed,
+      inProgressToday,
+      paymentDue7,
+      delayedTasks,
+      recentProjects,
+      reportProjectsRaw,
+      subPaymentRequestsNeedingApproval,
+      subPendingRequests,
+      subDuePayments7,
+      contractsWithoutEvaluation,
+    ] = await Promise.all([
+      prisma.project.count({ where: { ...projectAccess, status: "in_progress" } }),
+      prisma.task.count({
+        where: {
+          isActive: true,
+          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+          plannedEndDate: { lt: today },
+          project: projectAccess,
+        },
+      }),
+      prisma.task.count({
+        where: {
+          isActive: true,
+          status: TaskStatus.in_progress,
+          project: projectAccess,
+        },
+      }),
+      user.role === UserRole.admin
+        ? prisma.paymentSchedule.count({
+            where: {
+              status: PaymentStatus.not_collected,
+              expectedDate: { gte: today, lte: in7Days },
+            },
+          })
+        : Promise.resolve(0),
+      prisma.task.findMany({
+        where: {
+          isActive: true,
+          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+          plannedEndDate: { lt: today },
+          project: projectAccess,
+        },
+        include: {
+          project: { select: { id: true, code: true, name: true } },
+          assignedEngineer: { select: { id: true, fullName: true } },
+        },
+        orderBy: { plannedEndDate: "desc" },
+        take: 10,
+      }),
+      prisma.project.findMany({
+        where: projectAccess,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, code: true, name: true, createdAt: true },
+      }),
+      prisma.project.findMany({
+        where: {
+          ...projectAccess,
+          status: { in: ["planning", "in_progress", "paused"] },
+          goLiveDate: { not: null, lte: today },
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          mainEngineerId: true,
+          mainEngineer: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
             },
           },
-        }),
-      ]);
+        },
+      }),
+      prisma.subPayment.count({
+        where: {
+          status: "requested",
+          subContract: {
+            project: projectAccess,
+          },
+        },
+      }),
+      prisma.subPayment.count({
+        where: {
+          status: "pending",
+          subContract: {
+            project: projectAccess,
+          },
+        },
+      }),
+      prisma.subPayment.count({
+        where: {
+          status: { in: ["pending", "requested", "approved"] },
+          expectedDate: { gte: today, lte: in7Days },
+          subContract: {
+            project: projectAccess,
+          },
+        },
+      }),
+      prisma.subContract.count({
+        where: {
+          status: { in: ["active", "completed"] },
+          project: projectAccess,
+          evaluations: {
+            none: {},
+          },
+        },
+      }),
+    ]);
 
     const reportProjectIds = reportProjectsRaw.map((project) => project.id);
 
@@ -368,6 +413,18 @@ export async function GET() {
         value: issueProjects.length,
         tone: issueProjects.length > 0 ? ("danger" as const) : ("good" as const),
       },
+      {
+        key: user.role === UserRole.admin ? "admin_sub_requests" : "cm_sub_requests",
+        label: "Yêu cầu chi thầu phụ chờ duyệt",
+        value: subPaymentRequestsNeedingApproval,
+        tone: subPaymentRequestsNeedingApproval > 0 ? ("warn" as const) : ("good" as const),
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_sub_without_eval" : "cm_sub_without_eval",
+        label: "HĐ thầu phụ chưa đánh giá",
+        value: contractsWithoutEvaluation,
+        tone: contractsWithoutEvaluation > 0 ? ("warn" as const) : ("good" as const),
+      },
     ];
 
     const cards =
@@ -381,7 +438,21 @@ export async function GET() {
               tone: paymentDue7 > 0 ? ("warn" as const) : ("info" as const),
             },
           ]
-        : commonCards;
+        : [
+            ...commonCards,
+            {
+              key: "cm_sub_due7",
+              label: "Đợt chi thầu phụ 7 ngày tới",
+              value: subDuePayments7,
+              tone: subDuePayments7 > 0 ? ("warn" as const) : ("info" as const),
+            },
+            {
+              key: "cm_sub_pending",
+              label: "Đề xuất chi thầu phụ mới",
+              value: subPendingRequests,
+              tone: subPendingRequests > 0 ? ("warn" as const) : ("good" as const),
+            },
+          ];
 
     return NextResponse.json({
       role: user.role,
@@ -727,7 +798,7 @@ export async function GET() {
     const monthStart = startOfMonthUtc(today);
     const monthEnd = endOfMonthUtc(today);
 
-    const [upcoming, late, collectedMonthAgg, expectedMonthAgg] = await Promise.all([
+    const [upcoming, late, collectedMonthAgg, expectedMonthAgg, approvedSubPayments] = await Promise.all([
       prisma.paymentSchedule.findMany({
         where: {
           status: PaymentStatus.not_collected,
@@ -755,6 +826,11 @@ export async function GET() {
         _sum: { amount: true },
         where: {
           expectedDate: { gte: monthStart, lte: monthEnd },
+        },
+      }),
+      prisma.subPayment.count({
+        where: {
+          status: "approved",
         },
       }),
     ]);
@@ -788,6 +864,12 @@ export async function GET() {
           label: "Dự kiến thu tháng này",
           value: Math.round(expectedMonth),
           tone: "info",
+        },
+        {
+          key: "accountant_sub_approved_pending_payout",
+          label: "Chi thầu phụ đã duyệt chờ payout",
+          value: approvedSubPayments,
+          tone: approvedSubPayments > 0 ? "warn" : "good",
         },
       ],
       accountant: {

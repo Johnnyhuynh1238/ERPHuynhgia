@@ -15,10 +15,37 @@ type ReportRow = {
   targetHref: string;
 };
 
+type SubcontractorSpendingRow = {
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  subcontractorId: string;
+  subcontractorCode: string;
+  subcontractorName: string;
+  totalPaid: number;
+  paymentCount: number;
+};
+
+type TopSubcontractorRow = {
+  id: string;
+  code: string;
+  name: string;
+  avgRating: number | null;
+  totalContracts: number;
+  evaluationCount: number;
+  willHireAgainRate: number;
+};
+
+function fmtMoney(value: number) {
+  return `${Math.round(value).toLocaleString("vi-VN")} đ`;
+}
+
 export function ReportsOverviewClient({
   dateLabel,
   summary,
   rows,
+  subcontractorSpending = [],
+  topSubcontractors = [],
 }: {
   dateLabel: string;
   summary: {
@@ -28,6 +55,8 @@ export function ReportsOverviewClient({
     kpiPercent: number;
   };
   rows: ReportRow[];
+  subcontractorSpending?: SubcontractorSpendingRow[];
+  topSubcontractors?: TopSubcontractorRow[];
 }) {
   const [search, setSearch] = useState("");
 
@@ -157,6 +186,37 @@ export function ReportsOverviewClient({
           </table>
         </div>
       </div>
+
+      {subcontractorSpending.length > 0 ? (
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+          <h2 className="mb-3 text-lg font-semibold text-[#f0f2ff]">Chi phí thầu phụ (đã chi)</h2>
+          <div className="space-y-2">
+            {subcontractorSpending.map((row) => (
+              <div key={`${row.projectId}-${row.subcontractorId}`} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm">
+                <div className="font-medium text-[#f0f2ff]">{row.projectCode} • {row.subcontractorCode} - {row.subcontractorName}</div>
+                <div className="mt-1 text-xs text-[#8892b0]">{row.projectName} • {row.paymentCount} đợt đã chi</div>
+                <div className="mt-1 text-sm text-emerald-300">{fmtMoney(row.totalPaid)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {topSubcontractors.length > 0 ? (
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+          <h2 className="mb-3 text-lg font-semibold text-[#f0f2ff]">Top thầu phụ</h2>
+          <div className="space-y-2">
+            {topSubcontractors.map((row) => (
+              <div key={row.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm">
+                <div className="font-medium text-[#f0f2ff]">{row.code} - {row.name}</div>
+                <div className="mt-1 text-xs text-[#8892b0]">
+                  ĐTB: {row.avgRating !== null ? row.avgRating.toFixed(2) : "-"} • Đánh giá: {row.evaluationCount} • HĐ: {row.totalContracts} • Hire lại: {row.willHireAgainRate}%
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -28,10 +28,27 @@ type Subcontractor = {
   notes: string | null;
   avgRating: number | null;
   totalContracts: number;
+  evaluationCount: number;
+  hireAgainRate: number;
   isActive: boolean;
   specialties: Specialty[];
   createdAt: string;
   updatedAt: string;
+};
+
+type EvaluationItem = {
+  id: string;
+  overallRating: number;
+  comment: string | null;
+  willHireAgain: boolean;
+  createdAt: string;
+  evaluator: { id: string; fullName: string; role: string };
+  subContract: {
+    id: string;
+    code: string;
+    title: string;
+    project: { id: string; code: string; name: string };
+  };
 };
 
 function statusChipClass(status: Subcontractor["status"]) {
@@ -60,6 +77,27 @@ function fmtDate(value: string) {
 
 export function SubcontractorDetailClient({ subcontractor }: { subcontractor: Subcontractor }) {
   const [tab, setTab] = useState<"info" | "contracts" | "reviews">("info");
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviews, setReviews] = useState<EvaluationItem[]>([]);
+
+  useEffect(() => {
+    if (tab !== "reviews") return;
+
+    let cancel = false;
+    (async () => {
+      setLoadingReviews(true);
+      const res = await fetch(`/api/subcontractors/${subcontractor.id}/evaluations`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!cancel) {
+        setReviews((json.evaluations || []) as EvaluationItem[]);
+        setLoadingReviews(false);
+      }
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [tab, subcontractor.id]);
 
   return (
     <div className="space-y-4">
@@ -83,11 +121,19 @@ export function SubcontractorDetailClient({ subcontractor }: { subcontractor: Su
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-xl border border-[#252840] bg-[#13151f] p-2">
             <div className="text-[#8892b0]">ĐTB đánh giá</div>
-            <div className="mt-1 text-base font-semibold text-[#f0f2ff]">{subcontractor.avgRating ?? "-"}</div>
+            <div className="mt-1 text-base font-semibold text-[#f0f2ff]">{subcontractor.avgRating !== null ? subcontractor.avgRating.toFixed(2) : "-"}</div>
           </div>
           <div className="rounded-xl border border-[#252840] bg-[#13151f] p-2">
             <div className="text-[#8892b0]">Tổng HĐ</div>
             <div className="mt-1 text-base font-semibold text-[#f0f2ff]">{subcontractor.totalContracts}</div>
+          </div>
+          <div className="rounded-xl border border-[#252840] bg-[#13151f] p-2">
+            <div className="text-[#8892b0]">Lượt đánh giá</div>
+            <div className="mt-1 text-base font-semibold text-[#f0f2ff]">{subcontractor.evaluationCount}</div>
+          </div>
+          <div className="rounded-xl border border-[#252840] bg-[#13151f] p-2">
+            <div className="text-[#8892b0]">Tỷ lệ thuê lại</div>
+            <div className="mt-1 text-base font-semibold text-[#f0f2ff]">{subcontractor.hireAgainRate}%</div>
           </div>
         </div>
 
@@ -130,8 +176,24 @@ export function SubcontractorDetailClient({ subcontractor }: { subcontractor: Su
         ) : null}
 
         {tab === "reviews" ? (
-          <div className="rounded-xl border border-dashed border-[#2d3249] bg-[#13151f] p-4 text-sm text-[#8892b0]">
-            Placeholder Phase E: danh sách đánh giá thầu phụ sẽ hiển thị tại đây.
+          <div className="space-y-2">
+            {loadingReviews ? (
+              <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-4 text-sm text-[#8892b0]">Đang tải đánh giá...</div>
+            ) : reviews.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#2d3249] bg-[#13151f] p-4 text-sm text-[#8892b0]">Chưa có đánh giá nào.</div>
+            ) : (
+              reviews.map((review) => (
+                <div key={review.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-[#f0f2ff]">{review.subContract.code} • {review.subContract.title}</div>
+                    <div className="rounded-full bg-[#f97316]/20 px-2 py-1 text-xs text-[#fb923c]">{review.overallRating.toFixed(2)}/5</div>
+                  </div>
+                  <div className="mt-1 text-xs text-[#8892b0]">{review.subContract.project.code} • {review.evaluator.fullName} • {fmtDate(review.createdAt)}</div>
+                  <div className="mt-1 text-xs text-[#a4acc8]">Thuê lại: {review.willHireAgain ? "Có" : "Không"}</div>
+                  {review.comment ? <div className="mt-2 text-[#dbe0ff]">{review.comment}</div> : null}
+                </div>
+              ))
+            )}
           </div>
         ) : null}
       </div>
