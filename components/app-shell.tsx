@@ -36,6 +36,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   admin: [
     { label: "Dashboard", href: "/" },
     { label: "Dự án", href: "/projects" },
+    { label: "Thầu phụ", href: "/subcontractors" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "User", href: "/admin/users" },
@@ -46,22 +47,26 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   engineer: [
     { label: "Dashboard", href: "/" },
     { label: "Dự án của tôi", href: "/projects" },
+    { label: "Thầu phụ", href: "/subcontractors" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI của tôi", href: "/my-kpi" },
   ],
   foreman: [
     { label: "Dashboard", href: "/" },
     { label: "Công việc của đội", href: "/projects" },
+    { label: "Thầu phụ", href: "/subcontractors" },
   ],
   accountant: [
     { label: "Dashboard", href: "/" },
     { label: "Dự án", href: "/projects" },
+    { label: "Thầu phụ", href: "/subcontractors" },
     { label: "Thanh toán", href: "/payments" },
     { label: "KPI tổng", href: "/admin/kpi" },
   ],
   construction_manager: [
     { label: "Dashboard", href: "/" },
     { label: "Dự án", href: "/projects" },
+    { label: "Thầu phụ", href: "/subcontractors" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI của tôi", href: "/my-kpi" },
     { label: "KPI tổng", href: "/admin/kpi" },
@@ -95,6 +100,7 @@ function navIcon(href: string, label: string) {
   if (href.includes("users")) return Users;
   if (href.includes("templates")) return Settings;
   if (href.includes("payments")) return Receipt;
+  if (href.includes("subcontractors")) return Users;
   if (label.toLowerCase().includes("kpi")) return Target;
   return Home;
 }
