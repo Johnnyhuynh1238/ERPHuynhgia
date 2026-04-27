@@ -3,8 +3,13 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export function RouteToast({ denied }: { denied?: string }) {
+export function RouteToast({ denied, deletedName }: { denied?: string; deletedName?: string }) {
   useEffect(() => {
+    if (deletedName) {
+      toast.success(`Đã xóa dự án ${deletedName}`);
+      return;
+    }
+
     if (denied === "1") {
       toast.error("Không có quyền");
       return;
@@ -18,7 +23,7 @@ export function RouteToast({ denied }: { denied?: string }) {
     if (denied === "payments") {
       toast.error("Không có quyền xem lịch thanh toán");
     }
-  }, [denied]);
+  }, [deletedName, denied]);
 
   return null;
 }

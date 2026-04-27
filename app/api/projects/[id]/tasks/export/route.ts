@@ -14,7 +14,7 @@ function fmtDate(value: Date) {
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin, UserRole.accountant]);
+    await requireRole(["admin", "accountant"]);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN";
     if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
@@ -32,12 +32,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const tasks = await prisma.task.findMany({
-    where: { projectId: params.id },
+    where: { projectId: params.id, isActive: true },
     include: {
       assignedEngineer: { select: { fullName: true } },
       assignedForeman: { select: { fullName: true } },
     },
-    orderBy: [{ offsetDays: "asc" }, { code: "asc" }],
+    orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
   });
 
   const workbook = new ExcelJS.Workbook();
@@ -72,13 +72,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       durationDays: task.durationDays,
       start: fmtDate(task.plannedStartDate),
       end: fmtDate(task.plannedEndDate),
-      team: task.assignedForeman?.fullName || "-",
+      team: task.team || task.assignedForeman?.fullName || "-",
       engineer: task.assignedEngineer?.fullName || "Chưa gán",
       inspect: task.inspectorName || "-",
       materials: task.materialsNeeded,
-      proposer: "-",
-      orderer: "-",
-      receiver: "-",
+      proposer: task.proposerRole || "-",
+      orderer: task.ordererRole || "-",
+      receiver: task.receiverRole || "-",
       status: STATUS_LABEL[task.status],
     });
 

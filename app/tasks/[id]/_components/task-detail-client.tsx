@@ -9,6 +9,9 @@ import "dayjs/locale/vi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PHASE_COLOR, PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
+import { QcSection } from "./qc-section";
+import { MaterialSection } from "./material-section";
+import { JournalSection } from "./journal-section";
 
 dayjs.extend(relativeTime);
 dayjs.locale("vi");
@@ -19,6 +22,7 @@ type TaskDetail = {
   phase: keyof typeof PHASE_LABEL;
   name: string;
   isMilestone: boolean;
+  visibleToCustomer?: boolean;
   status: "not_started" | "in_progress" | "done" | "inspected" | "delayed" | "na";
   plannedStartDate: string;
   plannedEndDate: string;
@@ -130,28 +134,11 @@ export function TaskDetailClient({
   const [assignedForemanId, setAssignedForemanId] = useState(initialTask.assignedForeman?.id || "");
   const [team, setTeam] = useState(initialTask.team || "");
   const [inspectorName, setInspectorName] = useState(initialTask.inspectorName || "");
+  const [visibleToCustomer, setVisibleToCustomer] = useState(Boolean(initialTask.visibleToCustomer));
 
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
-  const checklistItems = useMemo(() => {
-    return task.qcChecklist
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => (line.startsWith("•") ? line.replace(/^•\s*/, "") : line));
-  }, [task.qcChecklist]);
-
-  const checkedIndexes = useMemo<number[]>(() => {
-    return Array.isArray(task.qcProgress?.checkedIndexes) ? task.qcProgress?.checkedIndexes || [] : [];
-  }, [task.qcProgress]);
-
-  const canChangeStatus =
-    currentUserRole === "admin" ||
-    currentUserRole === "construction_manager" ||
-    currentUserId === task.project.projectManagerId ||
-    currentUserId === task.project.mainEngineerId ||
-    currentUserId === task.assignedEngineer?.id ||
-    currentUserId === task.assignedForeman?.id;
+  const canChangeStatus = currentUserRole === "admin" || currentUserRole === "construction_manager";
 
   const canInspect =
     currentUserRole === "admin" ||
@@ -247,14 +234,12 @@ export function TaskDetailClient({
     });
   }
 
-  async function toggleChecklist(index: number) {
-    const set = new Set(checkedIndexes);
-    if (set.has(index)) set.delete(index);
-    else set.add(index);
-    const next = Array.from(set).sort((a, b) => a - b);
-    const json = await patchTask("qc", { checkedIndexes: next });
+  async function submitCustomerVisibility() {
+    const json = await patchTask("customer_visibility", {
+      visibleToCustomer,
+    });
     if (json?.task) {
-      setTask((prev) => ({ ...prev, qcProgress: json.task.qcProgress }));
+      setTask((prev) => ({ ...prev, visibleToCustomer: Boolean(json.task.visibleToCustomer) }));
     }
   }
 
@@ -351,7 +336,14 @@ export function TaskDetailClient({
     </div>
   ) : null;
 
-  const [activeTab, setActiveTab] = useState<"info" | "material" | "media" | "status">("info");
+  const [activeTab, setActiveTab] = useState<"qc" | "material" | "journal" | "info" | "status">("qc");
+  const visibleTabs = [
+    { key: "qc", label: "QC", icon: "🔍" },
+    { key: "material", label: "Vật tư", icon: "🧱" },
+    { key: "journal", label: "Nhật ký", icon: "📓" },
+    { key: "info", label: "Thông tin", icon: "📋" },
+    ...(canChangeStatus ? [{ key: "status", label: "Trạng thái", icon: "⚙️" }] : []),
+  ] as const;
 
   const statusTileClass: Record<TaskDetail["status"], string> = {
     not_started: "",
@@ -389,18 +381,13 @@ export function TaskDetailClient({
         {milestoneBanner}
 
         <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347]">
-          {[
-            { key: "info", label: "Thông tin", icon: "📋" },
-            { key: "material", label: "Vật tư & QC", icon: "🧱" },
-            { key: "media", label: "Ảnh & Nhật ký", icon: "📷" },
-            { key: "status", label: "Trạng thái", icon: "⚙️" },
-          ].map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               className={`flex h-12 flex-shrink-0 items-center gap-1 whitespace-nowrap border-b-2 px-4 text-xs font-semibold ${
                 activeTab === tab.key ? "border-amber-500 text-amber-500" : "border-transparent text-[#8891aa]"
               }`}
-              onClick={() => setActiveTab(tab.key as "info" | "material" | "media" | "status")}
+              onClick={() => setActiveTab(tab.key as "qc" | "material" | "journal" | "info" | "status")}
             >
               <span>{tab.icon}</span>
               {tab.label}
@@ -481,97 +468,38 @@ export function TaskDetailClient({
                 </div>
               </div>
               {canAssign ? (
-                <Button className="mt-3 w-full bg-amber-500 font-bold text-[#0f1117] hover:bg-amber-600" onClick={submitAssignment}>Lưu phân công</Button>
+                <>
+                  <div className="mt-3 rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={visibleToCustomer} onChange={(e) => setVisibleToCustomer(e.target.checked)} />
+                      Hiển thị task này ở Cổng chủ nhà
+                    </label>
+                  </div>
+                  <Button className="mt-3 w-full bg-amber-500 font-bold text-[#0f1117] hover:bg-amber-600" onClick={submitAssignment}>Lưu phân công</Button>
+                  <Button variant="outline" className="mt-2 w-full border-[#2e3347] bg-[#222637] text-white" onClick={submitCustomerVisibility}>Lưu hiển thị cổng chủ nhà</Button>
+                </>
               ) : null}
             </div>
           </>
         ) : null}
 
+        {activeTab === "qc" ? (
+          <QcSection
+            taskId={task.id}
+            canUpdateQc={canUpdateQc}
+            canManageItem={currentUserRole === "admin" || currentUserRole === "construction_manager" || currentUserRole === "engineer"}
+          />
+        ) : null}
+
         {activeTab === "material" ? (
-          <>
-            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Vật tư cần dùng</div>
-              <div className="space-y-2">
-                <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm">{task.materialsNeeded}</div>
-                <div className="grid gap-2 text-xs text-[#8891aa]">
-                  <div>Ai đề xuất: {task.template.proposerRole}</div>
-                  <div>Ai đặt hàng: {task.template.ordererRole}</div>
-                  <div>Ai nhận & kiểm: {task.template.receiverRole}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Checklist QC</div>
-              <div className="mb-2 text-xs text-[#8891aa]">Đã hoàn thành {checkedIndexes.length}/{checklistItems.length} mục</div>
-              <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[#222637]">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${checklistItems.length ? Math.round((checkedIndexes.length / checklistItems.length) * 100) : 0}%` }} />
-              </div>
-              <div className="space-y-2">
-                {checklistItems.map((item, idx) => {
-                  const checked = checkedIndexes.includes(idx);
-                  return (
-                    <label key={idx} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${checked ? "border-emerald-500/30 bg-emerald-500/10" : "border-[#2e3347] bg-[#222637]"}`}>
-                      <input type="checkbox" checked={checked} disabled={!canUpdateQc} onChange={() => toggleChecklist(idx)} className="mt-0.5" />
-                      <span className={`text-sm ${checked ? "text-[#8891aa] line-through" : "text-[#f0f2f8]"}`}>{item}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </>
+          <MaterialSection
+            taskId={task.id}
+            canUpdateQc={canUpdateQc}
+            canManageItem={currentUserRole === "admin" || currentUserRole === "construction_manager" || currentUserRole === "engineer"}
+          />
         ) : null}
 
-        {activeTab === "media" ? (
-          <>
-            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Ảnh công trình</div>
-              <div {...getRootProps()} className="mb-3 rounded-xl border-2 border-dashed border-[#2e3347] p-6 text-center text-sm text-[#8891aa]">
-                <input {...getInputProps()} />
-                <div className="mb-1 text-2xl">📸</div>
-                Bấm để chụp hoặc chọn ảnh (JPG/PNG/WEBP, max 5MB)
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo, idx) => (
-                  <div key={photo.id} className="space-y-1">
-                    <button type="button" onClick={() => setLightboxIdx(idx)} className="block w-full overflow-hidden rounded-xl border border-[#2e3347]">
-                      <Image src={photo.thumbnailUrl} alt="thumb" width={160} height={160} className="h-20 w-full object-cover" />
-                    </button>
-                    <div className="truncate text-[10px] text-[#8891aa]">{photo.user.fullName}</div>
-                    {(currentUserRole === "admin" || photo.user.id === currentUserId) ? (
-                      <button className="text-[11px] text-red-400 underline" onClick={() => deletePhoto(photo.id)}>Xóa</button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Ghi chú mới</div>
-              <textarea rows={3} className="w-full rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
-              <Button className="mt-3 w-full bg-amber-500 font-bold text-[#0f1117] hover:bg-amber-600" onClick={submitNote}>Ghi nhật ký</Button>
-            </div>
-
-            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Nhật ký hoạt động</div>
-              <div className="max-h-[360px] space-y-3 overflow-auto pr-1">
-                {logs.map((log) => (
-                  <div key={log.id} className="flex gap-3">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs font-bold text-amber-500">
-                      {(log.user.fullName || "?").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold">{log.user.fullName}</div>
-                      <div className="mb-1 text-[11px] text-[#8891aa]">{relative(log.createdAt)}</div>
-                      <div className="text-sm text-[#bcc4d8]">{log.content}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : null}
+        {activeTab === "journal" ? <JournalSection taskId={task.id} /> : null}
 
         {activeTab === "status" ? (
           <>

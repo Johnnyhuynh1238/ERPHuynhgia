@@ -25,7 +25,7 @@ export default async function DevSmokeTestPage() {
   const [users, projects, tasks] = await Promise.all([
     prisma.user.count(),
     prisma.project.count(),
-    prisma.task.count(),
+    prisma.task.count({ where: { isActive: true } }),
   ]);
 
   await prisma.$disconnect();
@@ -34,7 +34,7 @@ export default async function DevSmokeTestPage() {
   return (
     <ProtectedLayout>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Dev Smoke Test</h1>
+        <h1 className="text-2xl font-semibold text-orange-300">Dev Smoke Test</h1>
         <div className="rounded-lg border bg-white p-4 text-sm">
           <div><strong>User hiện tại:</strong> {user?.name} ({user?.role})</div>
           <div><strong>Tổng users:</strong> {users}</div>

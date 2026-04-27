@@ -317,7 +317,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
               <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={submitEdit} disabled={saving}>
+              <Button className="bg-orange-500 hover:bg-orange-600" onClick={submitEdit} disabled={saving}>
                 {saving ? "Đang lưu..." : "Lưu"}
               </Button>
             </div>

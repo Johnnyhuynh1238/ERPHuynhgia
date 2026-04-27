@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { TaskLogType, TaskPhase, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +13,7 @@ import {
 } from "@/lib/task-permissions";
 
 const patchSchema = z.object({
-  section: z.enum(["status", "dates", "assignment", "qc", "meta"]),
+  section: z.enum(["status", "dates", "assignment", "qc", "meta", "customer_visibility"]),
   payload: z.record(z.string(), z.any()),
 });
 
@@ -23,6 +24,8 @@ const statusSchema = z.object({
 });
 
 const datesSchema = z.object({
+  plannedStartDate: z.string().nullable().optional(),
+  plannedEndDate: z.string().nullable().optional(),
   actualStartDate: z.string().nullable().optional(),
   actualEndDate: z.string().nullable().optional(),
 });
@@ -48,9 +51,14 @@ const metaSchema = z.object({
   materialsNeeded: z.string().trim().min(1).optional(),
   qcChecklist: z.string().trim().min(1).optional(),
   isMilestone: z.boolean().optional(),
+  visibleToCustomer: z.boolean().optional(),
   proposerRole: z.string().trim().min(1).optional(),
   ordererRole: z.string().trim().min(1).optional(),
   receiverRole: z.string().trim().min(1).optional(),
+});
+
+const customerVisibilitySchema = z.object({
+  visibleToCustomer: z.boolean(),
 });
 
 function normalizeDate(raw: string | null | undefined) {
@@ -63,6 +71,21 @@ function addDays(baseDate: Date, offsetDays: number) {
   const d = new Date(baseDate);
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d;
+}
+
+async function isTaskQcCompleted(taskId: string) {
+  const rows = await prisma.$queryRaw<Array<{ total: number; passed: number }>>`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE qp.status = 'passed')::int AS passed
+    FROM qc_items qi
+    LEFT JOIN qc_progress qp ON qp.qc_item_id = qi.id
+    WHERE qi.task_id = ${taskId}
+  `;
+
+  const total = rows[0]?.total ?? 0;
+  const passed = rows[0]?.passed ?? 0;
+  return total > 0 && passed === total;
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -179,6 +202,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "Chỉ admin, trưởng phòng thi công hoặc KS chính mới được nghiệm thu" }, { status: 403 });
     }
 
+    if (payload.data.status === TaskStatus.inspected) {
+      const qcCompleted = await isTaskQcCompleted(task.id);
+      if (!qcCompleted) {
+        return NextResponse.json({ message: "Chưa thể nghiệm thu: QC chưa đạt 100%" }, { status: 400 });
+      }
+    }
+
     const naReason = (payload.data.notes || payload.data.note || "").trim();
     if (payload.data.status === TaskStatus.na && !naReason) {
       return NextResponse.json({ message: "Vui lòng nhập lý do khi chuyển NA" }, { status: 400 });
@@ -207,7 +237,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         logType: TaskLogType.status_change,
         oldValue: task.status,
         newValue: payload.data.status,
-        content: `Đổi trạng thái từ ${task.status} -> ${payload.data.status}`,
+        content: `MANUAL_STATUS: ${task.status} -> ${payload.data.status}`,
       },
     });
 
@@ -224,15 +254,65 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "Dữ liệu ngày không hợp lệ" }, { status: 400 });
     }
 
+    const plannedStartDate = normalizeDate(payload.data.plannedStartDate);
+    const plannedEndDate = normalizeDate(payload.data.plannedEndDate);
+
+    if (plannedStartDate && plannedEndDate && plannedEndDate < plannedStartDate) {
+      return NextResponse.json({ message: "Ngày kết thúc kế hoạch phải >= ngày bắt đầu kế hoạch" }, { status: 400 });
+    }
+
+    const updateData: Prisma.TaskUpdateInput = {
+      actualStartDate: normalizeDate(payload.data.actualStartDate),
+      actualEndDate: normalizeDate(payload.data.actualEndDate),
+    };
+
+    const hasPlannedStart = payload.data.plannedStartDate !== undefined;
+    const hasPlannedEnd = payload.data.plannedEndDate !== undefined;
+
+    if (hasPlannedStart || hasPlannedEnd) {
+      const project = await prisma.project.findUnique({
+        where: { id: task.projectId },
+        select: { startDate: true },
+      });
+
+      if (!project) {
+        return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+      }
+
+      const nextPlannedStart = hasPlannedStart ? plannedStartDate : task.plannedStartDate;
+      const nextPlannedEnd = hasPlannedEnd ? plannedEndDate : task.plannedEndDate;
+
+      if (!nextPlannedStart || !nextPlannedEnd) {
+        return NextResponse.json({ message: "Ngày kế hoạch không hợp lệ" }, { status: 400 });
+      }
+
+      if (nextPlannedEnd < nextPlannedStart) {
+        return NextResponse.json({ message: "Ngày kết thúc kế hoạch phải >= ngày bắt đầu kế hoạch" }, { status: 400 });
+      }
+
+      const offsetDays = Math.floor((nextPlannedStart.getTime() - project.startDate.getTime()) / 86400000);
+      const durationDays = Math.floor((nextPlannedEnd.getTime() - nextPlannedStart.getTime()) / 86400000) + 1;
+
+      if (offsetDays < 0) {
+        return NextResponse.json({ message: "Ngày bắt đầu kế hoạch không được trước ngày khởi công dự án" }, { status: 400 });
+      }
+
+      if (durationDays < 1) {
+        return NextResponse.json({ message: "Số ngày kế hoạch phải >= 1" }, { status: 400 });
+      }
+
+      updateData.plannedStartDate = nextPlannedStart;
+      updateData.plannedEndDate = nextPlannedEnd;
+      updateData.offsetDays = offsetDays;
+      updateData.durationDays = durationDays;
+    }
+
     const updated = await prisma.task.update({
       where: { id: params.id },
-      data: {
-        actualStartDate: normalizeDate(payload.data.actualStartDate),
-        actualEndDate: normalizeDate(payload.data.actualEndDate),
-      },
+      data: updateData,
     });
 
-    return NextResponse.json({ task: updated, message: "Đã cập nhật ngày thực tế" });
+    return NextResponse.json({ task: updated, message: "Đã cập nhật ngày task" });
   }
 
   if (parsed.data.section === "assignment") {
@@ -267,6 +347,35 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ task: updated, message: "Đã cập nhật phân công" });
   }
 
+  if (parsed.data.section === "customer_visibility") {
+    if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager) {
+      return NextResponse.json({ message: "Không có quyền cập nhật hiển thị cho chủ nhà" }, { status: 403 });
+    }
+
+    const payload = customerVisibilitySchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
+    }
+
+    const updated = await prisma.task.update({
+      where: { id: params.id },
+      data: {
+        visibleToCustomer: payload.data.visibleToCustomer,
+      },
+    });
+
+    await prisma.taskLog.create({
+      data: {
+        taskId: task.id,
+        userId: user.id,
+        logType: TaskLogType.note,
+        content: payload.data.visibleToCustomer ? "Bật hiển thị cổng chủ nhà" : "Ẩn khỏi cổng chủ nhà",
+      },
+    });
+
+    return NextResponse.json({ task: updated, message: "Đã cập nhật hiển thị cổng chủ nhà" });
+  }
+
   if (parsed.data.section === "meta") {
     if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager) {
       return NextResponse.json({ message: "Không có quyền sửa thông tin task" }, { status: 403 });
@@ -279,37 +388,43 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const offsetDays = payload.data.offsetDays ?? task.offsetDays;
     const durationDays = payload.data.durationDays ?? task.durationDays;
+    const scheduleChanged = offsetDays !== task.offsetDays || durationDays !== task.durationDays;
 
-    const project = await prisma.project.findUnique({
-      where: { id: task.projectId },
-      select: { id: true, startDate: true },
-    });
+    const updateData: Prisma.TaskUpdateInput = {
+      name: payload.data.name ?? task.name,
+      phase: payload.data.phase ?? task.phase,
+      offsetDays,
+      durationDays,
+      team: payload.data.team === undefined ? task.team : payload.data.team,
+      inspectorName: payload.data.inspectorName ?? task.inspectorName,
+      materialsNeeded: payload.data.materialsNeeded ?? task.materialsNeeded,
+      qcChecklist: payload.data.qcChecklist ?? task.qcChecklist,
+      isMilestone: payload.data.isMilestone ?? task.isMilestone,
+      visibleToCustomer: payload.data.visibleToCustomer ?? (task as { visibleToCustomer?: boolean }).visibleToCustomer,
+      proposerRole: payload.data.proposerRole ?? task.proposerRole,
+      ordererRole: payload.data.ordererRole ?? task.ordererRole,
+      receiverRole: payload.data.receiverRole ?? task.receiverRole,
+    };
 
-    if (!project) {
-      return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+    if (scheduleChanged) {
+      const project = await prisma.project.findUnique({
+        where: { id: task.projectId },
+        select: { id: true, startDate: true },
+      });
+
+      if (!project) {
+        return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+      }
+
+      const plannedStartDate = addDays(project.startDate, offsetDays);
+      const plannedEndDate = addDays(plannedStartDate, durationDays - 1);
+      updateData.plannedStartDate = plannedStartDate;
+      updateData.plannedEndDate = plannedEndDate;
     }
-
-    const plannedStartDate = addDays(project.startDate, offsetDays);
-    const plannedEndDate = addDays(plannedStartDate, durationDays - 1);
 
     const updated = await prisma.task.update({
       where: { id: params.id },
-      data: {
-        name: payload.data.name ?? task.name,
-        phase: payload.data.phase ?? task.phase,
-        offsetDays,
-        durationDays,
-        plannedStartDate,
-        plannedEndDate,
-        team: payload.data.team === undefined ? task.team : payload.data.team,
-        inspectorName: payload.data.inspectorName ?? task.inspectorName,
-        materialsNeeded: payload.data.materialsNeeded ?? task.materialsNeeded,
-        qcChecklist: payload.data.qcChecklist ?? task.qcChecklist,
-        isMilestone: payload.data.isMilestone ?? task.isMilestone,
-        proposerRole: payload.data.proposerRole ?? task.proposerRole,
-        ordererRole: payload.data.ordererRole ?? task.ordererRole,
-        receiverRole: payload.data.receiverRole ?? task.receiverRole,
-      },
+      data: updateData,
     });
 
     await prisma.taskLog.create({
@@ -380,7 +495,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
       taskId: task.id,
       userId: user.id,
       logType: TaskLogType.note,
-      content: "Đã xóa task khỏi tiến độ dự án",
+      content: "Đã xóa task",
     },
   });
 

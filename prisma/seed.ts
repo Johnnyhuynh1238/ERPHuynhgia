@@ -62,6 +62,14 @@ async function seedUsers() {
     ),
     upsertUser(
       {
+        email: "gdtc.test@congty.vn",
+        fullName: "GĐ Thi Công Phạm D",
+        role: UserRole.construction_manager,
+      },
+      passwordHash,
+    ),
+    upsertUser(
+      {
         email: "ks.test@congty.vn",
         fullName: "KS Nguyễn Văn A",
         role: UserRole.engineer,
@@ -88,9 +96,10 @@ async function seedUsers() {
 
   return {
     admin: users[0],
-    engineer: users[1],
-    foreman: users[2],
-    accountant: users[3],
+    constructionManager: users[1],
+    engineer: users[2],
+    foreman: users[3],
+    accountant: users[4],
   };
 }
 
@@ -227,11 +236,17 @@ async function seedDemoProject(userIds: { adminId: string; engineerId: string; f
         plannedEndDate,
         assignedEngineerId: userIds.engineerId,
         assignedForemanId: userIds.foremanId,
+        team: template.defaultTeam,
         inspectorName: template.defaultInspector,
         materialsNeeded: template.materialsNeeded,
+        proposerRole: template.proposerRole,
+        ordererRole: template.ordererRole,
+        receiverRole: template.receiverRole,
         qcChecklist: template.qcChecklist,
         isMilestone: template.isMilestone,
         status: TaskStatus.not_started,
+        isActive: true,
+        displayOrder: template.displayOrder,
         notes: null,
       },
     });
@@ -284,7 +299,9 @@ async function main() {
   const elapsedMs = Date.now() - startedAt;
 
   console.log("[SEED] Hoàn tất seed dữ liệu");
-  console.log(`[SEED] User upsert: admin=${users.admin.email}, engineer=${users.engineer.email}, foreman=${users.foreman.email}, accountant=${users.accountant.email}`);
+  console.log(
+    `[SEED] User upsert: admin=${users.admin.email}, construction_manager=${users.constructionManager.email}, engineer=${users.engineer.email}, foreman=${users.foreman.email}, accountant=${users.accountant.email}`,
+  );
   console.log(`[SEED] Password mặc định cho user test: ${DEFAULT_PASSWORD}`);
   console.log(`[SEED] Task templates tổng CSV: ${templateResult.totalRows}`);
   console.log(`[SEED] Task templates tạo mới: ${templateResult.created}`);

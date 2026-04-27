@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Detail - ERP Huỳnh Gia</title>
+    <link rel="stylesheet" href="./task-detail-screen.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="task-header">
+        <nav class="breadcrumb">Dự án DA-2026-001 &gt; Tiến độ &gt; Task 3.01</nav>
+        <div class="headline-row">
+          <h1 class="task-code">3.01</h1>
+          <span class="badge badge-phase">P3 - Khung trệt</span>
+          <span class="badge badge-status">Đang làm</span>
+        </div>
+        <h2 class="task-name">Đan thép cột tầng trệt</h2>
+        <div class="milestone-banner">⚠️ ĐIỂM DỪNG NGHIỆM THU - Chưa nghiệm thu không được làm công tác tiếp theo</div>
+      </header>
+
+      <main class="layout">
+        <section class="left-col">
+          <article class="card">
+            <h3>Section A - Thông tin kế hoạch + thực tế</h3>
+            <div class="grid-2">
+              <div><label>Ngày BĐ kế hoạch</label><input type="date" /></div>
+              <div><label>Ngày KT kế hoạch</label><input type="date" /></div>
+              <div><label>Ngày BĐ thực tế</label><input type="date" /></div>
+              <div><label>Ngày KT thực tế</label><input type="date" /></div>
+              <div><label>Offset</label><input value="45" readonly /></div>
+              <div><label>Số ngày</label><input value="3" readonly /></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Section B - Phân công</h3>
+            <div class="grid-2">
+              <div><label>Đội thực hiện</label><input value="Đội nề A" /></div>
+              <div><label>KS phụ trách</label><select><option>Nguyễn Văn A</option></select></div>
+              <div><label>Đội trưởng</label><select><option>Trần Văn B</option></select></div>
+              <div><label>Người nghiệm thu</label><input value="KS chính công trình" /></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Section C - Vật tư + phân trách nhiệm</h3>
+            <div class="grid-1">
+              <div><label>Vật tư cần</label><textarea rows="3">Thép D16, dây buộc, kê thép...</textarea></div>
+              <div class="grid-3">
+                <div><label>Ai đề xuất</label><input value="KS" readonly /></div>
+                <div><label>Ai đặt hàng</label><input value="Mua hàng" readonly /></div>
+                <div><label>Ai nhận & kiểm</label><input value="Kho" readonly /></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Section D - Checklist chất lượng (QC)</h3>
+            <p class="subtle">Đã tick 2/5 mục</p>
+            <div class="checklist">
+              <label><input type="checkbox" checked /> Cốt thép đúng bản vẽ</label>
+              <label><input type="checkbox" checked /> Khoảng cách thép đạt chuẩn</label>
+              <label><input type="checkbox" /> Mối nối buộc chắc chắn</label>
+              <label><input type="checkbox" /> Vệ sinh trước đổ bê tông</label>
+              <label><input type="checkbox" /> Nghiệm thu nội bộ đội thi công</label>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Section E - Đổi trạng thái</h3>
+            <div class="status-row">
+              <select>
+                <option>not_started</option>
+                <option selected>in_progress</option>
+                <option>done</option>
+                <option>inspected</option>
+                <option>delayed</option>
+                <option>na</option>
+              </select>
+              <button>Cập nhật trạng thái</button>
+            </div>
+          </article>
+        </section>
+
+        <aside class="right-col">
+          <article class="card">
+            <h3>Section F - Upload ảnh</h3>
+            <div class="upload-box">Kéo thả ảnh vào đây hoặc bấm để chọn</div>
+            <div class="photo-grid">
+              <div class="thumb">Ảnh 1</div>
+              <div class="thumb">Ảnh 2</div>
+              <div class="thumb">Ảnh 3</div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Section G - Nhật ký</h3>
+            <ul class="timeline">
+              <li><strong>Nguyễn Văn A</strong> • 5 phút trước<br />Đổi trạng thái not_started → in_progress</li>
+              <li><strong>Nguyễn Văn A</strong> • 20 phút trước<br />Đã upload 3 ảnh</li>
+              <li><strong>Trần Văn B</strong> • 1 giờ trước<br />Ghi chú: Đã tập kết vật tư đủ 80%</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h3>Section H - Ghi chú mới</h3>
+            <textarea rows="4" placeholder="Nhập nội dung nhật ký..."></textarea>
+            <button>Ghi nhật ký</button>
+          </article>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>

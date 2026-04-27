@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 type MemberRow = {
   id: string;
   userId: string;
-  roleInProject: "engineer" | "foreman" | "accountant";
+  roleInProject: "engineer" | "foreman" | "accountant" | "construction_manager";
   addedAt: string;
   user: {
     fullName: string;
@@ -41,7 +41,7 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
 
   const [showAdd, setShowAdd] = useState(false);
   const [newUserId, setNewUserId] = useState("");
-  const [newRole, setNewRole] = useState<"engineer" | "foreman" | "accountant">("engineer");
+  const [newRole, setNewRole] = useState<"engineer" | "foreman" | "accountant" | "construction_manager">("engineer");
 
   async function loadData() {
     setLoading(true);
@@ -128,8 +128,8 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-[#1F4E79]">Thành viên dự án</h2>
-        <Button onClick={() => setShowAdd(true)} className="bg-[#1F4E79] hover:bg-[#163a5b]">
+        <h2 className="text-xl font-semibold text-orange-300">Thành viên dự án</h2>
+        <Button onClick={() => setShowAdd(true)} className="bg-orange-500 hover:bg-orange-600">
           Thêm thành viên
         </Button>
       </div>
@@ -197,13 +197,14 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
                 <option value="engineer">engineer</option>
                 <option value="foreman">foreman</option>
                 <option value="accountant">accountant</option>
+                <option value="construction_manager">construction_manager</option>
               </select>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>
                 Hủy
               </Button>
-              <Button className="bg-[#1F4E79] hover:bg-[#163a5b]" onClick={addMember}>
+              <Button className="bg-orange-500 hover:bg-orange-600" onClick={addMember}>
                 Thêm
               </Button>
             </div>

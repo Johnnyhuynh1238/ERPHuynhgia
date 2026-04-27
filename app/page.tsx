@@ -18,7 +18,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <ProtectedLayout>
       <RouteToast denied={searchParams?.denied} />
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[#1F4E79]">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-orange-300">Dashboard</h1>
         {user?.id ? (
           <DashboardLoaderClient />
         ) : (

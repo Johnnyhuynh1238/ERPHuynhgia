@@ -1,10 +1,19 @@
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import {
+  getCustomerSessionCookieName,
+  isPortalExpired,
+  resolvePortalProjectByToken,
+  resolveCustomerSessionByToken,
+} from "@/lib/customer-portal";
 
 type AppRole = "admin" | "engineer" | "foreman" | "accountant" | "construction_manager";
 
 export async function getCurrentUser() {
   const session = await auth();
-  return session?.user ?? null;
+  if (!session?.user?.id) return null;
+  return session.user;
 }
 
 export async function requireRole(roles: AppRole[]) {
@@ -19,4 +28,44 @@ export async function requireRole(roles: AppRole[]) {
   }
 
   return user;
+}
+
+export async function getCustomerPortalSessionByToken(token: string) {
+  const project = await resolvePortalProjectByToken(token);
+  if (!project || !project.customerPortalEnabled || isPortalExpired(project.actualEndDate)) {
+    return { project: null, session: null as null | { tokenId: string } };
+  }
+
+  const cookieStore = cookies();
+  const sessionTokenId = cookieStore.get(getCustomerSessionCookieName(project.id))?.value;
+  if (!sessionTokenId) {
+    return { project, session: null };
+  }
+
+  const session = await resolveCustomerSessionByToken(project.id, sessionTokenId);
+  if (!session) {
+    return { project, session: null };
+  }
+
+  return { project, session: { tokenId: session.tokenId } };
+}
+
+export async function getStaffCommentUnreadCount(userId: string, role: string) {
+  if (!["admin", "construction_manager", "engineer"].includes(role)) return 0;
+
+  const projectWhere =
+    role === "engineer"
+      ? {
+          OR: [{ mainEngineerId: userId }, { tasks: { some: { assignedEngineerId: userId } } }],
+        }
+      : {};
+
+  const count = await prisma.customerComment.count({
+    where: {
+      readByStaff: false,
+      project: projectWhere,
+    },
+  });
+
+  return count;
 }

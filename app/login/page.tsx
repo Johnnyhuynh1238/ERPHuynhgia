@@ -12,7 +12,10 @@ type LoginPageProps = {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await auth();
 
-  if (session?.user) {
+  if (session?.user?.id) {
+    if (session.user.mustChangePassword) {
+      redirect("/change-password");
+    }
     redirect("/");
   }
 
@@ -22,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md items-center px-4">
       <div className="w-full rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="mb-2 text-xl font-semibold text-[#1F4E79]">Đăng nhập ERP Huỳnh Gia</h1>
+        <h1 className="mb-2 text-xl font-semibold text-orange-300">Đăng nhập ERP Huỳnh Gia</h1>
         <p className="mb-6 text-sm text-slate-500">Nhập email và mật khẩu để vào hệ thống.</p>
 
         <LoginForm callbackUrl={callbackUrl} hasCredentialError={hasCredentialError} />

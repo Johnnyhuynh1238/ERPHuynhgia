@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
-import { PaymentStatus, TaskStatus, UserRole } from "@prisma/client";
+import { DailyRating, PaymentStatus, TaskStatus, UserRole } from "@prisma/client";
+import { localDeadlineForDate } from "@/lib/date";
+import { calculateKpiForProjectEngineer, scoreToRank } from "@/lib/kpi";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { getReportProjectsForUser } from "@/lib/reporting";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 
 function startOfTodayUtc() {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+}
+
+function endOfTodayUtc() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
 }
 
 function addDays(date: Date, days: number) {
@@ -19,7 +28,66 @@ function startOfMonthUtc(date: Date) {
 }
 
 function endOfMonthUtc(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59));
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+}
+
+function formatHhMm(date: Date) {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function formatRemainingMinutes(diffMinutes: number) {
+  const abs = Math.abs(diffMinutes);
+  const hours = Math.floor(abs / 60);
+  const minutes = abs % 60;
+  return `${hours}h ${minutes}p`;
+}
+
+function buildReportStatusLabel(submittedAt: Date | null, isOnTime: boolean, deadline: Date, now: Date) {
+  if (submittedAt) {
+    if (isOnTime) {
+      return {
+        label: `Đã nộp ${formatHhMm(submittedAt)} ✓`,
+        tone: "good" as const,
+        submitted: true,
+      };
+    }
+
+    return {
+      label: `Nộp trễ lúc ${formatHhMm(submittedAt)}`,
+      tone: "warn" as const,
+      submitted: true,
+    };
+  }
+
+  const diffMinutes = Math.floor((deadline.getTime() - now.getTime()) / 60000);
+  if (diffMinutes >= 0) {
+    return {
+      label: `Chưa nộp - còn ${formatRemainingMinutes(diffMinutes)}`,
+      tone: "warn" as const,
+      submitted: false,
+    };
+  }
+
+  return {
+    label: `Chưa nộp - trễ ${formatRemainingMinutes(diffMinutes)}`,
+    tone: "danger" as const,
+    submitted: false,
+  };
+}
+
+function siteRestReasonLabel(reason: "SUNDAY" | "HOLIDAY" | "STORM" | "OTHER") {
+  if (reason === "SUNDAY") return "Nghỉ Chủ nhật";
+  if (reason === "HOLIDAY") return "Nghỉ lễ";
+  if (reason === "STORM") return "Mưa bão";
+  return "Khác";
+}
+
+function rankTone(rank: string): "good" | "warn" | "danger" | "info" {
+  if (rank === "A" || rank === "B") return "good";
+  if (rank === "C") return "warn";
+  return "danger";
 }
 
 export const revalidate = 60;
@@ -30,70 +98,324 @@ export async function GET() {
     return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  const now = new Date();
   const today = startOfTodayUtc();
+  const todayEnd = endOfTodayUtc();
   const in7Days = addDays(today, 7);
   const in3Days = addDays(today, 3);
 
-  if (user.role === UserRole.admin) {
-    const [projectInProgress, totalDelayed, inProgressToday, paymentDue7, delayedTasks, recentProjects] = await Promise.all([
-      prisma.project.count({ where: { status: "in_progress" } }),
-      prisma.task.count({
-        where: {
-          isActive: true,
-          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-          plannedEndDate: { lt: today },
-        },
+  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) {
+    const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
+
+    const [projectInProgress, totalDelayed, inProgressToday, paymentDue7, delayedTasks, recentProjects, reportProjectsRaw] =
+      await Promise.all([
+        prisma.project.count({ where: { ...projectAccess, status: "in_progress" } }),
+        prisma.task.count({
+          where: {
+            isActive: true,
+            status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+            plannedEndDate: { lt: today },
+            project: projectAccess,
+          },
+        }),
+        prisma.task.count({
+          where: {
+            isActive: true,
+            status: TaskStatus.in_progress,
+            project: projectAccess,
+          },
+        }),
+        user.role === UserRole.admin
+          ? prisma.paymentSchedule.count({
+              where: {
+                status: PaymentStatus.not_collected,
+                expectedDate: { gte: today, lte: in7Days },
+              },
+            })
+          : Promise.resolve(0),
+        prisma.task.findMany({
+          where: {
+            isActive: true,
+            status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+            plannedEndDate: { lt: today },
+            project: projectAccess,
+          },
+          include: {
+            project: { select: { id: true, code: true, name: true } },
+            assignedEngineer: { select: { id: true, fullName: true } },
+          },
+          orderBy: { plannedEndDate: "desc" },
+          take: 10,
+        }),
+        prisma.project.findMany({
+          where: projectAccess,
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { id: true, code: true, name: true, createdAt: true },
+        }),
+        prisma.project.findMany({
+          where: {
+            ...projectAccess,
+            status: { in: ["planning", "in_progress", "paused"] },
+            goLiveDate: { not: null, lte: today },
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            mainEngineerId: true,
+            mainEngineer: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+    const reportProjectIds = reportProjectsRaw.map((project) => project.id);
+
+    const [siteRestRows, morningSubmittedRows, eveningSubmittedRows, underRows] = reportProjectIds.length
+      ? await Promise.all([
+          prisma.siteRestDay.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              restDate: today,
+            },
+            select: {
+              projectId: true,
+            },
+          }),
+          prisma.morningReport.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              reportDate: today,
+              submittedAt: { not: null },
+            },
+            select: {
+              projectId: true,
+              reporterId: true,
+            },
+          }),
+          prisma.eveningReport.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              reportDate: today,
+              submittedAt: { not: null },
+            },
+            select: {
+              projectId: true,
+              reporterId: true,
+            },
+          }),
+          prisma.eveningReport.groupBy({
+            by: ["projectId"],
+            where: {
+              projectId: { in: reportProjectIds },
+              reportDate: today,
+              overallRating: DailyRating.UNDER,
+            },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], [], [], []];
+
+    const restProjectSet = new Set(siteRestRows.map((row) => row.projectId));
+    const activeReportProjects = reportProjectsRaw.filter((project) => !restProjectSet.has(project.id));
+
+    const morningSet = new Set(morningSubmittedRows.map((row) => `${row.projectId}_${row.reporterId}`));
+    const eveningSet = new Set(eveningSubmittedRows.map((row) => `${row.projectId}_${row.reporterId}`));
+
+    const missingMorning = activeReportProjects
+      .filter((project) => !morningSet.has(`${project.id}_${project.mainEngineerId}`))
+      .map((project) => ({
+        projectId: project.id,
+        projectCode: project.code,
+        projectName: project.name,
+        engineerId: project.mainEngineerId,
+        engineerName: project.mainEngineer.fullName,
+      }));
+
+    const missingEvening = activeReportProjects
+      .filter((project) => !eveningSet.has(`${project.id}_${project.mainEngineerId}`))
+      .map((project) => ({
+        projectId: project.id,
+        projectCode: project.code,
+        projectName: project.name,
+        engineerId: project.mainEngineerId,
+        engineerName: project.mainEngineer.fullName,
+      }));
+
+    const activeProjectMap = new Map(activeReportProjects.map((project) => [project.id, project]));
+
+    const issueProjects = underRows
+      .map((row) => {
+        const project = activeProjectMap.get(row.projectId);
+        if (!project) return null;
+        return {
+          projectId: project.id,
+          projectCode: project.code,
+          projectName: project.name,
+          underCount: row._count._all,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+    const monthStart = startOfMonthUtc(today);
+    const monthEnd = endOfMonthUtc(today);
+
+    const kpiByProject = await Promise.all(
+      activeReportProjects.map(async (project) => {
+        const kpi = await calculateKpiForProjectEngineer({
+          projectId: project.id,
+          reporterId: project.mainEngineerId,
+          from: monthStart,
+          to: monthEnd,
+        });
+
+        return {
+          userId: project.mainEngineerId,
+          fullName: project.mainEngineer.fullName,
+          email: project.mainEngineer.email,
+          projectCode: project.code,
+          projectName: project.name,
+          score: kpi.score,
+        };
       }),
-      prisma.task.count({ where: { isActive: true, status: TaskStatus.in_progress } }),
-      prisma.paymentSchedule.count({
-        where: {
-          status: PaymentStatus.not_collected,
-          expectedDate: { gte: today, lte: in7Days },
-        },
-      }),
-      prisma.task.findMany({
-        where: {
-          isActive: true,
-          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-          plannedEndDate: { lt: today },
-        },
-        include: {
-          project: { select: { id: true, code: true, name: true } },
-          assignedEngineer: { select: { id: true, fullName: true } },
-        },
-        orderBy: { plannedEndDate: "desc" },
-        take: 10,
-      }),
-      prisma.project.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        select: { id: true, code: true, name: true, createdAt: true },
-      }),
-    ]);
+    );
+
+    const kpiUserMap = new Map<
+      string,
+      {
+        userId: string;
+        fullName: string;
+        email: string;
+        scores: number[];
+        projectCount: number;
+      }
+    >();
+
+    for (const row of kpiByProject) {
+      const current = kpiUserMap.get(row.userId);
+      if (!current) {
+        kpiUserMap.set(row.userId, {
+          userId: row.userId,
+          fullName: row.fullName,
+          email: row.email,
+          scores: [row.score],
+          projectCount: 1,
+        });
+      } else {
+        current.scores.push(row.score);
+        current.projectCount += 1;
+      }
+    }
+
+    const kpiByUser = Array.from(kpiUserMap.values())
+      .map((row) => {
+        const total = row.scores.reduce((sum, score) => sum + score, 0);
+        const score = row.scores.length ? Number((total / row.scores.length).toFixed(2)) : 0;
+        return {
+          userId: row.userId,
+          fullName: row.fullName,
+          email: row.email,
+          projectCount: row.projectCount,
+          score,
+          rank: scoreToRank(score),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const topKpi = kpiByUser.slice(0, 3);
+    const bottomKpi = [...kpiByUser].sort((a, b) => a.score - b.score).slice(0, 3);
+
+    const commonCards = [
+      {
+        key: user.role === UserRole.admin ? "admin_projects" : "cm_projects",
+        label: "Dự án đang thi công",
+        value: projectInProgress,
+        tone: "good" as const,
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_delayed" : "cm_delayed",
+        label: "Task trễ toàn hệ thống",
+        value: totalDelayed,
+        tone: totalDelayed > 0 ? ("danger" as const) : ("good" as const),
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_in_progress" : "cm_in_progress",
+        label: "Task đang làm",
+        value: inProgressToday,
+        tone: "info" as const,
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_missing_morning" : "cm_missing_morning",
+        label: "KS chưa báo cáo sáng hôm nay",
+        value: missingMorning.length,
+        tone: missingMorning.length > 0 ? ("warn" as const) : ("good" as const),
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_missing_evening" : "cm_missing_evening",
+        label: "KS chưa báo cáo chiều hôm nay",
+        value: missingEvening.length,
+        tone: missingEvening.length > 0 ? ("warn" as const) : ("good" as const),
+      },
+      {
+        key: user.role === UserRole.admin ? "admin_issue_projects" : "cm_issue_projects",
+        label: "Dự án có vấn đề hôm nay",
+        value: issueProjects.length,
+        tone: issueProjects.length > 0 ? ("danger" as const) : ("good" as const),
+      },
+    ];
+
+    const cards =
+      user.role === UserRole.admin
+        ? [
+            ...commonCards,
+            {
+              key: "admin_payment_due",
+              label: "Đợt thanh toán 7 ngày tới",
+              value: paymentDue7,
+              tone: paymentDue7 > 0 ? ("warn" as const) : ("info" as const),
+            },
+          ]
+        : commonCards;
 
     return NextResponse.json({
       role: user.role,
-      cards: [
-        { key: "admin_projects", label: "Dự án đang thi công", value: projectInProgress, tone: "good" },
-        { key: "admin_delayed", label: "Task trễ toàn hệ thống", value: totalDelayed, tone: totalDelayed > 0 ? "danger" : "good" },
-        { key: "admin_in_progress", label: "Task đang làm", value: inProgressToday, tone: "info" },
-        { key: "admin_payment_due", label: "Đợt thanh toán 7 ngày tới", value: paymentDue7, tone: paymentDue7 > 0 ? "warn" : "info" },
-      ],
+      cards,
       admin: {
         delayedTasks,
         recentProjects,
+        missingMorning,
+        missingEvening,
+        issueProjects,
+        topKpi,
+        bottomKpi,
       },
     });
   }
 
   if (user.role === UserRole.engineer) {
-    const [todayTasks, delayedTasks, next3Tasks, projectsCount, upcomingMilestones] = await Promise.all([
+    const [taskCandidates, delayedTasks, next3Tasks, projectsCount, upcomingMilestones, reportProjects] = await Promise.all([
       prisma.task.findMany({
         where: {
           isActive: true,
           assignedEngineerId: user.id,
-          plannedStartDate: { lte: today },
-          plannedEndDate: { gte: today },
+          status: { notIn: [TaskStatus.done, TaskStatus.inspected, TaskStatus.na] },
+          OR: [
+            { plannedEndDate: { lt: today } },
+            {
+              plannedStartDate: { lte: todayEnd },
+              plannedEndDate: { gte: today },
+            },
+            {
+              plannedStartDate: { gte: today, lte: todayEnd },
+              status: TaskStatus.not_started,
+            },
+          ],
         },
         include: { project: { select: { id: true, code: true, name: true } } },
         orderBy: { plannedEndDate: "asc" },
@@ -105,7 +427,6 @@ export async function GET() {
           isActive: true,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
         },
-        include: { project: { select: { id: true, code: true, name: true } } },
       }),
       prisma.task.findMany({
         where: {
@@ -131,18 +452,221 @@ export async function GET() {
         orderBy: { plannedStartDate: "asc" },
         take: 3,
       }),
+      getReportProjectsForUser({ id: user.id, role: user.role }),
     ]);
+
+    const taskIds = taskCandidates.map((task) => task.id);
+    const morningDecisionRows = taskIds.length
+      ? await prisma.morningReportTask.findMany({
+          where: {
+            taskId: { in: taskIds },
+            morningReport: {
+              reportDate: today,
+              reporterId: user.id,
+            },
+          },
+          select: {
+            taskId: true,
+            decision: true,
+          },
+        })
+      : [];
+
+    const morningDecisionMap = new Map(morningDecisionRows.map((row) => [row.taskId, row.decision]));
+
+    type EngineerTodayTask = (typeof taskCandidates)[number] & {
+      reportGroup: "overdue" | "running" | "starting";
+      morningDecision: "WORK" | "PAUSE" | null;
+    };
+
+    const groupedTasks: {
+      overdue: EngineerTodayTask[];
+      running: EngineerTodayTask[];
+      starting: EngineerTodayTask[];
+    } = {
+      overdue: [],
+      running: [],
+      starting: [],
+    };
+
+    for (const task of taskCandidates) {
+      const reportGroup: EngineerTodayTask["reportGroup"] =
+        task.plannedEndDate < today
+          ? "overdue"
+          : task.plannedStartDate >= today && task.plannedStartDate <= todayEnd && task.status === TaskStatus.not_started
+            ? "starting"
+            : "running";
+
+      const row: EngineerTodayTask = {
+        ...task,
+        reportGroup,
+        morningDecision: (morningDecisionMap.get(task.id) ?? null) as EngineerTodayTask["morningDecision"],
+      };
+
+      if (reportGroup === "overdue") groupedTasks.overdue.push(row);
+      else if (reportGroup === "starting") groupedTasks.starting.push(row);
+      else groupedTasks.running.push(row);
+    }
+
+    const reportProjectIds = reportProjects.map((project) => project.id);
+    const [siteRestRows, morningRows, eveningRows] = reportProjectIds.length
+      ? await Promise.all([
+          prisma.siteRestDay.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              restDate: today,
+            },
+            select: {
+              projectId: true,
+              reason: true,
+            },
+          }),
+          prisma.morningReport.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              reportDate: today,
+              reporterId: user.id,
+            },
+            select: {
+              projectId: true,
+              submittedAt: true,
+              isOnTime: true,
+            },
+          }),
+          prisma.eveningReport.findMany({
+            where: {
+              projectId: { in: reportProjectIds },
+              reportDate: today,
+              reporterId: user.id,
+            },
+            select: {
+              projectId: true,
+              submittedAt: true,
+              isOnTime: true,
+            },
+          }),
+        ])
+      : [[], [], []];
+
+    const restMap = new Map(siteRestRows.map((row) => [row.projectId, row]));
+    const morningMap = new Map(morningRows.map((row) => [row.projectId, row]));
+    const eveningMap = new Map(eveningRows.map((row) => [row.projectId, row]));
+
+    const morningDeadline = localDeadlineForDate(today, 8);
+    const eveningDeadline = localDeadlineForDate(today, 19);
+
+    const reportStatus = reportProjects.map((project) => {
+      const goLiveActive = Boolean(project.goLiveDate && project.goLiveDate <= today);
+      const rest = restMap.get(project.id);
+
+      if (!goLiveActive) {
+        return {
+          projectId: project.id,
+          projectCode: project.code,
+          projectName: project.name,
+          isActive: false,
+          isRestDay: false,
+          restReason: null,
+          morningLabel: "Dự án chưa go-live",
+          morningTone: "info" as const,
+          eveningLabel: "Dự án chưa go-live",
+          eveningTone: "info" as const,
+          morningSubmitted: false,
+          eveningSubmitted: false,
+        };
+      }
+
+      if (rest) {
+        const reason = siteRestReasonLabel(rest.reason);
+        return {
+          projectId: project.id,
+          projectCode: project.code,
+          projectName: project.name,
+          isActive: true,
+          isRestDay: true,
+          restReason: reason,
+          morningLabel: `🏖️ Công trường nghỉ hôm nay - ${reason}`,
+          morningTone: "good" as const,
+          eveningLabel: `🏖️ Công trường nghỉ hôm nay - ${reason}`,
+          eveningTone: "good" as const,
+          morningSubmitted: false,
+          eveningSubmitted: false,
+        };
+      }
+
+      const morning = morningMap.get(project.id);
+      const evening = eveningMap.get(project.id);
+      const morningStatus = buildReportStatusLabel(morning?.submittedAt || null, Boolean(morning?.isOnTime), morningDeadline, now);
+      const eveningStatus = buildReportStatusLabel(evening?.submittedAt || null, Boolean(evening?.isOnTime), eveningDeadline, now);
+
+      return {
+        projectId: project.id,
+        projectCode: project.code,
+        projectName: project.name,
+        isActive: true,
+        isRestDay: false,
+        restReason: null,
+        morningLabel: morningStatus.label,
+        morningTone: morningStatus.tone,
+        eveningLabel: eveningStatus.label,
+        eveningTone: eveningStatus.tone,
+        morningSubmitted: morningStatus.submitted,
+        eveningSubmitted: eveningStatus.submitted,
+      };
+    });
+
+    const activeReportRows = reportStatus.filter((row) => row.isActive && !row.isRestDay);
+    const pendingReportCount = activeReportRows.filter((row) => !row.morningSubmitted || !row.eveningSubmitted).length;
+
+    const kpiTargetProject = reportProjects.find((project) => project.goLiveDate && project.goLiveDate <= today);
+
+    const kpiMonth = kpiTargetProject
+      ? await calculateKpiForProjectEngineer({
+          projectId: kpiTargetProject.id,
+          reporterId: user.id,
+          from: startOfMonthUtc(today),
+          to: endOfMonthUtc(today),
+        })
+      : null;
 
     return NextResponse.json({
       role: user.role,
       cards: [
-        { key: "engineer_today", label: "Task hôm nay", value: todayTasks.length, tone: "good" },
-        { key: "engineer_delayed", label: "Task trễ của bạn", value: delayedTasks.length, tone: delayedTasks.length > 0 ? "danger" : "good" },
+        { key: "engineer_today", label: "Task hôm nay", value: taskCandidates.length, tone: "good" },
+        {
+          key: "engineer_delayed",
+          label: "Task trễ của bạn",
+          value: delayedTasks.length,
+          tone: delayedTasks.length > 0 ? "danger" : "good",
+        },
         { key: "engineer_next3", label: "Task 3 ngày tới", value: next3Tasks.length, tone: "warn" },
         { key: "engineer_projects", label: "Dự án tham gia", value: projectsCount, tone: "info" },
+        {
+          key: "engineer_report_today",
+          label: "Báo cáo hôm nay",
+          value: pendingReportCount,
+          tone: pendingReportCount > 0 ? "warn" : "good",
+        },
+        {
+          key: "engineer_kpi_month",
+          label: "KPI tháng này",
+          value: kpiMonth ? `${kpiMonth.score.toFixed(2)} (${kpiMonth.rank})` : "-",
+          tone: kpiMonth ? rankTone(kpiMonth.rank) : "info",
+        },
       ],
       engineer: {
-        todayTasks,
+        todayTasks: [...groupedTasks.overdue, ...groupedTasks.running, ...groupedTasks.starting],
+        taskGroups: groupedTasks,
+        reportStatus,
+        kpiMonth: kpiMonth
+          ? {
+              score: kpiMonth.score,
+              rank: kpiMonth.rank,
+              projectId: kpiTargetProject?.id || null,
+              projectCode: kpiTargetProject?.code || null,
+              projectName: kpiTargetProject?.name || null,
+            }
+          : null,
         upcomingMilestones,
       },
     });
@@ -172,8 +696,8 @@ export async function GET() {
     ]);
 
     const materialsSet = new Set<string>();
-    weekTasks.forEach((t) => {
-      (t.materialsNeeded || "")
+    weekTasks.forEach((task) => {
+      (task.materialsNeeded || "")
         .split("\n")
         .map((x) => x.trim())
         .filter(Boolean)
@@ -184,57 +708,17 @@ export async function GET() {
       role: user.role,
       cards: [
         { key: "foreman_week", label: "Task tuần này", value: weekTasks.length, tone: "info" },
-        { key: "foreman_materials", label: "Vật tư cần chuẩn bị", value: materialsSet.size, tone: materialsSet.size > 0 ? "warn" : "good" },
+        {
+          key: "foreman_materials",
+          label: "Vật tư cần chuẩn bị",
+          value: materialsSet.size,
+          tone: materialsSet.size > 0 ? "warn" : "good",
+        },
       ],
       foreman: {
         weekTasks,
         upcomingMilestones: milestoneSoon,
         materialsCount: materialsSet.size,
-      },
-    });
-  }
-
-  if (user.role === UserRole.construction_manager) {
-    const [projectInProgress, totalDelayed, inProgressToday, delayedTasks, recentProjects] = await Promise.all([
-      prisma.project.count({ where: { status: "in_progress" } }),
-      prisma.task.count({
-        where: {
-          isActive: true,
-          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-          plannedEndDate: { lt: today },
-        },
-      }),
-      prisma.task.count({ where: { isActive: true, status: TaskStatus.in_progress } }),
-      prisma.task.findMany({
-        where: {
-          isActive: true,
-          status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
-          plannedEndDate: { lt: today },
-        },
-        include: {
-          project: { select: { id: true, code: true, name: true } },
-          assignedEngineer: { select: { id: true, fullName: true } },
-        },
-        orderBy: { plannedEndDate: "desc" },
-        take: 10,
-      }),
-      prisma.project.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        select: { id: true, code: true, name: true, createdAt: true },
-      }),
-    ]);
-
-    return NextResponse.json({
-      role: user.role,
-      cards: [
-        { key: "cm_projects", label: "Dự án đang thi công", value: projectInProgress, tone: "good" },
-        { key: "cm_delayed", label: "Task trễ toàn hệ thống", value: totalDelayed, tone: totalDelayed > 0 ? "danger" : "good" },
-        { key: "cm_in_progress", label: "Task đang làm", value: inProgressToday, tone: "info" },
-      ],
-      admin: {
-        delayedTasks,
-        recentProjects,
       },
     });
   }
@@ -281,14 +765,34 @@ export async function GET() {
     return NextResponse.json({
       role: user.role,
       cards: [
-        { key: "accountant_due7", label: "Đợt thu 7 ngày tới", value: upcoming.length, tone: upcoming.length ? "warn" : "good" },
-        { key: "accountant_late", label: "Đợt thanh toán trễ", value: late.length, tone: late.length ? "danger" : "good" },
-        { key: "accountant_collected_month", label: "Đã thu tháng này", value: Math.round(collectedMonth), tone: "good" },
-        { key: "accountant_expected_month", label: "Dự kiến thu tháng này", value: Math.round(expectedMonth), tone: "info" },
+        {
+          key: "accountant_due7",
+          label: "Đợt thu 7 ngày tới",
+          value: upcoming.length,
+          tone: upcoming.length ? "warn" : "good",
+        },
+        {
+          key: "accountant_late",
+          label: "Đợt thanh toán trễ",
+          value: late.length,
+          tone: late.length ? "danger" : "good",
+        },
+        {
+          key: "accountant_collected_month",
+          label: "Đã thu tháng này",
+          value: Math.round(collectedMonth),
+          tone: "good",
+        },
+        {
+          key: "accountant_expected_month",
+          label: "Dự kiến thu tháng này",
+          value: Math.round(expectedMonth),
+          tone: "info",
+        },
       ],
       accountant: {
-        upcomingPayments: upcoming.map((p) => ({ ...p, amount: Number(p.amount) })),
-        latePayments: late.map((p) => ({ ...p, amount: Number(p.amount) })),
+        upcomingPayments: upcoming.map((payment) => ({ ...payment, amount: Number(payment.amount) })),
+        latePayments: late.map((payment) => ({ ...payment, amount: Number(payment.amount) })),
       },
     });
   }

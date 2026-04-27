@@ -9,7 +9,10 @@ type TaskCtx = {
   projectId: string;
   assignedEngineerId: string | null;
   assignedForemanId: string | null;
+  visibleToCustomer?: boolean;
   isActive: boolean;
+  plannedStartDate: Date;
+  plannedEndDate: Date;
   actualStartDate: Date | null;
   actualEndDate: Date | null;
   status: string;
@@ -37,7 +40,10 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
       projectId: true,
       assignedEngineerId: true,
       assignedForemanId: true,
+      visibleToCustomer: true,
       isActive: true,
+      plannedStartDate: true,
+      plannedEndDate: true,
       actualStartDate: true,
       actualEndDate: true,
       status: true,
@@ -101,9 +107,7 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
 }
 
 export function canChangeStatus(task: TaskCtx, user: UserCtx) {
-  if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
-  if (user.id === task.project.mainEngineerId || user.id === task.project.projectManagerId) return true;
-  return task.assignedEngineerId === user.id || task.assignedForemanId === user.id;
+  return user.role === UserRole.admin || user.role === UserRole.construction_manager;
 }
 
 export function canInspectTask(task: TaskCtx, user: UserCtx) {
@@ -126,4 +130,8 @@ export function canUploadPhoto(task: TaskCtx, user: UserCtx) {
   if (user.role === UserRole.admin || user.role === UserRole.construction_manager) return true;
   if (user.id === task.project.mainEngineerId) return true;
   return task.assignedEngineerId === user.id || task.assignedForemanId === user.id;
+}
+
+export function canManageItem(_task: TaskCtx, user: UserCtx) {
+  return user.role === UserRole.admin || user.role === UserRole.construction_manager || user.role === UserRole.engineer;
 }

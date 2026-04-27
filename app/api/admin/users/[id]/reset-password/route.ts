@@ -26,7 +26,7 @@ function generatePassword(length = 12) {
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

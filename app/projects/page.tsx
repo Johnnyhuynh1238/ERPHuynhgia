@@ -6,15 +6,17 @@ import { ProjectsClient } from "./_components/projects-client";
 type ProjectsPageProps = {
   searchParams?: {
     denied?: string;
+    deleted?: string;
   };
 };
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const user = await getCurrentUser();
+  const deletedName = searchParams?.deleted || undefined;
 
   return (
     <ProtectedLayout>
-      <RouteToast denied={searchParams?.denied} />
+      <RouteToast denied={searchParams?.denied} deletedName={deletedName} />
       <ProjectsClient currentRole={(user?.role as string) || ""} />
     </ProtectedLayout>
   );

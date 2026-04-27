@@ -20,11 +20,12 @@ const createProjectSchema = z.object({
   customerIdNumber: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.number().min(1, "Diện tích phải > 0"),
-  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
+  areaM2: z.number().min(1, "Diện tích phải > 0").optional(),
+  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
+  expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   templateCategory: z.literal("nha_pho_1t1l"),
-  projectManagerId: z.string().uuid("GĐ quản lý không hợp lệ"),
+  projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ").optional(),
   mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
   members: z
     .array(
@@ -53,6 +54,11 @@ function addDays(baseDate: Date, offsetDays: number) {
 }
 
 function normalizeDateStart(raw: string) {
+  const [year, month, day] = raw.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+function normalizeDate(raw: string) {
   const [year, month, day] = raw.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 }
@@ -189,7 +195,7 @@ export async function GET(request: Request) {
       customerName: p.customerName,
       customerPhone: p.customerPhone,
       address: p.address,
-      contractValue: canViewFinancial ? Number(p.contractValue) : null,
+      contractValue: canViewFinancial ? (p.contractValue === null ? null : Number(p.contractValue)) : null,
       startDate: p.startDate,
       expectedEndDate: p.expectedEndDate,
       status: p.status,
@@ -256,8 +262,23 @@ export async function POST(request: Request) {
 
   const startedAt = Date.now();
   const startDate = normalizeDateStart(parsed.data.startDate);
-  const expectedEndDate = addDays(startDate, 120);
-  const contractValue = Math.round(parsed.data.areaM2 * parsed.data.unitPrice);
+  const expectedEndDate = normalizeDate(parsed.data.expectedEndDate);
+
+  const isConstructionManager = actorUser.role === UserRole.construction_manager;
+  const areaM2 = isConstructionManager ? 1 : Number(parsed.data.areaM2);
+  const unitPrice = isConstructionManager ? 1_000_000 : Number(parsed.data.unitPrice);
+
+  if (!isConstructionManager && (!parsed.data.areaM2 || !parsed.data.unitPrice)) {
+    return NextResponse.json({ message: "Thiếu dữ liệu tài chính dự án" }, { status: 400 });
+  }
+
+  const contractValue = isConstructionManager ? null : Math.round(areaM2 * unitPrice);
+  const projectManagerId = isConstructionManager ? actorUser.id : parsed.data.projectManagerId;
+
+  if (!projectManagerId) {
+    return NextResponse.json({ message: "Thiếu GĐ Thi Công" }, { status: 400 });
+  }
+
   const year = startDate.getFullYear();
   const codePrefix = `DA-${year}-`;
 
@@ -275,7 +296,7 @@ export async function POST(request: Request) {
       const users = await tx.user.findMany({
         where: {
           id: {
-            in: [parsed.data.projectManagerId, parsed.data.mainEngineerId, ...parsed.data.members.map((x) => x.userId)],
+            in: [projectManagerId, parsed.data.mainEngineerId, ...parsed.data.members.map((x) => x.userId)],
           },
           isActive: true,
         },
@@ -283,8 +304,8 @@ export async function POST(request: Request) {
       });
 
       const userSet = new Set(users.map((u) => u.id));
-      if (!userSet.has(parsed.data.projectManagerId)) {
-        throw new Error("GĐ quản lý không hợp lệ hoặc đã bị vô hiệu");
+      if (!userSet.has(projectManagerId)) {
+        throw new Error("GĐ Thi Công không hợp lệ hoặc đã bị vô hiệu");
       }
       if (!userSet.has(parsed.data.mainEngineerId)) {
         throw new Error("KS chính không hợp lệ hoặc đã bị vô hiệu");
@@ -310,12 +331,12 @@ export async function POST(request: Request) {
           customerPortalToken: randomUUID(),
           customerPortalEnabled: true,
           address: parsed.data.address,
-          areaM2: parsed.data.areaM2,
-          unitPrice: parsed.data.unitPrice,
+          areaM2,
+          unitPrice,
           contractValue,
           startDate,
           expectedEndDate,
-          projectManagerId: parsed.data.projectManagerId,
+          projectManagerId,
           mainEngineerId: parsed.data.mainEngineerId,
           status: ProjectStatus.planning,
           notes: null,
@@ -369,9 +390,10 @@ export async function POST(request: Request) {
         }),
       });
 
-      const paymentAmounts = paymentTemplate.map((item) => Math.round(contractValue * item.percent));
+      const paymentBaseValue = contractValue ?? 0;
+      const paymentAmounts = paymentTemplate.map((item) => Math.round(paymentBaseValue * item.percent));
       const partialSum = paymentAmounts.slice(0, 5).reduce((sum, v) => sum + v, 0);
-      paymentAmounts[5] = contractValue - partialSum;
+      paymentAmounts[5] = paymentBaseValue - partialSum;
 
       await tx.paymentSchedule.createMany({
         data: paymentTemplate.map((item, index) => ({
@@ -390,7 +412,7 @@ export async function POST(request: Request) {
       });
 
       const memberRows = parsed.data.members.filter(
-        (member) => member.userId !== parsed.data.projectManagerId && member.userId !== parsed.data.mainEngineerId,
+        (member) => member.userId !== projectManagerId && member.userId !== parsed.data.mainEngineerId,
       );
 
       const dedup = new Map<string, ProjectMemberRole>();

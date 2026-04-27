@@ -19,6 +19,7 @@ const createTaskSchema = z.object({
   receiverRole: z.string().trim().min(1, "Ai nhận & kiểm là bắt buộc"),
   qcChecklist: z.string().trim().min(1, "Checklist QC là bắt buộc"),
   isMilestone: z.boolean().optional().default(false),
+  visibleToCustomer: z.boolean().optional(),
 });
 
 function mapPhase(value: string | null): TaskPhase | null {
@@ -283,6 +284,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           isMilestone: payload.isMilestone || false,
           status: TaskStatus.not_started,
           isActive: true,
+          visibleToCustomer: payload.visibleToCustomer ?? payload.isMilestone ?? false,
           displayOrder,
           notes: null,
         },

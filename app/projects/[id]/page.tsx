@@ -5,6 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
 
+function startOfTodayUtc() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+}
+
 export default async function ProjectInfoPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) {
@@ -24,6 +29,29 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
       },
       mainEngineer: {
         select: { id: true, fullName: true, email: true },
+      },
+    },
+  });
+
+  const today = startOfTodayUtc();
+  const todaySiteRest = await prisma.siteRestDay.findUnique({
+    where: {
+      projectId_restDate: {
+        projectId: params.id,
+        restDate: today,
+      },
+    },
+    select: {
+      id: true,
+      restDate: true,
+      reason: true,
+      note: true,
+      createdAt: true,
+      declaredByUser: {
+        select: {
+          id: true,
+          fullName: true,
+        },
       },
     },
   });
@@ -65,7 +93,11 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
       admins={admins}
       engineers={engineers}
       isAdmin={user.role === UserRole.admin}
+      isConstructionManager={user.role === UserRole.construction_manager}
       canViewFinancial={canViewFinancial}
+      currentUserRole={user.role}
+      currentUserId={user.id}
+      todaySiteRest={todaySiteRest ? JSON.parse(JSON.stringify(todaySiteRest)) : null}
     />
   );
 }

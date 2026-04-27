@@ -34,10 +34,10 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
 };
 
 export const STATUS_CLASS: Record<TaskStatus, string> = {
-  not_started: "bg-slate-200 text-slate-700",
-  in_progress: "bg-blue-100 text-blue-700",
-  done: "bg-slate-400 text-white",
-  inspected: "bg-emerald-100 text-emerald-700",
-  delayed: "bg-red-100 text-red-700",
-  na: "bg-slate-100 text-slate-500",
+  not_started: "bg-zinc-700/50 text-zinc-200",
+  in_progress: "bg-orange-500/20 text-orange-200",
+  done: "bg-zinc-500/70 text-zinc-100",
+  inspected: "bg-emerald-500/20 text-emerald-200",
+  delayed: "bg-red-500/20 text-red-200",
+  na: "bg-zinc-800 text-zinc-400",
 };

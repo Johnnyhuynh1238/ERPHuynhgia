@@ -20,7 +20,7 @@ export default function ChangePasswordError({
         <button
           type="button"
           onClick={reset}
-          className="rounded-md bg-[#1F4E79] px-4 py-2 text-sm font-medium text-white hover:bg-[#163a5b]"
+          className="rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-orange-600"
         >
           Thử lại
         </button>

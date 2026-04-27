@@ -47,6 +47,8 @@ enum TaskLogType {
   note
   photo_uploaded
   assignment_change
+  report_edit
+  reminder_sent
 }
 
 enum PaymentStatus {
@@ -56,11 +58,66 @@ enum PaymentStatus {
   customer_late
 }
 
+enum CustomerPortalCommentType {
+  comment
+  reply
+}
+
 enum ProjectMemberRole {
   engineer
   foreman
   accountant
   construction_manager
+}
+
+enum PauseReason {
+  RAIN
+  LACK_MATERIAL
+  WAIT_INSPECTION
+  WAIT_SUBCONTRACTOR
+  WAIT_CUSTOMER
+  OTHER
+}
+
+enum ReportDecision {
+  WORK
+  PAUSE
+}
+
+enum DailyRating {
+  MET
+  UNDER
+  OVER
+}
+
+enum SiteRestReason {
+  SUNDAY
+  HOLIDAY
+  STORM
+  OTHER
+}
+
+enum KpiSnapshotType {
+  DAILY
+  MONTHLY_FINAL
+}
+
+enum QcItemStatus {
+  unchecked
+  passed
+  failed
+}
+
+enum QcLogAction {
+  status_changed
+  photo_added
+  note_updated
+  item_added
+}
+
+enum QcReviewAction {
+  approved
+  rejected
 }
 
 model User {
@@ -82,37 +139,60 @@ model User {
   assignedForemanFor  Task[]          @relation("AssignedForeman")
   taskLogs            TaskLog[]
   taskPhotos          TaskPhoto[]
+  qcItems             QcItem[]
+  qcProgressUpdates   QcProgress[]        @relation("QcProgressUpdatedBy")
+  qcPhotos            QcPhoto[]
+  qcLogs              QcLog[]
+  qcReviews           QcReview[]
   projectMembers      ProjectMember[]
   addedProjectMembers ProjectMember[] @relation("ProjectMemberAddedBy")
+  declaredSiteRestDays SiteRestDay[]
+  morningReports      MorningReport[]
+  eveningReports      EveningReport[]
+  kpiSnapshots        KpiSnapshot[]
+  customerCommentReplies CustomerCommentReply[]
 
   @@map("users")
 }
 
 model Project {
-  id               String        @id @default(uuid()) @db.Uuid
-  code             String        @unique
-  name             String
-  customerName     String        @map("customer_name")
-  customerPhone    String        @map("customer_phone")
-  address          String
-  areaM2           Decimal       @map("area_m2") @db.Decimal(12, 2)
-  unitPrice        Decimal       @map("unit_price") @db.Decimal(15, 2)
-  contractValue    Decimal       @map("contract_value") @db.Decimal(15, 2)
-  startDate        DateTime      @map("start_date") @db.Date
-  expectedEndDate  DateTime      @map("expected_end_date") @db.Date
-  actualEndDate    DateTime?     @map("actual_end_date") @db.Date
-  projectManagerId String        @map("project_manager_id") @db.Uuid
-  mainEngineerId   String        @map("main_engineer_id") @db.Uuid
-  status           ProjectStatus @default(planning)
-  notes            String?
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                     String        @id @default(uuid()) @db.Uuid
+  code                   String        @unique
+  name                   String
+  customerName           String        @map("customer_name")
+  customerPhone          String        @map("customer_phone")
+  customerIdNumber       String?       @map("customer_id_number")
+  address                String
+  areaM2                 Decimal       @map("area_m2") @db.Decimal(12, 2)
+  unitPrice              Decimal       @map("unit_price") @db.Decimal(15, 2)
+  contractValue          Decimal?      @map("contract_value") @db.Decimal(15, 2)
+  startDate              DateTime      @map("start_date") @db.Date
+  expectedEndDate        DateTime      @map("expected_end_date") @db.Date
+  actualEndDate          DateTime?     @map("actual_end_date") @db.Date
+  goLiveDate             DateTime?     @map("go_live_date") @db.Date
+  customerPortalToken    String?       @unique @map("customer_portal_token") @db.Uuid
+  customerPortalEnabled  Boolean       @default(true) @map("customer_portal_enabled")
+  customerPortalPassword String?       @map("customer_portal_password")
+  projectManagerId       String        @map("project_manager_id") @db.Uuid
+  mainEngineerId         String        @map("main_engineer_id") @db.Uuid
+  status                 ProjectStatus @default(planning)
+  notes                  String?
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
 
-  projectManager   User              @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  mainEngineer     User              @relation("MainEngineer", fields: [mainEngineerId], references: [id])
-  tasks            Task[]
-  paymentSchedules PaymentSchedule[]
-  projectMembers   ProjectMember[]
+  projectManager          User                     @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  mainEngineer            User                     @relation("MainEngineer", fields: [mainEngineerId], references: [id])
+  tasks                   Task[]
+  paymentSchedules        PaymentSchedule[]
+  projectMembers          ProjectMember[]
+  siteRestDays            SiteRestDay[]
+  morningReports          MorningReport[]
+  eveningReports          EveningReport[]
+  kpiSnapshots            KpiSnapshot[]
+  customerComments        CustomerComment[]
+  customerAcknowledgments CustomerAcknowledgment[]
+  customerSessions        CustomerSession[]
+  customerLoginAttempts   CustomerLoginAttempt[]
 
   @@index([status])
   @@map("projects")
@@ -166,6 +246,7 @@ model Task {
   receiverRole       String     @map("receiver_role")
   qcChecklist        String     @map("qc_checklist") @db.Text
   isMilestone        Boolean    @default(false) @map("is_milestone")
+  visibleToCustomer  Boolean    @default(false) @map("visible_to_customer")
   status             TaskStatus @default(not_started)
   isActive           Boolean    @default(true) @map("is_active")
   displayOrder       Int?       @map("display_order")
@@ -174,17 +255,43 @@ model Task {
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
-  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  template         TaskTemplate? @relation(fields: [templateId], references: [id])
-  assignedEngineer User?         @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
-  assignedForeman  User?         @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
-  taskLogs         TaskLog[]
-  taskPhotos       TaskPhoto[]
+  project               Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template              TaskTemplate?            @relation(fields: [templateId], references: [id])
+  assignedEngineer      User?                    @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
+  assignedForeman       User?                    @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
+  taskLogs              TaskLog[]
+  taskPhotos            TaskPhoto[]
+  qcItems               QcItem[]
+  materialItems         TaskMaterialItem[]
+  qcProgressItems       QcProgress[]
+  qcPhotos              QcPhoto[]
+  qcLogs                QcLog[]
+  qcReviews             QcReview[]
+  morningReportTasks    MorningReportTask[]
+  eveningReportTasks    EveningReportTask[]
+  customerComments      CustomerComment[]
+  customerAcknowledgments CustomerAcknowledgment[]
 
   @@unique([projectId, code])
   @@index([projectId, isActive, displayOrder, code])
   @@index([status])
+  @@index([projectId, visibleToCustomer])
   @@map("tasks")
+}
+
+model TaskMaterialItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  name        String
+  isAvailable Boolean  @default(false) @map("is_available")
+  orderIndex  Int      @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, orderIndex])
+  @@map("task_material_items")
 }
 
 model TaskLog {
@@ -205,21 +312,115 @@ model TaskLog {
 }
 
 model TaskPhoto {
-  id           String    @id @default(uuid()) @db.Uuid
-  taskId       String    @map("task_id") @db.Uuid
-  uploadedBy   String    @map("uploaded_by") @db.Uuid
-  photoUrl     String    @map("photo_url")
-  thumbnailUrl String    @map("thumbnail_url")
-  caption      String?
-  fileSizeKb   Int       @map("file_size_kb")
-  takenAt      DateTime? @map("taken_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id                  String     @id @default(uuid()) @db.Uuid
+  taskId              String     @map("task_id") @db.Uuid
+  uploadedBy          String     @map("uploaded_by") @db.Uuid
+  photoUrl            String     @map("photo_url")
+  thumbnailUrl        String     @map("thumbnail_url")
+  caption             String?
+  fileSizeKb          Int        @map("file_size_kb")
+  takenAt             DateTime?  @map("taken_at")
+  eveningReportTaskId String?    @map("evening_report_task_id") @db.Uuid
+  createdAt           DateTime   @default(now()) @map("created_at")
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [uploadedBy], references: [id])
+  task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [uploadedBy], references: [id])
+  eveningReportTask EveningReportTask? @relation(fields: [eveningReportTaskId], references: [id], onDelete: SetNull)
 
   @@index([taskId, createdAt])
+  @@index([eveningReportTaskId])
   @@map("task_photos")
+}
+
+model QcItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  templateItemId String?  @map("template_item_id") @db.Uuid
+  content        String   @db.Text
+  requirePhoto   Boolean  @default(false) @map("require_photo")
+  requireNote    Boolean  @default(false) @map("require_note")
+  createdBy      String   @map("created_by") @db.Uuid
+  orderIndex     Int      @map("order_index")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  task      Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator   User         @relation(fields: [createdBy], references: [id])
+  progress  QcProgress?
+  photos    QcPhoto[]
+  logs      QcLog[]
+
+  @@index([taskId, orderIndex])
+  @@map("qc_items")
+}
+
+model QcProgress {
+  id            String       @id @default(uuid()) @db.Uuid
+  qcItemId      String       @unique @map("qc_item_id") @db.Uuid
+  taskId        String       @map("task_id") @db.Uuid
+  status        QcItemStatus @default(unchecked)
+  note          String?      @db.Text
+  noPhotoReason Boolean      @default(false) @map("no_photo_reason")
+  updatedBy     String       @map("updated_by") @db.Uuid
+  updatedAt     DateTime     @default(now()) @map("updated_at")
+
+  item    QcItem @relation(fields: [qcItemId], references: [id], onDelete: Cascade)
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  updater User   @relation("QcProgressUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@index([taskId, status])
+  @@map("qc_progress")
+}
+
+model QcPhoto {
+  id         String   @id @default(uuid()) @db.Uuid
+  qcItemId   String   @map("qc_item_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  url        String
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  item     QcItem @relation(fields: [qcItemId], references: [id], onDelete: Cascade)
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User   @relation(fields: [uploadedBy], references: [id])
+
+  @@index([taskId, uploadedAt])
+  @@index([qcItemId])
+  @@map("qc_photos")
+}
+
+model QcLog {
+  id          String       @id @default(uuid()) @db.Uuid
+  taskId      String       @map("task_id") @db.Uuid
+  qcItemId    String?      @map("qc_item_id") @db.Uuid
+  action      QcLogAction
+  fromStatus  QcItemStatus? @map("from_status")
+  toStatus    QcItemStatus? @map("to_status")
+  note        String?      @db.Text
+  performedBy String       @map("performed_by") @db.Uuid
+  performedAt DateTime     @default(now()) @map("performed_at")
+
+  task      Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  item      QcItem? @relation(fields: [qcItemId], references: [id], onDelete: SetNull)
+  performer User    @relation(fields: [performedBy], references: [id])
+
+  @@index([taskId, performedAt])
+  @@index([qcItemId])
+  @@map("qc_logs")
+}
+
+model QcReview {
+  id         String         @id @default(uuid()) @db.Uuid
+  taskId      String        @map("task_id") @db.Uuid
+  action      QcReviewAction
+  reviewerId  String        @map("reviewer_id") @db.Uuid
+  note        String?       @db.Text
+  reviewedAt  DateTime      @default(now()) @map("reviewed_at")
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewer User @relation(fields: [reviewerId], references: [id])
+
+  @@index([taskId, reviewedAt])
+  @@map("qc_reviews")
 }
 
 model PaymentSchedule {
@@ -262,4 +463,228 @@ model ProjectMember {
   @@index([projectId])
   @@index([userId])
   @@map("project_members")
+}
+
+model SiteRestDay {
+  id         String         @id @default(uuid()) @db.Uuid
+  projectId  String         @map("project_id") @db.Uuid
+  restDate   DateTime       @map("rest_date") @db.Date
+  reason     SiteRestReason
+  note       String?
+  declaredBy String         @map("declared_by") @db.Uuid
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  declaredByUser User    @relation(fields: [declaredBy], references: [id])
+
+  @@unique([projectId, restDate])
+  @@index([projectId, restDate])
+  @@map("site_rest_days")
+}
+
+model MorningReport {
+  id          String     @id @default(uuid()) @db.Uuid
+  projectId   String     @map("project_id") @db.Uuid
+  reporterId  String     @map("reporter_id") @db.Uuid
+  reportDate  DateTime   @map("report_date") @db.Date
+  submittedAt DateTime?  @map("submitted_at")
+  isOnTime    Boolean    @default(false) @map("is_on_time")
+  overallNote String?    @map("overall_note") @db.Text
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter      User                @relation(fields: [reporterId], references: [id])
+  taskReports   MorningReportTask[]
+  eveningReport EveningReport?
+
+  @@unique([projectId, reportDate, reporterId])
+  @@index([projectId, reportDate])
+  @@map("morning_reports")
+}
+
+model MorningReportTask {
+  id              String         @id @default(uuid()) @db.Uuid
+  morningReportId String         @map("morning_report_id") @db.Uuid
+  taskId          String         @map("task_id") @db.Uuid
+  decision        ReportDecision
+  plannedActivity String?        @map("planned_activity") @db.Text
+  pauseReason     PauseReason?   @map("pause_reason")
+  pauseNote       String?        @map("pause_note") @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  morningReport MorningReport @relation(fields: [morningReportId], references: [id], onDelete: Cascade)
+  task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([morningReportId, taskId])
+  @@map("morning_report_tasks")
+}
+
+model EveningReport {
+  id               String      @id @default(uuid()) @db.Uuid
+  projectId        String      @map("project_id") @db.Uuid
+  reporterId       String      @map("reporter_id") @db.Uuid
+  reportDate       DateTime    @map("report_date") @db.Date
+  morningReportId  String      @unique @map("morning_report_id") @db.Uuid
+  submittedAt      DateTime?   @map("submitted_at")
+  isOnTime         Boolean     @default(false) @map("is_on_time")
+  issues           String?     @db.Text
+  overallRating    DailyRating @map("overall_rating")
+  overallNote      String?     @map("overall_note") @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter         User                   @relation(fields: [reporterId], references: [id])
+  morningReport    MorningReport          @relation(fields: [morningReportId], references: [id], onDelete: Cascade)
+  taskReports      EveningReportTask[]
+  sitePhotos       EveningReportPhoto[]
+  customerComments CustomerComment[]
+
+  @@unique([projectId, reportDate, reporterId])
+  @@index([projectId, reportDate])
+  @@map("evening_reports")
+}
+
+model EveningReportTask {
+  id                  String      @id @default(uuid()) @db.Uuid
+  eveningReportId     String      @map("evening_report_id") @db.Uuid
+  taskId              String      @map("task_id") @db.Uuid
+  completionPercent   Int?        @map("completion_percent")
+  actualWork          String?     @map("actual_work") @db.Text
+  issues              String?     @db.Text
+  rating              DailyRating?
+  explanation         String?     @db.Text
+  stillPaused         Boolean?    @map("still_paused")
+  actualWorkIfStarted String?     @map("actual_work_if_started") @db.Text
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  eveningReport EveningReport @relation(fields: [eveningReportId], references: [id], onDelete: Cascade)
+  task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskPhotos    TaskPhoto[]
+
+  @@unique([eveningReportId, taskId])
+  @@map("evening_report_tasks")
+}
+
+model EveningReportPhoto {
+  id              String   @id @default(uuid()) @db.Uuid
+  eveningReportId String   @map("evening_report_id") @db.Uuid
+  photoUrl        String   @map("photo_url")
+  thumbnailUrl    String   @map("thumbnail_url")
+  caption         String?
+  uploadedAt      DateTime @default(now()) @map("uploaded_at")
+
+  eveningReport EveningReport @relation(fields: [eveningReportId], references: [id], onDelete: Cascade)
+
+  @@map("evening_report_photos")
+}
+
+model KpiSnapshot {
+  id         String          @id @default(uuid()) @db.Uuid
+  projectId  String          @map("project_id") @db.Uuid
+  reporterId String          @map("reporter_id") @db.Uuid
+  date       DateTime        @db.Date
+  month      String
+  type       KpiSnapshotType
+  score      Decimal         @db.Decimal(5, 2)
+  rank       String
+  payload    Json
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, reporterId, date, type])
+  @@index([projectId, month, type])
+  @@index([reporterId, month, type])
+  @@map("kpi_snapshots")
+}
+
+model CustomerSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  tokenId    String   @unique @map("token_id") @db.Uuid
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  expiresAt  DateTime @map("expires_at")
+  loggedInAt DateTime @default(now()) @map("logged_in_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("customer_sessions")
+}
+
+model CustomerComment {
+  id              String    @id @default(uuid()) @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  taskId          String?   @map("task_id") @db.Uuid
+  eveningReportId String?   @map("evening_report_id") @db.Uuid
+  content         String    @db.Text
+  ipAddress       String?   @map("ip_address")
+  userAgent       String?   @map("user_agent")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  readByStaff     Boolean   @default(false) @map("read_by_staff")
+
+  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task          Task?                  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  eveningReport EveningReport?         @relation(fields: [eveningReportId], references: [id], onDelete: SetNull)
+  replies       CustomerCommentReply[]
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([eveningReportId])
+  @@index([readByStaff])
+  @@map("customer_comments")
+}
+
+model CustomerCommentReply {
+  id        String   @id @default(uuid()) @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment CustomerComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  author  User            @relation(fields: [authorId], references: [id])
+
+  @@index([commentId, createdAt])
+  @@map("customer_comment_replies")
+}
+
+model CustomerAcknowledgment {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  taskId         String   @unique @map("task_id") @db.Uuid
+  signatureUrl   String   @map("signature_url") @db.Text
+  ipAddress      String   @map("ip_address")
+  userAgent      String   @map("user_agent")
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
+  note           String?  @db.Text
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("customer_acknowledgments")
+}
+
+model CustomerLoginAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  token       String
+  ipAddress   String   @map("ip_address")
+  attemptCount Int     @default(0) @map("attempt_count")
+  blockedUntil DateTime? @map("blocked_until")
+  lastAttemptAt DateTime @default(now()) @map("last_attempt_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([token, ipAddress])
+  @@index([projectId])
+  @@index([blockedUntil])
+  @@map("customer_login_attempts")
 }

@@ -34,7 +34,7 @@ function mapAuthError(error: unknown) {
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }
@@ -61,7 +61,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

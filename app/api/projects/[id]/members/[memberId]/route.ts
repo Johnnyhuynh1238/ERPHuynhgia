@@ -8,7 +8,7 @@ export async function DELETE(
   { params }: { params: { id: string; memberId: string } },
 ) {
   try {
-    await requireRole([UserRole.admin]);
+    await requireRole(["admin"]);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN";
     if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
@@ -40,6 +40,7 @@ export async function DELETE(
   const assignedTaskCount = await prisma.task.count({
     where: {
       projectId: params.id,
+      isActive: true,
       OR: [{ assignedEngineerId: member.userId }, { assignedForemanId: member.userId }],
     },
   });

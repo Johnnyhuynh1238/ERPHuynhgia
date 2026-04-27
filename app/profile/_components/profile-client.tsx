@@ -172,7 +172,7 @@ export function ProfileClient() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-[#1F4E79]">Hồ sơ cá nhân</h1>
+      <h1 className="text-2xl font-semibold text-orange-300">Hồ sơ cá nhân</h1>
 
       <div className="rounded-xl border bg-white p-5">
         <h2 className="mb-4 text-base font-semibold">Thông tin tài khoản</h2>
@@ -197,7 +197,7 @@ export function ProfileClient() {
             <div>
               <label className="mb-1 block text-sm font-medium">Họ và tên</label>
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
                 {...profileForm.register("fullName")}
               />
               {profileForm.formState.errors.fullName ? (
@@ -207,7 +207,7 @@ export function ProfileClient() {
             <div>
               <label className="mb-1 block text-sm font-medium">Số điện thoại</label>
               <input
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
                 {...profileForm.register("phone")}
               />
               {profileForm.formState.errors.phone ? (
@@ -221,7 +221,7 @@ export function ProfileClient() {
             <input type="file" accept="image/png,image/jpeg,image/webp" {...profileForm.register("avatar")} />
           </div>
 
-          <Button type="submit" disabled={saving} className="bg-[#1F4E79] hover:bg-[#163a5b]">
+          <Button type="submit" disabled={saving} className="bg-orange-500 hover:bg-orange-600">
             {saving ? "Đang lưu..." : "Lưu thông tin"}
           </Button>
         </form>
@@ -241,7 +241,7 @@ export function ProfileClient() {
               <label className="mb-1 block text-sm font-medium">Mật khẩu cũ</label>
               <input
                 type="password"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
                 {...passwordForm.register("currentPassword")}
               />
               {passwordForm.formState.errors.currentPassword ? (
@@ -253,7 +253,7 @@ export function ProfileClient() {
               <label className="mb-1 block text-sm font-medium">Mật khẩu mới</label>
               <input
                 type="password"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
                 {...passwordForm.register("newPassword")}
               />
               {passwordForm.formState.errors.newPassword ? (
@@ -265,7 +265,7 @@ export function ProfileClient() {
               <label className="mb-1 block text-sm font-medium">Xác nhận mật khẩu mới</label>
               <input
                 type="password"
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+                className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
                 {...passwordForm.register("confirmPassword")}
               />
               {passwordForm.formState.errors.confirmPassword ? (
@@ -273,7 +273,7 @@ export function ProfileClient() {
               ) : null}
             </div>
 
-            <Button type="submit" disabled={changingPassword} className="bg-[#1F4E79] hover:bg-[#163a5b]">
+            <Button type="submit" disabled={changingPassword} className="bg-orange-500 hover:bg-orange-600">
               {changingPassword ? "Đang cập nhật..." : "Đổi mật khẩu"}
             </Button>
           </form>

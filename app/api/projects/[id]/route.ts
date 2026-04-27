@@ -24,6 +24,7 @@ const projectSchema = z.object({
   areaM2: z.number().min(1),
   unitPrice: z.number().min(1_000_000),
   startDate: z.string(),
+  expectedEndDate: z.string(),
   actualEndDate: z.string().nullable().optional(),
   status: z.nativeEnum(ProjectStatus),
   notes: z.string().nullable().optional(),
@@ -145,6 +146,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (parsed.data.section === "assignment") {
+    if (!isAdmin) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+
     const payload = assignmentSchema.safeParse(parsed.data.payload);
     if (!payload.success) {
       return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu phân công không hợp lệ" }, { status: 400 });
@@ -159,7 +164,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
 
     if (users.length !== 2) {
-      return NextResponse.json({ message: "GĐ quản lý hoặc KS chính không hợp lệ" }, { status: 400 });
+      return NextResponse.json({ message: "GĐ Thi Công hoặc KS chính không hợp lệ" }, { status: 400 });
     }
 
     const updated = await prisma.project.update({
@@ -245,13 +250,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu dự án không hợp lệ" }, { status: 400 });
   }
 
+  if (!isAdmin && !isConstructionManager) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
   const startDate = normalizeDate(payload.data.startDate);
   const previousStartDate = new Date(project.startDate);
   previousStartDate.setHours(0, 0, 0, 0);
   const isStartDateChanged = previousStartDate.getTime() !== startDate.getTime();
 
   const contractValue = Math.round(payload.data.areaM2 * payload.data.unitPrice);
-  const expectedEndDate = addDays(startDate, 120);
+  const expectedEndDate = normalizeDate(payload.data.expectedEndDate);
 
   const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.project.update({
@@ -335,4 +344,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ? "Đã cập nhật dự án. Ngày dự kiến của 69 công tác và 6 đợt thanh toán đã được cập nhật theo ngày khởi công mới."
       : "Đã cập nhật dự án",
   });
+}
+
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (user.role !== UserRole.admin) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: params.id },
+    select: { id: true, name: true },
+  });
+
+  if (!project) {
+    return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+  }
+
+  await prisma.project.delete({ where: { id: params.id } });
+
+  return NextResponse.json({ message: `Đã xóa dự án ${project.name}` });
 }

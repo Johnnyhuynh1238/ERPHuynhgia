@@ -72,7 +72,7 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
         <input
           id="email"
           type="email"
-          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
           {...form.register("email")}
         />
         {form.formState.errors.email ? (
@@ -87,7 +87,7 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
         <input
           id="password"
           type="password"
-          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
           {...form.register("password")}
         />
         {form.formState.errors.password ? (
@@ -98,7 +98,7 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
       <Button
         type="submit"
         disabled={submitting}
-        className="w-full bg-[#1F4E79] hover:bg-[#163a5b] disabled:cursor-not-allowed"
+        className="w-full bg-orange-500 hover:bg-orange-600 disabled:cursor-not-allowed"
       >
         {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
       </Button>

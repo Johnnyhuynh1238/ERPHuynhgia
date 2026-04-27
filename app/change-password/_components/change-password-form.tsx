@@ -89,7 +89,7 @@ export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         <input
           id="newPassword"
           type="password"
-          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
           {...form.register("newPassword")}
         />
         {form.formState.errors.newPassword ? (
@@ -104,7 +104,7 @@ export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         <input
           id="confirmPassword"
           type="password"
-          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-[#1F4E79] focus:ring-2"
+          className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
           {...form.register("confirmPassword")}
         />
         {form.formState.errors.confirmPassword ? (
@@ -115,7 +115,7 @@ export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
       <Button
         type="submit"
         disabled={submitting}
-        className="w-full bg-[#1F4E79] hover:bg-[#163a5b] disabled:cursor-not-allowed"
+        className="w-full bg-orange-500 hover:bg-orange-600 disabled:cursor-not-allowed"
       >
         {submitting ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
       </Button>

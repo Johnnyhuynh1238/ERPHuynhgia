@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -61,6 +62,11 @@ function reasonLabel(reason: SiteRestData["reason"]) {
   return "Khác";
 }
 
+function buildPortalUrl(token: string) {
+  const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "");
+  return `${appOrigin}/cn/${token}`;
+}
+
 export function ProjectInfoClient({
   project,
   isAdmin,
@@ -82,6 +88,7 @@ export function ProjectInfoClient({
   engineers: OptionUser[];
   todaySiteRest: SiteRestData | null;
 }) {
+  const router = useRouter();
   const [data, setData] = useState(project);
   const [todayRest, setTodayRest] = useState(todaySiteRest);
 
@@ -90,6 +97,10 @@ export function ProjectInfoClient({
   const [showAssignmentEdit, setShowAssignmentEdit] = useState(false);
   const [showGoLiveEdit, setShowGoLiveEdit] = useState(false);
   const [showSiteRestModal, setShowSiteRestModal] = useState(false);
+  const [showDeleteStep1, setShowDeleteStep1] = useState(false);
+  const [showDeleteStep2, setShowDeleteStep2] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [portalPassword, setPortalPassword] = useState("");
 
   const [ownerForm, setOwnerForm] = useState({
@@ -104,6 +115,7 @@ export function ProjectInfoClient({
     areaM2: String(project.areaM2),
     unitPrice: String(project.unitPrice ?? ""),
     startDate: project.startDate.slice(0, 10),
+    expectedEndDate: project.expectedEndDate.slice(0, 10),
     actualEndDate: project.actualEndDate ? project.actualEndDate.slice(0, 10) : "",
     status: project.status,
     notes: project.notes || "",
@@ -143,6 +155,16 @@ export function ProjectInfoClient({
     const projectJson = await projectRes.json().catch(() => ({}));
     if (projectRes.ok && projectJson.project) {
       setData(projectJson.project);
+      setProjectForm({
+        name: projectJson.project.name,
+        areaM2: String(projectJson.project.areaM2),
+        unitPrice: String(projectJson.project.unitPrice ?? ""),
+        startDate: projectJson.project.startDate.slice(0, 10),
+        expectedEndDate: projectJson.project.expectedEndDate.slice(0, 10),
+        actualEndDate: projectJson.project.actualEndDate ? projectJson.project.actualEndDate.slice(0, 10) : "",
+        status: projectJson.project.status,
+        notes: projectJson.project.notes || "",
+      });
       setGoLiveDateInput(projectJson.project.goLiveDate ? projectJson.project.goLiveDate.slice(0, 10) : "");
     }
 
@@ -181,6 +203,7 @@ export function ProjectInfoClient({
       areaM2: Number(projectForm.areaM2),
       unitPrice: Number(projectForm.unitPrice),
       startDate: projectForm.startDate,
+      expectedEndDate: projectForm.expectedEndDate,
       actualEndDate: projectForm.actualEndDate || null,
       status: projectForm.status,
       notes: projectForm.notes || null,
@@ -380,6 +403,36 @@ export function ProjectInfoClient({
     await reloadProject();
   }
 
+  async function copyPortalLink() {
+    if (!data.customerPortalToken) return;
+
+    try {
+      await navigator.clipboard.writeText(buildPortalUrl(data.customerPortalToken));
+      toast.success("Đã copy link cổng chủ nhà");
+    } catch {
+      toast.error("Không thể copy link");
+    }
+  }
+
+  async function deleteProject() {
+    if (!isAdmin || deleteConfirmName !== data.name) return;
+
+    setDeleting(true);
+    const res = await fetch(`/api/projects/${data.id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    setDeleting(false);
+
+    if (!res.ok) {
+      toast.error(json.message || "Xóa dự án thất bại");
+      return;
+    }
+
+    router.push(`/projects?deleted=${encodeURIComponent(data.name)}`);
+    router.refresh();
+  }
+
+  const isDeleteConfirmMatched = useMemo(() => deleteConfirmName.trim() === data.name, [data.name, deleteConfirmName]);
+
   useEffect(() => {
     loadComments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -409,12 +462,17 @@ export function ProjectInfoClient({
           <h2 className="font-semibold">Cổng chủ nhà</h2>
         </div>
         <div className="space-y-2 text-sm">
-          <div>
-            Link: {data.customerPortalToken ? (
-              <a className="text-orange-300 underline" href={`/cn/${data.customerPortalToken}`} target="_blank" rel="noreferrer">
-                /cn/{data.customerPortalToken}
-              </a>
-            ) : "-"}
+          <div className="space-y-2">
+            <div>
+              Link: {data.customerPortalToken ? (
+                <a className="break-all text-orange-300 underline" href={buildPortalUrl(data.customerPortalToken)} target="_blank" rel="noreferrer">
+                  {buildPortalUrl(data.customerPortalToken)}
+                </a>
+              ) : "-"}
+            </div>
+            {data.customerPortalToken ? (
+              <Button type="button" variant="outline" onClick={copyPortalLink}>Copy link đầy đủ</Button>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <span>Trạng thái:</span>
@@ -477,7 +535,7 @@ export function ProjectInfoClient({
         </div>
         <div className="grid gap-2 text-sm">
           <div>
-            GĐ quản lý: {data.projectManager.fullName} ({data.projectManager.email})
+            GĐ Thi Công: {data.projectManager.fullName} ({data.projectManager.email})
           </div>
           <div>
             KS chính: {data.mainEngineer.fullName} ({data.mainEngineer.email})
@@ -551,6 +609,19 @@ export function ProjectInfoClient({
         <h2 className="mb-3 font-semibold">Ghi chú dự án</h2>
         <div className="text-sm text-[#d9def3]">{data.notes || "Chưa có ghi chú"}</div>
       </div>
+
+      {isAdmin ? (
+        <div className="rounded-2xl border border-red-800/70 bg-red-950/30 p-4">
+          <h2 className="mb-3 font-semibold text-red-200">Vùng nguy hiểm</h2>
+          <Button
+            type="button"
+            className="bg-red-600 text-white hover:bg-red-500"
+            onClick={() => setShowDeleteStep1(true)}
+          >
+            Xóa dự án
+          </Button>
+        </div>
+      ) : null}
 
       {canViewCommentInbox ? (
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
@@ -666,6 +737,12 @@ export function ProjectInfoClient({
                 className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
                 value={projectForm.startDate}
                 onChange={(e) => setProjectForm((p) => ({ ...p, startDate: e.target.value }))}
+              />
+              <input
+                type="date"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                value={projectForm.expectedEndDate}
+                onChange={(e) => setProjectForm((p) => ({ ...p, expectedEndDate: e.target.value }))}
               />
               <input
                 type="date"
@@ -795,6 +872,63 @@ export function ProjectInfoClient({
               </Button>
               <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitSiteRest}>
                 Xác nhận
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDeleteStep1 ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-md rounded-2xl bg-[#1a1d2e] p-4">
+            <h3 className="mb-3 font-semibold text-red-300">Xóa dự án</h3>
+            <p className="text-sm text-[#d9def3]">
+              Xóa dự án <span className="font-semibold">{data.name}</span>? Toàn bộ dữ liệu liên quan sẽ bị xóa vĩnh viễn.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteStep1(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-500"
+                onClick={() => {
+                  setShowDeleteStep1(false);
+                  setShowDeleteStep2(true);
+                }}
+              >
+                Tiếp tục xóa
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDeleteStep2 ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-md rounded-2xl bg-[#1a1d2e] p-4">
+            <h3 className="mb-3 font-semibold text-red-300">Xác nhận xóa vĩnh viễn</h3>
+            <p className="mb-3 text-sm text-[#d9def3]">
+              Nhập chính xác tên dự án <span className="font-semibold">{data.name}</span> để xác nhận.
+            </p>
+            <input
+              className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder="Nhập tên dự án"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteStep2(false);
+                  setDeleteConfirmName("");
+                }}
+                disabled={deleting}
+              >
+                Hủy
+              </Button>
+              <Button className="bg-red-600 text-white hover:bg-red-500" onClick={deleteProject} disabled={!isDeleteConfirmMatched || deleting}>
+                {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
               </Button>
             </div>
           </div>

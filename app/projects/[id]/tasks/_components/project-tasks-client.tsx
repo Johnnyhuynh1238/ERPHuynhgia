@@ -31,6 +31,7 @@ type TaskRow = {
   qcChecklist: string;
   status: TaskStatus;
   isMilestone: boolean;
+  visibleToCustomer?: boolean;
   isActive: boolean;
 };
 
@@ -62,6 +63,7 @@ type TaskFormValues = {
   receiverRole: string;
   qcChecklist: string;
   isMilestone: boolean;
+  visibleToCustomer: boolean;
 };
 
 function fmtDate(dateIso: string) {
@@ -89,6 +91,7 @@ function defaultTaskForm(tasks: TaskRow[]): TaskFormValues {
     receiverRole: "",
     qcChecklist: "",
     isMilestone: false,
+    visibleToCustomer: false,
   };
 }
 
@@ -159,6 +162,7 @@ function SortableTaskRow({
       <td className={`px-2 py-2 ${task.isMilestone ? "font-bold text-red-300" : ""}`}>
         {task.isMilestone ? "⚠️ " : ""}
         {task.name}
+        {task.visibleToCustomer ? <span className="ml-2 rounded bg-emerald-500/20 px-1 py-0.5 text-[10px] text-emerald-300">CN</span> : null}
       </td>
       <td className="px-2 py-2 text-center">{task.offsetDays}</td>
       <td className="px-2 py-2 text-center">{task.durationDays}</td>
@@ -309,6 +313,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       receiverRole: task.receiverRole,
       qcChecklist: task.qcChecklist,
       isMilestone: task.isMilestone,
+      visibleToCustomer: Boolean(task.visibleToCustomer),
     });
     setShowEditModal(true);
   }
@@ -336,6 +341,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
         receiverRole: taskForm.receiverRole,
         qcChecklist: taskForm.qcChecklist,
         isMilestone: taskForm.isMilestone,
+        visibleToCustomer: taskForm.visibleToCustomer,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -373,6 +379,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
           receiverRole: taskForm.receiverRole,
           qcChecklist: taskForm.qcChecklist,
           isMilestone: taskForm.isMilestone,
+          visibleToCustomer: taskForm.visibleToCustomer,
         },
       }),
     });
@@ -864,6 +871,18 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                 </label>
               </div>
 
+              <div className="flex items-center gap-2 pt-7">
+                <input
+                  id="add-visible-to-customer"
+                  type="checkbox"
+                  checked={taskForm.visibleToCustomer}
+                  onChange={(e) => setTaskForm((p) => ({ ...p, visibleToCustomer: e.target.checked }))}
+                />
+                <label htmlFor="add-visible-to-customer" className="text-sm">
+                  Hiển thị ở Cổng chủ nhà
+                </label>
+              </div>
+
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm">Vật tư chính *</label>
                 <textarea
@@ -1002,6 +1021,18 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                 />
                 <label htmlFor="edit-is-milestone" className="text-sm">
                   Điểm dừng nghiệm thu
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 pt-7">
+                <input
+                  id="edit-visible-to-customer"
+                  type="checkbox"
+                  checked={taskForm.visibleToCustomer}
+                  onChange={(e) => setTaskForm((p) => ({ ...p, visibleToCustomer: e.target.checked }))}
+                />
+                <label htmlFor="edit-visible-to-customer" className="text-sm">
+                  Hiển thị ở Cổng chủ nhà
                 </label>
               </div>
 

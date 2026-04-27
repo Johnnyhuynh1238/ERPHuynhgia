@@ -16,11 +16,12 @@ const formSchema = z.object({
   customerIdNumber: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.number().min(1, "Diện tích phải > 0"),
-  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
+  areaM2: z.number().min(1, "Diện tích phải > 0").optional(),
+  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
+  expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   templateCategory: z.literal("nha_pho_1t1l"),
-  projectManagerId: z.string().uuid("Vui lòng chọn GĐ quản lý"),
+  projectManagerId: z.string().uuid("Vui lòng chọn GĐ Thi Công").optional(),
   mainEngineerId: z.string().uuid("Vui lòng chọn KS chính"),
   members: z.array(
     z.object({
@@ -44,28 +45,32 @@ function formatMoney(value: number) {
   return `${Math.round(value).toLocaleString("vi-VN")} đ`;
 }
 
-function formatDate(date: Date) {
-  const d = String(date.getDate()).padStart(2, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
+function toIsoDate(date: Date) {
   const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
-}
-
-function addDays(dateString: string, days: number) {
-  const d = new Date(dateString);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function todayIso() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
+function todayIso() {
+  return toIsoDate(new Date());
+}
+
+function todayPlusDaysIso(days: number) {
+  const now = new Date();
+  now.setDate(now.getDate() + days);
+  return toIsoDate(now);
+}
+
+export function ProjectsNewForm({
+  currentUserId,
+  currentUserRole,
+  currentUserName,
+}: {
+  currentUserId: string;
+  currentUserRole: "admin" | "construction_manager";
+  currentUserName: string;
+}) {
   const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +78,8 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
   const [admins, setAdmins] = useState<OptionUser[]>([]);
   const [engineers, setEngineers] = useState<OptionUser[]>([]);
   const [members, setMembers] = useState<OptionUser[]>([]);
+
+  const isConstructionManager = currentUserRole === "construction_manager";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -82,9 +89,10 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
       customerIdNumber: "",
       address: "",
       name: "",
-      areaM2: 0,
-      unitPrice: 0,
+      areaM2: undefined,
+      unitPrice: undefined,
       startDate: todayIso(),
+      expectedEndDate: todayPlusDaysIso(120),
       templateCategory: "nha_pho_1t1l",
       projectManagerId: currentUserId,
       mainEngineerId: "",
@@ -121,17 +129,18 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
       setEngineers(data.engineers || []);
       setMembers(data.members || []);
 
-      if (!form.getValues("projectManagerId") && data.admins?.[0]) {
+      if (isConstructionManager) {
+        form.setValue("projectManagerId", currentUserId);
+      } else if (!form.getValues("projectManagerId") && data.admins?.[0]) {
         form.setValue("projectManagerId", data.admins[0].id);
       }
     }
 
     loadOptions();
-  }, [form]);
+  }, [currentUserId, form, isConstructionManager]);
 
   const areaM2 = form.watch("areaM2");
   const unitPrice = form.watch("unitPrice");
-  const startDate = form.watch("startDate");
   const selectedMembers = form.watch("members");
 
   const contractValue = useMemo(() => {
@@ -139,12 +148,6 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
     const price = Number(unitPrice || 0);
     return area * price;
   }, [areaM2, unitPrice]);
-
-  const expectedEndDateText = useMemo(() => {
-    if (!startDate) return "-";
-    const expected = addDays(startDate, 120);
-    return formatDate(expected);
-  }, [startDate]);
 
   const hasDuplicateMembers = useMemo(() => {
     const ids = selectedMembers.map((m) => m.userId).filter(Boolean);
@@ -161,10 +164,20 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
 
     setSubmitting(true);
 
+    const payload = isConstructionManager
+      ? {
+          ...values,
+          projectManagerId: currentUserId,
+          areaM2: undefined,
+          unitPrice: undefined,
+          contractValue: null,
+        }
+      : values;
+
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify(payload),
     });
 
     const data = (await res.json().catch(() => ({}))) as { id?: string; code?: string; message?: string };
@@ -243,36 +256,40 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *</label>
-            <input
-              type="number"
-              min={1}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              {...form.register("areaM2", { valueAsNumber: true })}
-            />
-            {form.formState.errors.areaM2 ? (
-              <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p>
-            ) : null}
-          </div>
+          {!isConstructionManager ? (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  {...form.register("areaM2", { valueAsNumber: true })}
+                />
+                {form.formState.errors.areaM2 ? (
+                  <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p>
+                ) : null}
+              </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *</label>
-            <input
-              type="number"
-              min={1_000_000}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              {...form.register("unitPrice", { valueAsNumber: true })}
-            />
-            {form.formState.errors.unitPrice ? (
-              <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p>
-            ) : null}
-          </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *</label>
+                <input
+                  type="number"
+                  min={1_000_000}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  {...form.register("unitPrice", { valueAsNumber: true })}
+                />
+                {form.formState.errors.unitPrice ? (
+                  <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p>
+                ) : null}
+              </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">Giá trị HĐ (readonly)</label>
-            <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{formatMoney(contractValue)}</div>
-          </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Giá trị HĐ (readonly)</label>
+                <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{formatMoney(contractValue)}</div>
+              </div>
+            </>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-sm font-medium">Ngày khởi công *</label>
@@ -283,8 +300,11 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Ngày bàn giao dự kiến (readonly)</label>
-            <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{expectedEndDateText}</div>
+            <label className="mb-1 block text-sm font-medium">Ngày bàn giao dự kiến *</label>
+            <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("expectedEndDate")} />
+            {form.formState.errors.expectedEndDate ? (
+              <p className="mt-1 text-xs text-red-600">{form.formState.errors.expectedEndDate.message}</p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -294,15 +314,19 @@ export function ProjectsNewForm({ currentUserId }: { currentUserId: string }) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">GĐ quản lý *</label>
-            <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("projectManagerId")}>
-              <option value="">Chọn GĐ quản lý</option>
-              {admins.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.email})
-                </option>
-              ))}
-            </select>
+            <label className="mb-1 block text-sm font-medium">GĐ Thi Công *</label>
+            {isConstructionManager ? (
+              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{currentUserName}</div>
+            ) : (
+              <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("projectManagerId")}>
+                <option value="">Chọn GĐ Thi Công</option>
+                {admins.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.email})
+                  </option>
+                ))}
+              </select>
+            )}
             {form.formState.errors.projectManagerId ? (
               <p className="mt-1 text-xs text-red-600">{form.formState.errors.projectManagerId.message}</p>
             ) : null}

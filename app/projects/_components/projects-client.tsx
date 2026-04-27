@@ -156,7 +156,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
           {canViewAllProjects ? (
             <>
               <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-                <option value="">Tất cả GĐ quản lý</option>
+                <option value="">Tất cả GĐ Thi Công</option>
                 {projectManagers.map((u) => (
                   <option key={u.id} value={u.id}>{u.fullName}</option>
                 ))}
