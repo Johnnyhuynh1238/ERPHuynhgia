@@ -40,6 +40,8 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/admin/templates" },
+    { label: "Chuyên môn", href: "/admin/specialties" },
+    { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
   ],
   engineer: [
     { label: "Dashboard", href: "/" },
@@ -63,6 +65,8 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI của tôi", href: "/my-kpi" },
     { label: "KPI tổng", href: "/admin/kpi" },
+    { label: "Chuyên môn", href: "/admin/specialties" },
+    { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
   ],
 };
 

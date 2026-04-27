@@ -284,11 +284,71 @@ async function seedDemoProject(userIds: { adminId: string; engineerId: string; f
   };
 }
 
+async function seedSubcontractorMasterData() {
+  const specialties = [
+    { code: "masonry", name: "Nề (xây tô)", icon: "🧱", sortOrder: 1 },
+    { code: "reinforcement", name: "Sắt thép", icon: "🔩", sortOrder: 2 },
+    { code: "electrical", name: "Điện", icon: "⚡", sortOrder: 3 },
+    { code: "plumbing", name: "Nước", icon: "🚰", sortOrder: 4 },
+    { code: "painting", name: "Sơn", icon: "🎨", sortOrder: 5 },
+    { code: "aluminum", name: "Nhôm kính", icon: "🪟", sortOrder: 6 },
+    { code: "flooring", name: "Lát gạch", icon: "🟫", sortOrder: 7 },
+    { code: "carpentry", name: "Mộc", icon: "🪵", sortOrder: 8 },
+    { code: "roofing", name: "Mái", icon: "🏠", sortOrder: 9 },
+    { code: "waterproofing", name: "Chống thấm", icon: "💧", sortOrder: 10 },
+  ];
+
+  const criteria = [
+    { code: "quality", name: "Chất lượng", weight: 1.5, sortOrder: 1, isDefault: true },
+    { code: "schedule", name: "Tiến độ", weight: 1.3, sortOrder: 2, isDefault: true },
+    { code: "communication", name: "Giao tiếp", weight: 1.0, sortOrder: 3, isDefault: true },
+    { code: "professionalism", name: "Chuyên nghiệp", weight: 1.0, sortOrder: 4, isDefault: true },
+    { code: "enthusiasm", name: "Nhiệt tình", weight: 0.8, sortOrder: 5, isDefault: true },
+  ];
+
+  for (const item of specialties) {
+    await prisma.subcontractorSpecialty.upsert({
+      where: { code: item.code },
+      create: {
+        ...item,
+        isActive: true,
+      },
+      update: {
+        name: item.name,
+        icon: item.icon,
+        sortOrder: item.sortOrder,
+      },
+    });
+  }
+
+  for (const item of criteria) {
+    await prisma.evaluationCriterion.upsert({
+      where: { code: item.code },
+      create: {
+        ...item,
+        isActive: true,
+      },
+      update: {
+        name: item.name,
+        weight: item.weight,
+        sortOrder: item.sortOrder,
+        isDefault: item.isDefault,
+      },
+    });
+  }
+
+  return {
+    specialties: specialties.length,
+    criteria: criteria.length,
+  };
+}
+
 async function main() {
   const startedAt = Date.now();
 
   const users = await seedUsers();
   const templateResult = await seedTaskTemplates();
+  const subcontractorResult = await seedSubcontractorMasterData();
   const demoResult = await seedDemoProject({
     adminId: users.admin.id,
     engineerId: users.engineer.id,
@@ -309,6 +369,8 @@ async function main() {
   console.log(`[SEED] Demo project: ${demoResult.project.code}`);
   console.log(`[SEED] Demo project tasks: ${demoResult.taskCount}`);
   console.log(`[SEED] Demo project payment schedules: ${demoResult.paymentCount}`);
+  console.log(`[SEED] Subcontractor specialties seed: ${subcontractorResult.specialties}`);
+  console.log(`[SEED] Evaluation criteria seed: ${subcontractorResult.criteria}`);
   console.log(`[SEED] Thời gian chạy: ${elapsedMs} ms`);
 }
 

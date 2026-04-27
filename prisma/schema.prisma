@@ -14,6 +14,39 @@ enum UserRole {
   construction_manager
 }
 
+enum SubcontractorType {
+  individual
+  company
+}
+
+enum SubcontractorStatus {
+  active
+  inactive
+  blacklisted
+}
+
+enum SubContractStatus {
+  draft
+  active
+  completed
+  cancelled
+}
+
+enum SubContractUnit {
+  lump_sum
+  per_m2
+  per_day
+  per_unit
+}
+
+enum SubPaymentStatus {
+  pending
+  requested
+  approved
+  paid
+  cancelled
+}
+
 enum ProjectStatus {
   planning
   in_progress
@@ -151,6 +184,13 @@ model User {
   eveningReports      EveningReport[]
   kpiSnapshots        KpiSnapshot[]
   customerCommentReplies CustomerCommentReply[]
+  subcontractorsCreated Subcontractor[] @relation("SubcontractorCreator")
+  subContractsCreated   SubContract[]   @relation("SubContractCreator")
+  subContractFiles      SubContractFile[]
+  subPaymentsRequested  SubPayment[]    @relation("SubPaymentRequester")
+  subPaymentsApproved   SubPayment[]    @relation("SubPaymentApprover")
+  subPaymentsPaid       SubPayment[]    @relation("SubPaymentPayer")
+  subEvaluations        SubEvaluation[]
 
   @@map("users")
 }
@@ -193,6 +233,7 @@ model Project {
   customerAcknowledgments CustomerAcknowledgment[]
   customerSessions        CustomerSession[]
   customerLoginAttempts   CustomerLoginAttempt[]
+  subContracts            SubContract[]
 
   @@index([status])
   @@map("projects")
@@ -271,6 +312,8 @@ model Task {
   eveningReportTasks    EveningReportTask[]
   customerComments      CustomerComment[]
   customerAcknowledgments CustomerAcknowledgment[]
+  subContractTasks      SubContractTask[]
+  subPayments           SubPayment[]
 
   @@unique([projectId, code])
   @@index([projectId, isActive, displayOrder, code])
@@ -600,6 +643,211 @@ model KpiSnapshot {
   @@index([projectId, month, type])
   @@index([reporterId, month, type])
   @@map("kpi_snapshots")
+}
+
+model SubcontractorSpecialty {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  icon        String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  subcontractors SubcontractorSpecialtyMap[]
+
+  @@map("subcontractor_specialties")
+}
+
+model EvaluationCriterion {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  weight      Decimal  @default(1.0) @db.Decimal(3, 2)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  scores SubEvaluationScore[]
+
+  @@map("evaluation_criteria")
+}
+
+model Subcontractor {
+  id              String            @id @default(uuid()) @db.Uuid
+  code            String            @unique
+  name            String
+  type            SubcontractorType @default(individual)
+  taxCode         String?           @map("tax_code")
+  phone           String
+  altPhone        String?           @map("alt_phone")
+  email           String?
+  address         String?
+  bankName        String?           @map("bank_name")
+  bankAccount     String?           @map("bank_account")
+  bankAccountName String?           @map("bank_account_name")
+  status          SubcontractorStatus @default(active)
+  notes           String?           @db.Text
+  avgRating       Decimal?          @map("avg_rating") @db.Decimal(3, 2)
+  totalContracts  Int               @default(0) @map("total_contracts")
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  createdBy       String            @map("created_by") @db.Uuid
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  creator     User                       @relation("SubcontractorCreator", fields: [createdBy], references: [id])
+  specialties SubcontractorSpecialtyMap[]
+  contracts   SubContract[]
+
+  @@index([status])
+  @@index([isActive])
+  @@map("subcontractors")
+}
+
+model SubcontractorSpecialtyMap {
+  id              String   @id @default(uuid()) @db.Uuid
+  subcontractorId String   @map("subcontractor_id") @db.Uuid
+  specialtyId     String   @map("specialty_id") @db.Uuid
+
+  subcontractor Subcontractor          @relation(fields: [subcontractorId], references: [id], onDelete: Cascade)
+  specialty     SubcontractorSpecialty @relation(fields: [specialtyId], references: [id])
+
+  @@unique([subcontractorId, specialtyId])
+  @@map("subcontractor_specialty_map")
+}
+
+model SubContract {
+  id              String            @id @default(uuid()) @db.Uuid
+  code            String            @unique
+  projectId       String            @map("project_id") @db.Uuid
+  subcontractorId String            @map("subcontractor_id") @db.Uuid
+  title           String
+  scopeOfWork     String            @map("scope_of_work") @db.Text
+  unit            SubContractUnit   @default(lump_sum)
+  unitPrice       Decimal?          @map("unit_price") @db.Decimal(15, 2)
+  quantity        Decimal?          @db.Decimal(10, 2)
+  contractValue   Decimal           @map("contract_value") @db.Decimal(15, 2)
+  startDate       DateTime          @map("start_date") @db.Date
+  expectedEndDate DateTime          @map("expected_end_date") @db.Date
+  actualEndDate   DateTime?         @map("actual_end_date") @db.Date
+  status          SubContractStatus @default(draft)
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at")
+  createdBy       String            @map("created_by") @db.Uuid
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subcontractor Subcontractor     @relation(fields: [subcontractorId], references: [id])
+  creator       User              @relation("SubContractCreator", fields: [createdBy], references: [id])
+  linkedTasks   SubContractTask[]
+  payments      SubPayment[]
+  evaluations   SubEvaluation[]
+  files         SubContractFile[]
+
+  @@index([projectId])
+  @@index([subcontractorId])
+  @@index([status])
+  @@map("sub_contracts")
+}
+
+model SubContractTask {
+  id            String @id @default(uuid()) @db.Uuid
+  subContractId String @map("sub_contract_id") @db.Uuid
+  taskId        String @map("task_id") @db.Uuid
+
+  subContract SubContract @relation(fields: [subContractId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([subContractId, taskId])
+  @@map("sub_contract_tasks")
+}
+
+model SubContractFile {
+  id            String   @id @default(uuid()) @db.Uuid
+  subContractId String   @map("sub_contract_id") @db.Uuid
+  fileName      String   @map("file_name")
+  fileUrl       String   @map("file_url")
+  fileType      String   @map("file_type")
+  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+  uploadedBy    String   @map("uploaded_by") @db.Uuid
+
+  subContract SubContract @relation(fields: [subContractId], references: [id], onDelete: Cascade)
+  uploader    User        @relation(fields: [uploadedBy], references: [id])
+
+  @@map("sub_contract_files")
+}
+
+model SubPayment {
+  id             String           @id @default(uuid()) @db.Uuid
+  code           String           @unique
+  subContractId  String           @map("sub_contract_id") @db.Uuid
+  stage          Int
+  description    String
+  linkedTaskId   String?          @map("linked_task_id") @db.Uuid
+  expectedAmount Decimal          @map("expected_amount") @db.Decimal(15, 2)
+  expectedDate   DateTime         @map("expected_date") @db.Date
+  percentage     Decimal?         @db.Decimal(5, 2)
+  actualAmount   Decimal?         @map("actual_amount") @db.Decimal(15, 2)
+  actualPaidDate DateTime?        @map("actual_paid_date") @db.Date
+  status         SubPaymentStatus @default(pending)
+  requestedBy    String?          @map("requested_by") @db.Uuid
+  requestedAt    DateTime?        @map("requested_at")
+  requestNote    String?          @map("request_note") @db.Text
+  approvedBy     String?          @map("approved_by") @db.Uuid
+  approvedAt     DateTime?        @map("approved_at")
+  approveNote    String?          @map("approve_note") @db.Text
+  paidBy         String?          @map("paid_by") @db.Uuid
+  paidAt         DateTime?        @map("paid_at")
+  receiptUrl     String?          @map("receipt_url")
+  payNote        String?          @map("pay_note") @db.Text
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  subContract SubContract @relation(fields: [subContractId], references: [id], onDelete: Cascade)
+  linkedTask  Task?       @relation(fields: [linkedTaskId], references: [id])
+  requester   User?       @relation("SubPaymentRequester", fields: [requestedBy], references: [id])
+  approver    User?       @relation("SubPaymentApprover", fields: [approvedBy], references: [id])
+  payer       User?       @relation("SubPaymentPayer", fields: [paidBy], references: [id])
+
+  @@index([subContractId])
+  @@index([status])
+  @@map("sub_payments")
+}
+
+model SubEvaluation {
+  id            String   @id @default(uuid()) @db.Uuid
+  subContractId String   @map("sub_contract_id") @db.Uuid
+  evaluatorId   String   @map("evaluator_id") @db.Uuid
+  overallRating Decimal  @map("overall_rating") @db.Decimal(3, 2)
+  comment       String?  @db.Text
+  willHireAgain Boolean  @default(true) @map("will_hire_again")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  subContract SubContract          @relation(fields: [subContractId], references: [id], onDelete: Cascade)
+  evaluator   User                 @relation(fields: [evaluatorId], references: [id])
+  scores      SubEvaluationScore[]
+
+  @@unique([subContractId, evaluatorId])
+  @@map("sub_evaluations")
+}
+
+model SubEvaluationScore {
+  id           String @id @default(uuid()) @db.Uuid
+  evaluationId String @map("evaluation_id") @db.Uuid
+  criterionId  String @map("criterion_id") @db.Uuid
+  score        Int
+
+  evaluation SubEvaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterion  EvaluationCriterion @relation(fields: [criterionId], references: [id])
+
+  @@unique([evaluationId, criterionId])
+  @@map("sub_evaluation_scores")
 }
 
 model CustomerSession {
