@@ -22,7 +22,11 @@ export default async function SubContractDetailPage({ params }: { params: { id: 
 
   return (
     <ProtectedLayout>
-      <SubContractDetailClient contractId={params.id} canWrite={["admin", "construction_manager"].includes(user.role)} />
+      <SubContractDetailClient
+        contractId={params.id}
+        canWrite={["admin", "construction_manager"].includes(user.role)}
+        currentRole={user.role}
+      />
     </ProtectedLayout>
   );
 }
