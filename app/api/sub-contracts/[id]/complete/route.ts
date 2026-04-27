@@ -1,0 +1,45 @@
+import { SubContractStatus } from "@prisma/client";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
+import { serializeSubContract, startOfUtcDay } from "@/lib/sub-contract-utils";
+
+export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const { user, error } = await requireSubContractWriteUser();
+  if (error || !user) return error;
+
+  const access = await canUserAccessSubContract(params.id, { id: user.id, role: user.role });
+  if (!access.projectId) {
+    return NextResponse.json({ message: "Không tìm thấy hợp đồng" }, { status: 404 });
+  }
+
+  if (!access.canAccess) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  const row = await prisma.subContract.findUnique({
+    where: { id: params.id },
+    select: { id: true, status: true },
+  });
+
+  if (!row) {
+    return NextResponse.json({ message: "Không tìm thấy hợp đồng" }, { status: 404 });
+  }
+
+  if (row.status !== SubContractStatus.active) {
+    return NextResponse.json({ message: "Chỉ có thể hoàn thành hợp đồng đang active" }, { status: 400 });
+  }
+
+  const updated = await prisma.subContract.update({
+    where: { id: params.id },
+    data: {
+      status: SubContractStatus.completed,
+      actualEndDate: startOfUtcDay(),
+    },
+  });
+
+  return NextResponse.json({
+    contract: serializeSubContract(updated, true),
+    message: "Đã hoàn thành hợp đồng",
+  });
+}

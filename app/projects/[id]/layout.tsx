@@ -4,6 +4,7 @@ import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 import { ProjectTabsNav } from "./_components/project-tabs-nav";
 
 type ProjectLayoutProps = {
@@ -67,10 +68,12 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   const canViewMembers = user.role === UserRole.admin || user.role === UserRole.construction_manager;
 
   const canViewConstructionLog = user.role !== UserRole.accountant;
+  const canViewSubContracts = await canUserAccessProjectSubContracts(params.id, { id: user.id, role: user.role });
 
   const tabs = [
     { label: "Thông tin chung", href: `/projects/${params.id}` },
     { label: "Tiến độ", href: `/projects/${params.id}/tasks` },
+    ...(canViewSubContracts ? [{ label: "Thầu phụ", href: `/projects/${params.id}/sub-contracts` }] : []),
     ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),
     ...(canViewPayments ? [{ label: "Lịch thanh toán", href: `/projects/${params.id}/payments` }] : []),
     ...(canViewMembers ? [{ label: "Thành viên", href: `/projects/${params.id}/members` }] : []),
