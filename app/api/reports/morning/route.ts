@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PauseReason, ReportDecision, TaskLogType, UserRole } from "@prisma/client";
+import { PauseReason, ReportDecision, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -196,6 +196,37 @@ export async function POST(request: Request) {
         pauseNote: task.decision === ReportDecision.PAUSE ? task.pauseNote?.trim() || null : null,
       })),
     });
+
+    if (parsed.data.submit) {
+      const workTaskIds = Array.from(
+        new Set(parsed.data.tasks.filter((task) => task.decision === ReportDecision.WORK).map((task) => task.taskId)),
+      );
+
+      if (workTaskIds.length > 0) {
+        const shouldPromoteStatuses: TaskStatus[] = [TaskStatus.not_started];
+
+        const tasksToPromote = await tx.task.findMany({
+          where: {
+            id: { in: workTaskIds },
+            status: { in: shouldPromoteStatuses },
+          },
+          select: {
+            id: true,
+            actualStartDate: true,
+          },
+        });
+
+        for (const task of tasksToPromote) {
+          await tx.task.update({
+            where: { id: task.id },
+            data: {
+              status: TaskStatus.in_progress,
+              actualStartDate: task.actualStartDate ?? toUtcStartOfDay(reportDate),
+            },
+          });
+        }
+      }
+    }
 
     if (existing && parsed.data.submit) {
       await createBulkTaskLogs(uniqueTaskIds, user.id, "Đã chỉnh sửa báo cáo sáng trong ngày", "report_edit");
