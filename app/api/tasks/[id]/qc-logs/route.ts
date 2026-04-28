@@ -1,11 +1,10 @@
 import sharp from "sharp";
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
-import { getTaskWithAccess } from "@/lib/task-permissions";
+import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 
 const createSchema = z.object({
   qcItemId: z.string().uuid("qcItemId không hợp lệ"),
@@ -21,19 +20,6 @@ function safeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-async function isEngineerMemberOfProject(projectId: string, userId: string) {
-  const member = await prisma.projectMember.findFirst({
-    where: { projectId, userId, roleInProject: "engineer" },
-    select: { id: true },
-  });
-  return Boolean(member);
-}
-
-async function canHandleQcLog(role: string, projectId: string, userId: string) {
-  if (role === UserRole.admin || role === UserRole.construction_manager) return true;
-  if (role !== UserRole.engineer) return false;
-  return isEngineerMemberOfProject(projectId, userId);
-}
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -43,8 +29,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!task) return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
   if (!allowed) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
-  const can = await canHandleQcLog(user.role, task.projectId, user.id);
-  if (!can) return NextResponse.json({ message: "Không có quyền check QC" }, { status: 403 });
+  if (!canUpdateQc(task, { id: user.id, role: user.role })) {
+    return NextResponse.json({ message: "Không có quyền check QC" }, { status: 403 });
+  }
 
   const contentType = request.headers.get("content-type") || "";
 
