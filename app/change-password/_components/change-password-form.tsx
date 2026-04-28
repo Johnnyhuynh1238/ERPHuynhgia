@@ -32,6 +32,7 @@ type ChangePasswordFormProps = {
 export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -80,6 +81,28 @@ export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     router.refresh();
   }
 
+  async function handleCancel() {
+    setCancelling(true);
+
+    const res = await fetch("/api/change-password/cancel", {
+      method: "POST",
+    });
+
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+
+    if (!res.ok) {
+      setCancelling(false);
+      toast.error("Không thể bỏ qua lúc này", {
+        description: data.message || "Vui lòng thử lại sau.",
+      });
+      return;
+    }
+
+    toast.info("Đã bỏ qua đổi mật khẩu ở phiên này");
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-1">
@@ -112,13 +135,25 @@ export function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         ) : null}
       </div>
 
-      <Button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:cursor-not-allowed"
-      >
-        {submitting ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={submitting || cancelling}
+          onClick={handleCancel}
+          className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100"
+        >
+          {cancelling ? "Đang hủy..." : "Hủy"}
+        </Button>
+
+        <Button
+          type="submit"
+          disabled={submitting || cancelling}
+          className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
+        </Button>
+      </div>
     </form>
   );
 }

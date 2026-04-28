@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt";
 type SessionToken = {
   userId?: string;
   mustChangePassword?: boolean;
+  iat?: number;
 };
 
 function isStaticAsset(pathname: string) {
@@ -68,7 +69,11 @@ export async function middleware(req: NextRequest) {
 
   const mustChangePassword = Boolean(token?.mustChangePassword);
 
-  if (mustChangePassword && !isForceChangeRoute && !isLoginRoute) {
+  const skipForceCookie = req.cookies.get("force_password_change_skipped")?.value;
+  const skipForceMarker = token?.iat ? `${token.userId}:${token.iat}` : "";
+  const hasSkipForceForCurrentSession = Boolean(skipForceCookie && skipForceMarker && skipForceCookie === skipForceMarker);
+
+  if (mustChangePassword && !isForceChangeRoute && !isLoginRoute && !hasSkipForceForCurrentSession) {
     return NextResponse.redirect(new URL("/change-password", nextUrl.origin));
   }
 
