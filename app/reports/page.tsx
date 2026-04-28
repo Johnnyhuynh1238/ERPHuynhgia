@@ -13,6 +13,7 @@ type ReportRow = {
   reportName: string;
   status: "completed" | "pending";
   targetHref: string;
+  submittedAt?: string | null;
 };
 
 type SubcontractorSpendingRow = {
@@ -178,6 +179,7 @@ export default async function ReportsPage() {
         },
         select: {
           projectId: true,
+          submittedAt: true,
         },
       }),
       prisma.eveningReport.findMany({
@@ -187,6 +189,7 @@ export default async function ReportsPage() {
         },
         select: {
           projectId: true,
+          submittedAt: true,
         },
       }),
       loadSubcontractorSpending(),
@@ -196,6 +199,9 @@ export default async function ReportsPage() {
     const rows: ReportRow[] = [];
 
     for (const project of projects) {
+      const morning = morningReports.find((report) => report.projectId === project.id);
+      const evening = eveningReports.find((report) => report.projectId === project.id);
+
       rows.push({
         key: `${project.id}-morning`,
         projectId: project.id,
@@ -203,7 +209,8 @@ export default async function ReportsPage() {
         projectName: project.name,
         reportType: "morning",
         reportName: "Báo cáo sáng",
-        status: morningReports.some((report) => report.projectId === project.id) ? "completed" : "pending",
+        status: morning ? "completed" : "pending",
+        submittedAt: morning?.submittedAt?.toISOString() ?? null,
         targetHref: `/reports/morning/${project.id}`,
       });
 
@@ -214,7 +221,8 @@ export default async function ReportsPage() {
         projectName: project.name,
         reportType: "evening",
         reportName: "Báo cáo chiều",
-        status: eveningReports.some((report) => report.projectId === project.id) ? "completed" : "pending",
+        status: evening ? "completed" : "pending",
+        submittedAt: evening?.submittedAt?.toISOString() ?? null,
         targetHref: `/reports/evening/${project.id}`,
       });
     }
@@ -234,6 +242,7 @@ export default async function ReportsPage() {
           kpiPercent,
         }}
         rows={rows}
+        role={user.role}
         subcontractorSpending={spending}
         topSubcontractors={topSubcontractors}
       />
@@ -293,7 +302,7 @@ export default async function ReportsPage() {
           projectId: { in: projects.map((project) => project.id) },
           submittedAt: { not: null },
         },
-        select: { projectId: true },
+        select: { projectId: true, submittedAt: true },
       }),
       prisma.eveningReport.findMany({
         where: {
@@ -302,13 +311,16 @@ export default async function ReportsPage() {
           projectId: { in: projects.map((project) => project.id) },
           submittedAt: { not: null },
         },
-        select: { projectId: true },
+        select: { projectId: true, submittedAt: true },
       }),
     ]);
 
     const rows: ReportRow[] = [];
 
     for (const project of projects) {
+      const morning = morningReports.find((report) => report.projectId === project.id);
+      const evening = eveningReports.find((report) => report.projectId === project.id);
+
       rows.push({
         key: `${project.id}-morning`,
         projectId: project.id,
@@ -316,7 +328,8 @@ export default async function ReportsPage() {
         projectName: project.name,
         reportType: "morning",
         reportName: "Báo cáo sáng",
-        status: morningReports.some((report) => report.projectId === project.id) ? "completed" : "pending",
+        status: morning ? "completed" : "pending",
+        submittedAt: morning?.submittedAt?.toISOString() ?? null,
         targetHref: `/reports/morning/${project.id}`,
       });
 
@@ -327,7 +340,8 @@ export default async function ReportsPage() {
         projectName: project.name,
         reportType: "evening",
         reportName: "Báo cáo chiều",
-        status: eveningReports.some((report) => report.projectId === project.id) ? "completed" : "pending",
+        status: evening ? "completed" : "pending",
+        submittedAt: evening?.submittedAt?.toISOString() ?? null,
         targetHref: `/reports/evening/${project.id}`,
       });
     }
@@ -347,6 +361,7 @@ export default async function ReportsPage() {
           kpiPercent,
         }}
         rows={rows}
+        role={user.role}
       />
     );
   }
@@ -358,6 +373,7 @@ export default async function ReportsPage() {
         dateLabel={todayYmd}
         summary={{ totalReports: 0, completedReports: 0, pendingReports: 0, kpiPercent: 0 }}
         rows={[]}
+        role={user.role}
         subcontractorSpending={spending}
       />
     );
