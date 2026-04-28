@@ -183,20 +183,37 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
           </div>
         ) : (
           projects.map((project, idx) => (
-            <Link
+            <div
               key={project.id}
-              href={`/projects/${project.id}`}
-              className={`block rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 transition hover:border-[#fb923c]/60 slide-up delay-${(idx % 6) + 1}`}
+              className={`rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up delay-${(idx % 6) + 1}`}
             >
               <div className="mb-2 flex items-start justify-between gap-2">
-                <div>
+                <Link href={`/projects/${project.id}`}>
                   <div className="text-xs text-[#8892b0]">{project.code}</div>
-                  <div className="text-sm font-bold text-[#f0f2ff]">{project.name}</div>
-                </div>
+                  <div className="text-sm font-bold text-[#f0f2ff] hover:text-[#fb923c]">{project.name}</div>
+                </Link>
                 <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusChip(project.status)}`}>{statusLabel(project.status)}</span>
               </div>
 
               <div className="text-xs text-[#8892b0]">{project.address}</div>
+
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Link
+                  href={`/projects/${project.id}/tasks`}
+                  className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
+                >
+                  <span>📋 Tiến độ</span>
+                  <span>›</span>
+                </Link>
+                <Link
+                  href={`/projects/${project.id}/construction-log`}
+                  className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
+                >
+                  <span>📓 Nhật ký</span>
+                  <span>›</span>
+                </Link>
+              </div>
+
               <div className="mt-2 flex items-center justify-between text-[11px] text-[#8892b0]">
                 <span>Khởi công: {fmtDate(project.startDate)}</span>
                 <span>{Math.round(project.progressPercent)}%</span>
@@ -204,7 +221,7 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
               <div className="mt-2 h-1.5 rounded-full bg-[#252840]">
                 <div className="h-1.5 rounded-full bg-[#f97316]" style={{ width: `${Math.max(0, Math.min(100, project.progressPercent))}%` }} />
               </div>
-            </Link>
+            </div>
           ))
         )}
       </div>
