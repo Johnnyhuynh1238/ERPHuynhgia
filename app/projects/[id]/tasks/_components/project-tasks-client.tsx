@@ -15,6 +15,7 @@ type TaskRow = {
   name: string;
   offsetDays: number;
   durationDays: number;
+  displayOrder?: number | null;
   plannedStartDate: string;
   plannedEndDate: string;
   assignedEngineer: { id: string; fullName: string } | null;
@@ -65,6 +66,25 @@ function statusRank(status: TaskStatus) {
   if (status === "not_started") return 2;
   if (status === "done" || status === "inspected") return 3;
   return 4;
+}
+
+function compareByDisplayOrder(a: TaskRow, b: TaskRow) {
+  const ao = a.displayOrder ?? null;
+  const bo = b.displayOrder ?? null;
+
+  if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+  if (ao !== null && bo === null) return -1;
+  if (ao === null && bo !== null) return 1;
+
+  const aStart = new Date(a.plannedStartDate).getTime();
+  const bStart = new Date(b.plannedStartDate).getTime();
+  if (aStart !== bStart) return aStart - bStart;
+
+  const aEnd = new Date(a.plannedEndDate).getTime();
+  const bEnd = new Date(b.plannedEndDate).getTime();
+  if (aEnd !== bEnd) return aEnd - bEnd;
+
+  return a.id.localeCompare(b.id, "vi");
 }
 
 function statusGroupLabel(status: TaskStatus) {
@@ -183,24 +203,33 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const isCanExport = role === "admin" || role === "accountant";
   const activeFilterCount = [phaseFilter !== "all", statusFilter !== "all", !!engineerFilter, !!search, showDeleted].filter(Boolean).length;
 
+  const hasPhaseFilter = phaseFilter !== "all";
+  const hasStatusFilter = statusFilter !== "all";
+
   const visibleTasks = useMemo(() => {
-    const list = [...tasks].sort((a, b) => {
-      const rs = statusRank(a.status) - statusRank(b.status);
-      if (rs !== 0) return rs;
-      return a.name.localeCompare(b.name, "vi");
-    });
+    // Trường hợp 1,2,4: sort displayOrder ASC (fallback date/id), không sort alphabet
+    const list = [...tasks].sort(compareByDisplayOrder);
     return list;
   }, [tasks]);
 
   const grouped = useMemo(() => {
+    // Chỉ nhóm khi Trường hợp 3: lọc trạng thái, không lọc phase
+    if (!(hasStatusFilter && !hasPhaseFilter)) {
+      return [["Tất cả", visibleTasks]] as [string, TaskRow[]][];
+    }
+
     const map = new Map<string, TaskRow[]>();
     visibleTasks.forEach((t) => {
       const key = statusGroupLabel(t.status);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(t);
     });
-    return Array.from(map.entries());
-  }, [visibleTasks]);
+
+    const orderedGroups = ["Trễ hạn", "Đang làm", "Sắp bắt đầu", "Hoàn thành"];
+    return orderedGroups
+      .map((label) => [label, map.get(label) ?? []] as [string, TaskRow[]])
+      .filter(([, items]) => items.length > 0);
+  }, [visibleTasks, hasStatusFilter, hasPhaseFilter]);
 
   return (
     <div className="space-y-4">
@@ -253,7 +282,9 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
         {!loading ? grouped.map(([group, groupTasks]) => (
           <div key={group} className="space-y-2">
-            <div className="px-2 text-xs font-semibold uppercase tracking-[1px] text-[#8892b0]">←──── {group} ({groupTasks.length}) ────→</div>
+            {group !== "Tất cả" ? (
+              <div className="px-2 text-xs font-semibold uppercase tracking-[1px] text-[#8892b0]">←──── {group} ({groupTasks.length}) ────→</div>
+            ) : null}
             {groupTasks.map((task) => {
               const progress = calcProgress(task);
               return (
