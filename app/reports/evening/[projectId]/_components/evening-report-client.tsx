@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DailyRating, ReportDecision } from "@prisma/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,10 @@ export function EveningReportClient({
   const [reportId, setReportId] = useState<string | null>(eveningReport?.id || null);
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [qcSheetTaskId, setQcSheetTaskId] = useState<string | null>(null);
+  const [qcDraftChecked, setQcDraftChecked] = useState<Record<string, boolean>>({});
+  const [qcDraftNote, setQcDraftNote] = useState("");
+  const [savingQcBatch, setSavingQcBatch] = useState(false);
 
   function updateTask(taskId: string, patch: Partial<EveningTaskRow>) {
     setTasks((prev) => prev.map((task) => (task.taskId === taskId ? { ...task, ...patch } : task)));
@@ -166,34 +170,74 @@ export function EveningReportClient({
     });
   }
 
-  async function quickCheckQc(taskId: string) {
+  const qcSheetTask = useMemo(() => tasks.find((x) => x.taskId === qcSheetTaskId) || null, [tasks, qcSheetTaskId]);
+
+  function closeQcSheet() {
+    setQcSheetTaskId(null);
+    setQcDraftChecked({});
+    setQcDraftNote("");
+    setSavingQcBatch(false);
+  }
+
+  async function openQcSheet(taskId: string) {
     try {
       await loadTaskQcStatus(taskId);
       const t = tasks.find((x) => x.taskId === taskId);
       const items = t?.qcStatusItems || [];
-      const pending = items.find((x) => x.status === "pending");
-      if (!pending) {
+      const pendingItems = items.filter((x) => x.status === "pending");
+      if (pendingItems.length === 0) {
         toast.success("QC task này đã check hết");
         return;
       }
 
-      const draftId = await ensureDraftReport();
-      const res = await fetch(`/api/tasks/${taskId}/qc-logs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          qcItemId: pending.qcItemId,
-          eveningReportId: draftId,
-          note: "Check QC hôm nay",
-        }),
+      const init: Record<string, boolean> = {};
+      pendingItems.forEach((x) => {
+        init[x.qcItemId] = false;
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.message || "Check QC thất bại");
-
-      await loadTaskQcStatus(taskId);
-      toast.success(`Đã check QC: ${pending.name}`);
+      setQcDraftChecked(init);
+      setQcDraftNote("");
+      setQcSheetTaskId(taskId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Check QC thất bại");
+      toast.error(error instanceof Error ? error.message : "Không mở được sheet QC");
+    }
+  }
+
+  async function saveQcBatch() {
+    if (!qcSheetTask) return;
+
+    const selectedIds = Object.entries(qcDraftChecked)
+      .filter(([, checked]) => checked)
+      .map(([id]) => id);
+
+    if (selectedIds.length === 0) {
+      toast.error("Chọn ít nhất 1 tiêu chí để lưu QC");
+      return;
+    }
+
+    setSavingQcBatch(true);
+    try {
+      const draftId = await ensureDraftReport();
+      const note = qcDraftNote.trim() || "Check QC hôm nay";
+
+      await Promise.all(
+        selectedIds.map(async (qcItemId) => {
+          const res = await fetch(`/api/tasks/${qcSheetTask.taskId}/qc-logs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ qcItemId, eveningReportId: draftId, note }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json.message || "Lưu QC thất bại");
+        }),
+      );
+
+      await loadTaskQcStatus(qcSheetTask.taskId);
+      toast.success(`Đã lưu QC ${selectedIds.length} tiêu chí`);
+      closeQcSheet();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Lưu QC thất bại");
+    } finally {
+      setSavingQcBatch(false);
     }
   }
 
@@ -659,7 +703,7 @@ export function EveningReportClient({
 
         <div className="mt-3 rounded border bg-emerald-50 p-3 text-sm">
           <div className="font-medium">QC hôm nay: {task.qcCheckedCount || 0}/{task.qcTotalCount || 0} tiêu chí đã check ✅</div>
-          <Button type="button" className="mt-2" variant="outline" onClick={() => quickCheckQc(task.taskId)}>
+          <Button type="button" className="mt-2" variant="outline" onClick={() => openQcSheet(task.taskId)}>
             📋 Check QC hôm nay
           </Button>
         </div>
@@ -802,6 +846,46 @@ export function EveningReportClient({
           </div>
           </fieldset>
         </>
+      ) : null}
+
+      {qcSheetTask ? (
+        <div className="fixed inset-0 z-50 bg-black/50 p-4" onClick={closeQcSheet}>
+          <div className="mx-auto mt-8 w-full max-w-lg rounded-xl border bg-white p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 text-base font-semibold">Check QC – {qcSheetTask.code} {qcSheetTask.name}</div>
+            <div className="space-y-2">
+              {(qcSheetTask.qcStatusItems || [])
+                .filter((item) => item.status === "pending")
+                .map((item) => (
+                  <label key={item.qcItemId} className="flex items-center gap-2 rounded border p-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(qcDraftChecked[item.qcItemId])}
+                      onChange={(e) => setQcDraftChecked((prev) => ({ ...prev, [item.qcItemId]: e.target.checked }))}
+                    />
+                    <span>{item.name}</span>
+                  </label>
+                ))}
+            </div>
+
+            <div className="mt-3">
+              <label className="mb-1 block text-sm font-medium">Ghi chú QC (tuỳ chọn)</label>
+              <textarea
+                className="w-full rounded border px-3 py-2 text-sm"
+                rows={2}
+                value={qcDraftNote}
+                onChange={(e) => setQcDraftNote(e.target.value)}
+                placeholder="VD: Check QC hôm nay"
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={closeQcSheet} disabled={savingQcBatch}>Đóng</Button>
+              <Button className="bg-orange-500 hover:bg-orange-600" onClick={saveQcBatch} disabled={savingQcBatch}>
+                {savingQcBatch ? "Đang lưu..." : "Lưu QC"}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
