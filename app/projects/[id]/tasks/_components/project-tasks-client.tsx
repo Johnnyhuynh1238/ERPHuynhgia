@@ -45,7 +45,9 @@ type TasksResponse = {
 type PersistedTaskFilter = {
   phase: string;
   status: string;
+  engineerId?: string;
   search: string;
+  showDeleted?: boolean;
   sortBy: string;
   sortDir: "asc" | "desc";
 };
@@ -131,6 +133,8 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const [showDeleted, setShowDeleted] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const loadedPersistedFilterRef = useRef(false);
+  const latestRequestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const filterStorageKey = useMemo(() => `task-filter-${projectId}`, [projectId]);
 
@@ -142,10 +146,12 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       const parsed = JSON.parse(raw) as Partial<PersistedTaskFilter>;
       if (typeof parsed.phase === "string") setPhaseFilter(parsed.phase);
       if (typeof parsed.status === "string") setStatusFilter(parsed.status);
+      if (typeof parsed.engineerId === "string") setEngineerFilter(parsed.engineerId);
       if (typeof parsed.search === "string") {
         setSearchInput(parsed.search);
         setSearch(parsed.search.trim());
       }
+      if (typeof parsed.showDeleted === "boolean") setShowDeleted(parsed.showDeleted);
     } catch {
       window.localStorage.removeItem(filterStorageKey);
     } finally {
@@ -163,11 +169,24 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     if (!loadedPersistedFilterRef.current) return;
     window.localStorage.setItem(
       filterStorageKey,
-      JSON.stringify({ phase: phaseFilter, status: statusFilter, search: searchInput, sortBy: DEFAULT_SORT_BY, sortDir: DEFAULT_SORT_DIR }),
+      JSON.stringify({
+        phase: phaseFilter,
+        status: statusFilter,
+        engineerId: engineerFilter,
+        search: searchInput,
+        showDeleted,
+        sortBy: DEFAULT_SORT_BY,
+        sortDir: DEFAULT_SORT_DIR,
+      }),
     );
-  }, [filterStorageKey, phaseFilter, statusFilter, searchInput]);
+  }, [filterStorageKey, phaseFilter, statusFilter, engineerFilter, searchInput, showDeleted]);
 
   async function loadTasks() {
+    const requestId = ++latestRequestIdRef.current;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     const params = new URLSearchParams({
       phase: phaseFilter,
@@ -176,18 +195,40 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       search,
       ...(showDeleted ? { includeDeleted: "1" } : {}),
     });
-    const res = await fetch(`/api/projects/${projectId}/tasks?${params.toString()}`, { cache: "no-store" });
-    const data = (await res.json().catch(() => ({}))) as TasksResponse;
-    setLoading(false);
-    if (!res.ok) return setTasks([]);
-    setTasks(data.tasks || []);
-    setEngineers(data.engineers || []);
-    setRole(data.role || "");
-    setProjectCode(data.project?.code || "");
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/tasks?${params.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const data = (await res.json().catch(() => ({}))) as TasksResponse;
+
+      if (requestId !== latestRequestIdRef.current) return;
+
+      setLoading(false);
+      if (!res.ok) {
+        setTasks([]);
+        return;
+      }
+
+      setTasks(data.tasks || []);
+      setEngineers(data.engineers || []);
+      setRole(data.role || "");
+      setProjectCode(data.project?.code || "");
+    } catch (error) {
+      if ((error as Error).name === "AbortError") return;
+      if (requestId !== latestRequestIdRef.current) return;
+      setLoading(false);
+      setTasks([]);
+      toast.error("Không tải được danh sách task");
+    }
   }
 
   useEffect(() => {
     loadTasks();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
 
