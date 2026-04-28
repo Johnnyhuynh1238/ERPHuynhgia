@@ -73,7 +73,7 @@ function addDays(baseDate: Date, offsetDays: number) {
   return d;
 }
 
-async function isTaskQcCompleted(taskId: string) {
+async function getTaskQcSummary(taskId: string) {
   const rows = await prisma.$queryRaw<Array<{ total: number; passed: number }>>`
     SELECT
       COUNT(*)::int AS total,
@@ -85,7 +85,12 @@ async function isTaskQcCompleted(taskId: string) {
 
   const total = rows[0]?.total ?? 0;
   const passed = rows[0]?.passed ?? 0;
-  return total > 0 && passed === total;
+  return {
+    total,
+    passed,
+    remaining: Math.max(total - passed, 0),
+    completed: total > 0 && passed === total,
+  };
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -202,10 +207,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "Chỉ admin, trưởng phòng thi công hoặc KS chính mới được nghiệm thu" }, { status: 403 });
     }
 
-    if (payload.data.status === TaskStatus.inspected) {
-      const qcCompleted = await isTaskQcCompleted(task.id);
-      if (!qcCompleted) {
-        return NextResponse.json({ message: "Chưa thể nghiệm thu: QC chưa đạt 100%" }, { status: 400 });
+    if (payload.data.status === TaskStatus.inspected || payload.data.status === TaskStatus.done) {
+      const qc = await getTaskQcSummary(task.id);
+      if (!qc.completed) {
+        return NextResponse.json(
+          { message: `Còn ${qc.remaining} tiêu chí QC chưa đạt. Vui lòng check QC trước khi hoàn thành.` },
+          { status: 400 },
+        );
       }
     }
 

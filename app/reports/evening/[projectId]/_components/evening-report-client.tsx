@@ -22,6 +22,12 @@ type TaskPhoto = {
   caption: string | null;
 };
 
+type QcStatusItem = {
+  qcItemId: string;
+  name: string;
+  status: "pass" | "fail" | "pending";
+};
+
 type EveningTaskRow = {
   taskId: string;
   code: string;
@@ -42,6 +48,9 @@ type EveningTaskRow = {
   taskPhotos: TaskPhoto[];
   eveningTaskId: string | null;
   markAsDone: boolean;
+  qcStatusItems?: QcStatusItem[];
+  qcCheckedCount?: number;
+  qcTotalCount?: number;
 };
 
 type EveningReportTaskPayload = {
@@ -143,6 +152,49 @@ export function EveningReportClient({
 
   function updateTask(taskId: string, patch: Partial<EveningTaskRow>) {
     setTasks((prev) => prev.map((task) => (task.taskId === taskId ? { ...task, ...patch } : task)));
+  }
+
+  async function loadTaskQcStatus(taskId: string) {
+    const res = await fetch(`/api/tasks/${taskId}/qc-status`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || "Không tải được QC status");
+    const qcStatusItems = (json.items || []) as QcStatusItem[];
+    updateTask(taskId, {
+      qcStatusItems,
+      qcCheckedCount: qcStatusItems.filter((x) => x.status !== "pending").length,
+      qcTotalCount: qcStatusItems.length,
+    });
+  }
+
+  async function quickCheckQc(taskId: string) {
+    try {
+      await loadTaskQcStatus(taskId);
+      const t = tasks.find((x) => x.taskId === taskId);
+      const items = t?.qcStatusItems || [];
+      const pending = items.find((x) => x.status === "pending");
+      if (!pending) {
+        toast.success("QC task này đã check hết");
+        return;
+      }
+
+      const draftId = await ensureDraftReport();
+      const res = await fetch(`/api/tasks/${taskId}/qc-logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          qcItemId: pending.qcItemId,
+          eveningReportId: draftId,
+          note: "Check QC hôm nay",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || "Check QC thất bại");
+
+      await loadTaskQcStatus(taskId);
+      toast.success(`Đã check QC: ${pending.name}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Check QC thất bại");
+    }
   }
 
   function mapTaskFromPayload(existingTask: EveningTaskRow, reportTask: EveningReportTaskPayload): EveningTaskRow {
@@ -464,6 +516,13 @@ export function EveningReportClient({
     }
   }, [tasks.length, currentStep]);
 
+  useEffect(() => {
+    tasks.forEach((t) => {
+      loadTaskQcStatus(t.taskId).catch(() => undefined);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const canGoBackStep = tasks.length > 0 && currentStep > 0;
   const canProgressStep = tasks.length > 0 && currentStep < tasks.length - 1;
   const activeTask = tasks[currentStep] || null;
@@ -596,6 +655,13 @@ export function EveningReportClient({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mt-3 rounded border bg-emerald-50 p-3 text-sm">
+          <div className="font-medium">QC hôm nay: {task.qcCheckedCount || 0}/{task.qcTotalCount || 0} tiêu chí đã check ✅</div>
+          <Button type="button" className="mt-2" variant="outline" onClick={() => quickCheckQc(task.taskId)}>
+            📋 Check QC hôm nay
+          </Button>
         </div>
       </div>
     );

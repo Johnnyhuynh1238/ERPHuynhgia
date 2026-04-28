@@ -177,6 +177,7 @@ model User {
   qcPhotos            QcPhoto[]
   qcLogs              QcLog[]
   qcReviews           QcReview[]
+  taskQcLogs          TaskQcLog[] @relation("TaskQcLogChecker")
   projectMembers      ProjectMember[]
   addedProjectMembers ProjectMember[] @relation("ProjectMemberAddedBy")
   declaredSiteRestDays SiteRestDay[]
@@ -308,6 +309,7 @@ model Task {
   qcPhotos              QcPhoto[]
   qcLogs                QcLog[]
   qcReviews             QcReview[]
+  taskQcLogs            TaskQcLog[]
   morningReportTasks    MorningReportTask[]
   eveningReportTasks    EveningReportTask[]
   customerComments      CustomerComment[]
@@ -391,6 +393,7 @@ model QcItem {
   progress  QcProgress?
   photos    QcPhoto[]
   logs      QcLog[]
+  taskQcLogs TaskQcLog[]
 
   @@index([taskId, orderIndex])
   @@map("qc_items")
@@ -449,6 +452,28 @@ model QcLog {
   @@index([taskId, performedAt])
   @@index([qcItemId])
   @@map("qc_logs")
+}
+
+model TaskQcLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  taskId          String   @map("task_id") @db.Uuid
+  qcItemId        String   @map("qc_item_id") @db.Uuid
+  eveningReportId String?  @map("evening_report_id") @db.Uuid
+  checkedAt       DateTime @default(now()) @map("checked_at")
+  checkedBy       String   @map("checked_by") @db.Uuid
+  photos          String[]
+  note            String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  qcItem        QcItem        @relation(fields: [qcItemId], references: [id], onDelete: Cascade)
+  eveningReport EveningReport? @relation(fields: [eveningReportId], references: [id], onDelete: SetNull)
+  checker       User          @relation("TaskQcLogChecker", fields: [checkedBy], references: [id])
+
+  @@index([taskId])
+  @@index([qcItemId])
+  @@index([eveningReportId])
+  @@map("task_qc_logs")
 }
 
 model QcReview {
@@ -582,6 +607,7 @@ model EveningReport {
   morningReport    MorningReport          @relation(fields: [morningReportId], references: [id], onDelete: Cascade)
   taskReports      EveningReportTask[]
   sitePhotos       EveningReportPhoto[]
+  taskQcLogs       TaskQcLog[]
   customerComments CustomerComment[]
 
   @@unique([projectId, reportDate, reporterId])

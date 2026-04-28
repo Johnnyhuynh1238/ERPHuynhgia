@@ -139,6 +139,7 @@ export function TaskDetailClient({
   const [visibleToCustomer, setVisibleToCustomer] = useState(Boolean(initialTask.visibleToCustomer));
 
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [qcGate, setQcGate] = useState<{ allPassed: boolean; remaining: number }>({ allPassed: false, remaining: 0 });
 
   const canChangeStatus = currentUserRole === "admin" || currentUserRole === "construction_manager";
 
@@ -162,6 +163,21 @@ export function TaskDetailClient({
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id ||
     currentUserId === task.assignedForeman?.id;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/tasks/${task.id}/qc-status`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled) setQcGate({ allPassed: Boolean(json.allPassed), remaining: Number(json.remaining || 0) });
+      })
+      .catch(() => {
+        if (!cancelled) setQcGate({ allPassed: false, remaining: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task.id]);
 
   async function patchTask(section: string, payload: object) {
     const res = await fetch(`/api/tasks/${task.id}`, {
@@ -513,7 +529,8 @@ export function TaskDetailClient({
                     key={k}
                     className={`rounded-xl border-2 p-3 text-xs font-semibold ${status === k ? statusTileClass[k] || "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] bg-[#222637] text-[#8891aa]"}`}
                     onClick={() => setStatus(k)}
-                    disabled={!canChangeStatus}
+                    disabled={!canChangeStatus || ((k === "done" || k === "inspected") && !qcGate.allPassed)}
+                    title={(k === "done" || k === "inspected") && !qcGate.allPassed ? `Còn ${qcGate.remaining} tiêu chí QC chưa đạt` : undefined}
                   >
                     {STATUS_LABEL[k]}
                   </button>

@@ -14,6 +14,13 @@ type JournalEntry = {
   stillPaused: boolean | null;
   actualWorkIfStarted: string | null;
   taskPhotos: { id: string; photoUrl: string; thumbnailUrl: string; caption: string | null }[];
+  qcLogs?: {
+    id: string;
+    checkedAt: string;
+    note: string | null;
+    qcItem: { id: string; content: string };
+    checker: { fullName: string; email: string };
+  }[];
   eveningReport: {
     reportDate: string;
     submittedAt: string | null;
@@ -91,6 +98,26 @@ export function JournalSection({ taskId }: { taskId: string }) {
               <Field label="Vướng mắc chung" value={selected.eveningReport.issues} />
               <Field label="Đánh giá chung" value={selected.eveningReport.overallRating} />
               <Field label="Ghi chú chung" value={selected.eveningReport.overallNote} />
+              {selected.qcLogs && selected.qcLogs.length > 0 ? (
+                <div>
+                  <div className="mb-2 text-[11px] font-semibold uppercase text-[#8891aa]">QC trong ngày</div>
+                  <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-2 text-sm text-[#f0f2f8]">
+                    {selected.qcLogs.reduce<Record<string, string[]>>((acc, log) => {
+                      const checker = log.checker.fullName || log.checker.email;
+                      if (!acc[checker]) acc[checker] = [];
+                      acc[checker].push(`${log.qcItem.content} ✅`);
+                      return acc;
+                    }, {}) && Object.entries(selected.qcLogs.reduce<Record<string, string[]>>((acc, log) => {
+                      const checker = log.checker.fullName || log.checker.email;
+                      if (!acc[checker]) acc[checker] = [];
+                      acc[checker].push(`${log.qcItem.content} ✅`);
+                      return acc;
+                    }, {})).map(([checker, contents]) => (
+                      <div key={checker} className="mb-1 last:mb-0">{checker} check: {contents.join(", ")}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {photos.length > 0 ? <div><div className="mb-2 text-[11px] font-semibold uppercase text-[#8891aa]">Ảnh báo cáo</div><div className="grid grid-cols-3 gap-2">{photos.map((photo) => <button key={photo.id} className="overflow-hidden rounded-xl border border-[#2e3347]" onClick={() => setFullPhoto(photo.photoUrl)}><Image src={photo.thumbnailUrl} alt={photo.caption || "report photo"} width={180} height={180} className="h-24 w-full object-cover" /></button>)}</div></div> : null}
             </div>
           </div>

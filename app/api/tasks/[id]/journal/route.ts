@@ -25,5 +25,33 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
   });
 
-  return NextResponse.json({ entries });
+  const reportIds = entries.map((e) => e.eveningReport.id);
+  const qcLogs = reportIds.length
+    ? await prisma.taskQcLog.findMany({
+        where: {
+          taskId: params.id,
+          eveningReportId: { in: reportIds },
+        },
+        include: {
+          qcItem: { select: { id: true, content: true } },
+          checker: { select: { id: true, fullName: true, email: true } },
+        },
+        orderBy: { checkedAt: "asc" },
+      })
+    : [];
+
+  const qcLogsByReportId = qcLogs.reduce<Record<string, typeof qcLogs>>((acc, log) => {
+    const key = log.eveningReportId || "";
+    if (!key) return acc;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(log);
+    return acc;
+  }, {});
+
+  return NextResponse.json({
+    entries: entries.map((entry) => ({
+      ...entry,
+      qcLogs: qcLogsByReportId[entry.eveningReport.id] || [],
+    })),
+  });
 }
