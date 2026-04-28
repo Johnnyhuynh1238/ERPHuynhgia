@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TaskPhase, TaskStatus } from "@prisma/client";
 import { toast } from "sonner";
+import { ListFilter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PHASE_LABEL, STATUS_LABEL } from "@/lib/task-display";
 
@@ -281,8 +282,13 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
           <Button
             className={activeFilterCount ? "rounded-[10px] border border-orange-400 bg-orange-500/15 px-3 py-2 text-orange-300" : "rounded-[10px] border border-[#2d3249] bg-[#13151f] px-3 py-2 text-[#8892b0]"}
             onClick={() => setShowFilterPanel((v) => !v)}
+            aria-label="Mở bộ lọc"
+            title="Lọc task"
           >
-            🔽 Lọc{activeFilterCount ? ` (${activeFilterCount})` : ""}
+            <span className="inline-flex items-center gap-1">
+              <ListFilter className="h-4 w-4" />
+              {activeFilterCount ? <span className="text-xs font-semibold">({activeFilterCount})</span> : null}
+            </span>
           </Button>
         </div>
       </div>
