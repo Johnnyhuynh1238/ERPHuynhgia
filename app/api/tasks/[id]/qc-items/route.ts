@@ -11,8 +11,22 @@ const createSchema = z.object({
   requireNote: z.boolean().optional(),
 });
 
-function canManageQcItem(role: string) {
-  return role === UserRole.admin || role === UserRole.construction_manager || role === UserRole.engineer;
+async function isEngineerMemberOfProject(projectId: string, userId: string) {
+  const member = await prisma.projectMember.findFirst({
+    where: {
+      projectId,
+      userId,
+      roleInProject: "engineer",
+    },
+    select: { id: true },
+  });
+  return Boolean(member);
+}
+
+async function canManageQcItem(role: string, projectId: string, userId: string) {
+  if (role === UserRole.admin || role === UserRole.construction_manager) return true;
+  if (role !== UserRole.engineer) return false;
+  return isEngineerMemberOfProject(projectId, userId);
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -57,7 +71,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!task) return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
   if (!allowed) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
-  if (!canManageQcItem(user.role)) {
+  const canManage = await canManageQcItem(user.role, task.projectId, user.id);
+  if (!canManage) {
     return NextResponse.json({ message: "Không có quyền thêm mục QC" }, { status: 403 });
   }
 

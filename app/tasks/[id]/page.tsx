@@ -74,6 +74,21 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
 
   if (!detail) notFound();
 
+  const canManageQcItem =
+    user.role === "admin" ||
+    user.role === "construction_manager" ||
+    (user.role === "engineer" &&
+      Boolean(
+        await prisma.projectMember.findFirst({
+          where: {
+            projectId: detail.project.id,
+            userId: user.id,
+            roleInProject: "engineer",
+          },
+          select: { id: true },
+        }),
+      ));
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] slide-up">
@@ -96,6 +111,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
         foremen={foremen}
         currentUserId={user.id}
         currentUserRole={user.role}
+        canManageQcItem={canManageQcItem}
       />
     </div>
   );

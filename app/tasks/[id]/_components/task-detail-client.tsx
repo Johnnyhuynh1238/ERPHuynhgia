@@ -108,6 +108,7 @@ export function TaskDetailClient({
   foremen,
   currentUserId,
   currentUserRole,
+  canManageQcItem,
 }: {
   initialTask: TaskDetail;
   initialLogs: TaskLog[];
@@ -116,6 +117,7 @@ export function TaskDetailClient({
   foremen: OptionUser[];
   currentUserId: string;
   currentUserRole: string;
+  canManageQcItem: boolean;
 }) {
   const [task, setTask] = useState<TaskDetail>(initialTask);
   const [logs, setLogs] = useState<TaskLog[]>(initialLogs);
@@ -487,7 +489,7 @@ export function TaskDetailClient({
           <QcSection
             taskId={task.id}
             canUpdateQc={canUpdateQc}
-            canManageItem={currentUserRole === "admin" || currentUserRole === "construction_manager" || currentUserRole === "engineer"}
+            canManageItem={canManageQcItem}
           />
         ) : null}
 
@@ -495,7 +497,7 @@ export function TaskDetailClient({
           <MaterialSection
             taskId={task.id}
             canUpdateQc={canUpdateQc}
-            canManageItem={currentUserRole === "admin" || currentUserRole === "construction_manager" || currentUserRole === "engineer"}
+            canManageItem={canManageQcItem}
           />
         ) : null}
 

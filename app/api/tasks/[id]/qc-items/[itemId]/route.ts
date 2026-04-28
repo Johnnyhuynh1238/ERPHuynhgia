@@ -14,12 +14,28 @@ const patchSchema = z.object({
   requireNote: z.boolean().optional(),
 });
 
-function canEditQcItemMeta(role: string) {
-  return role === UserRole.admin || role === UserRole.construction_manager;
+async function isEngineerMemberOfProject(projectId: string, userId: string) {
+  const member = await prisma.projectMember.findFirst({
+    where: {
+      projectId,
+      userId,
+      roleInProject: "engineer",
+    },
+    select: { id: true },
+  });
+  return Boolean(member);
 }
 
-function canUpdateQcProgress(role: string) {
-  return role === UserRole.admin || role === UserRole.construction_manager || role === UserRole.engineer;
+async function canEditQcItemMeta(role: string, projectId: string, userId: string) {
+  if (role === UserRole.admin || role === UserRole.construction_manager) return true;
+  if (role !== UserRole.engineer) return false;
+  return isEngineerMemberOfProject(projectId, userId);
+}
+
+async function canUpdateQcProgress(role: string, projectId: string, userId: string) {
+  if (role === UserRole.admin || role === UserRole.construction_manager) return true;
+  if (role !== UserRole.engineer) return false;
+  return isEngineerMemberOfProject(projectId, userId);
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string; itemId: string } }) {
@@ -52,12 +68,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const payload = parsed.data;
 
-  if ((payload.content !== undefined || payload.requirePhoto !== undefined || payload.requireNote !== undefined) && !canEditQcItemMeta(user.role)) {
-    return NextResponse.json({ message: "Không có quyền sửa nội dung mục QC" }, { status: 403 });
+  const wantsMetaEdit = payload.content !== undefined || payload.requirePhoto !== undefined || payload.requireNote !== undefined;
+  const wantsProgressEdit = payload.status !== undefined || payload.note !== undefined || payload.noPhotoReason !== undefined;
+
+  if (wantsMetaEdit) {
+    const canEditMeta = await canEditQcItemMeta(user.role, task.projectId, user.id);
+    if (!canEditMeta) {
+      return NextResponse.json({ message: "Không có quyền sửa nội dung mục QC" }, { status: 403 });
+    }
   }
 
-  if ((payload.status !== undefined || payload.note !== undefined || payload.noPhotoReason !== undefined) && !canUpdateQcProgress(user.role)) {
-    return NextResponse.json({ message: "Không có quyền cập nhật trạng thái QC" }, { status: 403 });
+  if (wantsProgressEdit) {
+    const canEditProgress = await canUpdateQcProgress(user.role, task.projectId, user.id);
+    if (!canEditProgress) {
+      return NextResponse.json({ message: "Không có quyền cập nhật trạng thái QC" }, { status: 403 });
+    }
   }
 
   const nextStatus = payload.status ?? item.progress?.status ?? QcItemStatus.unchecked;
@@ -155,7 +180,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!task) return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
   if (!allowed) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
-  if (!canEditQcItemMeta(user.role)) {
+  const canDelete = await canEditQcItemMeta(user.role, task.projectId, user.id);
+  if (!canDelete) {
     return NextResponse.json({ message: "Không có quyền xóa mục QC" }, { status: 403 });
   }
 
