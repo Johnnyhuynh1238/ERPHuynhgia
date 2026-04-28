@@ -49,6 +49,10 @@ export function QcSection({
   const [suggestion, setSuggestion] = useState("");
   const [viewer, setViewer] = useState<{ itemId: string; index: number } | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editRequirePhoto, setEditRequirePhoto] = useState(false);
+  const [editRequireNote, setEditRequireNote] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
 
   async function loadItems() {
@@ -65,7 +69,17 @@ export function QcSection({
     }
   }
 
-  async function updateItem(itemId: string, payload: Partial<{ status: QcStatus; note: string; noPhotoReason: boolean }>) {
+  async function updateItem(
+    itemId: string,
+    payload: Partial<{
+      status: QcStatus;
+      note: string;
+      noPhotoReason: boolean;
+      content: string;
+      requirePhoto: boolean;
+      requireNote: boolean;
+    }>,
+  ) {
     const res = await fetch(`/api/tasks/${taskId}/qc-items/${itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -82,6 +96,66 @@ export function QcSection({
   function closeAddItemModal() {
     setShowAddItem(false);
     setNewContent("");
+  }
+
+  function startEditItem(item: QcItem) {
+    setEditingItemId(item.id);
+    setEditContent(item.content);
+    setEditRequirePhoto(Boolean(item.requirePhoto));
+    setEditRequireNote(Boolean(item.requireNote));
+  }
+
+  function cancelEditItem() {
+    setEditingItemId(null);
+    setEditContent("");
+    setEditRequirePhoto(false);
+    setEditRequireNote(false);
+  }
+
+  async function saveEditItem(itemId: string) {
+    const content = editContent.trim();
+    if (!content) {
+      toast.error("Nội dung mục QC là bắt buộc");
+      return;
+    }
+
+    const res = await fetch(`/api/tasks/${taskId}/qc-items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        requirePhoto: editRequirePhoto,
+        requireNote: editRequireNote,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Sửa mục QC thất bại");
+      return;
+    }
+
+    setItems((prev) => prev.map((x) => (x.id === itemId ? json.item : x)));
+    toast.success(json.message || "Đã cập nhật mục QC");
+    cancelEditItem();
+  }
+
+  async function deleteItem(item: QcItem) {
+    const confirmed = window.confirm(`Xóa mục QC: ${item.content}?`);
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/tasks/${taskId}/qc-items/${item.id}`, {
+      method: "DELETE",
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Xóa mục QC thất bại");
+      return;
+    }
+
+    setItems((prev) => prev.filter((x) => x.id !== item.id));
+    toast.success(json.message || "Đã xóa mục QC");
   }
 
   function closeSubmitQcModal() {
@@ -245,6 +319,16 @@ export function QcSection({
           const status = getItemStatus(item);
           return (
             <div key={item.id} className={`rounded-lg border p-3 ${getItemCardClass(item)}`}>
+              {canManageItem ? (
+                <div className="mb-2 flex justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => startEditItem(item)}>
+                    Sửa
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => deleteItem(item)}>
+                    Xóa
+                  </Button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={() => toggleExpanded(item.id)}
@@ -362,6 +446,47 @@ export function QcSection({
         })}
       </div>
 
+
+      {editingItemId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={cancelEditItem}>
+          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-base font-semibold">Sửa mục QC</div>
+              <button className="text-sm text-slate-500" onClick={cancelEditItem}>
+                Đóng
+              </button>
+            </div>
+
+            <textarea
+              autoFocus
+              className="w-full rounded border px-3 py-2 text-sm"
+              rows={4}
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Nhập nội dung mục QC..."
+            />
+
+            <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={editRequirePhoto} onChange={(e) => setEditRequirePhoto(e.target.checked)} />
+              Bắt buộc ảnh
+            </label>
+
+            <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={editRequireNote} onChange={(e) => setEditRequireNote(e.target.checked)} />
+              Bắt buộc ghi chú
+            </label>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={cancelEditItem}>
+                Hủy
+              </Button>
+              <Button size="sm" onClick={() => saveEditItem(editingItemId)}>
+                Lưu
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showAddItem ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeAddItemModal}>
