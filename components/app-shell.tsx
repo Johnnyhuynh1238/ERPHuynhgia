@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   BarChart3,
+  Bell,
   FolderKanban,
   Home,
   ListChecks,
@@ -80,6 +81,14 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   ],
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  construction_manager: "TPTC",
+  engineer: "Kỹ sư",
+  foreman: "Foreman",
+  accountant: "Kế toán",
+};
+
 export function getInitials(name?: string | null) {
   const words = (name || "User")
     .trim()
@@ -121,6 +130,8 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
 
   const primaryMenus = menus.slice(0, 4);
   const moreMenus = menus.slice(4);
+  const roleLabel = ROLE_LABELS[user.role] || user.role;
+  const pageTitle = menus.find((item) => isActive(pathname, item.href))?.label || "Dashboard";
 
   const displayName = user.name || user.email || "Người dùng";
   const canViewCommentInbox = ["admin", "construction_manager", "engineer"].includes(user.role);
@@ -146,43 +157,108 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   }, [canViewCommentInbox]);
 
   return (
-    <div className="app-wrapper">
+    <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
       <div className="bg-glow" />
 
-      <header className="sticky top-0 z-30 border-b border-[#252840] bg-[#0f1015]/90 backdrop-blur-xl">
-        <div className="flex h-14 items-center justify-between px-4">
-          <div>
-            <div className="text-sm font-bold text-[#f0f2ff]">ERP Huỳnh Gia</div>
-            <div className="text-[11px] text-[#8892b0]">{user.role}</div>
-          </div>
+      <aside className="hidden md:fixed md:left-0 md:top-0 md:z-50 md:flex md:h-screen md:w-60 md:flex-col md:border-r md:border-[#252840] md:bg-[#13151f]">
+        <div className="border-b border-[#252840] p-5">
+          <div className="text-lg font-bold text-[#f97316]">Huỳnh Gia ERP</div>
+          <div className="mt-0.5 text-xs text-[#8892b0]">{roleLabel}</div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            {canViewCommentInbox ? (
-              <Link href="/projects" className="relative rounded-full border border-[#2d3249] bg-[#1a1d2e] p-2 text-[#d9def3]">
-                <MessageSquare className="h-4 w-4" />
-                {commentUnread > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-bold text-black">
-                    {commentUnread > 99 ? "99+" : commentUnread}
-                  </span>
-                ) : null}
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {menus.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = navIcon(item.href, item.label);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  active
+                    ? "bg-[#f97316]/20 text-[#fb923c]"
+                    : "text-[#8892b0] hover:bg-[#1a1d2e] hover:text-[#f0f2ff]"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{item.label}</span>
               </Link>
-            ) : null}
+            );
+          })}
+        </nav>
 
-            <Link href="/profile" className="flex items-center gap-2 rounded-full bg-[#1a1d2e] px-2 py-1">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f97316] text-xs font-bold text-black">
-                {getInitials(user.name)}
-              </span>
-              <span className="max-w-[120px] truncate text-xs text-[#f0f2ff]">{displayName}</span>
+        <div className="space-y-2 border-t border-[#252840] p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#f97316] text-sm font-bold text-black">
+              {getInitials(user.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-[#f0f2ff]">{displayName}</div>
+              <div className="truncate text-xs text-[#8892b0]">{roleLabel}</div>
+            </div>
+            <Link href="/profile" className="text-lg text-[#8892b0] hover:text-[#f0f2ff]">
+              ⚙
             </Link>
           </div>
-        </div>
-      </header>
 
-      <main className="relative z-10 min-h-[calc(100vh-56px)] px-4 pb-24 pt-4">
-        <div key={pathname} className="slide-up">{children}</div>
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="flex w-full items-center justify-center rounded-xl bg-red-500/20 px-3 py-2 text-sm font-medium text-red-300"
+          >
+            Đăng xuất
+          </button>
+        </div>
+      </aside>
+
+      <main className="relative z-10 md:ml-60 md:min-h-screen">
+        <header className="sticky top-0 z-30 border-b border-[#252840] bg-[#0f1015]/90 backdrop-blur-xl md:hidden">
+          <div className="flex h-14 items-center justify-between px-4">
+            <div>
+              <div className="text-sm font-bold text-[#f0f2ff]">ERP Huỳnh Gia</div>
+              <div className="text-[11px] text-[#8892b0]">{user.role}</div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {canViewCommentInbox ? (
+                <Link href="/projects" className="relative rounded-full border border-[#2d3249] bg-[#1a1d2e] p-2 text-[#d9def3]">
+                  <MessageSquare className="h-4 w-4" />
+                  {commentUnread > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-bold text-black">
+                      {commentUnread > 99 ? "99+" : commentUnread}
+                    </span>
+                  ) : null}
+                </Link>
+              ) : null}
+
+              <Link href="/profile" className="flex items-center gap-2 rounded-full bg-[#1a1d2e] px-2 py-1">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f97316] text-xs font-bold text-black">
+                  {getInitials(user.name)}
+                </span>
+                <span className="max-w-[120px] truncate text-xs text-[#f0f2ff]">{displayName}</span>
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <div className="sticky top-0 z-40 hidden items-center justify-between border-b border-[#252840] bg-[#0f1015]/90 px-6 py-4 backdrop-blur-xl md:flex">
+          <h1 className="text-lg font-bold text-[#f0f2ff]">{pageTitle}</h1>
+          <div className="flex items-center gap-3">
+            <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#2d3249] bg-[#1a1d2e] text-base text-[#d9def3]">
+              <Bell className="h-4 w-4" />
+              {commentUnread > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#f87171]" /> : null}
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-[calc(100vh-56px)] px-4 pb-24 pt-4 md:p-6 md:pb-6 md:pt-6">
+          <div key={pathname} className="slide-up">
+            {children}
+          </div>
+        </div>
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-[#252840] bg-[#13151f]/96 px-2 pb-2 pt-2 backdrop-blur-xl">
+      <nav className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-[#252840] bg-[#13151f]/96 px-2 pb-2 pt-2 backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-5 gap-1">
           {primaryMenus.map((item) => {
             const active = isActive(pathname, item.href);
@@ -215,7 +291,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       </nav>
 
       {openMore ? (
-        <div className="fixed inset-0 z-50 bg-black/60">
+        <div className="fixed inset-0 z-50 bg-black/60 md:hidden">
           <button type="button" className="h-full w-full" aria-label="Đóng" onClick={() => setOpenMore(false)} />
           <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4">
             <div className="mb-3 flex items-center justify-between">

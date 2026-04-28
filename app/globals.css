@@ -66,6 +66,16 @@ body {
   background: radial-gradient(ellipse at 70% -20%, var(--orange-glow) 0%, transparent 65%);
 }
 
+@media (min-width: 768px) {
+  .app-wrapper {
+    max-width: none;
+  }
+
+  .bg-glow {
+    width: 100vw;
+  }
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;
