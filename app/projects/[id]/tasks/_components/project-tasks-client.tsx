@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -65,6 +65,24 @@ type TaskFormValues = {
   isMilestone: boolean;
   visibleToCustomer: boolean;
 };
+
+type PersistedTaskFilter = {
+  phase: string;
+  status: string;
+  search: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+};
+
+const DEFAULT_SORT_BY = "displayOrder";
+const DEFAULT_SORT_DIR: PersistedTaskFilter["sortDir"] = "asc";
+
+const SORT_BY_CHOICES = [
+  { value: "displayOrder", label: "Thứ tự" },
+  { value: "plannedStartDate", label: "Ngày bắt đầu" },
+  { value: "status", label: "Trạng thái" },
+  { value: "name", label: "Tên công tác" },
+] as const;
 
 function fmtDate(dateIso: string) {
   const d = new Date(dateIso);
@@ -224,7 +242,10 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const [engineerFilter, setEngineerFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState(DEFAULT_SORT_BY);
+  const [sortDir, setSortDir] = useState<PersistedTaskFilter["sortDir"]>(DEFAULT_SORT_DIR);
   const [showDeleted, setShowDeleted] = useState(false);
+  const loadedPersistedFilterRef = useRef(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -236,10 +257,73 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const [bulkPhase, setBulkPhase] = useState("all");
   const [bulkDate, setBulkDate] = useState("");
 
+  const filterStorageKey = useMemo(() => `task-filter-${projectId}`, [projectId]);
+
+  function resetTaskFilters() {
+    setPhaseFilter("all");
+    setStatusFilter("all");
+    setSearchInput("");
+    setSearch("");
+    setSortBy(DEFAULT_SORT_BY);
+    setSortDir(DEFAULT_SORT_DIR);
+    setEngineerFilter("");
+    setShowDeleted(false);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(filterStorageKey);
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const raw = window.localStorage.getItem(filterStorageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<PersistedTaskFilter>;
+
+      if (typeof parsed.phase === "string") setPhaseFilter(parsed.phase);
+      if (typeof parsed.status === "string") setStatusFilter(parsed.status);
+
+      if (typeof parsed.search === "string") {
+        setSearchInput(parsed.search);
+        setSearch(parsed.search.trim());
+      }
+
+      if (typeof parsed.sortBy === "string") {
+        setSortBy(parsed.sortBy);
+      }
+
+      if (parsed.sortDir === "asc" || parsed.sortDir === "desc") {
+        setSortDir(parsed.sortDir);
+      }
+    } catch {
+      window.localStorage.removeItem(filterStorageKey);
+    } finally {
+      loadedPersistedFilterRef.current = true;
+    }
+  }, [filterStorageKey]);
+
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!loadedPersistedFilterRef.current) return;
+
+    const payload: PersistedTaskFilter = {
+      phase: phaseFilter,
+      status: statusFilter,
+      search: searchInput,
+      sortBy,
+      sortDir,
+    };
+
+    window.localStorage.setItem(filterStorageKey, JSON.stringify(payload));
+  }, [filterStorageKey, phaseFilter, statusFilter, searchInput, sortBy, sortDir]);
 
   async function loadTasks() {
     setLoading(true);
@@ -284,10 +368,36 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     statusFilter === "all" &&
     !engineerFilter &&
     !search &&
-    !showDeleted;
+    !showDeleted &&
+    sortBy === DEFAULT_SORT_BY &&
+    sortDir === DEFAULT_SORT_DIR;
 
-  const activeTasks = useMemo(() => tasks.filter((t) => t.isActive), [tasks]);
-  const deletedTasks = useMemo(() => tasks.filter((t) => !t.isActive), [tasks]);
+  const sortedTasks = useMemo(() => {
+    const list = [...tasks];
+
+    if (sortBy === DEFAULT_SORT_BY) {
+      return sortDir === "asc" ? list : list.reverse();
+    }
+
+    list.sort((a, b) => {
+      const direction = sortDir === "asc" ? 1 : -1;
+
+      if (sortBy === "plannedStartDate") {
+        return (new Date(a.plannedStartDate).getTime() - new Date(b.plannedStartDate).getTime()) * direction;
+      }
+
+      if (sortBy === "status") {
+        return a.status.localeCompare(b.status) * direction;
+      }
+
+      return a.name.localeCompare(b.name, "vi") * direction;
+    });
+
+    return list;
+  }, [tasks, sortBy, sortDir]);
+
+  const activeTasks = useMemo(() => sortedTasks.filter((t) => t.isActive), [sortedTasks]);
+  const deletedTasks = useMemo(() => sortedTasks.filter((t) => !t.isActive), [sortedTasks]);
 
   const sortableIds = useMemo(() => activeTasks.map((t) => t.id), [activeTasks]);
   const sensors = useSensors(useSensor(PointerSensor));
@@ -457,8 +567,8 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   }
 
   const activeSelectableTasks = useMemo(
-    () => tasks.filter((task) => task.isActive && task.status !== "na"),
-    [tasks],
+    () => activeTasks.filter((task) => task.status !== "na"),
+    [activeTasks],
   );
 
   const selectedCount = selectedTaskIds.length;
@@ -508,7 +618,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
   const mobileRows = useMemo(
     () =>
-      tasks.map((task) => (
+      sortedTasks.map((task) => (
         <tr
           key={task.id}
           className={`border-b border-[#252840] ${task.isActive ? "cursor-pointer hover:bg-[#22263a]" : "bg-[#171a27] text-[#8892b0]"}`}
@@ -529,7 +639,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
           </td>
         </tr>
       )),
-    [tasks, router],
+    [sortedTasks, router],
   );
 
   return (
@@ -587,7 +697,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e]">
         <div className="sticky top-0 z-10 border-b border-[#252840] border-[#252840] bg-[#1a1d2e] p-3">
-          <div className="grid gap-2 md:grid-cols-5">
+          <div className="grid gap-2 md:grid-cols-8">
             <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)}>
               {PHASE_CHOICES.map((item) => (
                 <option key={item.value} value={item.value}>
@@ -621,10 +731,29 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
               onChange={(e) => setSearchInput(e.target.value)}
             />
 
+            <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              {SORT_BY_CHOICES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  Sắp xếp: {item.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+              value={sortDir}
+              onChange={(e) => setSortDir(e.target.value as PersistedTaskFilter["sortDir"])}
+            >
+              <option value="asc">Tăng dần</option>
+              <option value="desc">Giảm dần</option>
+            </select>
+
             <label className="flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm">
               <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
               Hiển thị task đã xóa
             </label>
+
+            <Button variant="outline" onClick={resetTaskFilters}>Xóa filter</Button>
           </div>
           {canManageTasks && !canReorder ? (
             <p className="mt-2 text-xs text-[#8892b0]">Kéo sắp xếp chỉ khả dụng khi bỏ toàn bộ bộ lọc và tắt &quot;Hiển thị task đã xóa&quot;.</p>
