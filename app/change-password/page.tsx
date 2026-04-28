@@ -23,7 +23,9 @@ export default async function ChangePasswordPage() {
   }
 
   if (!currentUser.mustChangePassword) {
-    redirect("/");
+    // Tránh vòng lặp khi JWT session cũ vẫn giữ mustChangePassword=true.
+    // Sign out để tạo phiên sạch, đăng nhập lại sẽ vào dashboard bình thường.
+    redirect("/api/auth/signout?callbackUrl=/login");
   }
 
   return (
