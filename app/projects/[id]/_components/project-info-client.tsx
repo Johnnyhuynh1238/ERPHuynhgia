@@ -42,6 +42,13 @@ type SiteRestData = {
 
 type OptionUser = { id: string; fullName: string; email: string };
 
+type ProjectAssignmentRow = {
+  id: string;
+  role: "pm_construction_manager" | "pm_engineer" | "pm_material_manager" | "pm_labor_manager" | "pm_accountant";
+  isPrimary: boolean;
+  user: { id: string; fullName: string; email: string };
+};
+
 function formatDate(dateIso: string | null) {
   if (!dateIso) return "-";
   const d = new Date(dateIso);
@@ -65,6 +72,15 @@ function reasonLabel(reason: SiteRestData["reason"]) {
 function buildPortalUrl(token: string) {
   const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "");
   return `${appOrigin}/cn/${token}`;
+}
+
+function assignmentRoleLabel(role: ProjectAssignmentRow["role"]) {
+  if (role === "pm_construction_manager") return "TPTC dự án";
+  if (role === "pm_engineer") return "Kỹ thuật";
+  if (role === "pm_material_manager") return "Vật tư";
+  if (role === "pm_labor_manager") return "Nhân công";
+  if (role === "pm_accountant") return "Kế toán";
+  return role;
 }
 
 export function ProjectInfoClient({
@@ -91,6 +107,7 @@ export function ProjectInfoClient({
   const router = useRouter();
   const [data, setData] = useState(project);
   const [todayRest, setTodayRest] = useState(todaySiteRest);
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignmentRow[]>([]);
 
   const [showOwnerEdit, setShowOwnerEdit] = useState(false);
   const [showProjectEdit, setShowProjectEdit] = useState(false);
@@ -161,9 +178,10 @@ export function ProjectInfoClient({
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
   async function reloadProject() {
-    const [projectRes, restRes] = await Promise.all([
+    const [projectRes, restRes, assignmentsRes] = await Promise.all([
       fetch(`/api/projects/${data.id}`, { cache: "no-store" }),
       fetch(`/api/projects/${data.id}/site-rest-today`, { cache: "no-store" }),
+      fetch(`/api/projects/${data.id}/assignments`, { cache: "no-store" }),
     ]);
 
     const projectJson = await projectRes.json().catch(() => ({}));
@@ -185,6 +203,11 @@ export function ProjectInfoClient({
     const restJson = await restRes.json().catch(() => ({}));
     if (restRes.ok) {
       setTodayRest(restJson.siteRestDay || null);
+    }
+
+    const assignmentsJson = await assignmentsRes.json().catch(() => ({}));
+    if (assignmentsRes.ok) {
+      setProjectAssignments(assignmentsJson.assignments || []);
     }
   }
 
@@ -491,6 +514,7 @@ export function ProjectInfoClient({
   const isDeleteConfirmMatched = useMemo(() => deleteConfirmName.trim() === data.name, [data.name, deleteConfirmName]);
 
   useEffect(() => {
+    reloadProject();
     loadComments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.id, canViewCommentInbox]);
@@ -589,20 +613,22 @@ export function ProjectInfoClient({
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Phân công</h2>
-          {isAdmin ? (
-            <Button variant="outline" onClick={() => setShowAssignmentEdit(true)}>
-              Sửa thông tin
-            </Button>
-          ) : null}
         </div>
-        <div className="grid gap-2 text-sm">
-          <div>
-            GĐ Thi Công: {data.projectManager.fullName} ({data.projectManager.email})
+        {projectAssignments.length === 0 ? (
+          <div className="text-sm text-[#8892b0]">Admin chưa phân công</div>
+        ) : (
+          <div className="space-y-2 text-sm">
+            {projectAssignments.map((row) => (
+              <div key={row.id} className="flex items-center justify-between rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2">
+                <div>
+                  <div className="font-medium text-[#f0f2ff]">{row.user.fullName}</div>
+                  <div className="text-xs text-[#8892b0]">{row.user.email}</div>
+                </div>
+                <div className="rounded bg-[#1f2537] px-2 py-1 text-xs text-[#d9def3]">{assignmentRoleLabel(row.role)}</div>
+              </div>
+            ))}
           </div>
-          <div>
-            KS chính: {data.mainEngineer.fullName} ({data.mainEngineer.email})
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
