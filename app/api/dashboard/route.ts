@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DailyRating, PaymentStatus, TaskStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, TaskStatus, UserRole } from "@prisma/client";
 import { localDeadlineForDate } from "@/lib/date";
 import { calculateKpiForProjectEngineer, scoreToRank } from "@/lib/kpi";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
@@ -222,7 +222,7 @@ export async function GET() {
 
     const reportProjectIds = reportProjectsRaw.map((project) => project.id);
 
-    const [siteRestRows, morningSubmittedRows, eveningSubmittedRows, underRows] = reportProjectIds.length
+    const [siteRestRows, technicalSubmittedRows] = reportProjectIds.length
       ? await Promise.all([
           prisma.siteRestDay.findMany({
             where: {
@@ -233,48 +233,28 @@ export async function GET() {
               projectId: true,
             },
           }),
-          prisma.morningReport.findMany({
+          prisma.taskTechnicalReport.findMany({
             where: {
-              projectId: { in: reportProjectIds },
               reportDate: today,
-              submittedAt: { not: null },
+              task: {
+                projectId: { in: reportProjectIds },
+              },
             },
             select: {
-              projectId: true,
-              reporterId: true,
+              createdBy: true,
+              task: { select: { projectId: true } },
             },
-          }),
-          prisma.eveningReport.findMany({
-            where: {
-              projectId: { in: reportProjectIds },
-              reportDate: today,
-              submittedAt: { not: null },
-            },
-            select: {
-              projectId: true,
-              reporterId: true,
-            },
-          }),
-          prisma.eveningReport.groupBy({
-            by: ["projectId"],
-            where: {
-              projectId: { in: reportProjectIds },
-              reportDate: today,
-              overallRating: DailyRating.UNDER,
-            },
-            _count: { _all: true },
           }),
         ])
-      : [[], [], [], []];
+      : [[], []];
 
     const restProjectSet = new Set(siteRestRows.map((row) => row.projectId));
     const activeReportProjects = reportProjectsRaw.filter((project) => !restProjectSet.has(project.id));
 
-    const morningSet = new Set(morningSubmittedRows.map((row) => `${row.projectId}_${row.reporterId}`));
-    const eveningSet = new Set(eveningSubmittedRows.map((row) => `${row.projectId}_${row.reporterId}`));
+    const technicalSet = new Set(technicalSubmittedRows.map((row) => `${row.task.projectId}_${row.createdBy}`));
 
     const missingMorning = activeReportProjects
-      .filter((project) => !morningSet.has(`${project.id}_${project.mainEngineerId}`))
+      .filter((project) => !technicalSet.has(`${project.id}_${project.mainEngineerId}`))
       .map((project) => ({
         projectId: project.id,
         projectCode: project.code,
@@ -283,30 +263,15 @@ export async function GET() {
         engineerName: project.mainEngineer.fullName,
       }));
 
-    const missingEvening = activeReportProjects
-      .filter((project) => !eveningSet.has(`${project.id}_${project.mainEngineerId}`))
-      .map((project) => ({
-        projectId: project.id,
-        projectCode: project.code,
-        projectName: project.name,
-        engineerId: project.mainEngineerId,
-        engineerName: project.mainEngineer.fullName,
-      }));
+    // Legacy evening/morning report đã bỏ; tạm dùng cùng nguồn technical report hôm nay.
+    const missingEvening = [...missingMorning];
 
-    const activeProjectMap = new Map(activeReportProjects.map((project) => [project.id, project]));
-
-    const issueProjects = underRows
-      .map((row) => {
-        const project = activeProjectMap.get(row.projectId);
-        if (!project) return null;
-        return {
-          projectId: project.id,
-          projectCode: project.code,
-          projectName: project.name,
-          underCount: row._count._all,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+    const issueProjects: Array<{
+      projectId: string;
+      projectCode: string;
+      projectName: string;
+      underCount: number;
+    }> = [];
 
     const monthStart = startOfMonthUtc(today);
     const monthEnd = endOfMonthUtc(today);
@@ -527,23 +492,23 @@ export async function GET() {
     ]);
 
     const taskIds = taskCandidates.map((task) => task.id);
-    const morningDecisionRows = taskIds.length
-      ? await prisma.morningReportTask.findMany({
+    const technicalTodayRows = taskIds.length
+      ? await prisma.taskTechnicalReport.findMany({
           where: {
             taskId: { in: taskIds },
-            morningReport: {
-              reportDate: today,
-              reporterId: user.id,
-            },
+            reportDate: today,
+            createdBy: user.id,
           },
           select: {
             taskId: true,
-            decision: true,
+            status: true,
           },
         })
       : [];
 
-    const morningDecisionMap = new Map(morningDecisionRows.map((row) => [row.taskId, row.decision]));
+    const morningDecisionMap = new Map(
+      technicalTodayRows.map((row) => [row.taskId, row.status === "paused" ? "PAUSE" : "WORK"] as const),
+    );
 
     type EngineerTodayTask = (typeof taskCandidates)[number] & {
       reportGroup: "overdue" | "running" | "starting";
@@ -580,7 +545,7 @@ export async function GET() {
     }
 
     const reportProjectIds = reportProjects.map((project) => project.id);
-    const [siteRestRows, morningRows, eveningRows] = reportProjectIds.length
+    const [siteRestRows, technicalRows] = reportProjectIds.length
       ? await Promise.all([
           prisma.siteRestDay.findMany({
             where: {
@@ -592,39 +557,31 @@ export async function GET() {
               reason: true,
             },
           }),
-          prisma.morningReport.findMany({
+          prisma.taskTechnicalReport.findMany({
             where: {
-              projectId: { in: reportProjectIds },
               reportDate: today,
-              reporterId: user.id,
+              createdBy: user.id,
+              task: {
+                projectId: { in: reportProjectIds },
+              },
             },
             select: {
-              projectId: true,
-              submittedAt: true,
-              isOnTime: true,
-            },
-          }),
-          prisma.eveningReport.findMany({
-            where: {
-              projectId: { in: reportProjectIds },
-              reportDate: today,
-              reporterId: user.id,
-            },
-            select: {
-              projectId: true,
-              submittedAt: true,
-              isOnTime: true,
+              createdAt: true,
+              task: { select: { projectId: true } },
             },
           }),
         ])
-      : [[], [], []];
+      : [[], []];
 
     const restMap = new Map(siteRestRows.map((row) => [row.projectId, row]));
-    const morningMap = new Map(morningRows.map((row) => [row.projectId, row]));
-    const eveningMap = new Map(eveningRows.map((row) => [row.projectId, row]));
+    const technicalMap = new Map<string, Date>();
+    for (const row of technicalRows) {
+      const pid = row.task.projectId;
+      const prev = technicalMap.get(pid);
+      if (!prev || prev < row.createdAt) technicalMap.set(pid, row.createdAt);
+    }
 
-    const morningDeadline = localDeadlineForDate(today, 8);
-    const eveningDeadline = localDeadlineForDate(today, 19);
+    const technicalDeadline = localDeadlineForDate(today, 19);
 
     const reportStatus = reportProjects.map((project) => {
       const goLiveActive = Boolean(project.goLiveDate && project.goLiveDate <= today);
@@ -665,10 +622,8 @@ export async function GET() {
         };
       }
 
-      const morning = morningMap.get(project.id);
-      const evening = eveningMap.get(project.id);
-      const morningStatus = buildReportStatusLabel(morning?.submittedAt || null, Boolean(morning?.isOnTime), morningDeadline, now);
-      const eveningStatus = buildReportStatusLabel(evening?.submittedAt || null, Boolean(evening?.isOnTime), eveningDeadline, now);
+      const submittedAt = technicalMap.get(project.id) ?? null;
+      const technicalStatus = buildReportStatusLabel(submittedAt, Boolean(submittedAt && submittedAt <= technicalDeadline), technicalDeadline, now);
 
       return {
         projectId: project.id,
@@ -677,12 +632,12 @@ export async function GET() {
         isActive: true,
         isRestDay: false,
         restReason: null,
-        morningLabel: morningStatus.label,
-        morningTone: morningStatus.tone,
-        eveningLabel: eveningStatus.label,
-        eveningTone: eveningStatus.tone,
-        morningSubmitted: morningStatus.submitted,
-        eveningSubmitted: eveningStatus.submitted,
+        morningLabel: technicalStatus.label,
+        morningTone: technicalStatus.tone,
+        eveningLabel: technicalStatus.label,
+        eveningTone: technicalStatus.tone,
+        morningSubmitted: technicalStatus.submitted,
+        eveningSubmitted: technicalStatus.submitted,
       };
     });
 
