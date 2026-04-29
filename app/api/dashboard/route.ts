@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { PaymentStatus, TaskStatus, UserRole } from "@prisma/client";
 import { localDeadlineForDate } from "@/lib/date";
-import { calculateKpiForProjectEngineer, scoreToRank } from "@/lib/kpi";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getReportProjectsForUser } from "@/lib/reporting";
 import { getCurrentUser } from "@/lib/auth-helpers";
@@ -82,12 +81,6 @@ function siteRestReasonLabel(reason: "SUNDAY" | "HOLIDAY" | "STORM" | "OTHER") {
   if (reason === "HOLIDAY") return "Nghỉ lễ";
   if (reason === "STORM") return "Mưa bão";
   return "Khác";
-}
-
-function rankTone(rank: string): "good" | "warn" | "danger" | "info" {
-  if (rank === "A" || rank === "B") return "good";
-  if (rank === "C") return "warn";
-  return "danger";
 }
 
 export const revalidate = 60;
@@ -273,73 +266,15 @@ export async function GET() {
       underCount: number;
     }> = [];
 
-    const monthStart = startOfMonthUtc(today);
-    const monthEnd = endOfMonthUtc(today);
-
-    const kpiByProject = await Promise.all(
-      activeReportProjects.map(async (project) => {
-        const kpi = await calculateKpiForProjectEngineer({
-          projectId: project.id,
-          reporterId: project.mainEngineerId,
-          from: monthStart,
-          to: monthEnd,
-        });
-
-        return {
-          userId: project.mainEngineerId,
-          fullName: project.mainEngineer.fullName,
-          email: project.mainEngineer.email,
-          projectCode: project.code,
-          projectName: project.name,
-          score: kpi.score,
-        };
-      }),
-    );
-
-    const kpiUserMap = new Map<
-      string,
-      {
-        userId: string;
-        fullName: string;
-        email: string;
-        scores: number[];
-        projectCount: number;
-      }
-    >();
-
-    for (const row of kpiByProject) {
-      const current = kpiUserMap.get(row.userId);
-      if (!current) {
-        kpiUserMap.set(row.userId, {
-          userId: row.userId,
-          fullName: row.fullName,
-          email: row.email,
-          scores: [row.score],
-          projectCount: 1,
-        });
-      } else {
-        current.scores.push(row.score);
-        current.projectCount += 1;
-      }
-    }
-
-    const kpiByUser = Array.from(kpiUserMap.values())
-      .map((row) => {
-        const total = row.scores.reduce((sum, score) => sum + score, 0);
-        const score = row.scores.length ? Number((total / row.scores.length).toFixed(2)) : 0;
-        return {
-          userId: row.userId,
-          fullName: row.fullName,
-          email: row.email,
-          projectCount: row.projectCount,
-          score,
-          rank: scoreToRank(score),
-        };
-      })
-      .sort((a, b) => b.score - a.score);
-
-    const topKpi = kpiByUser.slice(0, 3);
-    const bottomKpi = [...kpiByUser].sort((a, b) => a.score - b.score).slice(0, 3);
+    const topKpi: Array<{
+      userId: string;
+      fullName: string;
+      email: string;
+      projectCount: number;
+      score: number;
+      rank: string;
+    }> = [];
+    const bottomKpi: typeof topKpi = [];
 
     const commonCards = [
       {
@@ -645,15 +580,7 @@ export async function GET() {
     const pendingReportCount = activeReportRows.filter((row) => !row.morningSubmitted || !row.eveningSubmitted).length;
 
     const kpiTargetProject = reportProjects.find((project) => project.goLiveDate && project.goLiveDate <= today);
-
-    const kpiMonth = kpiTargetProject
-      ? await calculateKpiForProjectEngineer({
-          projectId: kpiTargetProject.id,
-          reporterId: user.id,
-          from: startOfMonthUtc(today),
-          to: endOfMonthUtc(today),
-        })
-      : null;
+    const kpiMonth: { score: number; rank: string } | null = null;
 
     return NextResponse.json({
       role: user.role,
@@ -676,23 +603,15 @@ export async function GET() {
         {
           key: "engineer_kpi_month",
           label: "KPI tháng này",
-          value: kpiMonth ? `${kpiMonth.score.toFixed(2)} (${kpiMonth.rank})` : "-",
-          tone: kpiMonth ? rankTone(kpiMonth.rank) : "info",
+          value: "-",
+          tone: "info",
         },
       ],
       engineer: {
         todayTasks: [...groupedTasks.overdue, ...groupedTasks.running, ...groupedTasks.starting],
         taskGroups: groupedTasks,
         reportStatus,
-        kpiMonth: kpiMonth
-          ? {
-              score: kpiMonth.score,
-              rank: kpiMonth.rank,
-              projectId: kpiTargetProject?.id || null,
-              projectCode: kpiTargetProject?.code || null,
-              projectName: kpiTargetProject?.name || null,
-            }
-          : null,
+        kpiMonth: null,
         upcomingMilestones,
       },
     });
