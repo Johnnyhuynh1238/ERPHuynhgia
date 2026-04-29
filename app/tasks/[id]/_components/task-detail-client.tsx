@@ -279,12 +279,8 @@ export function TaskDetailClient({
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-[#f0f2f8]">
-      <div className="sticky top-0 z-40 border-b border-[#2e3347] bg-[#0f1117] px-4 pb-0 pt-3">
-        <div className="mb-2 flex items-center gap-2"><button className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#2e3347] bg-[#1a1d27]" onClick={() => window.history.back()}>←</button><div className="truncate text-xs text-[#8891aa]">{task.project.code} › Task {task.code}</div></div>
-        <div className="mb-2 flex flex-wrap items-center gap-2"><div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div><span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[task.status]}`}>{STATUS_LABEL[task.status]}</span></div>
-        <div className="mb-2 text-base font-bold">{task.name}</div>
-
-        <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="sticky top-0 z-40 border-b border-[#2e3347] bg-[#0f1117] px-4 pb-0 pt-1">
+        <div className="mt-1 flex overflow-x-auto border-b border-[#2e3347] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => (
             <button key={tab.key} className={`flex h-12 flex-shrink-0 items-center whitespace-nowrap border-b-2 px-4 text-xs font-semibold transition ${activeTab === tab.key ? "border-amber-500 text-amber-500" : "border-transparent text-[#8891aa]"}`} onClick={async () => {
               setActiveTab(tab.key);
