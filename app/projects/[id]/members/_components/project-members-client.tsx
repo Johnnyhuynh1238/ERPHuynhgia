@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -26,13 +26,23 @@ type OptionUser = {
   role: string;
 };
 
+type AssignmentRole = "pm_construction_manager" | "pm_engineer" | "pm_material_manager" | "pm_labor_manager" | "pm_accountant";
+
 type AssignmentRow = {
   id: string;
   userId: string;
-  role: "pm_construction_manager" | "pm_engineer" | "pm_material_manager" | "pm_labor_manager" | "pm_accountant";
+  role: AssignmentRole;
   isPrimary: boolean;
   user: { id: string; fullName: string; email: string };
 };
+
+const ROLE_OPTIONS: Array<{ value: AssignmentRole; label: string }> = [
+  { value: "pm_construction_manager", label: "TPTC dự án" },
+  { value: "pm_engineer", label: "Kỹ thuật" },
+  { value: "pm_material_manager", label: "Vật tư" },
+  { value: "pm_labor_manager", label: "Nhân công" },
+  { value: "pm_accountant", label: "Kế toán" },
+];
 
 function formatDate(dateIso: string) {
   const d = new Date(dateIso);
@@ -51,7 +61,10 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newUserId, setNewUserId] = useState("");
   const [newRole, setNewRole] = useState<"engineer" | "foreman" | "accountant" | "construction_manager">("engineer");
-  const [assignmentRoles, setAssignmentRoles] = useState<Array<AssignmentRow["role"]>>([]);
+
+  const [assignTarget, setAssignTarget] = useState<MemberRow | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<AssignmentRole[]>([]);
+  const [savingAssignments, setSavingAssignments] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -88,6 +101,15 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  const assignmentMap = useMemo(() => {
+    const map = new Map<string, AssignmentRow[]>();
+    for (const row of assignments) {
+      if (!map.has(row.userId)) map.set(row.userId, []);
+      map.get(row.userId)!.push(row);
+    }
+    return map;
+  }, [assignments]);
+
   async function addMember() {
     const res = await fetch(`/api/projects/${projectId}/members`, {
       method: "POST",
@@ -95,7 +117,6 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
       body: JSON.stringify({
         userId: newUserId,
         roleInProject: newRole,
-        assignmentRoles,
       }),
     });
 
@@ -110,7 +131,6 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
     setShowAdd(false);
     setNewUserId("");
     setNewRole("engineer");
-    setAssignmentRoles([]);
     await loadData();
   }
 
@@ -143,6 +163,54 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
     await loadData();
   }
 
+  function openAssign(member: MemberRow) {
+    const current = assignmentMap.get(member.userId) || [];
+    setAssignTarget(member);
+    setSelectedRoles(current.map((x) => x.role));
+  }
+
+  async function saveAssignments() {
+    if (!assignTarget) return;
+    setSavingAssignments(true);
+
+    const currentRows = assignmentMap.get(assignTarget.userId) || [];
+    const currentRoles = new Set(currentRows.map((x) => x.role));
+    const selected = new Set(selectedRoles);
+
+    const toDelete = currentRows.filter((row) => !selected.has(row.role));
+    const toAdd = selectedRoles.filter((role) => !currentRoles.has(role));
+
+    try {
+      await Promise.all([
+        ...toDelete.map((row) =>
+          fetch(`/api/project-assignments/${row.id}`, {
+            method: "DELETE",
+          }),
+        ),
+        ...toAdd.map((role) =>
+          fetch(`/api/projects/${projectId}/assignments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: assignTarget.userId,
+              role,
+              isPrimary: false,
+            }),
+          }),
+        ),
+      ]);
+
+      toast.success("Đã cập nhật phân công");
+      setAssignTarget(null);
+      setSelectedRoles([]);
+      await loadData();
+    } catch {
+      toast.error("Cập nhật phân công thất bại");
+    } finally {
+      setSavingAssignments(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -159,6 +227,7 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
               <th className="py-2">Tên</th>
               <th className="py-2">Email</th>
               <th className="py-2">Role dự án</th>
+              <th className="py-2">Phân công</th>
               <th className="py-2">Ngày thêm</th>
               <th className="py-2">Ai thêm</th>
               <th className="py-2">Hành động</th>
@@ -167,53 +236,58 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-slate-500">
+                <td colSpan={7} className="py-6 text-center text-slate-500">
                   Đang tải...
                 </td>
               </tr>
             ) : members.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-slate-500">
+                <td colSpan={7} className="py-6 text-center text-slate-500">
                   Chưa có member nào.
                 </td>
               </tr>
             ) : (
-              members.map((member) => (
-                <tr key={member.id} className="border-b last:border-b-0">
-                  <td className="py-2">{member.user.fullName}</td>
-                  <td className="py-2">{member.user.email}</td>
-                  <td className="py-2">{member.roleInProject}</td>
-                  <td className="py-2">{formatDate(member.addedAt)}</td>
-                  <td className="py-2">{member.addedByUser.fullName}</td>
-                  <td className="py-2">
-                    <Button variant="outline" onClick={() => removeMember(member)}>
-                      Xóa
-                    </Button>
-                  </td>
-                </tr>
-              ))
+              members.map((member) => {
+                const rows = assignmentMap.get(member.userId) || [];
+                return (
+                  <tr key={member.id} className="border-b last:border-b-0">
+                    <td className="py-2">{member.user.fullName}</td>
+                    <td className="py-2">{member.user.email}</td>
+                    <td className="py-2">{member.roleInProject}</td>
+                    <td className="py-2">
+                      {rows.length === 0 ? (
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">Chưa phân công</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {rows.map((r) => {
+                            const label = ROLE_OPTIONS.find((x) => x.value === r.role)?.label || r.role;
+                            return (
+                              <span key={r.id} className="rounded bg-orange-100 px-2 py-1 text-xs text-orange-700">
+                                {label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2">{formatDate(member.addedAt)}</td>
+                    <td className="py-2">{member.addedByUser.fullName}</td>
+                    <td className="py-2">
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => openAssign(member)}>
+                          {rows.length === 0 ? "Phân công" : "Sửa phân công"}
+                        </Button>
+                        <Button variant="outline" onClick={() => removeMember(member)}>
+                          Xóa
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="rounded-xl border bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Phân công vai trò dự án</h3>
-        {assignments.length === 0 ? (
-          <div className="text-sm text-slate-500">Chưa có phân công theo vai trò dự án.</div>
-        ) : (
-          <div className="space-y-2 text-sm">
-            {assignments.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded border px-3 py-2">
-                <div>
-                  <div className="font-medium">{a.user.fullName}</div>
-                  <div className="text-xs text-slate-500">{a.user.email}</div>
-                </div>
-                <div className="rounded bg-slate-100 px-2 py-1 text-xs">{a.role}</div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {showAdd ? (
@@ -236,29 +310,6 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
                 <option value="accountant">accountant</option>
                 <option value="construction_manager">construction_manager</option>
               </select>
-
-              <div className="rounded border p-3 text-sm">
-                <div className="mb-2 font-medium">Phân công vai trò dự án (theo spec)</div>
-                {[
-                  ["pm_construction_manager", "TPTC dự án"],
-                  ["pm_engineer", "Kỹ thuật"],
-                  ["pm_material_manager", "Vật tư"],
-                  ["pm_labor_manager", "Nhân công"],
-                  ["pm_accountant", "Kế toán"],
-                ].map(([role, label]) => (
-                  <label key={role} className="mb-1 flex items-center gap-2 last:mb-0">
-                    <input
-                      type="checkbox"
-                      checked={assignmentRoles.includes(role as AssignmentRow["role"])}
-                      onChange={(e) => {
-                        const r = role as AssignmentRow["role"];
-                        setAssignmentRoles((prev) => (e.target.checked ? Array.from(new Set([...prev, r])) : prev.filter((x) => x !== r)));
-                      }}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>
@@ -266,6 +317,39 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
               </Button>
               <Button className="bg-orange-500 hover:bg-orange-600" onClick={addMember}>
                 Thêm
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {assignTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-4">
+            <h3 className="mb-1 font-semibold">Phân công cho {assignTarget.user.fullName}</h3>
+            <p className="mb-3 text-xs text-slate-500">Chỉ khi có phân công, user mới thấy dự án.</p>
+            <div className="space-y-2 rounded border p-3 text-sm">
+              {ROLE_OPTIONS.map((opt) => (
+                <label key={opt.value} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedRoles.includes(opt.value)}
+                    onChange={(e) => {
+                      setSelectedRoles((prev) =>
+                        e.target.checked ? Array.from(new Set([...prev, opt.value])) : prev.filter((x) => x !== opt.value),
+                      );
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={savingAssignments}>
+                Hủy
+              </Button>
+              <Button className="bg-orange-500 hover:bg-orange-600" onClick={saveAssignments} disabled={savingAssignments}>
+                {savingAssignments ? "Đang lưu..." : "Lưu phân công"}
               </Button>
             </div>
           </div>
