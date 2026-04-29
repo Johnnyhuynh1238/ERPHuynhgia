@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
@@ -69,6 +69,39 @@ function getTodayDateText() {
   return now.toISOString().slice(0, 10);
 }
 
+function statusLabel(value: string | null | undefined) {
+  if (value === "paused") return "Tạm dừng";
+  if (value === "completed") return "Hoàn thành";
+  return "Đang làm";
+}
+
+function parseTechnicalMeta(row: any) {
+  if (!row?.note) return { entries: [] as any[] };
+  try {
+    const parsed = JSON.parse(row.note);
+    if (parsed?.__guidedTechnicalReport === true) return { entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
+  } catch {}
+  return { entries: [] as any[] };
+}
+
+function buildTechnicalNote(row: any, entry: any) {
+  const current = parseTechnicalMeta(row);
+  return JSON.stringify({
+    __guidedTechnicalReport: true,
+    version: 1,
+    entries: [...current.entries, entry],
+  });
+}
+
+function groupRowsByDay(rows: any[]) {
+  return rows.reduce((acc: Record<string, any[]>, row: any) => {
+    const day = String(row.reportDate).slice(0, 10);
+    acc[day] = acc[day] || [];
+    acc[day].push(row);
+    return acc;
+  }, {});
+}
+
 function parseMainTab(input: string | null): MainTab {
   const value = (input || "").toLowerCase();
   if (["overview", "technical", "material", "labor", "equipment", "subcontractor", "journal"].includes(value)) return value as MainTab;
@@ -123,12 +156,14 @@ export function TaskDetailClient({
 
   const [reportRows, setReportRows] = useState<Record<ReportType, any[]>>({ technical: [], material: [], labor: [], equipment: [] });
   const [payloads, setPayloads] = useState<Record<ReportType, Record<string, any>>>({
-    technical: { status: "working", note: "" },
+    technical: { status: "working", progress: 0, progressSaved: false, assessment: "", assessmentNote: "", lesson: "" },
     material: { hasIssue: false, issueDescription: "", note: "" },
     labor: { masterWorkerCount: null, helperCount: null, note: "" },
     equipment: { note: "" },
   });
   const [pickedFiles, setPickedFiles] = useState<Record<ReportType, FileList | null>>({ technical: null, material: null, labor: null, equipment: null });
+  const [technicalReportOpen, setTechnicalReportOpen] = useState(false);
+  const [savingTechnicalStatus, setSavingTechnicalStatus] = useState(false);
 
   const [status, setStatus] = useState<TaskDetail["status"]>(initialTask.status);
   const [plannedStart, setPlannedStart] = useState(toInputDate(initialTask.plannedStartDate));
@@ -169,6 +204,10 @@ export function TaskDetailClient({
   const materialHistory = useMemo(() => [...(reportRows.material || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.material]);
   const laborHistory = useMemo(() => [...(reportRows.labor || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.labor]);
   const equipmentHistory = useMemo(() => [...(reportRows.equipment || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.equipment]);
+  const technicalTodayMeta = useMemo(() => parseTechnicalMeta(technicalToday), [technicalToday]);
+  const technicalTodayEntries = technicalTodayMeta.entries || [];
+  const technicalHasGuidedReport = technicalTodayEntries.length > 0;
+  const technicalHistoryGroups = useMemo(() => groupRowsByDay(technicalHistory), [technicalHistory]);
 
   const filteredLogs = useMemo(() => {
     if (journalSubTab === "all") return logs;
@@ -184,18 +223,25 @@ export function TaskDetailClient({
     toast.success(json.message || "Đã cập nhật");
   }
 
-  async function loadReportRows(type: ReportType) {
+  const loadReportRows = useCallback(async (type: ReportType) => {
     const endpoint = reportTypeConfig[type].endpoint;
     const res = await fetch(`/api/tasks/${task.id}/${endpoint}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return;
     setReportRows((prev) => ({ ...prev, [type]: json.reports || [] }));
-  }
+  }, [task.id]);
 
-  async function ensureRowsLoaded(type: ReportType) {
+  const ensureRowsLoaded = useCallback(async (type: ReportType) => {
     if ((reportRows[type] || []).length > 0) return;
     await loadReportRows(type);
-  }
+  }, [loadReportRows, reportRows]);
+
+  useEffect(() => {
+    if (activeTab === "technical") void ensureRowsLoaded("technical");
+    if (activeTab === "material") void ensureRowsLoaded("material");
+    if (activeTab === "labor") void ensureRowsLoaded("labor");
+    if (activeTab === "equipment") void ensureRowsLoaded("equipment");
+  }, [activeTab, ensureRowsLoaded]);
 
   async function submitReport(type: ReportType) {
     const endpoint = reportTypeConfig[type].endpoint;
@@ -220,7 +266,7 @@ export function TaskDetailClient({
       ...prev,
       [type]:
         type === "technical"
-          ? { status: "working", note: "" }
+          ? { status: "working", progress: 0, progressSaved: false, assessment: "", assessmentNote: "", lesson: "" }
           : type === "material"
             ? { hasIssue: false, issueDescription: "", note: "" }
             : type === "labor"
@@ -228,6 +274,133 @@ export function TaskDetailClient({
               : { note: "" },
     }));
     await loadReportRows(type);
+  }
+
+  async function saveTechnicalStatusToday() {
+    const payload = payloads.technical;
+    setSavingTechnicalStatus(true);
+    const res = await fetch(`/api/tasks/${task.id}/technical-reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: payload.status || "working" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setSavingTechnicalStatus(false);
+    if (!res.ok) return toast.error(json.message || "Cập nhật trạng thái thất bại");
+    toast.success("Đã cập nhật trạng thái hôm nay");
+    await loadReportRows("technical");
+  }
+
+  async function createGuidedTechnicalReport(additional = false) {
+    const payload = payloads.technical;
+    if (!payload.progressSaved) return toast.error("Vui lòng lưu tiến độ trước");
+    if (!payload.assessment) return toast.error("Vui lòng chọn đánh giá kỹ thuật");
+    if (payload.assessment === "failed" && !String(payload.assessmentNote || "").trim()) return toast.error("Chưa đạt bắt buộc nêu rõ lý do");
+
+    const entry = {
+      progressToday: Number(payload.progress) || 0,
+      assessment: payload.assessment,
+      assessmentText: payload.assessment === "passed" ? "Đã giám sát thi công đúng biện pháp thi công và đạt yêu cầu kỹ thuật" : "Chưa đạt",
+      assessmentNote: String(payload.assessmentNote || "").trim() || null,
+      lesson: String(payload.lesson || "").trim() || null,
+      createdAt: new Date().toISOString(),
+      additional,
+    };
+
+    const res = await fetch(`/api/tasks/${task.id}/technical-reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: technicalToday?.status || payload.status || "working",
+        technicalIssue: payload.assessment === "failed" ? payload.assessmentNote : null,
+        note: buildTechnicalNote(technicalToday, entry),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(json.message || "Tạo báo cáo thất bại");
+
+    const files = pickedFiles.technical;
+    if (files && files.length > 0) {
+      const form = new FormData();
+      form.append("reportType", "technical");
+      form.append("reportDate", getTodayDateText());
+      if (json.report?.id) form.append("technicalReportId", json.report.id);
+      Array.from(files).forEach((f) => form.append("files", f));
+      await fetch(`/api/tasks/${task.id}/report-photos`, { method: "POST", body: form });
+      setPickedFiles((prev) => ({ ...prev, technical: null }));
+    }
+
+    toast.success(additional ? "Đã cập nhật thêm báo cáo" : "Đã tạo báo cáo kỹ thuật");
+    setPayloads((prev) => ({ ...prev, technical: { status: technicalToday?.status || "working", progress: 0, progressSaved: false, assessment: "", assessmentNote: "", lesson: "" } }));
+    setTechnicalReportOpen(false);
+    setTechnicalSubTab("today");
+    await loadReportRows("technical");
+  }
+
+  function renderTechnicalTodayFlow() {
+    const payload = payloads.technical;
+    const isAdditional = technicalHasGuidedReport;
+    return (
+      <div className="space-y-3">
+        {!technicalToday ? (
+          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Cập nhật trạng thái hôm nay</div>
+            <select className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" value={payload.status || "working"} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, status: e.target.value } }))}>
+              <option value="working">Đang làm</option>
+              <option value="paused">Tạm dừng</option>
+              <option value="completed">Hoàn thành</option>
+            </select>
+            <Button disabled={savingTechnicalStatus} className="w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={saveTechnicalStatusToday}>Lưu</Button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Trạng thái hôm nay</div>
+                <div className="mt-1 text-sm font-semibold text-amber-300">{statusLabel(technicalToday.status)}</div>
+              </div>
+              {!technicalReportOpen ? <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => setTechnicalReportOpen(true)}>{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</Button> : null}
+            </div>
+          </div>
+        )}
+
+        {technicalReportOpen ? (
+          <div className="rounded-2xl border border-amber-500/50 bg-[#1a1d27] p-4 space-y-4">
+            <div className="text-sm font-bold text-amber-300">{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</div>
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
+              <div className="flex items-center justify-between text-sm"><span>Step Tiến độ</span><b>{Number(payload.progress) || 0}%</b></div>
+              <input type="range" min="0" max="100" className="w-full" value={payload.progress || 0} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, progress: Number(e.target.value), progressSaved: false } }))} />
+              <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, progressSaved: true } }))}>Lưu tiến độ</Button>
+            </div>
+
+            {payload.progressSaved ? (
+              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
+                <div className="text-sm font-semibold">Đánh giá kỹ thuật</div>
+                <label className="block text-sm"><input type="radio" name="technical-assessment" className="mr-2" checked={payload.assessment === "passed"} onChange={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessment: "passed" } }))} />Đã giám sát thi công đúng biện pháp thi công và đạt yêu cầu kỹ thuật</label>
+                <label className="block text-sm"><input type="radio" name="technical-assessment" className="mr-2" checked={payload.assessment === "failed"} onChange={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessment: "failed" } }))} />Chưa đạt</label>
+                <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#1a1d27] px-3 py-2" rows={3} placeholder={payload.assessment === "failed" ? "Bắt buộc nêu rõ lý do chưa đạt" : "Ghi chú đánh giá (nếu có)"} value={payload.assessmentNote || ""} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessmentNote: e.target.value } }))} />
+              </div>
+            ) : null}
+
+            {payload.progressSaved && payload.assessment ? (
+              <>
+                <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
+                  <div className="text-sm font-semibold">Đính kèm hình ảnh chi tiết</div>
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, technical: e.target.files }))} />
+                </div>
+                <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
+                  <div className="text-sm font-semibold">Kinh nghiệm lưu lại cho lần sau</div>
+                  <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#1a1d27] px-3 py-2" rows={3} placeholder="Kinh nghiệm / lưu ý kỹ thuật" value={payload.lesson || ""} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, lesson: e.target.value } }))} />
+                </div>
+                <Button className="w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => createGuidedTechnicalReport(isAdditional)}>Tạo báo cáo</Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {renderHistory("technical")}
+      </div>
+    );
   }
 
   function renderReportForm(type: ReportType) {
@@ -267,6 +440,40 @@ export function TaskDetailClient({
 
   function renderHistory(type: ReportType) {
     const rows = type === "technical" ? technicalHistory : type === "material" ? materialHistory : type === "labor" ? laborHistory : equipmentHistory;
+    if (type === "technical") {
+      const days = Object.keys(technicalHistoryGroups).sort((a, b) => +new Date(b) - +new Date(a));
+      return (
+        <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+          <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử báo cáo · Kỹ thuật</div>
+          {days.length === 0 ? <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-4 text-sm text-[#8891aa]">Chưa có dữ liệu</div> : (
+            <div className="space-y-3">{days.map((day) => (
+              <div key={day} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm">
+                <div className="font-semibold text-amber-300">{fmtDate(day)}</div>
+                <div className="mt-2 space-y-3">{technicalHistoryGroups[day].map((row: any) => {
+                  const meta = parseTechnicalMeta(row);
+                  return (
+                    <div key={row.id} className="rounded-lg border border-[#343a50] bg-[#1a1d27] p-3">
+                      <div className="text-xs text-[#8891aa]">Trạng thái: <span className="font-semibold text-[#f0f2f8]">{statusLabel(row.status)}</span></div>
+                      {meta.entries.length === 0 ? <div className="mt-2 text-xs text-[#8891aa]">Đã cập nhật trạng thái, chưa tạo báo cáo kỹ thuật chi tiết.</div> : null}
+                      {meta.entries.map((entry: any, idx: number) => (
+                        <div key={`${row.id}-${idx}`} className="mt-2 rounded-lg bg-[#222637] p-2 text-xs text-[#c8d0e8]">
+                          <div className="font-semibold text-[#f0f2f8]">{entry.additional ? "Báo cáo bổ sung" : "Báo cáo kỹ thuật"} #{idx + 1}</div>
+                          <div>Tiến độ hôm nay: {entry.progressToday ?? 0}%</div>
+                          <div>Đánh giá: {entry.assessmentText || (entry.assessment === "passed" ? "Đạt yêu cầu" : "Chưa đạt")}</div>
+                          {entry.assessmentNote ? <div>Ghi chú/Lý do: {entry.assessmentNote}</div> : null}
+                          {entry.lesson ? <div>Kinh nghiệm: {entry.lesson}</div> : null}
+                        </div>
+                      ))}
+                      {Array.isArray(row.photos) && row.photos.length > 0 ? <div className="mt-2 text-xs text-[#8891aa]">Ảnh đính kèm: {row.photos.length}</div> : null}
+                    </div>
+                  );
+                })}</div>
+              </div>
+            ))}</div>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử · {reportTypeConfig[type].label}</div>
@@ -390,7 +597,7 @@ export function TaskDetailClient({
             {technicalSubTab === "method" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Biện pháp thi công: placeholder theo spec (đã chừa slot để tích hợp form/duyệt).</div> : null}
             {technicalSubTab === "drawings" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Bản vẽ: placeholder theo spec (đã sẵn vị trí đính kèm file/bản vẽ).</div> : null}
             {technicalSubTab === "qc" ? <QcSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
-            {technicalSubTab === "today" ? renderReportForm("technical") : null}
+            {technicalSubTab === "today" ? renderTechnicalTodayFlow() : null}
             {technicalSubTab === "history" ? renderHistory("technical") : null}
           </>
         ) : null}

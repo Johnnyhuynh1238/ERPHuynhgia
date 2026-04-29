@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { getTaskProject, upsertTechnicalReport } from "@/lib/task-report-service";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const rows = await prisma.taskTechnicalReport.findMany({ where: { taskId: params.id }, orderBy: { reportDate: "desc" } });
+  const rows = await prisma.taskTechnicalReport.findMany({
+    where: { taskId: params.id },
+    include: { photos: { orderBy: { uploadedAt: "desc" } } },
+    orderBy: { reportDate: "desc" },
+  });
   return NextResponse.json({ reports: rows });
 }
 
