@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -90,29 +89,15 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
       ));
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] slide-up">
-        <Link href={`/projects/${detail.project.id}`} className="hover:underline">
-          Dự án {detail.project.code}
-        </Link>
-        <span className="mx-2">&gt;</span>
-        <Link href={`/projects/${detail.project.id}/tasks`} className="hover:underline">
-          Tiến độ
-        </Link>
-        <span className="mx-2">&gt;</span>
-        <span>Task {detail.code}</span>
-      </div>
-
-      <TaskDetailClient
-        initialTask={JSON.parse(JSON.stringify(detail))}
-        initialLogs={JSON.parse(JSON.stringify(logs))}
-        initialPhotos={JSON.parse(JSON.stringify(photos))}
-        engineers={engineers}
-        foremen={foremen}
-        currentUserId={user.id}
-        currentUserRole={user.role}
-        canManageQcItem={canManageQcItem}
-      />
-    </div>
+    <TaskDetailClient
+      initialTask={JSON.parse(JSON.stringify(detail))}
+      initialLogs={JSON.parse(JSON.stringify(logs))}
+      initialPhotos={JSON.parse(JSON.stringify(photos))}
+      engineers={engineers}
+      foremen={foremen}
+      currentUserId={user.id}
+      currentUserRole={user.role}
+      canManageQcItem={canManageQcItem}
+    />
   );
 }
