@@ -17,10 +17,18 @@ export default function CheckinPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/reports/today/checkin-options").then((r) => r.json()).then((j) => setData(j.projects || []));
+    fetch("/api/reports/today/checkin-options").then((r) => r.json()).then((j) => setData((j.projects || []).sort((a: Grouped, b: Grouped) => a.projectName.localeCompare(b.projectName, "vi"))));
   }, []);
 
   const totalPicked = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
+
+  const doneProjectCount = useMemo(() => {
+    return data.filter((p) => {
+      const all = ORDER.flatMap((k) => p.groups[k] || []);
+      if (!all.length) return false;
+      return all.every((t) => picked[t.id]);
+    }).length;
+  }, [data, picked]);
 
   async function submit() {
     const taskIds = Object.keys(picked).filter((k) => picked[k]);
@@ -31,7 +39,9 @@ export default function CheckinPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-4 space-y-4">
-      <h1 className="text-lg font-semibold">Check-in sáng</h1>
+      <h1 className="text-lg font-semibold">Check-in task hôm nay</h1>
+      <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">Đã chọn {totalPicked} task · Hoàn tất {doneProjectCount}/{data.length} dự án</div>
+
       {data.map((p) => (
         <section key={p.projectId} className="rounded-xl border p-3">
           <div className="mb-2 font-medium">{p.projectName}</div>
@@ -43,9 +53,9 @@ export default function CheckinPage() {
                 <div className="mb-1 flex items-center justify-between text-xs"><span>{LABEL[groupKey]}</span><span className="rounded-full bg-slate-200 px-2 py-0.5">{items.length}</span></div>
                 <div className="space-y-1">
                   {items.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between rounded-md border px-2 py-1 text-sm">
+                    <div key={t.id} className="flex items-center justify-between rounded-md border px-2 py-2 text-sm">
                       <label className="flex items-center gap-2"><input type="checkbox" checked={!!picked[t.id]} onChange={(e) => setPicked((s) => ({ ...s, [t.id]: e.target.checked }))} />{t.code} - {t.name}</label>
-                      <Link className="text-orange-600 text-xs" href={`/tasks/${t.id}?tab=reports&subTab=technical`}>Vào task</Link>
+                      <Link className="text-orange-600 text-xs" href={`/tasks/${t.id}?tab=technical&subTab=today`}>Vào task</Link>
                     </div>
                   ))}
                 </div>

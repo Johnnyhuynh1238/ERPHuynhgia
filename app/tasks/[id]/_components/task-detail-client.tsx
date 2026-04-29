@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
@@ -39,6 +39,20 @@ type TaskLog = {
 
 type OptionUser = { id: string; fullName: string; email: string };
 
+const reportTypeConfig = {
+  technical: { label: "Kỹ thuật", endpoint: "technical-reports" },
+  material: { label: "Vật tư", endpoint: "material-reports" },
+  labor: { label: "Nhân công", endpoint: "labor-reports" },
+  equipment: { label: "Máy móc", endpoint: "equipment-reports" },
+} as const;
+
+type ReportType = keyof typeof reportTypeConfig;
+
+type MainTab = "overview" | "technical" | "material" | "labor" | "equipment" | "subcontractor" | "journal";
+type TechnicalSubTab = "requirements" | "method" | "drawings" | "qc" | "today" | "history";
+type ResourceSubTab = "today" | "history" | "planning";
+type JournalSubTab = "all" | "photos" | "qc" | "issues";
+
 function toInputDate(dateIso: string | null) {
   if (!dateIso) return "";
   return dateIso.slice(0, 10);
@@ -50,14 +64,31 @@ function fmtDate(dateIso: string | null) {
   return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 }
 
-const reportTypeConfig = {
-  technical: { label: "Kỹ thuật", endpoint: "technical-reports", fields: ["status", "pauseReason", "technicalIssue", "note"] },
-  material: { label: "Vật tư", endpoint: "material-reports", fields: ["hasIssue", "issueDescription", "note"] },
-  labor: { label: "Nhân công", endpoint: "labor-reports", fields: ["masterWorkerCount", "helperCount", "note"] },
-  equipment: { label: "Thiết bị", endpoint: "equipment-reports", fields: ["note"] },
-} as const;
+function getTodayDateText() {
+  const now = new Date();
+  return now.toISOString().slice(0, 10);
+}
 
-type ReportType = keyof typeof reportTypeConfig;
+function parseMainTab(input: string | null): MainTab {
+  const value = (input || "").toLowerCase();
+  if (["overview", "technical", "material", "labor", "equipment", "subcontractor", "journal"].includes(value)) return value as MainTab;
+  if (value === "qc") return "technical";
+  if (value === "reports" || value === "history") return "technical";
+  return "overview";
+}
+
+function parseLegacySub(input: string | null): ReportType {
+  const value = (input || "").toLowerCase();
+  if (["technical", "material", "labor", "equipment"].includes(value)) return value as ReportType;
+  return "technical";
+}
+
+function detectMainFromReportType(type: ReportType): MainTab {
+  if (type === "technical") return "technical";
+  if (type === "material") return "material";
+  if (type === "labor") return "labor";
+  return "equipment";
+}
 
 export function TaskDetailClient({
   initialTask,
@@ -77,24 +108,27 @@ export function TaskDetailClient({
   currentUserRole: string;
   canManageQcItem: boolean;
 }) {
-  const [task, setTask] = useState<TaskDetail>(initialTask);
-  const [logs, setLogs] = useState<TaskLog[]>(initialLogs);
-  const getInitialTab = () => {
-    if (typeof window === "undefined") return "overview" as const;
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    return (["overview", "qc", "material", "reports", "history", "journal", "status"] as const).includes(tab as any) ? (tab as any) : "overview";
-  };
-  const getInitialSub = () => {
-    if (typeof window === "undefined") return "technical" as ReportType;
-    const sub = new URLSearchParams(window.location.search).get("subTab");
-    return (["technical", "material", "labor", "equipment"] as const).includes(sub as any) ? (sub as ReportType) : "technical";
-  };
-  const [activeTab, setActiveTab] = useState<"overview" | "qc" | "material" | "reports" | "history" | "journal" | "status">(getInitialTab);
-  const [reportType, setReportType] = useState<ReportType>(getInitialSub);
-  const [historyType, setHistoryType] = useState<ReportType>(getInitialSub);
+  const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const initialLegacySub = parseLegacySub(params.get("subTab"));
+  const initialMain = parseMainTab(params.get("tab")) === "technical" && params.get("tab") === "reports" ? detectMainFromReportType(initialLegacySub) : parseMainTab(params.get("tab"));
+
+  const [task] = useState<TaskDetail>(initialTask);
+  const [logs] = useState<TaskLog[]>(initialLogs);
+  const [activeTab, setActiveTab] = useState<MainTab>(initialMain);
+  const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(params.get("tab") === "history" ? "history" : "today");
+  const [materialSubTab, setMaterialSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "material" ? "history" : "today");
+  const [laborSubTab, setLaborSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "labor" ? "history" : "today");
+  const [equipmentSubTab, setEquipmentSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "equipment" ? "history" : "today");
+  const [journalSubTab, setJournalSubTab] = useState<JournalSubTab>("all");
+
   const [reportRows, setReportRows] = useState<Record<ReportType, any[]>>({ technical: [], material: [], labor: [], equipment: [] });
-  const [payload, setPayload] = useState<Record<string, any>>({ status: "working", note: "" });
-  const [pickedFiles, setPickedFiles] = useState<FileList | null>(null);
+  const [payloads, setPayloads] = useState<Record<ReportType, Record<string, any>>>({
+    technical: { status: "working", note: "" },
+    material: { hasIssue: false, issueDescription: "", note: "" },
+    labor: { masterWorkerCount: null, helperCount: null, note: "" },
+    equipment: { note: "" },
+  });
+  const [pickedFiles, setPickedFiles] = useState<Record<ReportType, FileList | null>>({ technical: null, material: null, labor: null, equipment: null });
 
   const [status, setStatus] = useState<TaskDetail["status"]>(initialTask.status);
   const [plannedStart, setPlannedStart] = useState(toInputDate(initialTask.plannedStartDate));
@@ -116,21 +150,37 @@ export function TaskDetailClient({
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id;
 
-  const tabs = [
+  const tabs: { key: MainTab; label: string }[] = [
     { key: "overview", label: "Tổng quan" },
-    { key: "qc", label: "QC" },
+    { key: "technical", label: "Kỹ thuật" },
     { key: "material", label: "Vật tư" },
-    { key: "reports", label: "Báo cáo" },
-    { key: "history", label: "Lịch sử" },
-    { key: "journal", label: "Timeline" },
-    ...(canChangeStatus ? [{ key: "status", label: "Trạng thái" }] : []),
-  ] as const;
+    { key: "labor", label: "Nhân công" },
+    { key: "equipment", label: "Máy móc" },
+    { key: "subcontractor", label: "Thầu phụ" },
+    { key: "journal", label: "Nhật ký" },
+  ];
+
+  const technicalToday = useMemo(() => (reportRows.technical || []).find((r: any) => String(r.reportDate).slice(0, 10) === getTodayDateText()) || null, [reportRows.technical]);
+  const materialToday = useMemo(() => (reportRows.material || []).find((r: any) => String(r.reportDate).slice(0, 10) === getTodayDateText()) || null, [reportRows.material]);
+  const laborToday = useMemo(() => (reportRows.labor || []).find((r: any) => String(r.reportDate).slice(0, 10) === getTodayDateText()) || null, [reportRows.labor]);
+  const equipmentToday = useMemo(() => (reportRows.equipment || []).find((r: any) => String(r.reportDate).slice(0, 10) === getTodayDateText()) || null, [reportRows.equipment]);
+
+  const technicalHistory = useMemo(() => [...(reportRows.technical || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.technical]);
+  const materialHistory = useMemo(() => [...(reportRows.material || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.material]);
+  const laborHistory = useMemo(() => [...(reportRows.labor || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.labor]);
+  const equipmentHistory = useMemo(() => [...(reportRows.equipment || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [reportRows.equipment]);
+
+  const filteredLogs = useMemo(() => {
+    if (journalSubTab === "all") return logs;
+    if (journalSubTab === "photos") return logs.filter((x) => x.logType === "photo_uploaded" || x.content.toLowerCase().includes("ảnh"));
+    if (journalSubTab === "qc") return logs.filter((x) => x.logType.toLowerCase().includes("qc") || x.content.toLowerCase().includes("qc"));
+    return logs.filter((x) => x.content.toLowerCase().includes("vướng") || x.content.toLowerCase().includes("phát sinh") || x.content.toLowerCase().includes("issue"));
+  }, [logs, journalSubTab]);
 
   async function patchTask(section: string, body: object) {
     const res = await fetch(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, payload: body }) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(json.message || "Cập nhật thất bại");
-    if (json.task) setTask((prev) => ({ ...prev, ...json.task }));
     toast.success(json.message || "Đã cập nhật");
   }
 
@@ -142,32 +192,89 @@ export function TaskDetailClient({
     setReportRows((prev) => ({ ...prev, [type]: json.reports || [] }));
   }
 
-  useEffect(() => {
-    loadReportRows(reportType);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, task.id]);
+  async function ensureRowsLoaded(type: ReportType) {
+    if ((reportRows[type] || []).length > 0) return;
+    await loadReportRows(type);
+  }
 
-  const sortedHistory = useMemo(() => [...(reportRows[historyType] || [])].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate)), [historyType, reportRows]);
-
-  async function submitReport() {
-    const endpoint = reportTypeConfig[reportType].endpoint;
+  async function submitReport(type: ReportType) {
+    const endpoint = reportTypeConfig[type].endpoint;
+    const payload = payloads[type];
     const res = await fetch(`/api/tasks/${task.id}/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(json.message || "Gửi báo cáo thất bại");
 
-    if (pickedFiles && pickedFiles.length > 0) {
+    const files = pickedFiles[type];
+    if (files && files.length > 0) {
       const form = new FormData();
-      form.append("reportType", reportType);
+      form.append("reportType", type);
       form.append("reportDate", new Date().toISOString().slice(0, 10));
-      if (reportType === "technical" && json.report?.id) form.append("technicalReportId", json.report.id);
-      Array.from(pickedFiles).forEach((f) => form.append("files", f));
+      if (type === "technical" && json.report?.id) form.append("technicalReportId", json.report.id);
+      Array.from(files).forEach((f) => form.append("files", f));
       await fetch(`/api/tasks/${task.id}/report-photos`, { method: "POST", body: form });
-      setPickedFiles(null);
+      setPickedFiles((prev) => ({ ...prev, [type]: null }));
     }
 
-    toast.success("Đã lưu báo cáo");
-    setPayload({ status: "working", note: "" });
-    loadReportRows(reportType);
+    toast.success("Đã lưu báo cáo hôm nay");
+    setPayloads((prev) => ({
+      ...prev,
+      [type]:
+        type === "technical"
+          ? { status: "working", note: "" }
+          : type === "material"
+            ? { hasIssue: false, issueDescription: "", note: "" }
+            : type === "labor"
+              ? { masterWorkerCount: null, helperCount: null, note: "" }
+              : { note: "" },
+    }));
+    await loadReportRows(type);
+  }
+
+  function renderReportForm(type: ReportType) {
+    const payload = payloads[type];
+    return (
+      <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Báo cáo hôm nay · {reportTypeConfig[type].label}</div>
+
+        {type === "technical" ? (
+          <select className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" value={payload.status || "working"} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, status: e.target.value } }))}>
+            <option value="working">Đang làm</option>
+            <option value="paused">Tạm dừng</option>
+            <option value="completed">Hoàn thành</option>
+          </select>
+        ) : null}
+
+        {type === "material" ? (
+          <>
+            <label className="text-sm"><input type="checkbox" className="mr-2" checked={Boolean(payload.hasIssue)} onChange={(e) => setPayloads((p) => ({ ...p, material: { ...p.material, hasIssue: e.target.checked } }))} />Có vướng mắc vật tư</label>
+            <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" rows={2} placeholder="Mô tả vướng mắc" value={payload.issueDescription || ""} onChange={(e) => setPayloads((p) => ({ ...p, material: { ...p.material, issueDescription: e.target.value } }))} />
+          </>
+        ) : null}
+
+        {type === "labor" ? (
+          <div className="grid grid-cols-2 gap-2">
+            <input type="number" className="rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" placeholder="Thợ chính" value={payload.masterWorkerCount || ""} onChange={(e) => setPayloads((p) => ({ ...p, labor: { ...p.labor, masterWorkerCount: Number(e.target.value) || null } }))} />
+            <input type="number" className="rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" placeholder="Thợ phụ" value={payload.helperCount || ""} onChange={(e) => setPayloads((p) => ({ ...p, labor: { ...p.labor, helperCount: Number(e.target.value) || null } }))} />
+          </div>
+        ) : null}
+
+        <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" rows={3} placeholder="Ghi chú" value={payload.note || ""} onChange={(e) => setPayloads((p) => ({ ...p, [type]: { ...p[type], note: e.target.value } }))} />
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, [type]: e.target.files }))} />
+        <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => submitReport(type)}>Lưu báo cáo</Button>
+      </div>
+    );
+  }
+
+  function renderHistory(type: ReportType) {
+    const rows = type === "technical" ? technicalHistory : type === "material" ? materialHistory : type === "labor" ? laborHistory : equipmentHistory;
+    return (
+      <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+        <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử · {reportTypeConfig[type].label}</div>
+        {rows.length === 0 ? <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-4 text-sm text-[#8891aa]">Chưa có dữ liệu</div> : (
+          <div className="space-y-2">{rows.map((row: any) => <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm"><div className="font-semibold">{fmtDate(row.reportDate)}</div><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-[#c8d0e8]">{JSON.stringify(row, null, 2)}</pre></div>)}</div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -177,16 +284,59 @@ export function TaskDetailClient({
         <div className="mb-2 flex flex-wrap items-center gap-2"><div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div><span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[task.status]}`}>{STATUS_LABEL[task.status]}</span></div>
         <div className="mb-2 text-base font-bold">{task.name}</div>
 
-        <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347]">
+        <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => (
-            <button key={tab.key} className={`flex h-12 flex-shrink-0 items-center whitespace-nowrap border-b-2 px-4 text-xs font-semibold ${activeTab === tab.key ? "border-amber-500 text-amber-500" : "border-transparent text-[#8891aa]"}`} onClick={() => setActiveTab(tab.key as any)}>{tab.label}</button>
+            <button key={tab.key} className={`flex h-12 flex-shrink-0 items-center whitespace-nowrap border-b-2 px-4 text-xs font-semibold transition ${activeTab === tab.key ? "border-amber-500 text-amber-500" : "border-transparent text-[#8891aa]"}`} onClick={async () => {
+              setActiveTab(tab.key);
+              if (tab.key === "technical") await ensureRowsLoaded("technical");
+              if (tab.key === "material") await ensureRowsLoaded("material");
+              if (tab.key === "labor") await ensureRowsLoaded("labor");
+              if (tab.key === "equipment") await ensureRowsLoaded("equipment");
+            }}>{tab.label}</button>
           ))}
         </div>
 
-        {(activeTab === "reports" || activeTab === "history") ? (
+        {activeTab === "technical" ? (
           <div className="flex gap-2 overflow-x-auto py-2">
-            {(Object.keys(reportTypeConfig) as ReportType[]).map((k) => (
-              <button key={k} onClick={() => activeTab === "reports" ? setReportType(k) : setHistoryType(k)} className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${(activeTab === "reports" ? reportType : historyType) === k ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"}`}>{reportTypeConfig[k].label}</button>
+            {[
+              { key: "requirements", label: "YC kỹ thuật" },
+              { key: "method", label: "Biện pháp TC" },
+              { key: "drawings", label: "Bản vẽ" },
+              { key: "qc", label: "QC checklist" },
+              { key: "today", label: "Báo cáo hôm nay" },
+              { key: "history", label: "Lịch sử" },
+            ].map((item) => (
+              <button key={item.key} onClick={() => setTechnicalSubTab(item.key as TechnicalSubTab)} className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${technicalSubTab === item.key ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"}`}>{item.label}</button>
+            ))}
+          </div>
+        ) : null}
+
+        {(["material", "labor", "equipment"] as MainTab[]).includes(activeTab) ? (
+          <div className="flex gap-2 overflow-x-auto py-2">
+            {[
+              { key: "today", label: "Báo cáo hôm nay" },
+              { key: "history", label: "Lịch sử" },
+              { key: "planning", label: "Dự toán/Đề xuất" },
+            ].map((item) => {
+              const active = activeTab === "material" ? materialSubTab : activeTab === "labor" ? laborSubTab : equipmentSubTab;
+              return <button key={item.key} onClick={() => {
+                if (activeTab === "material") setMaterialSubTab(item.key as ResourceSubTab);
+                if (activeTab === "labor") setLaborSubTab(item.key as ResourceSubTab);
+                if (activeTab === "equipment") setEquipmentSubTab(item.key as ResourceSubTab);
+              }} className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${active === item.key ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"}`}>{item.label}</button>;
+            })}
+          </div>
+        ) : null}
+
+        {activeTab === "journal" ? (
+          <div className="flex gap-2 overflow-x-auto py-2">
+            {[
+              { key: "all", label: "Tất cả" },
+              { key: "photos", label: "Ảnh" },
+              { key: "qc", label: "QC" },
+              { key: "issues", label: "Phát sinh" },
+            ].map((item) => (
+              <button key={item.key} onClick={() => setJournalSubTab(item.key as JournalSubTab)} className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${journalSubTab === item.key ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"}`}>{item.label}</button>
             ))}
           </div>
         ) : null}
@@ -224,47 +374,71 @@ export function TaskDetailClient({
                 <Button variant="outline" className="border-[#2e3347] bg-[#222637]" onClick={() => patchTask("customer_visibility", { visibleToCustomer })}>Lưu cổng chủ nhà</Button>
               </div>
             ) : null}
+
+            {canChangeStatus ? (
+              <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Trạng thái</div>
+                <div className="grid grid-cols-2 gap-2">{(Object.keys(STATUS_LABEL) as TaskDetail["status"][]).map((k) => <button key={k} className={`rounded-xl border px-3 py-2 text-xs ${status === k ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] bg-[#222637] text-[#8891aa]"}`} onClick={() => setStatus(k)}>{STATUS_LABEL[k]}</button>)}</div>
+                <Button className="mt-3 w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => patchTask("status", { status })}>Cập nhật trạng thái</Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {activeTab === "qc" ? <QcSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
-        {activeTab === "material" ? <MaterialSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
-
-        {activeTab === "reports" ? (
-          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-2">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Nộp báo cáo {reportTypeConfig[reportType].label}</div>
-            {reportType === "technical" ? <select className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" value={payload.status || "working"} onChange={(e) => setPayload((p) => ({ ...p, status: e.target.value }))}><option value="working">Đang làm</option><option value="paused">Tạm dừng</option><option value="completed">Hoàn thành</option></select> : null}
-            {reportType === "material" ? <label className="text-sm"><input type="checkbox" className="mr-2" checked={Boolean(payload.hasIssue)} onChange={(e) => setPayload((p) => ({ ...p, hasIssue: e.target.checked }))} />Có vướng mắc vật tư</label> : null}
-            {reportType === "labor" ? <div className="grid grid-cols-2 gap-2"><input type="number" className="rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" placeholder="Thợ chính" value={payload.masterWorkerCount || ""} onChange={(e) => setPayload((p) => ({ ...p, masterWorkerCount: Number(e.target.value) || null }))} /><input type="number" className="rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" placeholder="Thợ phụ" value={payload.helperCount || ""} onChange={(e) => setPayload((p) => ({ ...p, helperCount: Number(e.target.value) || null }))} /></div> : null}
-            <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" rows={3} placeholder="Ghi chú" value={payload.note || ""} onChange={(e) => setPayload((p) => ({ ...p, note: e.target.value }))} />
-            <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles(e.target.files)} />
-            <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={submitReport}>Lưu báo cáo</Button>
-          </div>
+        {activeTab === "technical" ? (
+          <>
+            {technicalSubTab === "requirements" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Yêu cầu kỹ thuật được kế thừa từ template & hồ sơ task. Bổ sung module nhập chi tiết theo spec ở phase sau.</div> : null}
+            {technicalSubTab === "method" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Biện pháp thi công: placeholder theo spec (đã chừa slot để tích hợp form/duyệt).</div> : null}
+            {technicalSubTab === "drawings" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Bản vẽ: placeholder theo spec (đã sẵn vị trí đính kèm file/bản vẽ).</div> : null}
+            {technicalSubTab === "qc" ? <QcSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
+            {technicalSubTab === "today" ? renderReportForm("technical") : null}
+            {technicalSubTab === "history" ? renderHistory("technical") : null}
+          </>
         ) : null}
 
-        {activeTab === "history" ? (
-          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử {reportTypeConfig[historyType].label}</div>
-            {sortedHistory.length === 0 ? <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-4 text-sm text-[#8891aa]">Chưa có dữ liệu</div> : (
-              <div className="space-y-2">{sortedHistory.map((row: any) => <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm"><div className="font-semibold">{fmtDate(row.reportDate)}</div><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-[#c8d0e8]">{JSON.stringify(row, null, 2)}</pre></div>)}</div>
-            )}
-          </div>
+        {activeTab === "material" ? (
+          <>
+            <MaterialSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} />
+            {materialSubTab === "today" ? renderReportForm("material") : null}
+            {materialSubTab === "history" ? renderHistory("material") : null}
+            {materialSubTab === "planning" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Dự toán/Đề xuất vật tư (placeholder theo spec).</div> : null}
+            {materialSubTab === "today" && materialToday ? <div className="rounded-xl border border-[#2e3347] bg-[#1a1d27] p-3 text-xs text-[#8891aa]">Đã có báo cáo hôm nay ({fmtDate(materialToday.reportDate)}).</div> : null}
+          </>
         ) : null}
 
-        {activeTab === "journal" ? <JournalSection taskId={task.id} /> : null}
-
-        {activeTab === "status" ? (
-          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Chọn trạng thái</div>
-            <div className="grid grid-cols-2 gap-2">{(Object.keys(STATUS_LABEL) as TaskDetail["status"][]).map((k) => <button key={k} className={`rounded-xl border px-3 py-2 text-xs ${status === k ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] bg-[#222637] text-[#8891aa]"}`} onClick={() => setStatus(k)}>{STATUS_LABEL[k]}</button>)}</div>
-            {canChangeStatus ? <Button className="mt-3 w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => patchTask("status", { status })}>Cập nhật trạng thái</Button> : null}
-          </div>
+        {activeTab === "labor" ? (
+          <>
+            {laborSubTab === "today" ? renderReportForm("labor") : null}
+            {laborSubTab === "history" ? renderHistory("labor") : null}
+            {laborSubTab === "planning" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Dự toán/Đề xuất nhân công (placeholder theo spec).</div> : null}
+            {laborSubTab === "today" && laborToday ? <div className="rounded-xl border border-[#2e3347] bg-[#1a1d27] p-3 text-xs text-[#8891aa]">Đã có báo cáo hôm nay ({fmtDate(laborToday.reportDate)}).</div> : null}
+          </>
         ) : null}
 
-        <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Timeline hoạt động</div>
-          <div className="space-y-2">{logs.slice(0, 30).map((log) => <div key={log.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-2 text-xs"><div className="font-semibold">{log.content}</div><div className="text-[#8891aa]">{new Date(log.createdAt).toLocaleString("vi-VN")} · {log.user?.fullName || log.user?.email || "-"}</div></div>)}</div>
-        </div>
+        {activeTab === "equipment" ? (
+          <>
+            {equipmentSubTab === "today" ? renderReportForm("equipment") : null}
+            {equipmentSubTab === "history" ? renderHistory("equipment") : null}
+            {equipmentSubTab === "planning" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Dự toán/Đề xuất máy móc (placeholder theo spec).</div> : null}
+            {equipmentSubTab === "today" && equipmentToday ? <div className="rounded-xl border border-[#2e3347] bg-[#1a1d27] p-3 text-xs text-[#8891aa]">Đã có báo cáo hôm nay ({fmtDate(equipmentToday.reportDate)}).</div> : null}
+          </>
+        ) : null}
+
+        {activeTab === "subcontractor" ? (
+          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Module thầu phụ: giữ tương thích hệ thống hiện hữu, không thay đổi API/module riêng. Vùng này là placeholder theo spec tab chính.</div>
+        ) : null}
+
+        {activeTab === "journal" ? (
+          <>
+            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Nhật ký task</div>
+              {filteredLogs.length === 0 ? <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-4 text-sm text-[#8891aa]">Không có bản ghi phù hợp.</div> : (
+                <div className="space-y-2">{filteredLogs.slice(0, 40).map((log) => <div key={log.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-2 text-xs"><div className="font-semibold">{log.content}</div><div className="text-[#8891aa]">{new Date(log.createdAt).toLocaleString("vi-VN")} · {log.user?.fullName || log.user?.email || "-"}</div></div>)}</div>
+              )}
+            </div>
+            {journalSubTab === "all" ? <JournalSection taskId={task.id} /> : null}
+          </>
+        ) : null}
       </div>
     </div>
   );
