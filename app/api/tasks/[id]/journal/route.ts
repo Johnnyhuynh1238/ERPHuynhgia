@@ -11,47 +11,19 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!task) return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
   if (!allowed) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
-  const entries = await prisma.eveningReportTask.findMany({
-    where: { taskId: params.id },
-    orderBy: { eveningReport: { reportDate: "desc" } },
-    include: {
-      taskPhotos: { orderBy: { createdAt: "desc" }, include: { user: { select: { id: true, fullName: true, email: true } } } },
-      eveningReport: {
-        include: {
-          reporter: { select: { id: true, fullName: true, email: true } },
-          sitePhotos: { orderBy: { uploadedAt: "desc" } },
-        },
-      },
-    },
-  });
+  const [technical, material, labor, equipment] = await Promise.all([
+    prisma.taskTechnicalReport.findMany({ where: { taskId: params.id }, include: { creator: { select: { id: true, fullName: true, email: true } } }, orderBy: { reportDate: "desc" } }),
+    prisma.taskMaterialReport.findMany({ where: { taskId: params.id }, include: { creator: { select: { id: true, fullName: true, email: true } } }, orderBy: { reportDate: "desc" } }),
+    prisma.taskLaborReport.findMany({ where: { taskId: params.id }, include: { creator: { select: { id: true, fullName: true, email: true } } }, orderBy: { reportDate: "desc" } }),
+    prisma.taskEquipmentReport.findMany({ where: { taskId: params.id }, include: { creator: { select: { id: true, fullName: true, email: true } } }, orderBy: { reportDate: "desc" } }),
+  ]);
 
-  const reportIds = entries.map((e) => e.eveningReport.id);
-  const qcLogs = reportIds.length
-    ? await prisma.taskQcLog.findMany({
-        where: {
-          taskId: params.id,
-          eveningReportId: { in: reportIds },
-        },
-        include: {
-          qcItem: { select: { id: true, content: true } },
-          checker: { select: { id: true, fullName: true, email: true } },
-        },
-        orderBy: { checkedAt: "asc" },
-      })
-    : [];
+  const entries = [
+    ...technical.map((r) => ({ id: r.id, reportDate: r.reportDate, reportType: "technical", createdAt: r.createdAt, reporter: r.creator, payload: r })),
+    ...material.map((r) => ({ id: r.id, reportDate: r.reportDate, reportType: "material", createdAt: r.createdAt, reporter: r.creator, payload: r })),
+    ...labor.map((r) => ({ id: r.id, reportDate: r.reportDate, reportType: "labor", createdAt: r.createdAt, reporter: r.creator, payload: r })),
+    ...equipment.map((r) => ({ id: r.id, reportDate: r.reportDate, reportType: "equipment", createdAt: r.createdAt, reporter: r.creator, payload: r })),
+  ].sort((a, b) => +new Date(b.reportDate) - +new Date(a.reportDate));
 
-  const qcLogsByReportId = qcLogs.reduce<Record<string, typeof qcLogs>>((acc, log) => {
-    const key = log.eveningReportId || "";
-    if (!key) return acc;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(log);
-    return acc;
-  }, {});
-
-  return NextResponse.json({
-    entries: entries.map((entry) => ({
-      ...entry,
-      qcLogs: qcLogsByReportId[entry.eveningReport.id] || [],
-    })),
-  });
+  return NextResponse.json({ entries });
 }
