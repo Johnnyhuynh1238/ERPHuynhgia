@@ -61,26 +61,29 @@ export async function POST(request: Request, { params }: { params: { id: string 
     : new Date(sourceProject.expectedEndDate);
 
   const created = await prisma.$transaction(async (tx) => {
+    const fallbackManagerId = sourceProject.projectManagerId || user.id;
+    const fallbackEngineerId = sourceProject.mainEngineerId || user.id;
+
     const project = await tx.project.create({
       data: {
         code: parsed.data.newProject.code,
         name: parsed.data.newProject.name,
-        customerName: copy.projectInfo ? sourceProject.customerName : "",
-        customerPhone: copy.projectInfo ? sourceProject.customerPhone : "",
+        customerName: copy.projectInfo ? sourceProject.customerName || "Khách hàng" : "Khách hàng",
+        customerPhone: copy.projectInfo ? sourceProject.customerPhone || "N/A" : "N/A",
         customerIdNumber: copy.projectInfo ? sourceProject.customerIdNumber : null,
-        address: copy.projectInfo ? sourceProject.address : "",
-        areaM2: copy.projectInfo ? sourceProject.areaM2 : 0,
-        unitPrice: copy.projectInfo ? sourceProject.unitPrice : 0,
+        address: copy.projectInfo ? sourceProject.address || "Chưa cập nhật" : "Chưa cập nhật",
+        areaM2: copy.projectInfo ? sourceProject.areaM2 ?? 0 : 0,
+        unitPrice: copy.projectInfo ? sourceProject.unitPrice ?? 0 : 0,
         contractValue: copy.projectInfo ? sourceProject.contractValue : null,
         startDate,
         expectedEndDate,
         actualEndDate: null,
         goLiveDate: parsed.data.newProject.goLiveDate ? toDateOnlyUtc(parsed.data.newProject.goLiveDate) : null,
-        customerPortalEnabled: sourceProject.customerPortalEnabled,
+        customerPortalEnabled: sourceProject.customerPortalEnabled ?? true,
         customerPortalToken: null,
         customerPortalPassword: null,
-        projectManagerId: sourceProject.projectManagerId,
-        mainEngineerId: sourceProject.mainEngineerId,
+        projectManagerId: fallbackManagerId,
+        mainEngineerId: fallbackEngineerId,
         status: "planning",
         notes: copy.projectInfo ? sourceProject.notes : null,
       },
