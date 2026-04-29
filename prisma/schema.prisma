@@ -103,6 +103,33 @@ enum ProjectMemberRole {
   construction_manager
 }
 
+enum ProjectRoleType {
+  pm_construction_manager
+  pm_engineer
+  pm_material_manager
+  pm_labor_manager
+  pm_accountant
+}
+
+enum TechnicalAttachmentType {
+  drawing
+  spec_doc
+  reference
+}
+
+enum TechnicalReportStatus {
+  working
+  paused
+  completed
+}
+
+enum ReportPhotoType {
+  technical
+  material
+  labor
+  equipment
+}
+
 enum PauseReason {
   RAIN
   LACK_MATERIAL
@@ -180,9 +207,21 @@ model User {
   taskQcLogs          TaskQcLog[] @relation("TaskQcLogChecker")
   projectMembers      ProjectMember[]
   addedProjectMembers ProjectMember[] @relation("ProjectMemberAddedBy")
+  projectAssignments          ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
+  projectAssignmentsAssigned  ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
   declaredSiteRestDays SiteRestDay[]
   morningReports      MorningReport[]
   eveningReports      EveningReport[]
+  technicalReportCreator TaskTechnicalReport[] @relation("TechReportCreator")
+  technicalReportUpdater TaskTechnicalReport[] @relation("TechReportUpdater")
+  materialReportCreator TaskMaterialReport[] @relation("MatReportCreator")
+  materialReportUpdater TaskMaterialReport[] @relation("MatReportUpdater")
+  laborReportCreator TaskLaborReport[] @relation("LaborReportCreator")
+  laborReportUpdater TaskLaborReport[] @relation("LaborReportUpdater")
+  equipmentReportCreator TaskEquipmentReport[] @relation("EquipReportCreator")
+  equipmentReportUpdater TaskEquipmentReport[] @relation("EquipReportUpdater")
+  technicalAttachmentsUploaded TaskTechnicalAttachment[]
+  reportPhotosUploaded TaskReportPhoto[]
   kpiSnapshots        KpiSnapshot[]
   customerCommentReplies CustomerCommentReply[]
   subcontractorsCreated Subcontractor[] @relation("SubcontractorCreator")
@@ -226,6 +265,7 @@ model Project {
   tasks                   Task[]
   paymentSchedules        PaymentSchedule[]
   projectMembers          ProjectMember[]
+  memberAssignments       ProjectMemberAssignment[]
   siteRestDays            SiteRestDay[]
   morningReports          MorningReport[]
   eveningReports          EveningReport[]
@@ -294,6 +334,8 @@ model Task {
   displayOrder       Int?       @map("display_order")
   notes              String?    @db.Text
   qcProgress         Json?      @map("qc_progress")
+  technicalRequirements String? @map("technical_requirements") @db.Text
+  constructionMethod String?    @map("construction_method") @db.Text
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
@@ -312,6 +354,12 @@ model Task {
   taskQcLogs            TaskQcLog[]
   morningReportTasks    MorningReportTask[]
   eveningReportTasks    EveningReportTask[]
+  technicalReports      TaskTechnicalReport[]
+  materialReports       TaskMaterialReport[]
+  laborReports          TaskLaborReport[]
+  equipmentReports      TaskEquipmentReport[]
+  technicalAttachments  TaskTechnicalAttachment[]
+  reportPhotos          TaskReportPhoto[]
   customerComments      CustomerComment[]
   customerAcknowledgments CustomerAcknowledgment[]
   subContractTasks      SubContractTask[]
@@ -533,6 +581,25 @@ model ProjectMember {
   @@map("project_members")
 }
 
+model ProjectMemberAssignment {
+  id         String          @id @default(uuid()) @db.Uuid
+  projectId  String          @map("project_id") @db.Uuid
+  userId     String          @map("user_id") @db.Uuid
+  role       ProjectRoleType
+  isPrimary  Boolean         @default(false) @map("is_primary")
+  assignedAt DateTime        @default(now()) @map("assigned_at")
+  assignedBy String          @map("assigned_by") @db.Uuid
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User    @relation("ProjectAssignmentUser", fields: [userId], references: [id])
+  assigner User    @relation("ProjectAssignmentAssigner", fields: [assignedBy], references: [id])
+
+  @@unique([projectId, userId, role])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_member_assignments")
+}
+
 model SiteRestDay {
   id         String         @id @default(uuid()) @db.Uuid
   projectId  String         @map("project_id") @db.Uuid
@@ -647,6 +714,130 @@ model EveningReportPhoto {
   eveningReport EveningReport @relation(fields: [eveningReportId], references: [id], onDelete: Cascade)
 
   @@map("evening_report_photos")
+}
+
+model TaskTechnicalAttachment {
+  id          String                  @id @default(uuid()) @db.Uuid
+  taskId      String                  @map("task_id") @db.Uuid
+  fileName    String                  @map("file_name")
+  fileUrl     String                  @map("file_url")
+  fileType    String                  @map("file_type")
+  fileSize    Int                     @map("file_size")
+  type        TechnicalAttachmentType @default(drawing)
+  description String?
+  uploadedAt  DateTime                @default(now()) @map("uploaded_at")
+  uploadedBy  String                  @map("uploaded_by") @db.Uuid
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploadedBy], references: [id])
+
+  @@index([taskId])
+  @@map("task_technical_attachments")
+}
+
+model TaskTechnicalReport {
+  id             String               @id @default(uuid()) @db.Uuid
+  taskId         String               @map("task_id") @db.Uuid
+  reportDate     DateTime             @map("report_date") @db.Date
+  status         TechnicalReportStatus @default(working)
+  pauseReason    String?              @map("pause_reason")
+  technicalIssue String?              @map("technical_issue") @db.Text
+  note           String?              @db.Text
+  createdAt      DateTime             @default(now()) @map("created_at")
+  createdBy      String               @map("created_by") @db.Uuid
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  updatedBy      String?              @map("updated_by") @db.Uuid
+
+  task      Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator   User             @relation("TechReportCreator", fields: [createdBy], references: [id])
+  updater   User?            @relation("TechReportUpdater", fields: [updatedBy], references: [id])
+  photos    TaskReportPhoto[]
+
+  @@unique([taskId, reportDate])
+  @@index([taskId])
+  @@index([reportDate])
+  @@map("task_technical_reports")
+}
+
+model TaskMaterialReport {
+  id               String   @id @default(uuid()) @db.Uuid
+  taskId           String   @map("task_id") @db.Uuid
+  reportDate       DateTime @map("report_date") @db.Date
+  note             String?  @db.Text
+  hasIssue         Boolean  @default(false) @map("has_issue")
+  issueDescription String?  @map("issue_description") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String   @map("created_by") @db.Uuid
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  task    Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User  @relation("MatReportCreator", fields: [createdBy], references: [id])
+  updater User? @relation("MatReportUpdater", fields: [updatedBy], references: [id])
+
+  @@unique([taskId, reportDate])
+  @@index([taskId])
+  @@map("task_material_reports")
+}
+
+model TaskLaborReport {
+  id                String   @id @default(uuid()) @db.Uuid
+  taskId            String   @map("task_id") @db.Uuid
+  reportDate        DateTime @map("report_date") @db.Date
+  masterWorkerCount Decimal? @map("master_worker_count") @db.Decimal(5, 2)
+  helperCount       Decimal? @map("helper_count") @db.Decimal(5, 2)
+  note              String?  @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String   @map("created_by") @db.Uuid
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  task    Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User  @relation("LaborReportCreator", fields: [createdBy], references: [id])
+  updater User? @relation("LaborReportUpdater", fields: [updatedBy], references: [id])
+
+  @@unique([taskId, reportDate])
+  @@index([taskId])
+  @@map("task_labor_reports")
+}
+
+model TaskEquipmentReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  reportDate DateTime @map("report_date") @db.Date
+  note       String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String   @map("created_by") @db.Uuid
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  task    Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User  @relation("EquipReportCreator", fields: [createdBy], references: [id])
+  updater User? @relation("EquipReportUpdater", fields: [updatedBy], references: [id])
+
+  @@unique([taskId, reportDate])
+  @@index([taskId])
+  @@map("task_equipment_reports")
+}
+
+model TaskReportPhoto {
+  id                String          @id @default(uuid()) @db.Uuid
+  taskId            String          @map("task_id") @db.Uuid
+  reportDate        DateTime        @map("report_date") @db.Date
+  type              ReportPhotoType
+  technicalReportId String?         @map("technical_report_id") @db.Uuid
+  fileUrl           String          @map("file_url")
+  caption           String?
+  uploadedAt        DateTime        @default(now()) @map("uploaded_at")
+  uploadedBy        String          @map("uploaded_by") @db.Uuid
+
+  task            Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  technicalReport TaskTechnicalReport? @relation(fields: [technicalReportId], references: [id], onDelete: Cascade)
+  uploader        User                @relation(fields: [uploadedBy], references: [id])
+
+  @@index([taskId, reportDate])
+  @@index([type])
+  @@map("task_report_photos")
 }
 
 model KpiSnapshot {
