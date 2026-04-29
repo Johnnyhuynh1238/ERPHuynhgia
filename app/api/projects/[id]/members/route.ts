@@ -86,9 +86,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
 
-  if (parsed.data.userId === project.projectManagerId || parsed.data.userId === project.mainEngineerId) {
-    return NextResponse.json({ message: "User này đã có quyền qua vai trò chính, không cần thêm member" }, { status: 400 });
-  }
 
   const existed = await prisma.projectMember.findFirst({
     where: {

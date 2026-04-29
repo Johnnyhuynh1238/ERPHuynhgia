@@ -8,15 +8,15 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const user = await getCurrentUser();
     if (!user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-    const [member, assignments] = await Promise.all([
-      prisma.projectMember.findFirst({ where: { projectId: params.id, userId: user.id } }),
+    const [hasAssignment, assignments] = await Promise.all([
+      prisma.projectMemberAssignment.findFirst({ where: { projectId: params.id, userId: user.id }, select: { id: true } }),
       prisma.projectMemberAssignment.findMany({
         where: { projectId: params.id },
         include: { user: { select: { id: true, fullName: true, email: true } } },
         orderBy: [{ role: "asc" }, { assignedAt: "desc" }],
       }),
     ]);
-    if (!member && user.role !== "admin") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (!hasAssignment && user.role !== "admin") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
     return NextResponse.json({ assignments });
   } catch (e) {

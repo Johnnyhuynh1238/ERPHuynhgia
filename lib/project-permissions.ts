@@ -5,23 +5,12 @@ export function buildProjectAccessWhere(user: { id: string; role: string }): Pri
     return {};
   }
 
-  // Source of truth: phải được admin add vào member/assignment mới thấy dự án.
+  // Source of truth: chỉ user có assignment mới thấy dự án.
   return {
-    OR: [
-      {
-        projectMembers: {
-          some: {
-            userId: user.id,
-          },
-        },
+    memberAssignments: {
+      some: {
+        userId: user.id,
       },
-      {
-        memberAssignments: {
-          some: {
-            userId: user.id,
-          },
-        },
-      },
-    ],
+    },
   };
 }

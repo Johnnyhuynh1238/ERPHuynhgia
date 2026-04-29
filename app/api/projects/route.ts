@@ -92,22 +92,11 @@ export async function GET(request: Request) {
 
   if (!canViewAllProjects) {
     andClauses.push({
-      OR: [
-        {
-          projectMembers: {
-            some: {
-              userId: user.id,
-            },
-          },
+      memberAssignments: {
+        some: {
+          userId: user.id,
         },
-        {
-          memberAssignments: {
-            some: {
-              userId: user.id,
-            },
-          },
-        },
-      ],
+      },
     });
   }
 
