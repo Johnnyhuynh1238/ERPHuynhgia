@@ -58,7 +58,18 @@ export async function DELETE(
     );
   }
 
-  await prisma.projectMember.delete({ where: { id: member.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.projectMember.delete({ where: { id: member.id } });
+
+    // Đồng bộ: xóa member thì xóa luôn tất cả phân công vai trò dự án của user đó
+    // để user mất truy cập dự án ngay lập tức.
+    await tx.projectMemberAssignment.deleteMany({
+      where: {
+        projectId: member.projectId,
+        userId: member.userId,
+      },
+    });
+  });
 
   return NextResponse.json({
     message: "Đã xóa thành viên",
