@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
@@ -80,7 +81,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         actualEndDate: null,
         goLiveDate: parsed.data.newProject.goLiveDate ? toDateOnlyUtc(parsed.data.newProject.goLiveDate) : null,
         customerPortalEnabled: sourceProject.customerPortalEnabled ?? true,
-        customerPortalToken: null,
+        customerPortalToken: randomUUID(),
         customerPortalPassword: null,
         projectManagerId: fallbackManagerId,
         mainEngineerId: fallbackEngineerId,
