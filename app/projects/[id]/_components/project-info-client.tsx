@@ -99,9 +99,11 @@ export function ProjectInfoClient({
   const [showSiteRestModal, setShowSiteRestModal] = useState(false);
   const [showDeleteStep1, setShowDeleteStep1] = useState(false);
   const [showDeleteStep2, setShowDeleteStep2] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [portalPassword, setPortalPassword] = useState("");
+  const [cloning, setCloning] = useState(false);
 
   const [ownerForm, setOwnerForm] = useState({
     customerName: project.customerName,
@@ -130,6 +132,18 @@ export function ProjectInfoClient({
   const [siteRestForm, setSiteRestForm] = useState({
     reason: "SUNDAY" as SiteRestData["reason"],
     note: "",
+  });
+
+  const [cloneForm, setCloneForm] = useState({
+    code: `${project.code}-COPY`,
+    name: `${project.name} (Bản sao)`,
+    startDate: project.startDate.slice(0, 10),
+    expectedEndDate: project.expectedEndDate.slice(0, 10),
+    goLiveDate: "",
+    copyProjectInfo: true,
+    copyPhasesTasks: true,
+    copyTechnicalQc: true,
+    copyAssignments: true,
   });
 
   const canManageSiteStatus = isAdmin || isConstructionManager;
@@ -431,6 +445,49 @@ export function ProjectInfoClient({
     router.refresh();
   }
 
+  async function submitCloneProject() {
+    if (!cloneForm.code.trim() || !cloneForm.name.trim()) {
+      toast.error("Mã dự án mới và tên dự án mới là bắt buộc");
+      return;
+    }
+
+    setCloning(true);
+    const res = await fetch(`/api/projects/${data.id}/clone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        newProject: {
+          code: cloneForm.code.trim(),
+          name: cloneForm.name.trim(),
+          startDate: cloneForm.startDate || undefined,
+          expectedEndDate: cloneForm.expectedEndDate || undefined,
+          goLiveDate: cloneForm.goLiveDate || null,
+        },
+        copy: {
+          projectInfo: cloneForm.copyProjectInfo,
+          phasesTasks: cloneForm.copyPhasesTasks,
+          technicalQc: cloneForm.copyTechnicalQc,
+          assignments: cloneForm.copyAssignments,
+        },
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    setCloning(false);
+
+    if (!res.ok) {
+      toast.error(json.message || "Sao chép dự án thất bại");
+      return;
+    }
+
+    toast.success(json.message || "Đã sao chép dự án");
+    setShowCloneModal(false);
+    if (json.project?.id) {
+      router.push(`/projects/${json.project.id}`);
+      router.refresh();
+    }
+  }
+
   const isDeleteConfirmMatched = useMemo(() => deleteConfirmName.trim() === data.name, [data.name, deleteConfirmName]);
 
   useEffect(() => {
@@ -506,9 +563,14 @@ export function ProjectInfoClient({
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Thông tin dự án</h2>
           {isAdmin ? (
-            <Button variant="outline" onClick={() => setShowProjectEdit(true)}>
-              Sửa thông tin
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setShowCloneModal(true)}>
+                Sao chép dự án
+              </Button>
+              <Button variant="outline" onClick={() => setShowProjectEdit(true)}>
+                Sửa thông tin
+              </Button>
+            </div>
           ) : null}
         </div>
         <div className="grid gap-2 text-sm md:grid-cols-2">
@@ -666,6 +728,76 @@ export function ProjectInfoClient({
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {showCloneModal ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
+          <div className="w-full max-w-2xl rounded-2xl bg-[#1a1d2e] p-4">
+            <h3 className="mb-3 font-semibold">Sao chép dự án</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <div className="mb-1 text-xs text-[#8892b0]">Mã dự án mới</div>
+                <input
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={cloneForm.code}
+                  onChange={(e) => setCloneForm((p) => ({ ...p, code: e.target.value }))}
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-[#8892b0]">Tên dự án mới</div>
+                <input
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={cloneForm.name}
+                  onChange={(e) => setCloneForm((p) => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-[#8892b0]">Khởi công KH</div>
+                <input
+                  type="date"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={cloneForm.startDate}
+                  onChange={(e) => setCloneForm((p) => ({ ...p, startDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-[#8892b0]">Bàn giao dự kiến</div>
+                <input
+                  type="date"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={cloneForm.expectedEndDate}
+                  onChange={(e) => setCloneForm((p) => ({ ...p, expectedEndDate: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <div className="mb-1 text-xs text-[#8892b0]">Go-live (tuỳ chọn)</div>
+                <input
+                  type="date"
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={cloneForm.goLiveDate}
+                  onChange={(e) => setCloneForm((p) => ({ ...p, goLiveDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
+              <div className="mb-2 text-sm font-medium">Chọn thông tin muốn sao chép</div>
+              <div className="space-y-2 text-sm">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={cloneForm.copyProjectInfo} onChange={(e)=>setCloneForm((p)=>({...p, copyProjectInfo:e.target.checked}))} /> Sao chép thông tin dự án</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={cloneForm.copyPhasesTasks} onChange={(e)=>setCloneForm((p)=>({...p, copyPhasesTasks:e.target.checked}))} /> Sao chép cấu trúc task</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={cloneForm.copyTechnicalQc} onChange={(e)=>setCloneForm((p)=>({...p, copyTechnicalQc:e.target.checked}))} /> Sao chép kỹ thuật + QC</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={cloneForm.copyAssignments} onChange={(e)=>setCloneForm((p)=>({...p, copyAssignments:e.target.checked}))} /> Sao chép phân công</label>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCloneModal(false)} disabled={cloning}>Hủy</Button>
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitCloneProject} disabled={cloning}>
+                {cloning ? "Đang sao chép..." : "Tạo dự án sao chép"}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
