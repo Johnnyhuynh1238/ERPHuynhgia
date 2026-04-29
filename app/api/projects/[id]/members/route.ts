@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ProjectMemberRole, UserRole } from "@prisma/client";
+import { ProjectMemberRole, ProjectRoleType, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
@@ -8,6 +8,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 const createSchema = z.object({
   userId: z.string().uuid(),
   roleInProject: z.nativeEnum(ProjectMemberRole),
+  assignmentRoles: z.array(z.nativeEnum(ProjectRoleType)).optional().default([]),
 });
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -101,18 +102,35 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "User đã là thành viên dự án" }, { status: 400 });
   }
 
-  const member = await prisma.projectMember.create({
-    data: {
-      projectId: params.id,
-      userId: parsed.data.userId,
-      roleInProject: parsed.data.roleInProject,
-      addedBy: current.id,
-    },
-    include: {
-      user: { select: { id: true, fullName: true, email: true } },
-      addedByUser: { select: { id: true, fullName: true, email: true } },
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    const member = await tx.projectMember.create({
+      data: {
+        projectId: params.id,
+        userId: parsed.data.userId,
+        roleInProject: parsed.data.roleInProject,
+        addedBy: current.id,
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        addedByUser: { select: { id: true, fullName: true, email: true } },
+      },
+    });
+
+    if (parsed.data.assignmentRoles.length > 0) {
+      await tx.projectMemberAssignment.createMany({
+        data: parsed.data.assignmentRoles.map((role) => ({
+          projectId: params.id,
+          userId: parsed.data.userId,
+          role,
+          isPrimary: false,
+          assignedBy: current.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return member;
   });
 
-  return NextResponse.json({ member, message: "Đã thêm thành viên" });
+  return NextResponse.json({ member: result, message: "Đã thêm thành viên" });
 }
