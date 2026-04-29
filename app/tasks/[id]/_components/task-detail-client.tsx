@@ -163,6 +163,7 @@ export function TaskDetailClient({
   });
   const [pickedFiles, setPickedFiles] = useState<Record<ReportType, FileList | null>>({ technical: null, material: null, labor: null, equipment: null });
   const [technicalReportOpen, setTechnicalReportOpen] = useState(false);
+  const [technicalReportStep, setTechnicalReportStep] = useState(1);
   const [savingTechnicalStatus, setSavingTechnicalStatus] = useState(false);
 
   const [status, setStatus] = useState<TaskDetail["status"]>(initialTask.status);
@@ -333,6 +334,7 @@ export function TaskDetailClient({
     toast.success(additional ? "Đã cập nhật thêm báo cáo" : "Đã tạo báo cáo kỹ thuật");
     setPayloads((prev) => ({ ...prev, technical: { status: technicalToday?.status || "working", progress: 0, progressSaved: false, assessment: "", assessmentNote: "", lesson: "" } }));
     setTechnicalReportOpen(false);
+    setTechnicalReportStep(1);
     setTechnicalSubTab("today");
     await loadReportRows("technical");
   }
@@ -359,41 +361,66 @@ export function TaskDetailClient({
                 <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Trạng thái hôm nay</div>
                 <div className="mt-1 text-sm font-semibold text-amber-300">{statusLabel(technicalToday.status)}</div>
               </div>
-              {!technicalReportOpen ? <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => setTechnicalReportOpen(true)}>{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</Button> : null}
+              {!technicalReportOpen ? <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => { setTechnicalReportStep(1); setTechnicalReportOpen(true); }}>{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</Button> : null}
             </div>
           </div>
         )}
 
         {technicalReportOpen ? (
           <div className="rounded-2xl border border-amber-500/50 bg-[#1a1d27] p-4 space-y-4">
-            <div className="text-sm font-bold text-amber-300">{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</div>
-            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
-              <div className="flex items-center justify-between text-sm"><span>Step Tiến độ</span><b>{Number(payload.progress) || 0}%</b></div>
-              <input type="range" min="0" max="100" className="w-full" value={payload.progress || 0} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, progress: Number(e.target.value), progressSaved: false } }))} />
-              <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, progressSaved: true } }))}>Lưu tiến độ</Button>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-bold text-amber-300">{isAdditional ? "Cập nhật thêm báo cáo" : "Báo cáo kỹ thuật hôm nay"}</div>
+              <div className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">Bước {technicalReportStep}/4</div>
             </div>
 
-            {payload.progressSaved ? (
-              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
+            {technicalReportStep === 1 ? (
+              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
+                <div className="flex items-center justify-between text-sm"><span className="font-semibold">Tiến độ hôm nay</span><b>{Number(payload.progress) || 0}%</b></div>
+                <input type="range" min="0" max="100" className="w-full" value={payload.progress || 0} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, progress: Number(e.target.value), progressSaved: false } }))} />
+                <Button className="w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => {
+                  setPayloads((p) => ({ ...p, technical: { ...p.technical, progressSaved: true } }));
+                  setTechnicalReportStep(2);
+                }}>Tiếp tục</Button>
+              </div>
+            ) : null}
+
+            {technicalReportStep === 2 ? (
+              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
                 <div className="text-sm font-semibold">Đánh giá kỹ thuật</div>
                 <label className="block text-sm"><input type="radio" name="technical-assessment" className="mr-2" checked={payload.assessment === "passed"} onChange={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessment: "passed" } }))} />Đã giám sát thi công đúng biện pháp thi công và đạt yêu cầu kỹ thuật</label>
                 <label className="block text-sm"><input type="radio" name="technical-assessment" className="mr-2" checked={payload.assessment === "failed"} onChange={() => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessment: "failed" } }))} />Chưa đạt</label>
                 <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#1a1d27] px-3 py-2" rows={3} placeholder={payload.assessment === "failed" ? "Bắt buộc nêu rõ lý do chưa đạt" : "Ghi chú đánh giá (nếu có)"} value={payload.assessmentNote || ""} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, assessmentNote: e.target.value } }))} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setTechnicalReportStep(1)}>Quay lại</Button>
+                  <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => {
+                    if (!payload.assessment) return toast.error("Vui lòng chọn đánh giá kỹ thuật");
+                    if (payload.assessment === "failed" && !String(payload.assessmentNote || "").trim()) return toast.error("Chưa đạt bắt buộc nêu rõ lý do");
+                    setTechnicalReportStep(3);
+                  }}>Tiếp tục</Button>
+                </div>
               </div>
             ) : null}
 
-            {payload.progressSaved && payload.assessment ? (
-              <>
-                <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
-                  <div className="text-sm font-semibold">Đính kèm hình ảnh chi tiết</div>
-                  <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, technical: e.target.files }))} />
+            {technicalReportStep === 3 ? (
+              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
+                <div className="text-sm font-semibold">Đính kèm hình ảnh chi tiết</div>
+                <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, technical: e.target.files }))} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setTechnicalReportStep(2)}>Quay lại</Button>
+                  <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => setTechnicalReportStep(4)}>Tiếp tục</Button>
                 </div>
-                <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-2">
-                  <div className="text-sm font-semibold">Kinh nghiệm lưu lại cho lần sau</div>
-                  <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#1a1d27] px-3 py-2" rows={3} placeholder="Kinh nghiệm / lưu ý kỹ thuật" value={payload.lesson || ""} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, lesson: e.target.value } }))} />
+              </div>
+            ) : null}
+
+            {technicalReportStep === 4 ? (
+              <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
+                <div className="text-sm font-semibold">Kinh nghiệm lưu lại cho lần sau</div>
+                <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#1a1d27] px-3 py-2" rows={3} placeholder="Kinh nghiệm / lưu ý kỹ thuật" value={payload.lesson || ""} onChange={(e) => setPayloads((p) => ({ ...p, technical: { ...p.technical, lesson: e.target.value } }))} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setTechnicalReportStep(3)}>Quay lại</Button>
+                  <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => createGuidedTechnicalReport(isAdditional)}>Tạo báo cáo</Button>
                 </div>
-                <Button className="w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => createGuidedTechnicalReport(isAdditional)}>Tạo báo cáo</Button>
-              </>
+              </div>
             ) : null}
           </div>
         ) : null}
