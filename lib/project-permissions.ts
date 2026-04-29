@@ -1,21 +1,22 @@
 import { Prisma, UserRole } from "@prisma/client";
 
 export function buildProjectAccessWhere(user: { id: string; role: string }): Prisma.ProjectWhereInput {
-  const isAdminLike =
-    user.role === UserRole.admin ||
-    user.role === UserRole.accountant ||
-    user.role === UserRole.construction_manager;
-
-  if (isAdminLike) {
+  if (user.role === UserRole.admin) {
     return {};
   }
 
+  // Source of truth: phải được admin add vào member/assignment mới thấy dự án.
   return {
     OR: [
-      { projectManagerId: user.id },
-      { mainEngineerId: user.id },
       {
         projectMembers: {
+          some: {
+            userId: user.id,
+          },
+        },
+      },
+      {
+        memberAssignments: {
           some: {
             userId: user.id,
           },

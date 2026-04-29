@@ -85,10 +85,7 @@ export async function GET(request: Request) {
   const managerFilter = searchParams.get("projectManagerId") || "";
   const engineerFilter = searchParams.get("mainEngineerId") || "";
 
-  const canViewAllProjects =
-    user.role === UserRole.admin ||
-    user.role === UserRole.accountant ||
-    user.role === UserRole.construction_manager;
+  const canViewAllProjects = user.role === UserRole.admin;
   const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
 
   const andClauses: Prisma.ProjectWhereInput[] = [];
@@ -96,10 +93,15 @@ export async function GET(request: Request) {
   if (!canViewAllProjects) {
     andClauses.push({
       OR: [
-        { projectManagerId: user.id },
-        { mainEngineerId: user.id },
         {
           projectMembers: {
+            some: {
+              userId: user.id,
+            },
+          },
+        },
+        {
+          memberAssignments: {
             some: {
               userId: user.id,
             },
