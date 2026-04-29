@@ -62,8 +62,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     : new Date(sourceProject.expectedEndDate);
 
   const created = await prisma.$transaction(async (tx) => {
-    const fallbackManagerId = sourceProject.projectManagerId || user.id;
-    const fallbackEngineerId = sourceProject.mainEngineerId || user.id;
+    const fallbackManagerId = copy.assignments ? sourceProject.projectManagerId || user.id : user.id;
+    const fallbackEngineerId = copy.assignments ? sourceProject.mainEngineerId || user.id : user.id;
 
     const project = await tx.project.create({
       data: {
