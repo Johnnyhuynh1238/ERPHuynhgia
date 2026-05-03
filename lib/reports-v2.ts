@@ -125,6 +125,43 @@ export async function getVisibleProjectsForUser(user: { id: string; role: string
   return Array.from(merged.values()).sort((a, b) => a.code.localeCompare(b.code, "vi"));
 }
 
+export function mapTaskToMorningRow(
+  row: {
+    id: string;
+    code: string;
+    name: string;
+    status: TaskStatus;
+    plannedStartDate: Date;
+    plannedEndDate: Date;
+    actualStartDate: Date | null;
+  },
+  reportDate: Date,
+) {
+  const start = toUtcStartOfDay(reportDate);
+  const overdueDays = row.plannedEndDate < start ? Math.max(1, Math.floor((start.getTime() - row.plannedEndDate.getTime()) / 86400000)) : 0;
+  const daysUntil = row.plannedStartDate > start ? Math.floor((row.plannedStartDate.getTime() - start.getTime()) / 86400000) : 0;
+  const progress = row.status === TaskStatus.in_progress ? 60 : null;
+
+  let group: MorningGroupKey = "upcoming";
+  if (row.plannedEndDate < start && row.status !== TaskStatus.done) {
+    group = "overdue";
+  } else if (row.status === TaskStatus.in_progress || row.actualStartDate) {
+    group = "in_progress";
+  } else if (formatUtcYmd(row.plannedStartDate) === formatUtcYmd(start)) {
+    group = "starting_today";
+  }
+
+  return {
+    taskId: row.id,
+    taskCode: row.code,
+    taskName: row.name,
+    progress,
+    daysLate: overdueDays > 0 ? overdueDays : null,
+    daysUntil: daysUntil > 0 ? daysUntil : null,
+    group,
+  };
+}
+
 export async function getMorningTaskCandidates(projectId: string, reportDate: Date) {
   const start = toUtcStartOfDay(reportDate);
   const end = toUtcEndOfDay(reportDate);
@@ -155,30 +192,30 @@ export async function getMorningTaskCandidates(projectId: string, reportDate: Da
     orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
   });
 
-  return rows.map((row) => {
-    const overdueDays = row.plannedEndDate < start ? Math.max(1, Math.floor((start.getTime() - row.plannedEndDate.getTime()) / 86400000)) : 0;
-    const daysUntil = row.plannedStartDate > start ? Math.floor((row.plannedStartDate.getTime() - start.getTime()) / 86400000) : 0;
-    const progress = row.status === TaskStatus.in_progress ? 60 : null;
+  return rows.map((row) => mapTaskToMorningRow(row, reportDate));
+}
 
-    let group: MorningGroupKey = "upcoming";
-    if (row.plannedEndDate < start && row.status !== TaskStatus.done) {
-      group = "overdue";
-    } else if (row.status === TaskStatus.in_progress || row.actualStartDate) {
-      group = "in_progress";
-    } else if (formatUtcYmd(row.plannedStartDate) === formatUtcYmd(start)) {
-      group = "starting_today";
-    }
-
-    return {
-      taskId: row.id,
-      taskCode: row.code,
-      taskName: row.name,
-      progress,
-      daysLate: overdueDays > 0 ? overdueDays : null,
-      daysUntil: daysUntil > 0 ? daysUntil : null,
-      group,
-    };
+export async function getEngineerAssignedTasksForMorning(projectId: string, engineerId: string, reportDate: Date) {
+  const rows = await prisma.task.findMany({
+    where: {
+      projectId,
+      assignedEngineerId: engineerId,
+      isActive: true,
+      status: { notIn: [TaskStatus.done, TaskStatus.na] },
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      status: true,
+      plannedStartDate: true,
+      plannedEndDate: true,
+      actualStartDate: true,
+    },
+    orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
   });
+
+  return rows.map((row) => mapTaskToMorningRow(row, reportDate));
 }
 
 export function defaultSelectedTaskIds(rows: Array<{ taskId: string; group: MorningGroupKey }>) {

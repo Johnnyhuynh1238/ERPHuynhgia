@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import { TaskStatus, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
-import { getMorningTaskCandidates, canAccessProjectReports, defaultSelectedTaskIds, getProjectForReports, isMorningLate, sortByTaskCode } from "@/lib/reports-v2";
+import {
+  getMorningTaskCandidates,
+  canAccessProjectReports,
+  defaultSelectedTaskIds,
+  getProjectForReports,
+  getEngineerAssignedTasksForMorning,
+  isMorningLate,
+  sortByTaskCode,
+} from "@/lib/reports-v2";
 import { getTodayDateVn } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
 
 type Params = { params: { projectId: string } };
+type MorningTaskRow = Awaited<ReturnType<typeof getMorningTaskCandidates>>[number];
 
-function toGroupedResponse(rows: Awaited<ReturnType<typeof getMorningTaskCandidates>>) {
+function toGroupedResponse(rows: MorningTaskRow[]) {
   return {
     overdue: sortByTaskCode(rows.filter((row) => row.group === "overdue")),
     in_progress: sortByTaskCode(rows.filter((row) => row.group === "in_progress")),
@@ -20,6 +29,18 @@ function normalizeTaskIds(value: unknown) {
   if (!Array.isArray(value)) return [] as string[];
   const ids = value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
   return Array.from(new Set(ids));
+}
+
+function mergeMorningRows(...sources: MorningTaskRow[][]) {
+  const merged = new Map<string, MorningTaskRow>();
+  sources.forEach((rows) => {
+    rows.forEach((row) => {
+      if (!merged.has(row.taskId)) {
+        merged.set(row.taskId, row);
+      }
+    });
+  });
+  return Array.from(merged.values());
 }
 
 export async function GET(_: Request, { params }: Params) {
@@ -46,8 +67,9 @@ export async function GET(_: Request, { params }: Params) {
   const reportDate = getTodayDateVn();
   const checkinUserId = user.role === UserRole.engineer ? user.id : project.mainEngineerId;
 
-  const [candidates, checkin] = await Promise.all([
+  const [candidates, assignedTasks, checkin] = await Promise.all([
     getMorningTaskCandidates(params.projectId, reportDate),
+    getEngineerAssignedTasksForMorning(params.projectId, checkinUserId, reportDate),
     prisma.morningCheckin.findUnique({
       where: {
         userId_projectId_reportDate: {
@@ -80,6 +102,7 @@ export async function GET(_: Request, { params }: Params) {
       selectedTaskIds,
     },
     groups: toGroupedResponse(candidates),
+    assignedTasks: sortByTaskCode(assignedTasks),
   });
 }
 
@@ -123,12 +146,16 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ message: "Đã báo cáo sáng rồi, dùng PATCH để sửa" }, { status: 409 });
   }
 
-  const candidates = await getMorningTaskCandidates(params.projectId, reportDate);
-  const candidateMap = new Map(candidates.map((row) => [row.taskId, row]));
-  const invalidTaskId = taskIds.find((taskId) => !candidateMap.has(taskId));
+  const [candidates, assignedTasks] = await Promise.all([
+    getMorningTaskCandidates(params.projectId, reportDate),
+    getEngineerAssignedTasksForMorning(params.projectId, user.id, reportDate),
+  ]);
+  const allowedRows = mergeMorningRows(candidates, assignedTasks);
+  const allowedMap = new Map(allowedRows.map((row) => [row.taskId, row]));
+  const invalidTaskId = taskIds.find((taskId) => !allowedMap.has(taskId));
 
   if (invalidTaskId) {
-    return NextResponse.json({ message: "Có task không thuộc danh sách báo cáo sáng" }, { status: 400 });
+    return NextResponse.json({ message: "Có task không thuộc danh sách được phép chọn" }, { status: 400 });
   }
 
   const checkin = await prisma.$transaction(async (tx) => {
@@ -142,7 +169,7 @@ export async function POST(request: Request, { params }: Params) {
         tasks: {
           create: taskIds.map((taskId) => ({
             taskId,
-            taskGroup: candidateMap.get(taskId)?.group || "upcoming",
+            taskGroup: allowedMap.get(taskId)?.group || "upcoming",
           })),
         },
       },
@@ -243,12 +270,16 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ message: "Chưa có báo cáo sáng, dùng POST" }, { status: 404 });
   }
 
-  const candidates = await getMorningTaskCandidates(params.projectId, reportDate);
-  const candidateMap = new Map(candidates.map((row) => [row.taskId, row]));
-  const invalidTaskId = nextTaskIds.find((taskId) => !candidateMap.has(taskId));
+  const [candidates, assignedTasks] = await Promise.all([
+    getMorningTaskCandidates(params.projectId, reportDate),
+    getEngineerAssignedTasksForMorning(params.projectId, user.id, reportDate),
+  ]);
+  const allowedRows = mergeMorningRows(candidates, assignedTasks);
+  const allowedMap = new Map(allowedRows.map((row) => [row.taskId, row]));
+  const invalidTaskId = nextTaskIds.find((taskId) => !allowedMap.has(taskId));
 
   if (invalidTaskId) {
-    return NextResponse.json({ message: "Có task không thuộc danh sách báo cáo sáng" }, { status: 400 });
+    return NextResponse.json({ message: "Có task không thuộc danh sách được phép chọn" }, { status: 400 });
   }
 
   const oldTaskIds = checkin.tasks.map((row) => row.taskId);
@@ -261,7 +292,7 @@ export async function PATCH(request: Request, { params }: Params) {
         data: toAdd.map((taskId) => ({
           checkinId: checkin.id,
           taskId,
-          taskGroup: candidateMap.get(taskId)?.group || "upcoming",
+          taskGroup: allowedMap.get(taskId)?.group || "upcoming",
         })),
       });
 

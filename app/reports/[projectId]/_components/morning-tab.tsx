@@ -25,6 +25,7 @@ type MorningResponse = {
     starting_today: MorningTask[];
     upcoming: MorningTask[];
   };
+  assignedTasks: MorningTask[];
 };
 
 const GROUP_ORDER: Array<keyof MorningResponse["groups"]> = ["overdue", "in_progress", "starting_today", "upcoming"];
@@ -56,6 +57,7 @@ export function MorningTab({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [data, setData] = useState<MorningResponse | null>(null);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [showAssignedPicker, setShowAssignedPicker] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -87,6 +89,15 @@ export function MorningTab({ projectId }: { projectId: string }) {
   }, [loadData]);
 
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
+
+  const suggestedTaskIds = useMemo(() => {
+    if (!data) return new Set<string>();
+    return new Set(
+      GROUP_ORDER.flatMap((groupKey) => data.groups[groupKey].map((row) => row.taskId)),
+    );
+  }, [data]);
+
+  const assignedTasks = data?.assignedTasks || [];
 
   async function submit() {
     if (!data) return;
@@ -163,6 +174,47 @@ export function MorningTab({ projectId }: { projectId: string }) {
           </div>
         );
       })}
+
+      <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
+        <button
+          type="button"
+          onClick={() => setShowAssignedPicker((prev) => !prev)}
+          className="rounded-lg border border-[#2f3555] bg-[#11182d] px-3 py-1.5 text-xs font-semibold text-[#d9def3]"
+        >
+          {showAssignedPicker ? "Ẩn task phân bổ" : "➕ Thêm task"}
+        </button>
+
+        {showAssignedPicker ? (
+          assignedTasks.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {assignedTasks.map((row) => (
+                <label key={`assigned_${row.taskId}`} className="flex items-start justify-between gap-3 rounded-xl border border-[#293251] bg-[#0f1424] px-3 py-2.5 text-sm text-[#f0f2ff]">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(picked[row.taskId])}
+                      onChange={(event) => setPicked((prev) => ({ ...prev, [row.taskId]: event.target.checked }))}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <div className="font-semibold">{row.taskCode} - {row.taskName}</div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        {taskHint(row) ? <span className="text-xs text-[#98a0c2]">{taskHint(row)}</span> : null}
+                        {suggestedTaskIds.has(row.taskId) ? <span className="rounded bg-[#273252] px-2 py-0.5 text-[10px] text-[#b9c6f3]">Đã có trong đề xuất</span> : null}
+                      </div>
+                    </div>
+                  </div>
+                  <a href={`/tasks/${row.taskId}?tab=technical&subtab=today`} className="text-xs font-semibold text-[#f97316]">
+                    Vào task
+                  </a>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-[#98a0c2]">KS chưa được phân bổ task nào trong dự án này.</div>
+          )
+        ) : null}
+      </div>
 
       <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
         <div className="text-sm text-[#d9def3]">Đã chọn: <b className="text-[#f97316]">{pickedCount}</b> task</div>
