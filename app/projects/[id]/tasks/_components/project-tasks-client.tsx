@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TaskPhase, TaskStatus } from "@prisma/client";
 import { toast } from "sonner";
@@ -119,7 +118,6 @@ function calcProgress(task: TaskRow) {
 }
 
 export function ProjectTasksClient({ projectId }: { projectId: string }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [engineers, setEngineers] = useState<EngineerOption[]>([]);
@@ -335,12 +333,11 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
             {groupTasks.map((task) => {
               const progress = calcProgress(task);
               return (
-                <button
+                <Link
                   key={task.id}
-                  type="button"
-                  onClick={() => task.isActive && router.push(`/tasks/${task.id}`)}
-                  className="w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
-                  style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}`, cursor: task.isActive ? "pointer" : "default" }}
+                  href={`/tasks/${task.id}`}
+                  className="block w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
+                  style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
@@ -355,7 +352,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                       <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
                     </div>
                   ) : null}
-                </button>
+                </Link>
               );
             })}
           </div>
