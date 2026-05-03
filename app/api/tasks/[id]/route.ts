@@ -11,6 +11,7 @@ import {
   canUpdateQc,
   getTaskWithAccess,
 } from "@/lib/task-permissions";
+import { addDaysUtc, LEGACY_PHASE_META, syncPhaseStatusByTaskId } from "@/lib/project-phase";
 
 const patchSchema = z.object({
   section: z.enum(["status", "dates", "assignment", "qc", "meta", "customer_visibility"]),
@@ -222,31 +223,42 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "Vui lòng nhập lý do khi chuyển NA" }, { status: 400 });
     }
 
-    const now = new Date();
+    const now = addDaysUtc(new Date(), 0);
+    const taskDuration = Math.max(((task as { duration?: number }).duration ?? task.durationDays) || 1, 1);
 
-    const updated = await prisma.task.update({
-      where: { id: params.id },
-      data: {
-        status: payload.data.status,
-        actualStartDate:
-          payload.data.status === TaskStatus.in_progress && !task.actualStartDate ? now : task.actualStartDate,
-        actualEndDate:
-          (payload.data.status === TaskStatus.done || payload.data.status === TaskStatus.inspected) && !task.actualEndDate
-            ? now
-            : task.actualEndDate,
-        notes: naReason ? `${task.notes || ""}\n[NA_REASON] ${naReason}`.trim() : task.notes,
-      },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedTask = await tx.task.update({
+        where: { id: params.id },
+        data: {
+          status: payload.data.status,
+          actualStartDate:
+            payload.data.status === TaskStatus.in_progress && !task.actualStartDate ? now : task.actualStartDate,
+          actualEndDate:
+            (payload.data.status === TaskStatus.done || payload.data.status === TaskStatus.inspected) && !task.actualEndDate
+              ? now
+              : task.actualEndDate,
+          plannedEndDate:
+            payload.data.status === TaskStatus.in_progress && !task.actualStartDate
+              ? addDaysUtc(now, taskDuration - 1)
+              : task.plannedEndDate,
+          notes: naReason ? `${task.notes || ""}\n[NA_REASON] ${naReason}`.trim() : task.notes,
+        },
+      });
 
-    await prisma.taskLog.create({
-      data: {
-        taskId: task.id,
-        userId: user.id,
-        logType: TaskLogType.status_change,
-        oldValue: task.status,
-        newValue: payload.data.status,
-        content: `MANUAL_STATUS: ${task.status} -> ${payload.data.status}`,
-      },
+      await tx.taskLog.create({
+        data: {
+          taskId: task.id,
+          userId: user.id,
+          logType: TaskLogType.status_change,
+          oldValue: task.status,
+          newValue: payload.data.status,
+          content: `MANUAL_STATUS: ${task.status} -> ${payload.data.status}`,
+        },
+      });
+
+      await syncPhaseStatusByTaskId(tx, task.id, now);
+
+      return updatedTask;
     });
 
     return NextResponse.json({ task: updated, message: "Đã cập nhật trạng thái" });
@@ -394,15 +406,32 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu task không hợp lệ" }, { status: 400 });
     }
 
+    const nextPhase = payload.data.phase ?? task.phase;
     const offsetDays = payload.data.offsetDays ?? task.offsetDays;
     const durationDays = payload.data.durationDays ?? task.durationDays;
     const scheduleChanged = offsetDays !== task.offsetDays || durationDays !== task.durationDays;
+    const phaseChanged = nextPhase !== task.phase;
 
-    const updateData: Prisma.TaskUpdateInput = {
+    let phaseId = (task as { phaseId?: string | null }).phaseId ?? null;
+    if (phaseChanged) {
+      const phaseMeta = LEGACY_PHASE_META[nextPhase];
+      const mappedPhase = await prisma.projectPhase.findFirst({
+        where: {
+          projectId: task.projectId,
+          code: phaseMeta.code,
+        },
+        select: { id: true },
+      });
+      phaseId = mappedPhase?.id || null;
+    }
+
+    const updateData: Prisma.TaskUncheckedUpdateInput = {
       name: payload.data.name ?? task.name,
-      phase: payload.data.phase ?? task.phase,
+      phase: nextPhase,
+      phaseId,
       offsetDays,
       durationDays,
+      duration: durationDays,
       team: payload.data.team === undefined ? task.team : payload.data.team,
       inspectorName: payload.data.inspectorName ?? task.inspectorName,
       materialsNeeded: payload.data.materialsNeeded ?? task.materialsNeeded,

@@ -24,6 +24,7 @@ const createProjectSchema = z.object({
   unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
+  plannedDeadline: z.string().optional().nullable(),
   templateCategory: z.literal("nha_pho_1t1l"),
   projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ").optional(),
   mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
@@ -254,6 +255,7 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
   const startDate = normalizeDateStart(parsed.data.startDate);
   const expectedEndDate = normalizeDate(parsed.data.expectedEndDate);
+  const plannedDeadline = parsed.data.plannedDeadline ? normalizeDate(parsed.data.plannedDeadline) : null;
 
   const isConstructionManager = actorUser.role === UserRole.construction_manager;
   const areaM2 = isConstructionManager ? 1 : Number(parsed.data.areaM2);
@@ -329,6 +331,7 @@ export async function POST(request: Request) {
           contractValue: contractValueForCreate ?? new Prisma.Decimal(0),
           startDate,
           expectedEndDate,
+          plannedDeadline,
           projectManagerId,
           mainEngineerId: parsed.data.mainEngineerId,
           status: ProjectStatus.planning,
@@ -347,19 +350,86 @@ export async function POST(request: Request) {
         throw new Error("Template chưa được seed, liên hệ admin hệ thống");
       }
 
+      const phaseTemplateMap = new Map<
+        string,
+        { code: string; name: string; displayOrder: number; duration: number }
+      >();
+
+      taskTemplates.forEach((template) => {
+        if (!template.phaseCode || !template.phaseName || !template.phaseOrder || !template.phaseDuration) {
+          throw new Error("Template phase metadata chưa đầy đủ, liên hệ admin hệ thống");
+        }
+
+        const current = phaseTemplateMap.get(template.phaseCode);
+        const nextDuration = Math.max(1, Number(template.phaseDuration));
+
+        if (!current) {
+          phaseTemplateMap.set(template.phaseCode, {
+            code: template.phaseCode,
+            name: template.phaseName,
+            displayOrder: template.phaseOrder,
+            duration: nextDuration,
+          });
+          return;
+        }
+
+        if (nextDuration > current.duration) {
+          current.duration = nextDuration;
+        }
+      });
+
+      const phaseTemplates = Array.from(phaseTemplateMap.values()).sort((a, b) => a.displayOrder - b.displayOrder);
+      let phaseStartDateCursor = startDate;
+
+      await tx.projectPhase.createMany({
+        data: phaseTemplates.map((phaseTemplate) => {
+          const plannedStartDate = phaseStartDateCursor;
+          const plannedEndDate = addDays(plannedStartDate, phaseTemplate.duration - 1);
+          phaseStartDateCursor = addDays(plannedEndDate, 1);
+
+          return {
+            projectId: project.id,
+            code: phaseTemplate.code,
+            name: phaseTemplate.name,
+            description: null,
+            displayOrder: phaseTemplate.displayOrder,
+            duration: phaseTemplate.duration,
+            plannedStartDate,
+            plannedEndDate,
+            actualStartDate: null,
+            actualEndDate: null,
+            status: "not_started",
+            createdBy: actorUser.id,
+          };
+        }),
+      });
+
+      const projectPhases = await tx.projectPhase.findMany({
+        where: { projectId: project.id },
+        select: { id: true, code: true },
+      });
+
+      const phaseIdByCode = new Map(projectPhases.map((phase) => [phase.code, phase.id]));
+
       await tx.task.createMany({
         data: taskTemplates.map((template) => {
+          if (!template.phaseCode) {
+            throw new Error("Template phase metadata chưa đầy đủ, liên hệ admin hệ thống");
+          }
+
           const plannedStartDate = addDays(startDate, template.defaultOffsetDays);
           const plannedEndDate = addDays(plannedStartDate, template.defaultDurationDays - 1);
 
           return {
             projectId: project.id,
             templateId: template.id,
+            phaseId: phaseIdByCode.get(template.phaseCode) || null,
             code: template.code,
             phase: template.phase,
             name: template.name,
             offsetDays: template.defaultOffsetDays,
             durationDays: template.defaultDurationDays,
+            duration: template.defaultDurationDays,
             plannedStartDate,
             plannedEndDate,
             actualStartDate: null,

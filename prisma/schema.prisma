@@ -91,6 +91,12 @@ enum PaymentStatus {
   customer_late
 }
 
+enum PhaseStatus {
+  not_started
+  in_progress
+  completed
+}
+
 enum CustomerPortalCommentType {
   comment
   reply
@@ -231,6 +237,7 @@ model User {
   subPaymentsApproved   SubPayment[]    @relation("SubPaymentApprover")
   subPaymentsPaid       SubPayment[]    @relation("SubPaymentPayer")
   subEvaluations        SubEvaluation[]
+  createdProjectPhases  ProjectPhase[]
 
   @@map("users")
 }
@@ -248,6 +255,7 @@ model Project {
   contractValue          Decimal?      @map("contract_value") @db.Decimal(15, 2)
   startDate              DateTime      @map("start_date") @db.Date
   expectedEndDate        DateTime      @map("expected_end_date") @db.Date
+  plannedDeadline        DateTime?     @map("planned_deadline") @db.Date
   actualEndDate          DateTime?     @map("actual_end_date") @db.Date
   goLiveDate             DateTime?     @map("go_live_date") @db.Date
   customerPortalToken    String?       @unique @map("customer_portal_token") @db.Uuid
@@ -263,6 +271,7 @@ model Project {
   projectManager          User                     @relation("ProjectManager", fields: [projectManagerId], references: [id])
   mainEngineer            User                     @relation("MainEngineer", fields: [mainEngineerId], references: [id])
   tasks                   Task[]
+  phases                  ProjectPhase[]
   paymentSchedules        PaymentSchedule[]
   projectMembers          ProjectMember[]
   memberAssignments       ProjectMemberAssignment[]
@@ -280,10 +289,40 @@ model Project {
   @@map("projects")
 }
 
+model ProjectPhase {
+  id               String      @id @default(uuid()) @db.Uuid
+  projectId        String      @map("project_id") @db.Uuid
+  code             String
+  name             String
+  description      String?     @db.Text
+  displayOrder     Int         @map("display_order")
+  duration         Int
+  plannedStartDate DateTime    @map("planned_start_date") @db.Date
+  plannedEndDate   DateTime    @map("planned_end_date") @db.Date
+  actualStartDate  DateTime?   @map("actual_start_date") @db.Date
+  actualEndDate    DateTime?   @map("actual_end_date") @db.Date
+  status           PhaseStatus @default(not_started)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  createdBy        String      @map("created_by") @db.Uuid
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation(fields: [createdBy], references: [id])
+  tasks   Task[]  @relation("TaskProjectPhase")
+
+  @@unique([projectId, displayOrder])
+  @@index([projectId])
+  @@map("project_phases")
+}
+
 model TaskTemplate {
   id                  String    @id @default(uuid()) @db.Uuid
   code                String
   phase               TaskPhase
+  phaseCode           String    @map("phase_code")
+  phaseName           String    @map("phase_name")
+  phaseDuration       Int       @map("phase_duration")
+  phaseOrder          Int       @map("phase_order")
   name                String
   defaultOffsetDays   Int       @map("default_offset_days")
   defaultDurationDays Int       @map("default_duration_days")
@@ -309,11 +348,13 @@ model Task {
   id                 String     @id @default(uuid()) @db.Uuid
   projectId          String     @map("project_id") @db.Uuid
   templateId         String?    @map("template_id") @db.Uuid
+  phaseId            String?    @map("phase_id") @db.Uuid
   code               String
   phase              TaskPhase
   name               String
   offsetDays         Int        @map("offset_days")
   durationDays       Int        @map("duration_days")
+  duration           Int        @default(1)
   plannedStartDate   DateTime   @map("planned_start_date") @db.Date
   plannedEndDate     DateTime   @map("planned_end_date") @db.Date
   actualStartDate    DateTime?  @map("actual_start_date") @db.Date
@@ -341,6 +382,7 @@ model Task {
 
   project               Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   template              TaskTemplate?            @relation(fields: [templateId], references: [id])
+  projectPhase          ProjectPhase?            @relation("TaskProjectPhase", fields: [phaseId], references: [id], onDelete: SetNull)
   assignedEngineer      User?                    @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
   assignedForeman       User?                    @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
   taskLogs              TaskLog[]
@@ -367,6 +409,7 @@ model Task {
 
   @@unique([projectId, code])
   @@index([projectId, isActive, displayOrder, code])
+  @@index([projectId, phaseId, isActive])
   @@index([status])
   @@index([projectId, visibleToCustomer])
   @@map("tasks")

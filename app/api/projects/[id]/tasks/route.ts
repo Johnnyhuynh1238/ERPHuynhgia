@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { LEGACY_PHASE_META } from "@/lib/project-phase";
 
 const createTaskSchema = z.object({
   insertAfterTaskId: z.string().uuid("Task chèn sau không hợp lệ"),
@@ -133,6 +134,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
       ...roleFilter,
     },
     include: {
+      projectPhase: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          displayOrder: true,
+          duration: true,
+          plannedStartDate: true,
+          plannedEndDate: true,
+          actualStartDate: true,
+          actualEndDate: true,
+          status: true,
+        },
+      },
       assignedEngineer: {
         select: { id: true, fullName: true },
       },
@@ -143,15 +158,35 @@ export async function GET(request: Request, { params }: { params: { id: string }
     orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
   });
 
-  const engineers = await prisma.user.findMany({
-    where: { role: UserRole.engineer, isActive: true },
-    select: { id: true, fullName: true },
-    orderBy: { fullName: "asc" },
-  });
+  const [engineers, phases] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: UserRole.engineer, isActive: true },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.projectPhase.findMany({
+      where: { projectId: params.id },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        displayOrder: true,
+        duration: true,
+        plannedStartDate: true,
+        plannedEndDate: true,
+        actualStartDate: true,
+        actualEndDate: true,
+        status: true,
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     project,
     tasks,
+    phases,
     engineers,
     role: user.role,
   });
@@ -215,6 +250,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const phase = payload.phase;
       const phaseNo = parsePhaseNumber(phase);
+      const phaseMeta = LEGACY_PHASE_META[phase];
 
       const sameProjectCodes = await tx.task.findMany({
         where: { projectId: params.id },
@@ -255,6 +291,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
         displayOrder = Math.floor((refreshedCurrent + refreshedNext) / 2);
       }
 
+      const targetPhase = await tx.projectPhase.findFirst({
+        where: {
+          projectId: params.id,
+          code: phaseMeta.code,
+        },
+        select: { id: true },
+      });
+
       const offsetDays = afterTask.offsetDays + afterTask.durationDays;
       const plannedStartDate = addDays(project.startDate, offsetDays);
       const plannedEndDate = addDays(plannedStartDate, payload.durationDays - 1);
@@ -263,11 +307,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
         data: {
           projectId: params.id,
           templateId: afterTask.templateId,
+          phaseId: targetPhase?.id || null,
           code,
           phase,
           name: payload.name,
           offsetDays,
           durationDays: payload.durationDays,
+          duration: payload.durationDays,
           plannedStartDate,
           plannedEndDate,
           actualStartDate: null,

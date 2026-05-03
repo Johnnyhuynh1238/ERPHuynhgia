@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TaskPhase, TaskStatus } from "@prisma/client";
+import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ChevronDown, GripVertical, ListFilter, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ListFilter } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { PHASE_LABEL, STATUS_LABEL } from "@/lib/task-display";
 
@@ -31,15 +36,51 @@ type TaskRow = {
   isMilestone: boolean;
   visibleToCustomer?: boolean;
   isActive: boolean;
+  projectPhase?: {
+    id: string;
+    code: string;
+    name: string;
+    displayOrder: number;
+    duration: number;
+    plannedStartDate: string;
+    plannedEndDate: string;
+    actualStartDate: string | null;
+    actualEndDate: string | null;
+    status: "not_started" | "in_progress" | "completed";
+  } | null;
 };
 
 type EngineerOption = { id: string; fullName: string };
 
+type PhaseRow = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  displayOrder: number;
+  duration: number;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  actualStartDate: string | null;
+  actualEndDate: string | null;
+  status: "not_started" | "in_progress" | "completed";
+};
+
 type TasksResponse = {
-  project: { id: string; code: string; name: string };
+  project: { id: string; code: string; name: string; startDate?: string; plannedDeadline?: string | null };
   tasks: TaskRow[];
+  phases: PhaseRow[];
   engineers: EngineerOption[];
   role: string;
+};
+
+type DeadlineCheckResponse = {
+  hasDeadline: boolean;
+  plannedDeadline: string | null;
+  totalPhaseDuration: number;
+  calculatedEndDate: string | null;
+  isOverDeadline: boolean;
+  exceedDays: number;
 };
 
 type PersistedTaskFilter = {
@@ -52,22 +93,53 @@ type PersistedTaskFilter = {
   sortDir: "asc" | "desc";
 };
 
+type PhaseFormState = {
+  mode: "create" | "edit";
+  open: boolean;
+  phaseId?: string;
+  name: string;
+  duration: string;
+  description: string;
+  displayOrder: string;
+  confirmRunningChange: boolean;
+};
+
+type PhaseDeleteDetail = {
+  id: string;
+  name: string;
+  projectId: string;
+  tasks: Array<{ id: string; code: string; name: string; status: TaskStatus }>;
+};
+
+type PhaseDeleteState = {
+  open: boolean;
+  loading: boolean;
+  phase: PhaseRow | null;
+  detail: PhaseDeleteDetail | null;
+  confirmName: string;
+  confirmRisk: boolean;
+};
+
 const DEFAULT_SORT_BY = "displayOrder";
 const DEFAULT_SORT_DIR: PersistedTaskFilter["sortDir"] = "asc";
 
-function fmtDate(dateIso: string) {
+function fmtDate(dateIso: string | null | undefined) {
+  if (!dateIso) return "--/--";
   const d = new Date(dateIso);
+  if (Number.isNaN(d.getTime())) return "--/--";
   const dd = String(d.getUTCDate()).padStart(2, "0");
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}`;
 }
 
-function statusRank(status: TaskStatus) {
-  if (status === "delayed") return 0;
-  if (status === "in_progress") return 1;
-  if (status === "not_started") return 2;
-  if (status === "done" || status === "inspected") return 3;
-  return 4;
+function toInputDate(dateIso: string | null | undefined) {
+  if (!dateIso) return "";
+  const d = new Date(dateIso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function compareByDisplayOrder(a: TaskRow, b: TaskRow) {
@@ -117,12 +189,74 @@ function calcProgress(task: TaskRow) {
   return 0;
 }
 
+function phaseStatusText(status: PhaseRow["status"]) {
+  if (status === "completed") return "Hoàn thành";
+  if (status === "in_progress") return "Đang làm";
+  return "Chưa bắt đầu";
+}
+
+function phaseStatusClass(status: PhaseRow["status"]) {
+  if (status === "completed") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/40";
+  if (status === "in_progress") return "bg-orange-500/15 text-orange-300 border-orange-500/40";
+  return "bg-[#13151f] text-[#8892b0] border-[#2d3249]";
+}
+
+function getPhaseProgress(tasks: TaskRow[]) {
+  const activeTasks = tasks.filter((task) => task.isActive);
+  const total = activeTasks.length;
+  const done = activeTasks.filter((task) => task.status === "done" || task.status === "inspected").length;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { total, done, percent };
+}
+
+function SortablePhaseContainer({
+  phaseId,
+  children,
+}: {
+  phaseId: string;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: phaseId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? "opacity-70" : "opacity-100"}>
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          className="mt-2 hidden cursor-grab rounded-md border border-[#2d3249] bg-[#13151f] p-1 text-[#8892b0] active:cursor-grabbing md:block"
+          {...attributes}
+          {...listeners}
+          aria-label="Kéo để đổi thứ tự phase"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export function ProjectTasksClient({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [savingPhase, setSavingPhase] = useState(false);
+  const [deletingPhaseId, setDeletingPhaseId] = useState<string | null>(null);
+  const [reorderingPhaseId, setReorderingPhaseId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [phases, setPhases] = useState<PhaseRow[]>([]);
+  const [phaseOrderDraft, setPhaseOrderDraft] = useState<PhaseRow[]>([]);
+  const [expandedPhaseIds, setExpandedPhaseIds] = useState<Record<string, boolean>>({});
   const [engineers, setEngineers] = useState<EngineerOption[]>([]);
   const [role, setRole] = useState("");
   const [projectCode, setProjectCode] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [projectDeadline, setProjectDeadline] = useState<string | null>(null);
+  const [deadlineCheck, setDeadlineCheck] = useState<DeadlineCheckResponse | null>(null);
 
   const [phaseFilter, setPhaseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -131,9 +265,31 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState("");
   const [showDeleted, setShowDeleted] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  const [phaseForm, setPhaseForm] = useState<PhaseFormState>({
+    mode: "create",
+    open: false,
+    name: "",
+    duration: "",
+    description: "",
+    displayOrder: "1",
+    confirmRunningChange: false,
+  });
+
+  const [phaseDelete, setPhaseDelete] = useState<PhaseDeleteState>({
+    open: false,
+    loading: false,
+    phase: null,
+    detail: null,
+    confirmName: "",
+    confirmRisk: false,
+  });
+
   const loadedPersistedFilterRef = useRef(false);
   const latestRequestIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const filterStorageKey = useMemo(() => `task-filter-${projectId}`, [projectId]);
 
@@ -196,30 +352,63 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     });
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/tasks?${params.toString()}`, {
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      const data = (await res.json().catch(() => ({}))) as TasksResponse;
+      const [tasksRes, deadlineRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/tasks?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        }),
+        fetch(`/api/projects/${projectId}/deadline-check`, {
+          cache: "no-store",
+          signal: controller.signal,
+        }),
+      ]);
+
+      const data = (await tasksRes.json().catch(() => ({}))) as TasksResponse;
+      const deadlineData = (await deadlineRes.json().catch(() => ({}))) as DeadlineCheckResponse;
 
       if (requestId !== latestRequestIdRef.current) return;
 
       setLoading(false);
-      if (!res.ok) {
+      if (!tasksRes.ok) {
         setTasks([]);
+        setPhases([]);
+        setPhaseOrderDraft([]);
+        setDeadlineCheck(null);
         return;
       }
 
+      const nextPhases = (data.phases || []).sort((a, b) => a.displayOrder - b.displayOrder);
+
       setTasks(data.tasks || []);
+      setPhases(nextPhases);
+      setPhaseOrderDraft(nextPhases);
+      setExpandedPhaseIds((prev) => {
+        const next: Record<string, boolean> = {};
+        nextPhases.forEach((phase) => {
+          next[phase.id] = prev[phase.id] ?? false;
+        });
+        return next;
+      });
       setEngineers(data.engineers || []);
       setRole(data.role || "");
       setProjectCode(data.project?.code || "");
+      setProjectName(data.project?.name || "");
+      setProjectDeadline(data.project?.plannedDeadline || null);
+
+      if (deadlineRes.ok) {
+        setDeadlineCheck(deadlineData);
+      } else {
+        setDeadlineCheck(null);
+      }
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
       if (requestId !== latestRequestIdRef.current) return;
       setLoading(false);
       setTasks([]);
-      toast.error("Không tải được danh sách task");
+      setPhases([]);
+      setPhaseOrderDraft([]);
+      setDeadlineCheck(null);
+      toast.error("Không tải được dữ liệu tiến độ");
     }
   }
 
@@ -240,29 +429,247 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setShowDeleted(false);
   }
 
+  function openCreatePhaseSheet() {
+    setPhaseForm({
+      mode: "create",
+      open: true,
+      name: "",
+      duration: "",
+      description: "",
+      displayOrder: String(phases.length + 1),
+      confirmRunningChange: false,
+    });
+  }
+
+  function openEditPhaseSheet(phase: PhaseRow) {
+    setPhaseForm({
+      mode: "edit",
+      open: true,
+      phaseId: phase.id,
+      name: phase.name,
+      duration: String(phase.duration),
+      description: phase.description || "",
+      displayOrder: String(phase.displayOrder),
+      confirmRunningChange: false,
+    });
+  }
+
+  function togglePhaseExpanded(phaseId: string) {
+    setExpandedPhaseIds((prev) => ({
+      ...prev,
+      [phaseId]: !prev[phaseId],
+    }));
+  }
+
+  async function submitPhaseForm() {
+    const name = phaseForm.name.trim();
+    const duration = Number(phaseForm.duration);
+    const displayOrder = Number(phaseForm.displayOrder);
+
+    if (!name) {
+      toast.error("Tên phase là bắt buộc");
+      return;
+    }
+
+    if (!Number.isFinite(duration) || duration < 1) {
+      toast.error("Số ngày phase phải >= 1");
+      return;
+    }
+
+    if (!Number.isFinite(displayOrder) || displayOrder < 1) {
+      toast.error("Thứ tự phase không hợp lệ");
+      return;
+    }
+
+    setSavingPhase(true);
+
+    try {
+      if (phaseForm.mode === "create") {
+        const res = await fetch(`/api/projects/${projectId}/phases`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            duration,
+            description: phaseForm.description.trim() || null,
+            displayOrder,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        if (!res.ok) {
+          toast.error(data.message || "Không thể tạo phase");
+          return;
+        }
+        toast.success(data.message || "Đã thêm phase");
+      } else {
+        if (!phaseForm.phaseId) {
+          toast.error("Không tìm thấy phase để cập nhật");
+          return;
+        }
+        const res = await fetch(`/api/phases/${phaseForm.phaseId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            duration,
+            description: phaseForm.description.trim() || null,
+            displayOrder,
+            confirmRunningChange: phaseForm.confirmRunningChange,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        if (!res.ok) {
+          toast.error(data.message || "Không thể cập nhật phase");
+          return;
+        }
+        toast.success(data.message || "Đã cập nhật phase");
+      }
+
+      setPhaseForm((prev) => ({ ...prev, open: false }));
+      await loadTasks();
+    } finally {
+      setSavingPhase(false);
+    }
+  }
+
+  async function persistPhaseOrder(nextOrder: PhaseRow[]) {
+    setReorderingPhaseId(nextOrder[0]?.id || "loading");
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/phases/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phaseIds: nextOrder.map((phase) => phase.id),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể sắp xếp phase");
+        setPhaseOrderDraft(phases);
+        return;
+      }
+
+      toast.success(data.message || "Đã cập nhật thứ tự phase");
+      await loadTasks();
+    } finally {
+      setReorderingPhaseId(null);
+    }
+  }
+
+  async function onPhaseDragEnd(event: DragEndEvent) {
+    if (!canManagePhase) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = phaseOrderDraft.findIndex((phase) => phase.id === active.id);
+    const newIndex = phaseOrderDraft.findIndex((phase) => phase.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const nextOrder = arrayMove(phaseOrderDraft, oldIndex, newIndex);
+    setPhaseOrderDraft(nextOrder);
+    await persistPhaseOrder(nextOrder);
+  }
+
+  async function openDeletePhaseModal(phase: PhaseRow) {
+    setPhaseDelete({
+      open: true,
+      loading: true,
+      phase,
+      detail: null,
+      confirmName: "",
+      confirmRisk: false,
+    });
+
+    try {
+      const res = await fetch(`/api/phases/${phase.id}`, { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as { phase?: PhaseDeleteDetail; message?: string };
+
+      if (!res.ok || !data.phase) {
+        setPhaseDelete({
+          open: true,
+          loading: false,
+          phase,
+          detail: null,
+          confirmName: "",
+          confirmRisk: false,
+        });
+        toast.error(data.message || "Không tải được thông tin phase");
+        return;
+      }
+
+      setPhaseDelete((prev) => ({ ...prev, loading: false, detail: data.phase ?? null }));
+    } catch {
+      setPhaseDelete((prev) => ({ ...prev, loading: false }));
+      toast.error("Không tải được thông tin phase");
+    }
+  }
+
+  async function confirmDeletePhase() {
+    if (!phaseDelete.phase) return;
+    if (!phaseDelete.confirmRisk) {
+      toast.error("Vui lòng xác nhận hiểu rõ rủi ro trước khi xóa");
+      return;
+    }
+
+    if (phaseDelete.confirmName.trim() !== phaseDelete.phase.name) {
+      toast.error("Tên phase xác nhận không khớp");
+      return;
+    }
+
+    setDeletingPhaseId(phaseDelete.phase.id);
+
+    try {
+      const res = await fetch(`/api/phases/${phaseDelete.phase.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: phaseDelete.confirmName.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể xóa phase");
+        return;
+      }
+
+      toast.success(data.message || "Đã xóa phase");
+      setPhaseDelete({
+        open: false,
+        loading: false,
+        phase: null,
+        detail: null,
+        confirmName: "",
+        confirmRisk: false,
+      });
+      await loadTasks();
+    } finally {
+      setDeletingPhaseId(null);
+    }
+  }
+
   const isCanExport = role === "admin" || role === "accountant";
+  const canManagePhase = role === "admin" || role === "construction_manager";
+  const canDeletePhase = role === "admin";
+
   const activeFilterCount = [phaseFilter !== "all", statusFilter !== "all", !!engineerFilter, !!search, showDeleted].filter(Boolean).length;
 
   const hasPhaseFilter = phaseFilter !== "all";
   const hasStatusFilter = statusFilter !== "all";
 
   const visibleTasks = useMemo(() => {
-    // Trường hợp 1,2,4: sort displayOrder ASC (fallback date/id), không sort alphabet
     const list = [...tasks].sort(compareByDisplayOrder);
     return list;
   }, [tasks]);
 
   const grouped = useMemo(() => {
-    // Chỉ nhóm khi Trường hợp 3: lọc trạng thái, không lọc phase
     if (!(hasStatusFilter && !hasPhaseFilter)) {
       return [["Tất cả", visibleTasks]] as [string, TaskRow[]][];
     }
 
     const map = new Map<string, TaskRow[]>();
-    visibleTasks.forEach((t) => {
-      const key = statusGroupLabel(t.status);
+    visibleTasks.forEach((task) => {
+      const key = statusGroupLabel(task.status);
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(t);
+      map.get(key)!.push(task);
     });
 
     const orderedGroups = ["Trễ hạn", "Đang làm", "Sắp bắt đầu", "Hoàn thành"];
@@ -271,11 +678,32 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       .filter(([, items]) => items.length > 0);
   }, [visibleTasks, hasStatusFilter, hasPhaseFilter]);
 
+  const phaseTaskMap = useMemo(() => {
+    const map = new Map<string, TaskRow[]>();
+    const sorted = [...visibleTasks].sort(compareByDisplayOrder);
+    sorted.forEach((task) => {
+      const key = task.projectPhase?.id || "__none__";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(task);
+    });
+    return map;
+  }, [visibleTasks]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-orange-300">Tiến độ công tác</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-orange-300">Tiến độ dự án</h2>
+          {projectName ? <p className="text-xs text-[#8892b0]">{projectName}</p> : null}
+        </div>
+
         <div className="flex items-center gap-2">
+          {canManagePhase ? (
+            <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={openCreatePhaseSheet}>
+              <Plus className="mr-1 h-4 w-4" />
+              Phase
+            </Button>
+          ) : null}
           {isCanExport ? <Link href={`/api/projects/${projectId}/tasks/export`}><Button variant="outline">Xuất Excel</Button></Link> : null}
           <Button
             className={activeFilterCount ? "rounded-[10px] border border-orange-400 bg-orange-500/15 px-3 py-2 text-orange-300" : "rounded-[10px] border border-[#2d3249] bg-[#13151f] px-3 py-2 text-[#8892b0]"}
@@ -289,6 +717,23 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
             </span>
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-sm text-[#d9def3]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-[#f0f2ff]">Deadline:</span>
+          <span>{projectDeadline ? toInputDate(projectDeadline).split("-").reverse().join("/") : "Chưa đặt"}</span>
+          {deadlineCheck?.calculatedEndDate ? (
+            <span className="text-[#8892b0]">· KT dự kiến {fmtDate(deadlineCheck.calculatedEndDate)}</span>
+          ) : null}
+          {deadlineCheck ? <span className="text-[#8892b0]">· Tổng phase {deadlineCheck.totalPhaseDuration} ngày</span> : null}
+        </div>
+
+        {deadlineCheck?.isOverDeadline ? (
+          <div className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            ⚠ Lệch deadline {deadlineCheck.exceedDays} ngày. Hãy giảm duration phase hoặc dời deadline dự án.
+          </div>
+        ) : null}
       </div>
 
       {showFilterPanel ? (
@@ -323,43 +768,372 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
       <div className="space-y-3">
         {loading ? <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Đang tải...</div> : null}
-        {!loading && visibleTasks.length === 0 ? <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Không có task nào</div> : null}
 
-        {!loading ? grouped.map(([group, groupTasks]) => (
-          <div key={group} className="space-y-2">
-            {group !== "Tất cả" ? (
-              <div className="px-2 text-xs font-semibold uppercase tracking-[1px] text-[#8892b0]">←──── {group} ({groupTasks.length}) ────→</div>
-            ) : null}
-            {groupTasks.map((task) => {
-              const progress = calcProgress(task);
-              return (
-                <Link
-                  key={task.id}
-                  href={`/tasks/${task.id}`}
-                  className="block w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
-                  style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
-                    <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
-                  </div>
-                  <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
-                  <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
-                  <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
-                  {task.status === "in_progress" ? (
-                    <div className="mt-3">
-                      <div className="h-[5px] rounded bg-[#252840]"><div className="h-[5px] rounded bg-[#f97316]" style={{ width: `${progress}%` }} /></div>
-                      <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
-                    </div>
-                  ) : null}
-                </Link>
-              );
-            })}
+        {!loading && phaseOrderDraft.length === 0 ? (
+          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Chưa có phase nào</div>
+        ) : null}
+
+        {!loading && phaseOrderDraft.length > 0 ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onPhaseDragEnd}>
+            <SortableContext items={phaseOrderDraft.map((phase) => phase.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {phaseOrderDraft.map((phase) => {
+                  const phaseTasks = phaseTaskMap.get(phase.id) || [];
+                  const phaseProgress = getPhaseProgress(phaseTasks);
+                  const isPhaseExpanded = expandedPhaseIds[phase.id] ?? false;
+
+                  return (
+                    <SortablePhaseContainer key={phase.id} phaseId={phase.id}>
+                      <div className="space-y-2">
+                        <div className="rounded-2xl border border-[#3a4472] bg-gradient-to-r from-[#232a47] via-[#1d243d] to-[#171d31] p-4 shadow-[0_10px_28px_rgba(8,11,24,0.45)]">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="mb-2 inline-flex items-center rounded-full border border-[#4a588f] bg-[#1d2440] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[1.2px] text-[#cad4ff]">
+                                Phase
+                              </div>
+                              <div className="truncate text-sm font-semibold text-[#f0f2ff]">{phase.code} - {phase.name}</div>
+                              {phase.description ? <div className="mt-1 text-xs text-[#aeb8dc]">{phase.description}</div> : null}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {canManagePhase ? (
+                                <Button type="button" variant="outline" className="h-8 border-[#3f4a7a] bg-[#1b2137] px-2" onClick={() => openEditPhaseSheet(phase)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+
+                              {canDeletePhase ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-8 border-red-500/40 bg-[#2a1a24] px-2 text-red-300 hover:bg-red-500/10"
+                                  onClick={() => openDeletePhaseModal(phase)}
+                                  disabled={deletingPhaseId === phase.id}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 border-[#5160a0] bg-[#1c2340] px-2 text-[#d4dbff] hover:bg-[#27315a]"
+                                onClick={() => togglePhaseExpanded(phase.id)}
+                              >
+                                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isPhaseExpanded ? "rotate-180" : "rotate-0"}`} />
+                                <span className="ml-1 hidden text-xs sm:inline">{isPhaseExpanded ? "Thu gọn" : "Xổ task"}</span>
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3">
+                            <div className="h-2 rounded-full bg-[#2a3254]">
+                              <div className="h-2 rounded-full bg-[#8aa0ff]" style={{ width: `${phaseProgress.percent}%` }} />
+                            </div>
+                            <div className="mt-1 text-xs text-[#b6c0e2]">{phaseProgress.percent}% ({phaseProgress.done}/{phaseProgress.total} task)</div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                            <span className={`rounded-full border px-2 py-0.5 ${phaseStatusClass(phase.status)}`}>{phaseStatusText(phase.status)}</span>
+                            <span className="text-[#b6c0e2]">⏱ {phase.duration} ngày</span>
+                            <span className="text-[#b6c0e2]">📅 KH: {fmtDate(phase.plannedStartDate)} → {fmtDate(phase.plannedEndDate)}</span>
+                            <span className="text-[#b6c0e2]">🚀 TT: {fmtDate(phase.actualStartDate)} → {fmtDate(phase.actualEndDate)}</span>
+                          </div>
+
+                          {!isPhaseExpanded ? <div className="mt-2 text-[11px] text-[#98a6d8]">Nhấn Xổ task để xem danh sách công tác trong phase.</div> : null}
+                        </div>
+
+                        <div
+                          className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                            isPhaseExpanded ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-70"
+                          }`}
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <div
+                              className={`space-y-2 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                                isPhaseExpanded ? "translate-y-0" : "-translate-y-2"
+                              }`}
+                            >
+                              {phaseTasks.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-[#2d3249] bg-[#13151f] px-4 py-3 text-xs text-[#8892b0]">Không có task theo bộ lọc hiện tại.</div>
+                              ) : hasStatusFilter && !hasPhaseFilter ? (
+                                grouped.map(([groupName, groupTasks]) => {
+                                  const tasksInPhase = groupTasks.filter((task) => task.projectPhase?.id === phase.id);
+                                  if (tasksInPhase.length === 0) return null;
+                                  return (
+                                    <div key={`${phase.id}-${groupName}`} className="space-y-2">
+                                      <div className="px-2 text-xs font-semibold uppercase tracking-[1px] text-[#8892b0]">←──── {groupName} ({tasksInPhase.length}) ────→</div>
+                                      {tasksInPhase.map((task) => {
+                                        const progress = calcProgress(task);
+                                        return (
+                                          <button
+                                            key={task.id}
+                                            type="button"
+                                            onClick={() => router.push(`/tasks/${task.id}`)}
+                                            className="w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
+                                            style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}`, cursor: task.isActive ? "pointer" : "default" }}
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
+                                              <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                            </div>
+                                            <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
+                                            <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
+                                            <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
+                                            {task.status === "in_progress" ? (
+                                              <div className="mt-3">
+                                                <div className="h-[5px] rounded bg-[#252840]"><div className="h-[5px] rounded bg-[#f97316]" style={{ width: `${progress}%` }} /></div>
+                                                <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
+                                              </div>
+                                            ) : null}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                phaseTasks.map((task) => {
+                                  const progress = calcProgress(task);
+                                  return (
+                                    <button
+                                      key={task.id}
+                                      type="button"
+                                      onClick={() => router.push(`/tasks/${task.id}`)}
+                                      className="w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
+                                      style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}`, cursor: task.isActive ? "pointer" : "default" }}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
+                                        <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                      </div>
+                                      <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
+                                      <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
+                                      <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
+                                      {task.status === "in_progress" ? (
+                                        <div className="mt-3">
+                                          <div className="h-[5px] rounded bg-[#252840]"><div className="h-[5px] rounded bg-[#f97316]" style={{ width: `${progress}%` }} /></div>
+                                          <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
+                                        </div>
+                                      ) : null}
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </SortablePhaseContainer>
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : null}
+
+        {!loading && phases.length > 0 && (phaseTaskMap.get("__none__") || []).length > 0 ? (
+          <div className="rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-200">
+            Có {(phaseTaskMap.get("__none__") || []).length} task chưa map phase mới, vẫn hiển thị theo cơ chế cũ.
           </div>
-        )) : null}
+        ) : null}
       </div>
 
       <div className="text-xs text-[#8892b0]">{projectCode ? `Dự án: ${projectCode}` : ""} · Tổng {tasks.length} task</div>
+
+      {phaseForm.open && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+              <button
+                type="button"
+                className="absolute inset-0"
+                onClick={() => {
+                  if (savingPhase) return;
+                  setPhaseForm((prev) => ({ ...prev, open: false }));
+                }}
+                aria-label="Đóng"
+              />
+              <div className="relative z-10 w-full max-w-[430px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] p-4">
+                <div className="mb-3 text-lg font-semibold text-[#f0f2ff]">
+                  {phaseForm.mode === "create" ? "Thêm phase mới" : "Sửa phase"}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a4acc8]">Tên phase</label>
+                    <input
+                      className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                      value={phaseForm.name}
+                      onChange={(e) => setPhaseForm((prev) => ({ ...prev, name: e.target.value }))}
+                      disabled={savingPhase}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a4acc8]">Mô tả</label>
+                    <textarea
+                      rows={2}
+                      className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                      value={phaseForm.description}
+                      onChange={(e) => setPhaseForm((prev) => ({ ...prev, description: e.target.value }))}
+                      disabled={savingPhase}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[#a4acc8]">Số ngày</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={phaseForm.duration}
+                        onChange={(e) => setPhaseForm((prev) => ({ ...prev, duration: e.target.value }))}
+                        disabled={savingPhase}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-[#a4acc8]">Thứ tự</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={phaseForm.mode === "create" ? phases.length + 1 : phases.length}
+                        className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={phaseForm.displayOrder}
+                        onChange={(e) => setPhaseForm((prev) => ({ ...prev, displayOrder: e.target.value }))}
+                        disabled={savingPhase}
+                      />
+                    </div>
+                  </div>
+
+                  {phaseForm.mode === "edit" ? (
+                    <label className="flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs text-[#d9def3]">
+                      <input
+                        type="checkbox"
+                        checked={phaseForm.confirmRunningChange}
+                        onChange={(e) => setPhaseForm((prev) => ({ ...prev, confirmRunningChange: e.target.checked }))}
+                        disabled={savingPhase}
+                      />
+                      Xác nhận sửa duration khi phase đang chạy
+                    </label>
+                  ) : null}
+
+                  <div className="rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0]">
+                    Lưu ý: đổi duration hoặc thứ tự phase sẽ tự tính lại timeline của các phase sau.
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setPhaseForm((prev) => ({ ...prev, open: false }))} disabled={savingPhase}>Hủy</Button>
+                    <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitPhaseForm} disabled={savingPhase}>
+                      {savingPhase ? "Đang lưu..." : "Lưu"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {phaseDelete.open && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+              <button
+                type="button"
+                className="absolute inset-0"
+                onClick={() => {
+                  if (deletingPhaseId) return;
+                  setPhaseDelete({
+                    open: false,
+                    loading: false,
+                    phase: null,
+                    detail: null,
+                    confirmName: "",
+                    confirmRisk: false,
+                  });
+                }}
+                aria-label="Đóng"
+              />
+              <div className="relative z-10 w-full max-w-[430px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] p-4">
+                <div className="mb-3 text-lg font-semibold text-red-300">Xác nhận xóa phase</div>
+
+                {phaseDelete.loading ? (
+                  <div className="rounded-xl border border-[#2d3249] bg-[#1a1d2e] p-3 text-sm text-[#8892b0]">Đang tải thông tin phase...</div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="text-sm text-[#d9def3]">
+                      Phase <span className="font-semibold">{phaseDelete.phase?.name}</span> có {phaseDelete.detail?.tasks.length || 0} task.
+                    </div>
+
+                    {(phaseDelete.detail?.tasks.length || 0) > 0 ? (
+                      <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-[#2d3249] bg-[#1a1d2e] p-2 text-xs text-[#c4cae2]">
+                        {phaseDelete.detail?.tasks.map((task) => (
+                          <div key={task.id} className="rounded-md border border-[#252840] bg-[#13151f] px-2 py-1">
+                            {task.code} - {task.name}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                      Xóa phase sẽ xóa mềm task trong phase này và không thể khôi phục.
+                    </div>
+
+                    <label className="flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs text-[#d9def3]">
+                      <input
+                        type="checkbox"
+                        checked={phaseDelete.confirmRisk}
+                        onChange={(e) => setPhaseDelete((prev) => ({ ...prev, confirmRisk: e.target.checked }))}
+                        disabled={!!deletingPhaseId}
+                      />
+                      Tôi hiểu rõ rủi ro xóa vĩnh viễn phase này.
+                    </label>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-[#a4acc8]">Nhập tên phase để xác nhận</label>
+                      <input
+                        className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={phaseDelete.confirmName}
+                        onChange={(e) => setPhaseDelete((prev) => ({ ...prev, confirmName: e.target.value }))}
+                        disabled={!!deletingPhaseId}
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={!!deletingPhaseId}
+                        onClick={() =>
+                          setPhaseDelete({
+                            open: false,
+                            loading: false,
+                            phase: null,
+                            detail: null,
+                            confirmName: "",
+                            confirmRisk: false,
+                          })
+                        }
+                      >
+                        Hủy
+                      </Button>
+                      <Button
+                        className="border border-red-500/40 bg-red-500 text-white hover:bg-red-600"
+                        disabled={!!deletingPhaseId}
+                        onClick={confirmDeletePhase}
+                      >
+                        {deletingPhaseId ? "Đang xóa..." : "Xóa vĩnh viễn"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {reorderingPhaseId ? <div className="text-xs text-[#8892b0]">Đang cập nhật thứ tự phase...</div> : null}
     </div>
   );
 }

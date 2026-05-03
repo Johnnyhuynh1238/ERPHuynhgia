@@ -19,17 +19,19 @@ export type CsvTaskTemplateRow = {
   template_category: string;
 };
 
-const allowedPhases = new Set<string>([
-  "P1_CHUAN_BI",
-  "P2_MONG",
-  "P3_KHUNG_TRET",
-  "P4_KHUNG_LAU",
-  "P5_ME_XAY_TO",
-  "P6_OP_LAT",
-  "P7_SON_BA",
-  "P8_LAP_TB",
-  "P9_BAN_GIAO",
-]);
+const PHASE_META: Record<TaskPhase, { code: string; name: string; order: number }> = {
+  P1_CHUAN_BI: { code: "P1", name: "Chuẩn bị", order: 1 },
+  P2_MONG: { code: "P2", name: "Móng", order: 2 },
+  P3_KHUNG_TRET: { code: "P3", name: "Khung trệt", order: 3 },
+  P4_KHUNG_LAU: { code: "P4", name: "Khung lầu", order: 4 },
+  P5_ME_XAY_TO: { code: "P5", name: "M&E + xây tô", order: 5 },
+  P6_OP_LAT: { code: "P6", name: "Ốp lát", order: 6 },
+  P7_SON_BA: { code: "P7", name: "Sơn bả", order: 7 },
+  P8_LAP_TB: { code: "P8", name: "Lắp thiết bị", order: 8 },
+  P9_BAN_GIAO: { code: "P9", name: "Bàn giao", order: 9 },
+};
+
+const allowedPhases = new Set<string>(Object.keys(PHASE_META));
 
 export function parsePhase(value: string): TaskPhase {
   const normalized = value.trim() as TaskPhase;
@@ -37,6 +39,10 @@ export function parsePhase(value: string): TaskPhase {
     throw new Error(`Phase không hợp lệ trong CSV: ${value}`);
   }
   return normalized;
+}
+
+export function getPhaseMeta(phase: TaskPhase) {
+  return PHASE_META[phase];
 }
 
 export function parseTaskTemplateCsv(csvText: string) {
@@ -48,9 +54,16 @@ export function parseTaskTemplateCsv(csvText: string) {
 }
 
 export function mapCsvRowToTemplateData(row: CsvTaskTemplateRow) {
+  const phase = parsePhase(row.phase);
+  const phaseMeta = getPhaseMeta(phase);
+
   return {
     code: row.code.trim(),
-    phase: parsePhase(row.phase),
+    phase,
+    phaseCode: phaseMeta.code,
+    phaseName: phaseMeta.name,
+    phaseOrder: phaseMeta.order,
+    phaseDuration: Number(row.default_duration_days),
     name: row.name,
     defaultOffsetDays: Number(row.default_offset_days),
     defaultDurationDays: Number(row.default_duration_days),

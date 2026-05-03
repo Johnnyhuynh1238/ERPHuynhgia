@@ -3,6 +3,7 @@ import { TaskPhase, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-helpers";
+import { getPhaseMeta } from "@/lib/task-template-csv";
 
 const patchSchema = z.object({
   phase: z.nativeEnum(TaskPhase),
@@ -51,9 +52,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ message: "Không tìm thấy template" }, { status: 404 });
   }
 
+  const phaseMeta = getPhaseMeta(parsed.data.phase);
+
   const updated = await prisma.taskTemplate.update({
     where: { id: params.id },
-    data: parsed.data,
+    data: {
+      ...parsed.data,
+      phaseCode: phaseMeta.code,
+      phaseName: phaseMeta.name,
+      phaseOrder: phaseMeta.order,
+      phaseDuration: parsed.data.defaultDurationDays,
+    },
   });
 
   return NextResponse.json({ template: updated, message: "Đã cập nhật template" });

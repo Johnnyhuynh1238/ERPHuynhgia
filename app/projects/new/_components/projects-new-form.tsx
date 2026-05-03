@@ -20,6 +20,7 @@ const formSchema = z.object({
   unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
+  plannedDeadline: z.string().min(1, "Deadline là bắt buộc"),
   templateCategory: z.literal("nha_pho_1t1l"),
   projectManagerId: z.string().uuid("Vui lòng chọn GĐ Thi Công").optional(),
   mainEngineerId: z.string().uuid("Vui lòng chọn KS chính"),
@@ -38,6 +39,19 @@ type OptionUser = {
   fullName: string;
   email: string;
   role: string;
+};
+
+type TemplatePhaseItem = {
+  code: string;
+  name: string;
+  order: number;
+  duration: number;
+};
+
+type TemplatePhaseSummaryResponse = {
+  templateCategory: string;
+  phases: TemplatePhaseItem[];
+  totalDuration: number;
 };
 
 function formatMoney(value: number) {
@@ -62,6 +76,25 @@ function todayPlusDaysIso(days: number) {
   return toIsoDate(now);
 }
 
+function parseIsoDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+function addDays(baseDate: Date, days: number) {
+  const next = new Date(baseDate);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function formatDateVi(date: Date | null) {
+  if (!date) return "--/--/----";
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = date.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 export function ProjectsNewForm({
   currentUserId,
   currentUserRole,
@@ -75,9 +108,12 @@ export function ProjectsNewForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [loadingTemplateSummary, setLoadingTemplateSummary] = useState(true);
   const [admins, setAdmins] = useState<OptionUser[]>([]);
   const [engineers, setEngineers] = useState<OptionUser[]>([]);
   const [members, setMembers] = useState<OptionUser[]>([]);
+  const [templatePhases, setTemplatePhases] = useState<TemplatePhaseItem[]>([]);
+  const [templateTotalDuration, setTemplateTotalDuration] = useState(0);
 
   const isConstructionManager = currentUserRole === "construction_manager";
 
@@ -93,6 +129,7 @@ export function ProjectsNewForm({
       unitPrice: undefined,
       startDate: todayIso(),
       expectedEndDate: todayPlusDaysIso(120),
+      plannedDeadline: todayPlusDaysIso(120),
       templateCategory: "nha_pho_1t1l",
       projectManagerId: currentUserId,
       mainEngineerId: "",
@@ -142,6 +179,40 @@ export function ProjectsNewForm({
   const areaM2 = form.watch("areaM2");
   const unitPrice = form.watch("unitPrice");
   const selectedMembers = form.watch("members");
+  const startDateValue = form.watch("startDate");
+  const plannedDeadlineValue = form.watch("plannedDeadline");
+  const templateCategoryValue = form.watch("templateCategory");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadTemplateSummary() {
+      setLoadingTemplateSummary(true);
+      const params = new URLSearchParams({ templateCategory: templateCategoryValue });
+      const res = await fetch(`/api/projects/template-phase-summary?${params.toString()}`, { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as TemplatePhaseSummaryResponse & { message?: string };
+
+      if (!mounted) return;
+
+      if (!res.ok) {
+        setTemplatePhases([]);
+        setTemplateTotalDuration(0);
+        setLoadingTemplateSummary(false);
+        toast.error("Không tải được phase template", { description: data.message || "Vui lòng thử lại" });
+        return;
+      }
+
+      setTemplatePhases(data.phases || []);
+      setTemplateTotalDuration(Number(data.totalDuration || 0));
+      setLoadingTemplateSummary(false);
+    }
+
+    loadTemplateSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, [templateCategoryValue]);
 
   const contractValue = useMemo(() => {
     const area = Number(areaM2 || 0);
@@ -154,7 +225,22 @@ export function ProjectsNewForm({
     return new Set(ids).size !== ids.length;
   }, [selectedMembers]);
 
-  const isSubmitDisabled = !form.formState.isValid || submitting || hasDuplicateMembers || loadingOptions;
+  const calculatedEndDate = useMemo(() => {
+    if (!startDateValue || templateTotalDuration < 1) return null;
+    const startDate = parseIsoDate(startDateValue);
+    return addDays(startDate, templateTotalDuration - 1);
+  }, [startDateValue, templateTotalDuration]);
+
+  const exceedDays = useMemo(() => {
+    if (!calculatedEndDate || !plannedDeadlineValue) return 0;
+    const plannedDeadline = parseIsoDate(plannedDeadlineValue);
+    const diffMs = calculatedEndDate.getTime() - plannedDeadline.getTime();
+    if (diffMs <= 0) return 0;
+    return Math.floor(diffMs / 86400000);
+  }, [calculatedEndDate, plannedDeadlineValue]);
+
+  const isSubmitDisabled =
+    !form.formState.isValid || submitting || hasDuplicateMembers || loadingOptions || loadingTemplateSummary;
 
   async function onSubmit(values: FormValues) {
     if (hasDuplicateMembers) {
@@ -306,6 +392,46 @@ export function ProjectsNewForm({
               <p className="mt-1 text-xs text-red-600">{form.formState.errors.expectedEndDate.message}</p>
             ) : null}
           </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Deadline phase timeline *</label>
+            <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("plannedDeadline")} />
+            {form.formState.errors.plannedDeadline ? (
+              <p className="mt-1 text-xs text-red-600">{form.formState.errors.plannedDeadline.message}</p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-lg border bg-slate-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold">Phase từ template</h3>
+
+          {loadingTemplateSummary ? (
+            <div className="text-sm text-slate-500">Đang tải phase template...</div>
+          ) : templatePhases.length === 0 ? (
+            <div className="text-sm text-slate-500">Không có dữ liệu phase template.</div>
+          ) : (
+            <div className="space-y-2">
+              {templatePhases.map((phase) => (
+                <div key={phase.code} className="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
+                  <span>
+                    {phase.code} {phase.name}
+                  </span>
+                  <span className="font-medium">{phase.duration} ngày</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 space-y-1 text-sm">
+            <div className="text-slate-700">Tổng: <span className="font-semibold">{templateTotalDuration} ngày</span></div>
+            <div className="text-slate-700">KT dự kiến: <span className="font-semibold">{formatDateVi(calculatedEndDate)}</span></div>
+          </div>
+
+          {exceedDays > 0 ? (
+            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              ⚠ Vượt deadline {exceedDays} ngày. Hãy giảm duration phase hoặc dời deadline.
+            </div>
+          ) : null}
         </div>
       </div>
 

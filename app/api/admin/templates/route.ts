@@ -3,6 +3,7 @@ import { TaskPhase, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-helpers";
+import { getPhaseMeta } from "@/lib/task-template-csv";
 
 const templateSchema = z.object({
   code: z.string().trim().min(1),
@@ -83,9 +84,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Mã template đã tồn tại trong category" }, { status: 400 });
   }
 
+  const phaseMeta = getPhaseMeta(payload.phase);
+
   const created = await prisma.taskTemplate.create({
     data: {
       ...payload,
+      phaseCode: phaseMeta.code,
+      phaseName: phaseMeta.name,
+      phaseOrder: phaseMeta.order,
+      phaseDuration: payload.defaultDurationDays,
       isActive: true,
     },
   });
