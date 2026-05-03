@@ -168,6 +168,12 @@ enum KpiSnapshotType {
   MONTHLY_FINAL
 }
 
+enum KpiMonthlyStatus {
+  draft
+  pending
+  finalized
+}
+
 enum QcItemStatus {
   unchecked
   passed
@@ -229,6 +235,12 @@ model User {
   technicalAttachmentsUploaded TaskTechnicalAttachment[]
   reportPhotosUploaded TaskReportPhoto[]
   kpiSnapshots        KpiSnapshot[]
+  engineerSalaryConfig       EngineerSalaryConfig?  @relation("EngineerSalary")
+  engineerSalaryUpdated      EngineerSalaryConfig[] @relation("EngineerSalaryUpdater")
+  engineerSalaryHistory      EngineerSalaryHistory[] @relation("EngineerSalaryChanger")
+  engineerKpiMonthly         EngineerKpiMonthly[]   @relation("EngineerKpiMonthlyUser")
+  engineerKpiMonthlyRated    EngineerKpiMonthly[]   @relation("EngineerKpiMonthlyRater")
+  engineerKpiMonthlyFinalized EngineerKpiMonthly[]  @relation("EngineerKpiMonthlyFinalizer")
   customerCommentReplies CustomerCommentReply[]
   subcontractorsCreated Subcontractor[] @relation("SubcontractorCreator")
   subContractsCreated   SubContract[]   @relation("SubContractCreator")
@@ -903,6 +915,81 @@ model KpiSnapshot {
   @@index([projectId, month, type])
   @@index([reporterId, month, type])
   @@map("kpi_snapshots")
+}
+
+model EngineerSalaryConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  salaryMax      Decimal  @map("salary_max") @db.Decimal(15, 2)
+  effectiveFrom  DateTime @map("effective_from") @db.Date
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedBy      String   @map("updated_by") @db.Uuid
+
+  user           User                   @relation("EngineerSalary", fields: [userId], references: [id], onDelete: Cascade)
+  updater        User                   @relation("EngineerSalaryUpdater", fields: [updatedBy], references: [id])
+  history        EngineerSalaryHistory[]
+
+  @@index([isActive])
+  @@map("engineer_salary_configs")
+}
+
+model EngineerSalaryHistory {
+  id            String   @id @default(uuid()) @db.Uuid
+  configId       String   @map("config_id") @db.Uuid
+  salaryMax      Decimal  @map("salary_max") @db.Decimal(15, 2)
+  effectiveFrom  DateTime @map("effective_from") @db.Date
+  changeReason   String?  @map("change_reason") @db.Text
+  changedAt      DateTime @default(now()) @map("changed_at")
+  changedBy      String   @map("changed_by") @db.Uuid
+
+  config         EngineerSalaryConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  changer        User                 @relation("EngineerSalaryChanger", fields: [changedBy], references: [id])
+
+  @@index([configId])
+  @@index([changedAt])
+  @@map("engineer_salary_history")
+}
+
+model EngineerKpiMonthly {
+  id                 String           @id @default(uuid()) @db.Uuid
+  userId             String           @map("user_id") @db.Uuid
+  year               Int
+  month              Int
+  scoreSchedule      Decimal          @default(0) @map("score_schedule") @db.Decimal(5, 2)
+  scoreQc            Decimal          @default(0) @map("score_qc") @db.Decimal(5, 2)
+  scoreReport        Decimal          @default(0) @map("score_report") @db.Decimal(5, 2)
+  scoreCustomer      Decimal          @default(0) @map("score_customer") @db.Decimal(5, 2)
+  scoreContribution  Decimal          @default(0) @map("score_contribution") @db.Decimal(5, 2)
+  contributionNote   String?          @map("contribution_note") @db.Text
+  contributionBy     String?          @map("contribution_by") @db.Uuid
+  contributionAt     DateTime?        @map("contribution_at")
+  totalScore         Decimal          @default(0) @map("total_score") @db.Decimal(5, 2)
+  salaryMax          Decimal          @map("salary_max") @db.Decimal(15, 2)
+  baseSalary         Decimal          @map("base_salary") @db.Decimal(15, 2)
+  bonusMax           Decimal          @map("bonus_max") @db.Decimal(15, 2)
+  bonusRatio         Decimal          @default(0) @map("bonus_ratio") @db.Decimal(5, 2)
+  bonusAmount        Decimal          @default(0) @map("bonus_amount") @db.Decimal(15, 2)
+  totalSalary        Decimal          @default(0) @map("total_salary") @db.Decimal(15, 2)
+  scheduleDetails    Json?            @map("schedule_details")
+  qcDetails          Json?            @map("qc_details")
+  reportDetails      Json?            @map("report_details")
+  customerDetails    Json?            @map("customer_details")
+  status             KpiMonthlyStatus @default(draft)
+  finalizedAt        DateTime?        @map("finalized_at")
+  finalizedBy        String?          @map("finalized_by") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  user               User             @relation("EngineerKpiMonthlyUser", fields: [userId], references: [id], onDelete: Cascade)
+  contributionRater  User?            @relation("EngineerKpiMonthlyRater", fields: [contributionBy], references: [id])
+  finalizer          User?            @relation("EngineerKpiMonthlyFinalizer", fields: [finalizedBy], references: [id])
+
+  @@unique([userId, year, month])
+  @@index([year, month])
+  @@index([status])
+  @@map("engineer_kpi_monthly")
 }
 
 model SubcontractorSpecialty {

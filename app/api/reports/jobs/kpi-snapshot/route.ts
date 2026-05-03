@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { formatUtcYmd } from "@/lib/date";
 import type { KpiResult } from "@/lib/kpi";
 import { calculateKpiForProjectEngineer } from "@/lib/kpi";
+import { asPrismaDecimal, calculateSalary, calculateTotalScore, toNumber } from "@/lib/kpi-salary";
 import {
   getReminderTargetProjects,
   monthStringOfDate,
@@ -95,7 +96,10 @@ export async function POST(request: Request) {
   const monthlyFinalRange = resolveMonthlyFinalRange(targetDate);
 
   let monthlyFinalSnapshots = 0;
+  let monthlySalarySnapshots = 0;
   if (monthlyFinalRange) {
+    const [year, month] = monthlyFinalRange.month.split("-").map((value) => Number(value));
+
     for (const project of projects) {
       const monthlyKpi = await calculateKpiForProjectEngineer({
         projectId: project.id,
@@ -115,6 +119,97 @@ export async function POST(request: Request) {
         payload: toSnapshotPayload(monthlyKpi),
       });
 
+      const salaryConfig = await prisma.engineerSalaryConfig.findUnique({
+        where: { userId: project.mainEngineerId },
+        select: {
+          salaryMax: true,
+          isActive: true,
+        },
+      });
+
+      if (salaryConfig?.isActive) {
+        const scoreSchedule = Number(monthlyKpi.breakdown.taskOnSchedule.toFixed(2));
+        const scoreQc = Number(monthlyKpi.breakdown.inspectionQuality.toFixed(2));
+        const scoreReport = Number(monthlyKpi.breakdown.reportProactivity.toFixed(2));
+        const scoreCustomer = 100;
+        const scoreContribution = 0;
+
+        const totalScore = calculateTotalScore({
+          schedule: scoreSchedule,
+          qc: scoreQc,
+          report: scoreReport,
+          customer: scoreCustomer,
+          contribution: scoreContribution,
+        });
+
+        const salary = calculateSalary(toNumber(salaryConfig.salaryMax), totalScore);
+
+        const existing = await prisma.engineerKpiMonthly.findUnique({
+          where: {
+            userId_year_month: {
+              userId: project.mainEngineerId,
+              year,
+              month,
+            },
+          },
+          select: { id: true, status: true },
+        });
+
+        if (!existing || existing.status !== "finalized") {
+          await prisma.engineerKpiMonthly.upsert({
+            where: {
+              userId_year_month: {
+                userId: project.mainEngineerId,
+                year,
+                month,
+              },
+            },
+            create: {
+              userId: project.mainEngineerId,
+              year,
+              month,
+              scoreSchedule: asPrismaDecimal(scoreSchedule),
+              scoreQc: asPrismaDecimal(scoreQc),
+              scoreReport: asPrismaDecimal(scoreReport),
+              scoreCustomer: asPrismaDecimal(scoreCustomer),
+              scoreContribution: asPrismaDecimal(scoreContribution),
+              totalScore: asPrismaDecimal(totalScore),
+              salaryMax: salaryConfig.salaryMax,
+              baseSalary: asPrismaDecimal(salary.baseSalary),
+              bonusMax: asPrismaDecimal(salary.bonusMax),
+              bonusRatio: asPrismaDecimal(salary.bonusRatio),
+              bonusAmount: asPrismaDecimal(salary.bonusAmount),
+              totalSalary: asPrismaDecimal(salary.totalSalary),
+              scheduleDetails: monthlyKpi.detail,
+              qcDetails: monthlyKpi.detail,
+              reportDetails: monthlyKpi.detail,
+              customerDetails: monthlyKpi.detail,
+              status: "pending",
+            },
+            update: {
+              scoreSchedule: asPrismaDecimal(scoreSchedule),
+              scoreQc: asPrismaDecimal(scoreQc),
+              scoreReport: asPrismaDecimal(scoreReport),
+              scoreCustomer: asPrismaDecimal(scoreCustomer),
+              totalScore: asPrismaDecimal(totalScore),
+              salaryMax: salaryConfig.salaryMax,
+              baseSalary: asPrismaDecimal(salary.baseSalary),
+              bonusMax: asPrismaDecimal(salary.bonusMax),
+              bonusRatio: asPrismaDecimal(salary.bonusRatio),
+              bonusAmount: asPrismaDecimal(salary.bonusAmount),
+              totalSalary: asPrismaDecimal(salary.totalSalary),
+              scheduleDetails: monthlyKpi.detail,
+              qcDetails: monthlyKpi.detail,
+              reportDetails: monthlyKpi.detail,
+              customerDetails: monthlyKpi.detail,
+              status: "pending",
+            },
+          });
+
+          monthlySalarySnapshots += 1;
+        }
+      }
+
       monthlyFinalSnapshots += 1;
     }
   }
@@ -123,6 +218,7 @@ export async function POST(request: Request) {
     date: targetDateYmd,
     snapshots,
     monthlyFinalSnapshots,
+    monthlySalarySnapshots,
     skippedRest,
     monthResetTriggered: Boolean(monthlyFinalRange),
     monthFinalized: monthlyFinalRange?.month ?? null,
