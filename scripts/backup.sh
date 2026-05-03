@@ -1,27 +1,58 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script backup PostgreSQL (chạy cron lúc 2h sáng ở bước sau)
-# - Dump DB từ container "db"
-# - Nén .sql.gz
-# - Giữ lại 30 ngày gần nhất
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKUP_DIR="$ROOT_DIR/backups"
+COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
+PRINT_PATH_ONLY=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --compose-file)
+      COMPOSE_FILE="$2"
+      shift 2
+      ;;
+    --print-path)
+      PRINT_PATH_ONLY=1
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ ! -f "$COMPOSE_FILE" ]; then
+  echo "Compose file not found: $COMPOSE_FILE" >&2
+  exit 1
+fi
+
 TIMESTAMP="$(date +"%Y%m%d-%H%M%S")"
 BACKUP_FILE="$BACKUP_DIR/postgres-$TIMESTAMP.sql.gz"
 
 mkdir -p "$BACKUP_DIR"
-
 cd "$ROOT_DIR"
 
-echo "[Backup] Bắt đầu dump PostgreSQL..."
-docker compose exec -T db pg_dump -U "${POSTGRES_USER:-erp_user}" "${POSTGRES_DB:-erp_db}" | gzip > "$BACKUP_FILE"
+if [ "$PRINT_PATH_ONLY" -eq 0 ]; then
+  echo "[Backup] Starting PostgreSQL dump..."
+fi
 
-echo "[Backup] Đã tạo: $BACKUP_FILE"
+docker compose -f "$COMPOSE_FILE" exec -T db \
+  pg_dump -U "${POSTGRES_USER:-erp_user}" "${POSTGRES_DB:-erp_db}" \
+  | gzip > "$BACKUP_FILE"
 
-# Xóa file backup cũ hơn 30 ngày
+if [ ! -s "$BACKUP_FILE" ]; then
+  echo "Backup file is empty: $BACKUP_FILE" >&2
+  exit 1
+fi
+
 find "$BACKUP_DIR" -type f -name "postgres-*.sql.gz" -mtime +30 -delete
 
-echo "[Backup] Hoàn tất. Đã dọn file > 30 ngày."
+if [ "$PRINT_PATH_ONLY" -eq 1 ]; then
+  printf '%s\n' "$BACKUP_FILE"
+else
+  echo "[Backup] Created: $BACKUP_FILE"
+  echo "[Backup] Completed and cleaned files older than 30 days."
+fi
