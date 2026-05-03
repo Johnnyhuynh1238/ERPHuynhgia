@@ -24,19 +24,19 @@ echo "[Deploy] Running pre-deploy checks (backup + migrate)..."
 "$PRE_DEPLOY_SCRIPT"
 
 echo "[Deploy] Building and restarting app container..."
-docker compose -f "$COMPOSE_FILE" up -d --build app
+docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" up -d --build app
 
 echo "[Deploy] Waiting for app container to be running..."
 for _ in $(seq 1 30); do
-  if docker compose -f "$COMPOSE_FILE" ps --status running app | grep -q "erp_app_prod"; then
+  if docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" ps --status running app | grep -q "erp_app_prod"; then
     break
   fi
   sleep 2
 done
 
-if ! docker compose -f "$COMPOSE_FILE" ps --status running app | grep -q "erp_app_prod"; then
+if ! docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" ps --status running app | grep -q "erp_app_prod"; then
   echo "App container is not running after deploy." >&2
-  docker compose -f "$COMPOSE_FILE" ps
+  docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" ps
   exit 1
 fi
 
