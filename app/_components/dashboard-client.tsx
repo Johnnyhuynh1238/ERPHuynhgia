@@ -201,7 +201,7 @@ function ReportStatusCard({
   rows: NonNullable<DashboardData["engineer"]>["reportStatus"];
 }) {
   if (!rows || rows.length === 0) {
-    return <EmptyState text="Không có dự án báo cáo hôm nay." href="/reports/morning" action="Vào báo cáo" />;
+    return <EmptyState text="Không có dự án báo cáo hôm nay." href="/reports" action="Vào báo cáo" />;
   }
 
   return (
@@ -217,12 +217,12 @@ function ReportStatusCard({
           </div>
           {row.isActive && !row.isRestDay ? (
             <div className="flex flex-wrap gap-2">
-              <Link href={`/reports/morning/${row.projectId}`}>
+              <Link href={`/reports/${row.projectId}?tab=morning`}>
                 <Button variant="outline" size="sm">
                   Báo cáo sáng
                 </Button>
               </Link>
-              <Link href={`/reports/evening/${row.projectId}`}>
+              <Link href={`/reports/${row.projectId}?tab=evening`}>
                 <Button variant="outline" size="sm">
                   Báo cáo chiều
                 </Button>
@@ -402,7 +402,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
                 {data.admin?.missingMorning?.length ? (
                   <div className="space-y-2 text-sm">
                     {data.admin.missingMorning.map((row) => (
-                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/morning/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/${row.projectId}?tab=morning`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
                         <div className="font-medium">{row.engineerName}</div>
                         <div className="text-xs text-[#8892b0]">
                           {row.projectCode} - {row.projectName}
@@ -424,7 +424,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
                 {data.admin?.missingEvening?.length ? (
                   <div className="space-y-2 text-sm">
                     {data.admin.missingEvening.map((row) => (
-                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/evening/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/${row.projectId}?tab=evening`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
                         <div className="font-medium">{row.engineerName}</div>
                         <div className="text-xs text-[#8892b0]">
                           {row.projectCode} - {row.projectName}

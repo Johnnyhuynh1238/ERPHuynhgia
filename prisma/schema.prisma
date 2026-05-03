@@ -222,6 +222,7 @@ model User {
   projectAssignments          ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
   projectAssignmentsAssigned  ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
   declaredSiteRestDays SiteRestDay[]
+  morningCheckins     MorningCheckin[] @relation("MorningCheckinUser")
   morningReports      MorningReport[]
   eveningReports      EveningReport[]
   technicalReportCreator TaskTechnicalReport[] @relation("TechReportCreator")
@@ -288,6 +289,7 @@ model Project {
   projectMembers          ProjectMember[]
   memberAssignments       ProjectMemberAssignment[]
   siteRestDays            SiteRestDay[]
+  morningCheckins         MorningCheckin[]
   morningReports          MorningReport[]
   eveningReports          EveningReport[]
   kpiSnapshots            KpiSnapshot[]
@@ -406,6 +408,7 @@ model Task {
   qcLogs                QcLog[]
   qcReviews             QcReview[]
   taskQcLogs            TaskQcLog[]
+  morningCheckinTasks   MorningCheckinTask[] @relation("MorningCheckinTask")
   morningReportTasks    MorningReportTask[]
   eveningReportTasks    EveningReportTask[]
   technicalReports      TaskTechnicalReport[]
@@ -670,6 +673,41 @@ model SiteRestDay {
   @@unique([projectId, restDate])
   @@index([projectId, restDate])
   @@map("site_rest_days")
+}
+
+model MorningCheckin {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  reportDate    DateTime @map("report_date") @db.Date
+  submittedAt   DateTime @default(now()) @map("submitted_at")
+  lastUpdatedAt DateTime @updatedAt @map("last_updated_at")
+  isLate        Boolean  @default(false) @map("is_late")
+  note          String?  @db.Text
+
+  user    User                 @relation("MorningCheckinUser", fields: [userId], references: [id], onDelete: Cascade)
+  project Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   MorningCheckinTask[]
+
+  @@unique([userId, projectId, reportDate])
+  @@index([projectId, reportDate])
+  @@index([userId, reportDate])
+  @@map("morning_checkins")
+}
+
+model MorningCheckinTask {
+  id        String   @id @default(uuid()) @db.Uuid
+  checkinId String   @map("checkin_id") @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  taskGroup String   @map("group")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  checkin MorningCheckin @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+  task    Task           @relation("MorningCheckinTask", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([checkinId, taskId])
+  @@index([taskId])
+  @@map("morning_checkin_tasks")
 }
 
 model MorningReport {

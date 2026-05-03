@@ -1,4 +1,4 @@
-import { DailyRating, TaskLogType, TaskStatus } from "@prisma/client";
+import { TaskLogType, TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addUtcDays, formatUtcYmd, nowUtcDateOnly, toUtcStartOfDay } from "@/lib/date";
 import { getActivityDates, getProjectSiteRestDates } from "@/lib/reporting";
@@ -193,37 +193,20 @@ export async function calculateKpiForProjectEngineer(input: {
   const requiredDays = activeDays.length;
   const activeDaySet = new Set(activeDays.map((d) => formatUtcYmd(d)));
 
-  const [morningReports, eveningReports, completedTasks, inspectionQuality] = await Promise.all([
-    prisma.morningReport.findMany({
+  const [morningCheckins, completedTasks, inspectionQuality, technicalReports] = await Promise.all([
+    prisma.morningCheckin.findMany({
       where: {
         projectId: input.projectId,
-        reporterId: input.reporterId,
+        userId: input.reporterId,
         reportDate: { gte: from, lte: to },
       },
       select: {
         reportDate: true,
         submittedAt: true,
-        isOnTime: true,
-      },
-    }),
-    prisma.eveningReport.findMany({
-      where: {
-        projectId: input.projectId,
-        reporterId: input.reporterId,
-        reportDate: { gte: from, lte: to },
-      },
-      select: {
-        reportDate: true,
-        submittedAt: true,
-        isOnTime: true,
-        overallRating: true,
-        taskReports: {
+        isLate: true,
+        tasks: {
           select: {
-            actualWork: true,
-            actualWorkIfStarted: true,
-            taskPhotos: {
-              select: { id: true },
-            },
+            taskId: true,
           },
         },
       },
@@ -247,33 +230,86 @@ export async function calculateKpiForProjectEngineer(input: {
       to,
       activeDaySet,
     }),
+    prisma.taskTechnicalReport.findMany({
+      where: {
+        task: {
+          projectId: input.projectId,
+        },
+        reportDate: { gte: from, lte: to },
+      },
+      select: {
+        taskId: true,
+        reportDate: true,
+        updatedAt: true,
+        note: true,
+        technicalIssue: true,
+        photos: {
+          select: { id: true },
+        },
+      },
+    }),
   ]);
 
-  const morningOnTimeDays = morningReports.filter((row) => row.submittedAt && row.isOnTime && activeDaySet.has(formatUtcYmd(row.reportDate))).length;
+  const morningOnTimeDays = morningCheckins.filter((row) => !row.isLate && activeDaySet.has(formatUtcYmd(row.reportDate))).length;
 
-  const submittedEveningReports = eveningReports.filter((row) => row.submittedAt && activeDaySet.has(formatUtcYmd(row.reportDate)));
-  const eveningOnTimeDays = submittedEveningReports.filter((row) => row.isOnTime).length;
+  const reportMap = new Map<string, Array<(typeof technicalReports)[number]>>();
+  for (const report of technicalReports) {
+    const key = `${formatUtcYmd(report.reportDate)}:${report.taskId}`;
+    const bucket = reportMap.get(key) || [];
+    bucket.push(report);
+    reportMap.set(key, bucket);
+  }
+
+  let eveningOnTimeDays = 0;
+  let totalEvening = 0;
+  let metOrOverCount = 0;
+  let proactiveAccumulator = 0;
+  let proactiveCount = 0;
+
+  for (const checkin of morningCheckins) {
+    const dateKey = formatUtcYmd(checkin.reportDate);
+    if (!activeDaySet.has(dateKey)) continue;
+
+    const pickedTaskIds = checkin.tasks.map((row) => row.taskId);
+    totalEvening += 1;
+
+    const reportsForCheckin = pickedTaskIds
+      .flatMap((taskId) => reportMap.get(`${dateKey}:${taskId}`) || [])
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
+    const uniqueReports = new Map<string, (typeof reportsForCheckin)[number]>();
+    for (const row of reportsForCheckin) {
+      if (!uniqueReports.has(row.taskId)) {
+        uniqueReports.set(row.taskId, row);
+      }
+    }
+
+    const reportRows = Array.from(uniqueReports.values());
+    const allCompleted = pickedTaskIds.length === 0 || reportRows.length === pickedTaskIds.length;
+
+    if (allCompleted) {
+      metOrOverCount += 1;
+
+      const deadline = new Date(`${dateKey}T19:00:00+07:00`);
+      const allBeforeDeadline = reportRows.every((row) => row.updatedAt.getTime() <= deadline.getTime());
+      if (allBeforeDeadline) {
+        eveningOnTimeDays += 1;
+      }
+    }
+
+    for (const row of reportRows) {
+      const hasNote = Boolean((row.note || row.technicalIssue || "").trim());
+      proactiveAccumulator += row.photos.length + (hasNote ? 1 : 0);
+      proactiveCount += 1;
+    }
+  }
 
   const completedTasksInActiveDays = completedTasks.filter((task) => task.actualEndDate && activeDaySet.has(formatUtcYmd(task.actualEndDate)));
   const totalCompletedTasks = completedTasksInActiveDays.length;
   const onScheduleTasks = completedTasksInActiveDays.filter((task) => task.actualEndDate && task.actualEndDate <= task.plannedEndDate).length;
 
-  const totalEvening = submittedEveningReports.length;
-  const metOrOverCount = submittedEveningReports.filter((row) => row.overallRating === DailyRating.MET || row.overallRating === DailyRating.OVER).length;
-
   const totalInspected = inspectionQuality.totalInspected;
   const inspectedPassFirstTime = inspectionQuality.inspectedPassFirstTime;
-
-  let proactiveAccumulator = 0;
-  let proactiveCount = 0;
-
-  for (const report of submittedEveningReports) {
-    for (const taskRow of report.taskReports) {
-      const hasNote = Boolean((taskRow.actualWork || taskRow.actualWorkIfStarted || "").trim());
-      proactiveAccumulator += taskRow.taskPhotos.length + (hasNote ? 1 : 0);
-      proactiveCount += 1;
-    }
-  }
 
   const proactivityRaw = proactiveCount > 0 ? (proactiveAccumulator / proactiveCount) * 10 : 0;
   const reportProactivity = Math.min(100, proactivityRaw);

@@ -48,10 +48,10 @@ export function ReportingHomeClient({ projects }: { projects: ReportProject[] })
             <div className="font-semibold">{project.name}</div>
             <div className="mt-2 text-xs text-[#8892b0]">Go-live: {formatDate(project.goLiveDate)}</div>
             <div className="mt-3 flex gap-2">
-              <Link href={`/reports/morning/${project.id}`}>
+              <Link href={`/reports/${project.id}?tab=morning`}>
                 <Button variant="outline">Báo cáo sáng</Button>
               </Link>
-              <Link href={`/reports/evening/${project.id}`}>
+              <Link href={`/reports/${project.id}?tab=evening`}>
                 <Button variant="outline">Báo cáo chiều</Button>
               </Link>
             </div>
