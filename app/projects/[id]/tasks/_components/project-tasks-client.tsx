@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TaskPhase, TaskStatus } from "@prisma/client";
+import { TaskCategory, TaskPhase, TaskStatus } from "@prisma/client";
 import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -51,6 +51,36 @@ type TaskRow = {
 };
 
 type EngineerOption = { id: string; fullName: string };
+
+type TemplateRow = {
+  id: string;
+  code: string;
+  name: string;
+  phaseCode: string;
+  phaseName: string;
+  category: TaskCategory;
+  defaultDurationDays: number;
+  defaultOffsetDays: number;
+  isMilestone: boolean;
+};
+
+type CreateTaskMode = "none" | "template" | "custom";
+
+type CustomTaskFormState = {
+  name: string;
+  phase: TaskPhase;
+  durationDays: string;
+  offsetDays: string;
+  team: string;
+  inspectorName: string;
+  materialsNeeded: string;
+  proposerRole: string;
+  ordererRole: string;
+  receiverRole: string;
+  isMilestone: boolean;
+  visibleToCustomer: boolean;
+  category: TaskCategory;
+};
 
 type PhaseRow = {
   id: string;
@@ -122,6 +152,30 @@ type PhaseDeleteState = {
 
 const DEFAULT_SORT_BY = "displayOrder";
 const DEFAULT_SORT_DIR: PersistedTaskFilter["sortDir"] = "asc";
+
+const PHASE_CODE_OPTIONS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"];
+
+const TASK_CATEGORY_OPTIONS: Array<{ value: TaskCategory; label: string }> = [
+  { value: TaskCategory.normal, label: "Thường" },
+  { value: TaskCategory.internal_milestone, label: "Milestone nội bộ" },
+  { value: TaskCategory.major_milestone, label: "Milestone chính" },
+];
+
+const DEFAULT_CUSTOM_TASK_FORM: CustomTaskFormState = {
+  name: "",
+  phase: TaskPhase.P1_CHUAN_BI,
+  durationDays: "1",
+  offsetDays: "0",
+  team: "",
+  inspectorName: "",
+  materialsNeeded: "",
+  proposerRole: "",
+  ordererRole: "",
+  receiverRole: "",
+  isMilestone: false,
+  visibleToCustomer: false,
+  category: TaskCategory.normal,
+};
 
 function fmtDate(dateIso: string | null | undefined) {
   if (!dateIso) return "--/--";
@@ -285,6 +339,18 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     confirmRisk: false,
   });
 
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [createTaskMode, setCreateTaskMode] = useState<CreateTaskMode>("none");
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateSubmitting, setTemplateSubmitting] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templatePhaseCode, setTemplatePhaseCode] = useState("");
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [customTaskSubmitting, setCustomTaskSubmitting] = useState(false);
+  const [customTaskForm, setCustomTaskForm] = useState<CustomTaskFormState>(DEFAULT_CUSTOM_TASK_FORM);
+
   const loadedPersistedFilterRef = useRef(false);
   const latestRequestIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -420,6 +486,12 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
 
+  useEffect(() => {
+    if (!createTaskOpen || createTaskMode !== "template") return;
+    void loadTemplateLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createTaskOpen, createTaskMode, templateSearch, templatePhaseCode, templateCategoryFilter]);
+
   function clearFilters() {
     setPhaseFilter("all");
     setStatusFilter("all");
@@ -427,6 +499,149 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setSearchInput("");
     setSearch("");
     setShowDeleted(false);
+  }
+
+  function openCreateTaskModal() {
+    setCreateTaskOpen(true);
+    setCreateTaskMode("none");
+    setTemplates([]);
+    setTemplateSearch("");
+    setTemplatePhaseCode("");
+    setTemplateCategoryFilter("");
+    setSelectedTemplateId("");
+    setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);
+  }
+
+  function closeCreateTaskModal() {
+    if (templateSubmitting || customTaskSubmitting || templateLoading) return;
+    setCreateTaskOpen(false);
+    setCreateTaskMode("none");
+  }
+
+  async function loadTemplateLibrary() {
+    setTemplateLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (templateSearch.trim()) params.set("q", templateSearch.trim());
+      if (templatePhaseCode) params.set("phaseCode", templatePhaseCode);
+      if (templateCategoryFilter) params.set("taskCategory", templateCategoryFilter);
+
+      const res = await fetch(`/api/admin/templates?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => ({}))) as { templates?: TemplateRow[]; message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không tải được thư viện task");
+        setTemplates([]);
+        return;
+      }
+
+      const nextTemplates = data.templates || [];
+      setTemplates(nextTemplates);
+      if (selectedTemplateId && !nextTemplates.some((template) => template.id === selectedTemplateId)) {
+        setSelectedTemplateId("");
+      }
+    } catch {
+      toast.error("Không tải được thư viện task");
+      setTemplates([]);
+    } finally {
+      setTemplateLoading(false);
+    }
+  }
+
+  async function submitCreateFromTemplate() {
+    if (!selectedTemplateId) {
+      toast.error("Vui lòng chọn một template");
+      return;
+    }
+
+    setTemplateSubmitting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/tasks/from-template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: selectedTemplateId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể tạo task từ thư viện");
+        return;
+      }
+
+      toast.success(data.message || "Đã thêm task từ thư viện");
+      setCreateTaskOpen(false);
+      setCreateTaskMode("none");
+      await loadTasks();
+    } finally {
+      setTemplateSubmitting(false);
+    }
+  }
+
+  async function submitCreateCustomTask() {
+    const name = customTaskForm.name.trim();
+    const durationDays = Number(customTaskForm.durationDays);
+    const offsetDays = Number(customTaskForm.offsetDays || "0");
+
+    if (!name || name.length < 3) {
+      toast.error("Tên task tối thiểu 3 ký tự");
+      return;
+    }
+
+    if (!Number.isFinite(durationDays) || durationDays < 1) {
+      toast.error("Số ngày phải >= 1");
+      return;
+    }
+
+    if (!Number.isFinite(offsetDays) || offsetDays < 0) {
+      toast.error("Offset ngày không hợp lệ");
+      return;
+    }
+
+    if (!customTaskForm.inspectorName.trim()) {
+      toast.error("Người nghiệm thu là bắt buộc");
+      return;
+    }
+
+    if (!customTaskForm.proposerRole.trim() || !customTaskForm.ordererRole.trim() || !customTaskForm.receiverRole.trim()) {
+      toast.error("Vui lòng điền đủ vai trò đề xuất/đặt hàng/nhận");
+      return;
+    }
+
+    setCustomTaskSubmitting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/tasks/custom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phase: customTaskForm.phase,
+          durationDays,
+          offsetDays,
+          team: customTaskForm.team.trim() || undefined,
+          inspectorName: customTaskForm.inspectorName.trim(),
+          materialsNeeded: customTaskForm.materialsNeeded.trim() || undefined,
+          proposerRole: customTaskForm.proposerRole.trim(),
+          ordererRole: customTaskForm.ordererRole.trim(),
+          receiverRole: customTaskForm.receiverRole.trim(),
+          isMilestone: customTaskForm.isMilestone,
+          visibleToCustomer: customTaskForm.visibleToCustomer,
+          category: customTaskForm.category,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể tạo task tùy ý");
+        return;
+      }
+
+      toast.success(data.message || "Đã thêm task tùy ý");
+      setCreateTaskOpen(false);
+      setCreateTaskMode("none");
+      setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);
+      await loadTasks();
+    } finally {
+      setCustomTaskSubmitting(false);
+    }
   }
 
   function openCreatePhaseSheet() {
@@ -648,6 +863,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
   const isCanExport = role === "admin" || role === "accountant";
   const canManagePhase = role === "admin" || role === "construction_manager";
+  const canCreateTask = role === "admin" || role === "construction_manager";
   const canDeletePhase = role === "admin";
 
   const activeFilterCount = [phaseFilter !== "all", statusFilter !== "all", !!engineerFilter, !!search, showDeleted].filter(Boolean).length;
@@ -698,6 +914,12 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {canCreateTask ? (
+            <Button className="bg-emerald-500 text-black hover:bg-emerald-400" onClick={openCreateTaskModal}>
+              <Plus className="mr-1 h-4 w-4" />
+              Thêm task
+            </Button>
+          ) : null}
           {canManagePhase ? (
             <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={openCreatePhaseSheet}>
               <Plus className="mr-1 h-4 w-4" />
@@ -940,6 +1162,318 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       </div>
 
       <div className="text-xs text-[#8892b0]">{projectCode ? `Dự án: ${projectCode}` : ""} · Tổng {tasks.length} task</div>
+
+      {createTaskOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4">
+              <button type="button" className="absolute inset-0" onClick={closeCreateTaskModal} aria-label="Đóng" />
+              <div className="relative z-10 w-full max-w-[720px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="text-lg font-semibold text-[#f0f2ff]">Thêm task vào dự án</div>
+                  {createTaskMode !== "none" ? (
+                    <Button
+                      variant="outline"
+                      className="h-8 border-[#2d3249] bg-[#1a1d2e] text-xs"
+                      onClick={() => {
+                        if (templateSubmitting || customTaskSubmitting) return;
+                        setCreateTaskMode("none");
+                      }}
+                    >
+                      Chọn lại loại
+                    </Button>
+                  ) : null}
+                </div>
+
+                {createTaskMode === "none" ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateTaskMode("template");
+                        setSelectedTemplateId("");
+                      }}
+                      className="rounded-2xl border border-[#2d3249] bg-[#1a1d2e] p-4 text-left transition hover:border-emerald-500/40"
+                    >
+                      <div className="text-sm font-semibold text-emerald-300">Task từ thư viện chuẩn</div>
+                      <div className="mt-1 text-xs text-[#a4acc8]">Chọn mẫu có sẵn, giữ checklist QC và thông số mặc định.</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateTaskMode("custom");
+                        setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);
+                      }}
+                      className="rounded-2xl border border-[#2d3249] bg-[#1a1d2e] p-4 text-left transition hover:border-amber-500/40"
+                    >
+                      <div className="text-sm font-semibold text-amber-300">Task tùy ý</div>
+                      <div className="mt-1 text-xs text-[#a4acc8]">Tạo công tác mới với mã TUY-YYYY-XXX và nhập thông tin thủ công.</div>
+                    </button>
+                  </div>
+                ) : null}
+
+                {createTaskMode === "template" ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <input
+                        className="rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={templateSearch}
+                        onChange={(e) => setTemplateSearch(e.target.value)}
+                        placeholder="Tìm code hoặc tên template"
+                        disabled={templateSubmitting}
+                      />
+                      <select
+                        className="rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={templatePhaseCode}
+                        onChange={(e) => setTemplatePhaseCode(e.target.value)}
+                        disabled={templateSubmitting}
+                      >
+                        <option value="">Tất cả phase</option>
+                        {PHASE_CODE_OPTIONS.map((phaseCode) => (
+                          <option key={phaseCode} value={phaseCode}>
+                            {phaseCode}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                        value={templateCategoryFilter}
+                        onChange={(e) => setTemplateCategoryFilter(e.target.value)}
+                        disabled={templateSubmitting}
+                      >
+                        <option value="">Tất cả loại task</option>
+                        {TASK_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {templateLoading ? <div className="text-sm text-[#8892b0]">Đang tải thư viện...</div> : null}
+
+                    {!templateLoading && templates.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[#2d3249] bg-[#1a1d2e] p-4 text-sm text-[#8892b0]">Không có template phù hợp.</div>
+                    ) : null}
+
+                    {!templateLoading ? (
+                      <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+                        {templates.map((template) => {
+                          const selected = selectedTemplateId === template.id;
+                          return (
+                            <button
+                              key={template.id}
+                              type="button"
+                              className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                                selected ? "border-emerald-500/50 bg-emerald-500/10" : "border-[#2d3249] bg-[#1a1d2e]"
+                              }`}
+                              onClick={() => setSelectedTemplateId(template.id)}
+                              disabled={templateSubmitting}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-semibold text-[#f0f2ff]">
+                                  {template.code} - {template.name}
+                                </div>
+                                <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] text-[#a4acc8]">{template.phaseCode}</span>
+                              </div>
+                              <div className="mt-1 text-xs text-[#8892b0]">
+                                {template.phaseName} · {template.defaultDurationDays} ngày · Offset {template.defaultOffsetDays} ngày
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={closeCreateTaskModal} disabled={templateSubmitting || templateLoading}>
+                        Hủy
+                      </Button>
+                      <Button
+                        className="bg-emerald-500 text-black hover:bg-emerald-400"
+                        onClick={submitCreateFromTemplate}
+                        disabled={!selectedTemplateId || templateSubmitting || templateLoading}
+                      >
+                        {templateSubmitting ? "Đang tạo..." : "Tạo task từ thư viện"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {createTaskMode === "custom" ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Tên task</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.name}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, name: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Phase</label>
+                        <select
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.phase}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, phase: e.target.value as TaskPhase }))}
+                          disabled={customTaskSubmitting}
+                        >
+                          {Object.entries(PHASE_LABEL).map(([phase, label]) => (
+                            <option key={phase} value={phase}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Loại task</label>
+                        <select
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.category}
+                          onChange={(e) =>
+                            setCustomTaskForm((prev) => ({
+                              ...prev,
+                              category: e.target.value as TaskCategory,
+                            }))
+                          }
+                          disabled={customTaskSubmitting}
+                        >
+                          {TASK_CATEGORY_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Số ngày</label>
+                        <input
+                          type="number"
+                          min={1}
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.durationDays}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, durationDays: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Offset ngày</label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.offsetDays}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, offsetDays: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Team</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.team}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, team: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Người nghiệm thu</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.inspectorName}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, inspectorName: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Ai đề xuất</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.proposerRole}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, proposerRole: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Ai đặt hàng</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.ordererRole}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, ordererRole: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Ai nhận</label>
+                        <input
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.receiverRole}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, receiverRole: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-xs text-[#a4acc8]">Vật tư cần</label>
+                        <textarea
+                          rows={2}
+                          className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                          value={customTaskForm.materialsNeeded}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, materialsNeeded: e.target.value }))}
+                          disabled={customTaskSubmitting}
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs text-[#d9def3]">
+                        <input
+                          type="checkbox"
+                          checked={customTaskForm.isMilestone}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, isMilestone: e.target.checked }))}
+                          disabled={customTaskSubmitting}
+                        />
+                        Đánh dấu milestone
+                      </label>
+
+                      <label className="flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs text-[#d9def3]">
+                        <input
+                          type="checkbox"
+                          checked={customTaskForm.visibleToCustomer}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, visibleToCustomer: e.target.checked }))}
+                          disabled={customTaskSubmitting}
+                        />
+                        Hiển thị cho chủ nhà
+                      </label>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={closeCreateTaskModal} disabled={customTaskSubmitting}>
+                        Hủy
+                      </Button>
+                      <Button
+                        className="bg-amber-500 text-black hover:bg-amber-400"
+                        onClick={submitCreateCustomTask}
+                        disabled={customTaskSubmitting}
+                      >
+                        {customTaskSubmitting ? "Đang tạo..." : "Tạo task tùy ý"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {phaseForm.open && typeof document !== "undefined"
         ? createPortal(

@@ -156,7 +156,7 @@ function resolveTemplatePayload(input: unknown) {
 
 export async function GET(request: Request) {
   try {
-    await requireRole(["admin"]);
+    await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return mapAuthError(error) || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
   }

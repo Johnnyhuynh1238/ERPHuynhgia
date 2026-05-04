@@ -1,595 +1,343 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-type QcStatus = "unchecked" | "passed" | "failed";
-
-type QcPhoto = {
+type QcMissionTemplate = {
   id: string;
-  url: string;
-  uploadedAt: string;
+  preparationSteps: string | null;
+  executionSteps: string | null;
+  commonMistakes: string | null;
+  beforeQcSteps: string | null;
 };
 
-type QcProgress = {
-  status: QcStatus;
-  note: string | null;
-  noPhotoReason: boolean;
+type QcTemplateResponse = {
+  taskId: string;
+  qcChecklist?: string | null;
+  qcTemplate: QcMissionTemplate | null;
+  items: Array<{
+    id: string;
+    displayOrder: number;
+    title: string;
+    description: string | null;
+    requirePhoto: boolean;
+  }>;
 };
 
-type QcItem = {
-  id: string;
-  content: string;
-  requirePhoto: boolean;
-  requireNote: boolean;
-  orderIndex: number;
-  progress: QcProgress | null;
-  photos: QcPhoto[];
+type QcResultRow = {
+  item: {
+    id: string;
+    displayOrder: number;
+    title: string;
+    description: string | null;
+    requirePhoto: boolean;
+  };
+  result: {
+    id: string;
+    isPassed: boolean;
+    photoUrl: string | null;
+    note: string | null;
+    checkedAt: string;
+    updatedAt: string;
+    checkedBy: { id: string; fullName: string; email: string };
+  } | null;
 };
+
+type QcResultsResponse = {
+  taskId: string;
+  status: string;
+  canUpdate: boolean;
+  items: QcResultRow[];
+  summary: {
+    total: number;
+    passed: number;
+    remaining: number;
+    completed: boolean;
+  };
+};
+
+type QcSubTab = "missions" | "checklist";
+
+function fmtDateTime(input: string | null | undefined) {
+  if (!input) return "-";
+  return new Date(input).toLocaleString("vi-VN");
+}
 
 export function QcSection({
   taskId,
   canUpdateQc,
-  canManageItem,
 }: {
   taskId: string;
   canUpdateQc: boolean;
-  canManageItem: boolean;
+  canManageItem?: boolean;
 }) {
-  const [items, setItems] = useState<QcItem[]>([]);
+  const [activeTab, setActiveTab] = useState<QcSubTab>("missions");
   const [loading, setLoading] = useState(false);
-  const [newContent, setNewContent] = useState("");
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [showSubmitQc, setShowSubmitQc] = useState(false);
-  const [overallComment, setOverallComment] = useState("");
-  const [issueNote, setIssueNote] = useState("");
-  const [suggestion, setSuggestion] = useState("");
-  const [viewer, setViewer] = useState<{ itemId: string; index: number } | null>(null);
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [editRequirePhoto, setEditRequirePhoto] = useState(false);
-  const [editRequireNote, setEditRequireNote] = useState(false);
-  const sectionRef = useRef<HTMLDivElement | null>(null);
+  const [savingByItem, setSavingByItem] = useState<Record<string, boolean>>({});
+  const [mission, setMission] = useState<QcTemplateResponse | null>(null);
+  const [results, setResults] = useState<QcResultsResponse | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File | null>>({});
 
-  async function loadItems() {
+  const locked = useMemo(() => {
+    const status = results?.status || "";
+    return ["done", "internal_approved", "completed"].includes(status);
+  }, [results?.status]);
+
+  const canEdit = canUpdateQc && Boolean(results?.canUpdate) && !locked;
+
+  async function loadData() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/qc-items`, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Không tải được QC items");
-      setItems(json.items || []);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không tải được QC items");
+      const [templateRes, resultsRes] = await Promise.all([
+        fetch(`/api/tasks/${taskId}/qc-template`, { cache: "no-store" }),
+        fetch(`/api/tasks/${taskId}/qc-results`, { cache: "no-store" }),
+      ]);
+
+      const templateJson = await templateRes.json().catch(() => ({} as { message?: string }));
+      const resultsJson = await resultsRes.json().catch(() => ({} as { message?: string }));
+
+      if (!templateRes.ok) throw new Error(templateJson.message || "Không tải được nhiệm vụ QC");
+      if (!resultsRes.ok) throw new Error(resultsJson.message || "Không tải được checklist QC");
+
+      setMission(templateJson);
+      setResults(resultsJson);
+      const nextNotes: Record<string, string> = {};
+      (resultsJson.items || []).forEach((row: QcResultRow) => {
+        nextNotes[row.item.id] = row.result?.note || "";
+      });
+      setNotes(nextNotes);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không tải được dữ liệu QC");
     } finally {
       setLoading(false);
     }
   }
 
-  async function updateItem(
-    itemId: string,
-    payload: Partial<{
-      status: QcStatus;
-      note: string;
-      noPhotoReason: boolean;
-      content: string;
-      requirePhoto: boolean;
-      requireNote: boolean;
-    }>,
-  ) {
-    const res = await fetch(`/api/tasks/${taskId}/qc-items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Cập nhật QC thất bại");
-      return;
-    }
-    setItems((prev) => prev.map((x) => (x.id === itemId ? json.item : x)));
-  }
-
-  function closeAddItemModal() {
-    setShowAddItem(false);
-    setNewContent("");
-  }
-
-  function startEditItem(item: QcItem) {
-    setEditingItemId(item.id);
-    setEditContent(item.content);
-    setEditRequirePhoto(Boolean(item.requirePhoto));
-    setEditRequireNote(Boolean(item.requireNote));
-  }
-
-  function cancelEditItem() {
-    setEditingItemId(null);
-    setEditContent("");
-    setEditRequirePhoto(false);
-    setEditRequireNote(false);
-  }
-
-  async function saveEditItem(itemId: string) {
-    const content = editContent.trim();
-    if (!content) {
-      toast.error("Nội dung mục QC là bắt buộc");
-      return;
-    }
-
-    const res = await fetch(`/api/tasks/${taskId}/qc-items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content,
-        requirePhoto: editRequirePhoto,
-        requireNote: editRequireNote,
-      }),
-    });
-
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Sửa mục QC thất bại");
-      return;
-    }
-
-    setItems((prev) => prev.map((x) => (x.id === itemId ? json.item : x)));
-    toast.success(json.message || "Đã cập nhật mục QC");
-    cancelEditItem();
-  }
-
-  async function deleteItem(item: QcItem) {
-    const confirmed = window.confirm(`Xóa mục QC: ${item.content}?`);
-    if (!confirmed) return;
-
-    const res = await fetch(`/api/tasks/${taskId}/qc-items/${item.id}`, {
-      method: "DELETE",
-    });
-
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Xóa mục QC thất bại");
-      return;
-    }
-
-    setItems((prev) => prev.filter((x) => x.id !== item.id));
-    toast.success(json.message || "Đã xóa mục QC");
-  }
-
-  function closeSubmitQcModal() {
-    setShowSubmitQc(false);
-    setOverallComment("");
-    setIssueNote("");
-    setSuggestion("");
-  }
-
-  async function addItem() {
-    if (!newContent.trim()) {
-      toast.error("Nhập nội dung mục QC");
-      return;
-    }
-    const res = await fetch(`/api/tasks/${taskId}/qc-items`, {
+  async function uploadPhoto(file: File) {
+    const form = new FormData();
+    form.append("files", file);
+    const res = await fetch(`/api/tasks/${taskId}/photos`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newContent.trim() }),
+      body: form,
     });
-    const json = await res.json().catch(() => ({}));
+    const json = await res.json().catch(() => ({} as { message?: string; photos?: Array<{ photoUrl: string }> }));
     if (!res.ok) {
-      toast.error(json.message || "Thêm mục QC thất bại");
-      return;
+      throw new Error(json.message || "Upload ảnh thất bại");
     }
-    setItems((prev) => [...prev, json.item].sort((a, b) => a.orderIndex - b.orderIndex));
-    closeAddItemModal();
+    const photoUrl = json.photos?.[0]?.photoUrl;
+    if (!photoUrl) {
+      throw new Error("Không lấy được URL ảnh upload");
+    }
+    return photoUrl;
   }
 
-  async function uploadFiles(itemId: string, files: FileList | null) {
-    if (!files || files.length === 0) return;
-    const formData = new FormData();
-    formData.append("qcItemId", itemId);
-    Array.from(files).forEach((f) => formData.append("files", f));
+  async function saveItem(itemId: string, isPassed: boolean) {
+    const row = results?.items.find((x) => x.item.id === itemId);
+    if (!row || !results) return;
 
-    const res = await fetch(`/api/tasks/${taskId}/qc-photos`, {
-      method: "POST",
-      body: formData,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Upload ảnh QC thất bại");
-      return;
-    }
-    toast.success(json.message || "Đã upload ảnh QC");
-    await loadItems();
-  }
+    setSavingByItem((prev) => ({ ...prev, [itemId]: true }));
 
-  async function deletePhoto(photoId: string) {
-    const res = await fetch(`/api/tasks/${taskId}/qc-photos/${photoId}`, {
-      method: "DELETE",
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Xóa ảnh thất bại");
-      return;
-    }
-    toast.success(json.message || "Đã xóa ảnh QC");
-    await loadItems();
-  }
+    try {
+      let photoUrl = row.result?.photoUrl || "";
+      const picked = files[itemId];
+      if (picked) {
+        photoUrl = await uploadPhoto(picked);
+      }
 
-  async function submitQc() {
-    const res = await fetch(`/api/tasks/${taskId}/qc-submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ overallComment, issueNote, suggestion }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Gửi báo cáo QC thất bại");
-      return;
+      if (isPassed && row.item.requirePhoto && !photoUrl) {
+        throw new Error("Tiêu chí này bắt buộc ảnh minh chứng");
+      }
+
+      const res = await fetch(`/api/tasks/${taskId}/qc-results/${itemId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isPassed,
+          photoUrl: photoUrl || undefined,
+          note: notes[itemId] || undefined,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({} as { message?: string }));
+      if (!res.ok) {
+        throw new Error(json.message || "Lưu checklist QC thất bại");
+      }
+
+      setFiles((prev) => ({ ...prev, [itemId]: null }));
+      toast.success("Đã auto-save checklist QC");
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Lưu checklist QC thất bại");
+    } finally {
+      setSavingByItem((prev) => ({ ...prev, [itemId]: false }));
     }
-    toast.success(json.message || "Đã gửi báo cáo QC");
-    closeSubmitQcModal();
   }
 
   useEffect(() => {
-    loadItems();
+    void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      if (!sectionRef.current) return;
-      if (viewer || showAddItem || showSubmitQc) return;
-      if (!sectionRef.current.contains(event.target as Node)) {
-        setExpandedItemId(null);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [viewer, showAddItem, showSubmitQc]);
-
-  const total = items.length;
-  const passed = useMemo(() => items.filter((x) => x.progress?.status === "passed").length, [items]);
-  const progress = total > 0 ? Math.round((passed / total) * 100) : 0;
-
-  const currentItem = useMemo(() => items.find((x) => x.id === viewer?.itemId) ?? null, [items, viewer?.itemId]);
-  const currentPhotos = currentItem?.photos ?? [];
-  const currentIndex = viewer?.index ?? 0;
-  const currentPhoto = currentPhotos[currentIndex] ?? null;
-
-  function prevPhoto() {
-    if (!viewer || currentPhotos.length === 0) return;
-    setViewer({ ...viewer, index: (currentIndex - 1 + currentPhotos.length) % currentPhotos.length });
-  }
-
-  function nextPhoto() {
-    if (!viewer || currentPhotos.length === 0) return;
-    setViewer({ ...viewer, index: (currentIndex + 1) % currentPhotos.length });
-  }
-
-  function toggleExpanded(itemId: string) {
-    setExpandedItemId((prev) => (prev === itemId ? null : itemId));
-  }
-
-  function getItemStatus(item: QcItem): QcStatus {
-    return item.progress?.status ?? "unchecked";
-  }
-
-  function getItemCardClass(item: QcItem) {
-    const status = getItemStatus(item);
-    if (status === "passed") return "border-emerald-400 bg-emerald-50";
-    if (status === "failed") return "border-rose-400 bg-rose-50";
-    return "border-slate-200 bg-white";
-  }
-
   return (
-    <div ref={sectionRef} className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold">QC Checklist mới</div>
-          <div className="text-xs text-slate-500">
-            Đã đạt {passed}/{total} ({progress}%)
+    <div className="space-y-3">
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("missions")}
+          className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${
+            activeTab === "missions" ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"
+          }`}
+        >
+          Nhiệm vụ
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("checklist")}
+          className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${
+            activeTab === "checklist" ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"
+          }`}
+        >
+          Checklist QC
+        </button>
+      </div>
+
+      {activeTab === "missions" ? (
+        <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Hướng dẫn nhiệm vụ QC</div>
+          {loading ? <div className="text-sm text-[#8891aa]">Đang tải...</div> : null}
+
+          {!loading && !mission?.qcTemplate && !mission?.qcChecklist ? (
+            <div className="text-sm text-[#8891aa]">Task này không có checklist QC mẫu.</div>
+          ) : null}
+
+          {mission?.qcTemplate?.preparationSteps ? (
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+              <div className="text-xs font-semibold text-amber-300">Chuẩn bị trước khi làm</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.preparationSteps}</div>
+            </div>
+          ) : null}
+
+          {mission?.qcTemplate?.executionSteps ? (
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+              <div className="text-xs font-semibold text-amber-300">Các bước thực hiện</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.executionSteps}</div>
+            </div>
+          ) : null}
+
+          {mission?.qcTemplate?.commonMistakes ? (
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+              <div className="text-xs font-semibold text-amber-300">Lỗi thường gặp</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.commonMistakes}</div>
+            </div>
+          ) : null}
+
+          {mission?.qcTemplate?.beforeQcSteps ? (
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+              <div className="text-xs font-semibold text-amber-300">Trước khi gọi QC</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.beforeQcSteps}</div>
+            </div>
+          ) : null}
+
+          {!mission?.qcTemplate && mission?.qcChecklist ? (
+            <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
+              <div className="text-xs font-semibold text-amber-300">Checklist tham chiếu</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcChecklist}</div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === "checklist" ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Checklist QC auto-save</div>
+              <Button variant="outline" className="border-[#2e3347] bg-[#222637]" onClick={loadData} disabled={loading}>
+                {loading ? "Đang tải..." : "Làm mới"}
+              </Button>
+            </div>
+            <div className="mt-2 text-xs text-[#8891aa]">
+              Đạt {results?.summary.passed || 0}/{results?.summary.total || 0} · Còn {results?.summary.remaining || 0}
+            </div>
+            {locked ? <div className="mt-2 text-xs text-amber-300">Task đã Done/Approved, checklist chỉ xem.</div> : null}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {progress === 100 && total > 0 ? (
-            <Button size="sm" onClick={() => setShowSubmitQc(true)} title="Gửi duyệt QC">
-              Gửi duyệt
-            </Button>
-          ) : null}
-          {canManageItem ? (
-            <Button variant="outline" size="sm" onClick={() => setShowAddItem(true)} title="Thêm mục QC">
-              +
-            </Button>
-          ) : null}
-          <Button variant="outline" size="sm" onClick={loadItems} disabled={loading}>
-            {loading ? "Đang tải..." : "Làm mới QC"}
-          </Button>
-        </div>
-      </div>
 
-      <div className="h-2 rounded bg-slate-200">
-        <div className="h-2 rounded bg-emerald-500" style={{ width: `${progress}%` }} />
-      </div>
+          {(results?.items || []).length === 0 ? (
+            <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm text-[#8891aa]">Chưa có tiêu chí checklist.</div>
+          ) : (
+            (results?.items || []).map((row) => {
+              const saving = Boolean(savingByItem[row.item.id]);
+              const checked = Boolean(row.result?.isPassed);
+              const requirePhoto = row.item.requirePhoto;
 
-      <div className="space-y-3">
-        {items.map((item) => {
-          const expanded = expandedItemId === item.id;
-          const status = getItemStatus(item);
-          return (
-            <div key={item.id} className={`rounded-lg border p-3 ${getItemCardClass(item)}`}>
-              {canManageItem ? (
-                <div className="mb-2 flex justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => startEditItem(item)}>
-                    Sửa
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteItem(item)}>
-                    Xóa
-                  </Button>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => toggleExpanded(item.id)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-              >
-                <div className="text-sm font-semibold">{item.content}</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="rounded px-2 py-0.5 bg-black/5">
-                    {status === "passed" ? "Hoàn thành" : status === "failed" ? "Không đạt" : "Chưa làm"}
-                  </span>
-                  <span>{expanded ? "▲" : "▼"}</span>
-                </div>
-              </button>
-
-              {expanded ? (
-                <div className="mt-3">
-                  <div className="mb-2 text-[11px] text-slate-600">
-                    {item.requirePhoto ? "Bắt buộc ảnh" : "Ảnh tùy chọn"} · {item.requireNote ? "Bắt buộc ghi chú" : "Ghi chú tùy chọn"}
+              return (
+                <div key={row.item.id} className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-[#f0f2f8]">
+                        {row.item.displayOrder}. {row.item.title}
+                      </div>
+                      {row.item.description ? <div className="mt-1 text-xs text-[#8891aa]">{row.item.description}</div> : null}
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-xs text-[#c8d0e8]">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!canEdit || saving}
+                        onChange={(e) => {
+                          void saveItem(row.item.id, e.target.checked);
+                        }}
+                      />
+                      Đạt
+                    </label>
                   </div>
 
-                  <div className="mb-2 flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={item.progress?.status === "unchecked" ? "default" : "outline"}
-                      disabled={!canUpdateQc}
-                      onClick={() => updateItem(item.id, { status: "unchecked" })}
-                    >
-                      ⬜
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={item.progress?.status === "passed" ? "default" : "outline"}
-                      disabled={!canUpdateQc}
-                      onClick={() => updateItem(item.id, { status: "passed" })}
-                    >
-                      ✅
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={item.progress?.status === "failed" ? "destructive" : "outline"}
-                      disabled={!canUpdateQc}
-                      onClick={() => updateItem(item.id, { status: "failed" })}
-                    >
-                      ❌
-                    </Button>
+                  <div className="text-xs text-[#8891aa]">
+                    {requirePhoto ? "Bắt buộc ảnh minh chứng" : "Ảnh tùy chọn"}
+                    {row.result?.checkedAt ? ` · Cập nhật: ${fmtDateTime(row.result.checkedAt)}` : ""}
                   </div>
+
+                  {row.result?.photoUrl ? (
+                    <a href={row.result.photoUrl} target="_blank" rel="noreferrer" className="inline-block text-xs text-amber-300 underline">
+                      Xem ảnh đã lưu
+                    </a>
+                  ) : null}
+
+                  {canEdit ? (
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="block w-full text-xs"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setFiles((prev) => ({ ...prev, [row.item.id]: file }));
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  ) : null}
+
+                  {files[row.item.id] ? <div className="text-xs text-amber-300">Đã chọn ảnh mới: {files[row.item.id]?.name}</div> : null}
 
                   <textarea
-                    className="w-full rounded border px-2 py-1 text-sm"
+                    value={notes[row.item.id] || ""}
+                    onChange={(e) => setNotes((prev) => ({ ...prev, [row.item.id]: e.target.value }))}
+                    onBlur={() => {
+                      if (!canEdit || saving) return;
+                      void saveItem(row.item.id, checked);
+                    }}
+                    disabled={!canEdit || saving}
                     rows={2}
-                    placeholder="Ghi chú mục QC..."
-                    defaultValue={item.progress?.note || ""}
-                    onBlur={(e) => updateItem(item.id, { note: e.target.value })}
-                    disabled={!canUpdateQc}
+                    placeholder="Ghi chú QC (auto-save khi rời ô)"
+                    className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm"
                   />
 
-                  <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.progress?.noPhotoReason)}
-                      onChange={(e) => updateItem(item.id, { noPhotoReason: e.target.checked })}
-                      disabled={!canUpdateQc}
-                    />
-                    Task không có ảnh
-                  </label>
-
-                  <div className="mt-3 rounded border border-slate-200 p-2">
-                    <div className="mb-2 text-xs font-semibold text-slate-600">Ảnh bằng chứng ({item.photos.length})</div>
-
-                    {item.photos.length > 0 ? (
-                      <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                        {item.photos.map((photo, idx) => (
-                          <div key={photo.id} className="space-y-1">
-                            <button
-                              type="button"
-                              onClick={() => setViewer({ itemId: item.id, index: idx })}
-                              className="block w-full overflow-hidden rounded border border-slate-200"
-                            >
-                              <img
-                                src={`/api/tasks/${taskId}/qc-photos/${photo.id}/file`}
-                                alt={`QC photo ${idx + 1}`}
-                                className="h-20 w-full object-cover"
-                                loading="lazy"
-                              />
-                            </button>
-                            {canUpdateQc ? (
-                              <button className="text-[11px] text-red-500 underline" onClick={() => deletePhoto(photo.id)}>
-                                Xóa
-                              </button>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mb-2 text-xs text-slate-500">Chưa có ảnh</div>
-                    )}
-
-                    {canUpdateQc ? (
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={async (e) => {
-                          await uploadFiles(item.id, e.target.files);
-                          e.currentTarget.value = "";
-                        }}
-                        className="block w-full text-xs"
-                      />
-                    ) : null}
-                  </div>
+                  {saving ? <div className="text-xs text-[#8891aa]">Đang lưu...</div> : null}
                 </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-
-      {editingItemId ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={cancelEditItem}>
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-base font-semibold">Sửa mục QC</div>
-              <button className="text-sm text-slate-500" onClick={cancelEditItem}>
-                Đóng
-              </button>
-            </div>
-
-            <textarea
-              autoFocus
-              className="w-full rounded border px-3 py-2 text-sm"
-              rows={4}
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              placeholder="Nhập nội dung mục QC..."
-            />
-
-            <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={editRequirePhoto} onChange={(e) => setEditRequirePhoto(e.target.checked)} />
-              Bắt buộc ảnh
-            </label>
-
-            <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={editRequireNote} onChange={(e) => setEditRequireNote(e.target.checked)} />
-              Bắt buộc ghi chú
-            </label>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={cancelEditItem}>
-                Hủy
-              </Button>
-              <Button size="sm" onClick={() => saveEditItem(editingItemId)}>
-                Lưu
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showAddItem ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeAddItemModal}>
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-base font-semibold">Thêm mục QC</div>
-              <button className="text-sm text-slate-500" onClick={closeAddItemModal}>
-                Đóng
-              </button>
-            </div>
-            <textarea
-              autoFocus
-              className="w-full rounded border px-3 py-2 text-sm"
-              rows={4}
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              placeholder="Nhập tiêu đề mục QC mới..."
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={closeAddItemModal}>
-                Hủy
-              </Button>
-              <Button size="sm" onClick={addItem}>
-                Lưu mục QC
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showSubmitQc ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeSubmitQcModal}>
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="text-base font-semibold">Gửi duyệt QC</div>
-                <div className="text-xs text-slate-500">QC đã đạt 100%. KS nhập đánh giá tổng thể trước khi gửi TPTC.</div>
-              </div>
-              <button className="text-sm text-slate-500" onClick={closeSubmitQcModal}>
-                Đóng
-              </button>
-            </div>
-            <div className="space-y-2">
-              <textarea
-                autoFocus
-                className="w-full rounded border px-3 py-2 text-sm"
-                rows={3}
-                placeholder="Nhận xét tổng thể *"
-                value={overallComment}
-                onChange={(e) => setOverallComment(e.target.value)}
-              />
-              <textarea
-                className="w-full rounded border px-3 py-2 text-sm"
-                rows={2}
-                placeholder="Vấn đề phát sinh"
-                value={issueNote}
-                onChange={(e) => setIssueNote(e.target.value)}
-              />
-              <textarea
-                className="w-full rounded border px-3 py-2 text-sm"
-                rows={2}
-                placeholder="Đề xuất"
-                value={suggestion}
-                onChange={(e) => setSuggestion(e.target.value)}
-              />
-            </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={closeSubmitQcModal}>
-                Hủy
-              </Button>
-              <Button size="sm" onClick={submitQc}>
-                Gửi lên TPTC
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {viewer && currentPhoto ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setViewer(null)}>
-          <div className="relative w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
-            <button className="absolute right-0 top-0 rounded bg-black/50 px-3 py-1 text-sm text-white" onClick={() => setViewer(null)}>
-              Đóng
-            </button>
-            <div className="relative mt-8 aspect-[16/10] w-full overflow-hidden rounded-lg bg-black">
-              <Image src={`/api/tasks/${taskId}/qc-photos/${currentPhoto.id}/file`} alt="QC full" fill unoptimized className="object-contain" />
-            </div>
-            {currentPhotos.length > 1 ? (
-              <div className="mt-3 flex items-center justify-between">
-                <Button variant="outline" onClick={prevPhoto}>
-                  ← Trước
-                </Button>
-                <div className="text-xs text-slate-200">
-                  Ảnh {currentIndex + 1}/{currentPhotos.length} (cùng mục QC)
-                </div>
-                <Button variant="outline" onClick={nextPhoto}>
-                  Sau →
-                </Button>
-              </div>
-            ) : (
-              <div className="mt-3 text-center text-xs text-slate-300">Chỉ có 1 ảnh trong mục QC này</div>
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
       ) : null}
     </div>

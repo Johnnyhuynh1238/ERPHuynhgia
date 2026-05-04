@@ -27,7 +27,9 @@ export const PHASE_COLOR: Record<TaskPhase, string> = {
 export const STATUS_LABEL: Record<TaskStatus, string> = {
   not_started: "Chưa bắt đầu",
   in_progress: "Đang làm",
-  done: "Đã xong",
+  done: "KS hoàn thành",
+  internal_approved: "Đã duyệt nội bộ",
+  completed: "Hoàn tất",
   inspected: "Đã nghiệm thu",
   delayed: "Trễ",
   na: "Không áp dụng",
@@ -36,7 +38,9 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
 export const STATUS_CLASS: Record<TaskStatus, string> = {
   not_started: "bg-zinc-700/50 text-zinc-200",
   in_progress: "bg-orange-500/20 text-orange-200",
-  done: "bg-zinc-500/70 text-zinc-100",
+  done: "bg-blue-500/20 text-blue-200",
+  internal_approved: "bg-indigo-500/20 text-indigo-200",
+  completed: "bg-emerald-500/20 text-emerald-200",
   inspected: "bg-emerald-500/20 text-emerald-200",
   delayed: "bg-red-500/20 text-red-200",
   na: "bg-zinc-800 text-zinc-400",

@@ -7,6 +7,8 @@ import { PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
 import { QcSection } from "./qc-section";
 import { MaterialSection } from "./material-section";
 import { JournalSection } from "./journal-section";
+import { TaskProgressSection } from "./task-progress-section";
+import { TaskStatusFlow } from "./task-status-flow";
 
 type TaskDetail = {
   id: string;
@@ -14,8 +16,10 @@ type TaskDetail = {
   phase: keyof typeof PHASE_LABEL;
   name: string;
   isMilestone: boolean;
+  origin: "template" | "custom";
+  category: "normal" | "internal_milestone" | "major_milestone";
   visibleToCustomer?: boolean;
-  status: "not_started" | "in_progress" | "done" | "inspected" | "delayed" | "na";
+  status: "not_started" | "in_progress" | "done" | "internal_approved" | "completed" | "inspected" | "delayed" | "na";
   plannedStartDate: string;
   plannedEndDate: string;
   actualStartDate: string | null;
@@ -48,7 +52,7 @@ const reportTypeConfig = {
 
 type ReportType = keyof typeof reportTypeConfig;
 
-type MainTab = "overview" | "technical" | "material" | "labor" | "equipment" | "subcontractor" | "journal";
+type MainTab = "overview" | "progress" | "technical" | "material" | "labor" | "equipment" | "subcontractor" | "journal";
 type TechnicalSubTab = "requirements" | "method" | "drawings" | "qc" | "today" | "history";
 type ResourceSubTab = "today" | "history" | "planning";
 type JournalSubTab = "all" | "photos" | "qc" | "issues";
@@ -104,7 +108,7 @@ function groupRowsByDay(rows: any[]) {
 
 function parseMainTab(input: string | null): MainTab {
   const value = (input || "").toLowerCase();
-  if (["overview", "technical", "material", "labor", "equipment", "subcontractor", "journal"].includes(value)) return value as MainTab;
+  if (["overview", "progress", "technical", "material", "labor", "equipment", "subcontractor", "journal"].includes(value)) return value as MainTab;
   if (value === "qc") return "technical";
   if (value === "reports" || value === "history") return "technical";
   return "overview";
@@ -148,7 +152,7 @@ export function TaskDetailClient({
   const [task] = useState<TaskDetail>(initialTask);
   const [logs] = useState<TaskLog[]>(initialLogs);
   const [activeTab, setActiveTab] = useState<MainTab>(initialMain);
-  const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(params.get("tab") === "history" ? "history" : "today");
+  const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(params.get("tab") === "history" ? "history" : "qc");
   const [materialSubTab, setMaterialSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "material" ? "history" : "today");
   const [laborSubTab, setLaborSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "labor" ? "history" : "today");
   const [equipmentSubTab, setEquipmentSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "equipment" ? "history" : "today");
@@ -188,7 +192,8 @@ export function TaskDetailClient({
 
   const tabs: { key: MainTab; label: string }[] = [
     { key: "overview", label: "Tổng quan" },
-    { key: "technical", label: "Kỹ thuật" },
+    { key: "progress", label: "Tiến độ" },
+    { key: "technical", label: "QC" },
     { key: "material", label: "Vật tư" },
     { key: "labor", label: "Nhân công" },
     { key: "equipment", label: "Máy móc" },
@@ -514,7 +519,7 @@ export function TaskDetailClient({
   return (
     <div className="min-h-screen bg-[#0f1117] text-[#f0f2f8]">
       <div className="sticky top-0 z-40 border-b border-[#2e3347] bg-[#0f1117] px-4 pb-0 pt-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2"><div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div><span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[task.status]}`}>{STATUS_LABEL[task.status]}</span></div>
+        <div className="mb-2 flex flex-wrap items-center gap-2"><div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div><span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span></div>
         <div className="mb-2 text-base font-bold">{task.name}</div>
 
         <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -532,10 +537,7 @@ export function TaskDetailClient({
         {activeTab === "technical" ? (
           <div className="flex gap-2 overflow-x-auto py-2">
             {[
-              { key: "requirements", label: "YC kỹ thuật" },
-              { key: "method", label: "Biện pháp TC" },
-              { key: "drawings", label: "Bản vẽ" },
-              { key: "qc", label: "QC checklist" },
+              { key: "qc", label: "Checklist QC" },
               { key: "today", label: "Báo cáo hôm nay" },
               { key: "history", label: "Lịch sử" },
             ].map((item) => (
@@ -608,14 +610,19 @@ export function TaskDetailClient({
               </div>
             ) : null}
 
-            {canChangeStatus ? (
-              <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Trạng thái</div>
-                <div className="grid grid-cols-2 gap-2">{(Object.keys(STATUS_LABEL) as TaskDetail["status"][]).map((k) => <button key={k} className={`rounded-xl border px-3 py-2 text-xs ${status === k ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] bg-[#222637] text-[#8891aa]"}`} onClick={() => setStatus(k)}>{STATUS_LABEL[k]}</button>)}</div>
-                <Button className="mt-3 w-full bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => patchTask("status", { status })}>Cập nhật trạng thái</Button>
-              </div>
-            ) : null}
+            <TaskStatusFlow
+              taskId={task.id}
+              status={status}
+              category={task.category}
+              currentUserRole={currentUserRole}
+              canUpdateQc={canUpdateQc}
+              onStatusChanged={(nextStatus) => setStatus(nextStatus)}
+            />
           </div>
+        ) : null}
+
+        {activeTab === "progress" ? (
+          <TaskProgressSection taskId={task.id} canUpdate={canUpdateQc} />
         ) : null}
 
         {activeTab === "technical" ? (

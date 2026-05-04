@@ -1,0 +1,192 @@
+import { NextResponse } from "next/server";
+import { TaskActivityType, TaskLogType, TaskStatus } from "@prisma/client";
+import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
+
+const createProgressSchema = z.object({
+  progressPercent: z.number().int().min(0).max(100),
+  photoUrl: z.string().trim().min(1, "Ảnh tiến độ là bắt buộc"),
+  reason: z.string().optional(),
+  note: z.string().optional(),
+});
+
+const LOCKED_STATUSES = new Set<TaskStatus>([TaskStatus.done, TaskStatus.internal_approved, TaskStatus.completed]);
+
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  const { task, allowed } = await getTaskWithAccess(params.id, { id: user.id, role: user.role });
+  if (!task) {
+    return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
+  }
+  if (!allowed) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  const [taskDetail, history] = await Promise.all([
+    prisma.task.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        progressPercent: true,
+        progressUpdatedAt: true,
+        status: true,
+      },
+    }),
+    prisma.taskProgressHistory.findMany({
+      where: { taskId: params.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return NextResponse.json({
+    progress: {
+      percent: taskDetail?.progressPercent ?? 0,
+      updatedAt: taskDetail?.progressUpdatedAt ?? null,
+      status: taskDetail?.status ?? null,
+    },
+    history,
+  });
+}
+
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  const { task, allowed } = await getTaskWithAccess(params.id, { id: user.id, role: user.role });
+  if (!task) {
+    return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
+  }
+  if (!allowed) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  if (!canUpdateQc(task, { id: user.id, role: user.role })) {
+    return NextResponse.json({ message: "Không có quyền cập nhật tiến độ" }, { status: 403 });
+  }
+
+  const taskDetail = await prisma.task.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      name: true,
+      progressPercent: true,
+      status: true,
+    },
+  });
+
+  if (!taskDetail) {
+    return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
+  }
+
+  if (LOCKED_STATUSES.has(taskDetail.status)) {
+    return NextResponse.json({ message: "Task đã hoàn tất, không thể cập nhật tiến độ" }, { status: 400 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = createProgressSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
+  }
+
+  const reason = String(parsed.data.reason || "").trim();
+  const note = String(parsed.data.note || "").trim();
+
+  if (parsed.data.progressPercent < taskDetail.progressPercent && !reason) {
+    return NextResponse.json({ message: "Giảm tiến độ bắt buộc nhập lý do" }, { status: 400 });
+  }
+
+  const now = new Date();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedTask = await tx.task.update({
+      where: { id: params.id },
+      data: {
+        progressPercent: parsed.data.progressPercent,
+        progressUpdatedAt: now,
+      },
+      select: {
+        id: true,
+        progressPercent: true,
+        progressUpdatedAt: true,
+        status: true,
+      },
+    });
+
+    const history = await tx.taskProgressHistory.create({
+      data: {
+        taskId: params.id,
+        userId: user.id,
+        fromPercent: taskDetail.progressPercent,
+        toPercent: parsed.data.progressPercent,
+        photoUrl: parsed.data.photoUrl,
+        reason: reason || null,
+        note: note || null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await tx.taskActivityLog.create({
+      data: {
+        taskId: params.id,
+        userId: user.id,
+        type: TaskActivityType.progress_updated,
+        fromValue: String(taskDetail.progressPercent),
+        toValue: String(parsed.data.progressPercent),
+        metadata: {
+          photoUrl: parsed.data.photoUrl,
+          reason: reason || null,
+          note: note || null,
+        },
+        description: `Cập nhật tiến độ ${taskDetail.progressPercent}% -> ${parsed.data.progressPercent}%`,
+      },
+    });
+
+    await tx.taskLog.create({
+      data: {
+        taskId: params.id,
+        userId: user.id,
+        logType: TaskLogType.note,
+        oldValue: String(taskDetail.progressPercent),
+        newValue: String(parsed.data.progressPercent),
+        content: `PROGRESS_UPDATE: ${taskDetail.progressPercent}% -> ${parsed.data.progressPercent}%`,
+      },
+    });
+
+    return { updatedTask, history };
+  });
+
+  return NextResponse.json({
+    message: "Đã cập nhật tiến độ",
+    progress: {
+      percent: result.updatedTask.progressPercent,
+      updatedAt: result.updatedTask.progressUpdatedAt,
+      status: result.updatedTask.status,
+    },
+    history: result.history,
+  });
+}

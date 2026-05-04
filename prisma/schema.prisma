@@ -70,15 +70,34 @@ enum TaskStatus {
   not_started
   in_progress
   done
+  internal_approved
+  completed
   inspected
   delayed
   na
+}
+
+enum TaskOrigin {
+  template
+  custom
 }
 
 enum TaskCategory {
   normal
   internal_milestone
   major_milestone
+}
+
+enum TaskActivityType {
+  status_changed
+  progress_updated
+  qc_item_checked
+  qc_item_unchecked
+  qc_completed
+  internal_approved
+  customer_signed
+  task_created
+  task_updated
 }
 
 enum TaskLogType {
@@ -223,6 +242,10 @@ model User {
   qcLogs                       QcLog[]
   qcReviews                    QcReview[]
   taskQcLogs                   TaskQcLog[]               @relation("TaskQcLogChecker")
+  taskProgressHistories        TaskProgressHistory[]     @relation("TaskProgressUpdatedBy")
+  taskQcResultsChecked         TaskQcResult[]            @relation("TaskQcResultCheckedBy")
+  taskActivityLogs             TaskActivityLog[]         @relation("TaskActivityActor")
+  internalApprovedTasks        Task[]                    @relation("TaskInternalApprover")
   projectMembers               ProjectMember[]
   addedProjectMembers          ProjectMember[]           @relation("ProjectMemberAddedBy")
   projectAssignments           ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
@@ -394,7 +417,8 @@ model QcChecklistItem {
   description  String? @db.Text
   requirePhoto Boolean @default(false) @map("require_photo")
 
-  template QcChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template      QcChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  taskQcResults TaskQcResult[]
 
   @@unique([templateId, displayOrder])
   @@index([templateId])
@@ -402,46 +426,57 @@ model QcChecklistItem {
 }
 
 model Task {
-  id                    String     @id @default(uuid()) @db.Uuid
-  projectId             String     @map("project_id") @db.Uuid
-  templateId            String?    @map("template_id") @db.Uuid
-  phaseId               String?    @map("phase_id") @db.Uuid
+  id                    String       @id @default(uuid()) @db.Uuid
+  projectId             String       @map("project_id") @db.Uuid
+  templateId            String?      @map("template_id") @db.Uuid
+  phaseId               String?      @map("phase_id") @db.Uuid
   code                  String
   phase                 TaskPhase
   name                  String
-  offsetDays            Int        @map("offset_days")
-  durationDays          Int        @map("duration_days")
-  duration              Int        @default(1)
-  plannedStartDate      DateTime   @map("planned_start_date") @db.Date
-  plannedEndDate        DateTime   @map("planned_end_date") @db.Date
-  actualStartDate       DateTime?  @map("actual_start_date") @db.Date
-  actualEndDate         DateTime?  @map("actual_end_date") @db.Date
-  assignedEngineerId    String?    @map("assigned_engineer_id") @db.Uuid
-  assignedForemanId     String?    @map("assigned_foreman_id") @db.Uuid
-  team                  String?    @map("team")
-  inspectorName         String     @map("inspector_name")
-  materialsNeeded       String     @map("materials_needed") @db.Text
-  proposerRole          String     @map("proposer_role")
-  ordererRole           String     @map("orderer_role")
-  receiverRole          String     @map("receiver_role")
-  qcChecklist           String     @map("qc_checklist") @db.Text
-  isMilestone           Boolean    @default(false) @map("is_milestone")
-  visibleToCustomer     Boolean    @default(false) @map("visible_to_customer")
-  status                TaskStatus @default(not_started)
-  isActive              Boolean    @default(true) @map("is_active")
-  displayOrder          Int?       @map("display_order")
-  notes                 String?    @db.Text
-  qcProgress            Json?      @map("qc_progress")
-  technicalRequirements String?    @map("technical_requirements") @db.Text
-  constructionMethod    String?    @map("construction_method") @db.Text
-  createdAt             DateTime   @default(now()) @map("created_at")
-  updatedAt             DateTime   @updatedAt @map("updated_at")
+  origin                TaskOrigin   @default(template)
+  category              TaskCategory @default(normal)
+  offsetDays            Int          @map("offset_days")
+  durationDays          Int          @map("duration_days")
+  duration              Int          @default(1)
+  plannedStartDate      DateTime     @map("planned_start_date") @db.Date
+  plannedEndDate        DateTime     @map("planned_end_date") @db.Date
+  actualStartDate       DateTime?    @map("actual_start_date") @db.Date
+  actualEndDate         DateTime?    @map("actual_end_date") @db.Date
+  progressPercent       Int          @default(0) @map("progress_percent")
+  progressUpdatedAt     DateTime?    @map("progress_updated_at")
+  qcCompletedAt         DateTime?    @map("qc_completed_at")
+  assignedEngineerId    String?      @map("assigned_engineer_id") @db.Uuid
+  assignedForemanId     String?      @map("assigned_foreman_id") @db.Uuid
+  internalApprovedBy    String?      @map("internal_approved_by") @db.Uuid
+  internalApprovedAt    DateTime?    @map("internal_approved_at")
+  internalApproverNote  String?      @map("internal_approver_note") @db.Text
+  customerSignedAt      DateTime?    @map("customer_signed_at")
+  customerSignatureUrl  String?      @map("customer_signature_url")
+  team                  String?      @map("team")
+  inspectorName         String       @map("inspector_name")
+  materialsNeeded       String       @map("materials_needed") @db.Text
+  proposerRole          String       @map("proposer_role")
+  ordererRole           String       @map("orderer_role")
+  receiverRole          String       @map("receiver_role")
+  qcChecklist           String       @map("qc_checklist") @db.Text
+  isMilestone           Boolean      @default(false) @map("is_milestone")
+  visibleToCustomer     Boolean      @default(false) @map("visible_to_customer")
+  status                TaskStatus   @default(not_started)
+  isActive              Boolean      @default(true) @map("is_active")
+  displayOrder          Int?         @map("display_order")
+  notes                 String?      @db.Text
+  qcProgress            Json?        @map("qc_progress")
+  technicalRequirements String?      @map("technical_requirements") @db.Text
+  constructionMethod    String?      @map("construction_method") @db.Text
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
 
   project                 Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   template                TaskTemplate?             @relation(fields: [templateId], references: [id])
   projectPhase            ProjectPhase?             @relation("TaskProjectPhase", fields: [phaseId], references: [id], onDelete: SetNull)
   assignedEngineer        User?                     @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
   assignedForeman         User?                     @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
+  internalApprover        User?                     @relation("TaskInternalApprover", fields: [internalApprovedBy], references: [id], onDelete: SetNull)
   taskLogs                TaskLog[]
   taskPhotos              TaskPhoto[]
   qcItems                 QcItem[]
@@ -451,6 +486,9 @@ model Task {
   qcLogs                  QcLog[]
   qcReviews               QcReview[]
   taskQcLogs              TaskQcLog[]
+  progressHistory         TaskProgressHistory[]
+  taskQcResults           TaskQcResult[]
+  taskActivityLogs        TaskActivityLog[]
   morningCheckinTasks     MorningCheckinTask[]      @relation("MorningCheckinTask")
   morningReportTasks      MorningReportTask[]
   eveningReportTasks      EveningReportTask[]
@@ -638,6 +676,62 @@ model QcReview {
 
   @@index([taskId, reviewedAt])
   @@map("qc_reviews")
+}
+
+model TaskProgressHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  fromPercent Int      @map("from_percent")
+  toPercent   Int      @map("to_percent")
+  photoUrl    String   @map("photo_url")
+  reason      String?  @db.Text
+  note        String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation("TaskProgressUpdatedBy", fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_progress_history")
+}
+
+model TaskQcResult {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  itemId    String   @map("item_id") @db.Uuid
+  isPassed  Boolean  @default(false) @map("is_passed")
+  photoUrl  String?  @map("photo_url")
+  note      String?  @db.Text
+  checkedBy String   @map("checked_by") @db.Uuid
+  checkedAt DateTime @default(now()) @map("checked_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task    Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  item    QcChecklistItem @relation(fields: [itemId], references: [id])
+  checker User            @relation("TaskQcResultCheckedBy", fields: [checkedBy], references: [id])
+
+  @@unique([taskId, itemId])
+  @@index([taskId])
+  @@map("task_qc_results")
+}
+
+model TaskActivityLog {
+  id          String           @id @default(uuid()) @db.Uuid
+  taskId      String           @map("task_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  type        TaskActivityType
+  fromValue   String?          @map("from_value")
+  toValue     String?          @map("to_value")
+  metadata    Json?
+  description String           @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation("TaskActivityActor", fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_activity_logs")
 }
 
 model PaymentSchedule {
