@@ -534,17 +534,6 @@ export function TaskDetailClient({
           ))}
         </div>
 
-        {activeTab === "technical" ? (
-          <div className="flex gap-2 overflow-x-auto py-2">
-            {[
-              { key: "qc", label: "Checklist QC" },
-              { key: "today", label: "Báo cáo hôm nay" },
-              { key: "history", label: "Lịch sử" },
-            ].map((item) => (
-              <button key={item.key} onClick={() => setTechnicalSubTab(item.key as TechnicalSubTab)} className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${technicalSubTab === item.key ? "border-amber-500 bg-amber-500/15 text-amber-300" : "border-[#2e3347] text-[#8891aa]"}`}>{item.label}</button>
-            ))}
-          </div>
-        ) : null}
 
         {(["material", "labor", "equipment"] as MainTab[]).includes(activeTab) ? (
           <div className="flex gap-2 overflow-x-auto py-2">
@@ -625,16 +614,7 @@ export function TaskDetailClient({
           <TaskProgressSection taskId={task.id} canUpdate={canUpdateQc} />
         ) : null}
 
-        {activeTab === "technical" ? (
-          <>
-            {technicalSubTab === "requirements" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Yêu cầu kỹ thuật được kế thừa từ template & hồ sơ task. Bổ sung module nhập chi tiết theo spec ở phase sau.</div> : null}
-            {technicalSubTab === "method" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Biện pháp thi công: placeholder theo spec (đã chừa slot để tích hợp form/duyệt).</div> : null}
-            {technicalSubTab === "drawings" ? <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 text-sm">Bản vẽ: placeholder theo spec (đã sẵn vị trí đính kèm file/bản vẽ).</div> : null}
-            {technicalSubTab === "qc" ? <QcSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
-            {technicalSubTab === "today" ? renderTechnicalTodayFlow() : null}
-            {technicalSubTab === "history" ? renderHistory("technical") : null}
-          </>
-        ) : null}
+        {activeTab === "technical" ? <QcSection taskId={task.id} canUpdateQc={canUpdateQc} canManageItem={canManageQcItem} /> : null}
 
         {activeTab === "material" ? (
           <>
