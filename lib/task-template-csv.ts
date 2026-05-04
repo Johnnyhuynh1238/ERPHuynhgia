@@ -1,5 +1,5 @@
+import { TaskCategory, TaskPhase } from "@prisma/client";
 import { parse } from "csv-parse/sync";
-import { TaskPhase } from "@prisma/client";
 
 export type CsvTaskTemplateRow = {
   code: string;
@@ -17,6 +17,8 @@ export type CsvTaskTemplateRow = {
   is_milestone: string;
   display_order: string;
   template_category: string;
+  category?: string;
+  duration?: string;
 };
 
 const PHASE_META: Record<TaskPhase, { code: string; name: string; order: number }> = {
@@ -32,6 +34,8 @@ const PHASE_META: Record<TaskPhase, { code: string; name: string; order: number 
 };
 
 const allowedPhases = new Set<string>(Object.keys(PHASE_META));
+
+const allowedCategories = new Set<string>(Object.values(TaskCategory));
 
 export function parsePhase(value: string): TaskPhase {
   const normalized = value.trim() as TaskPhase;
@@ -53,9 +57,26 @@ export function parseTaskTemplateCsv(csvText: string) {
   }) as CsvTaskTemplateRow[];
 }
 
+function parseCategory(value?: string) {
+  const normalized = (value || "").trim();
+  if (!normalized) return TaskCategory.normal;
+  if (!allowedCategories.has(normalized)) {
+    throw new Error(`Category không hợp lệ trong CSV: ${value}`);
+  }
+  return normalized as TaskCategory;
+}
+
+function parseDuration(durationValue: string | undefined, fallback: number) {
+  const parsed = Number(durationValue);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.floor(parsed);
+}
+
 export function mapCsvRowToTemplateData(row: CsvTaskTemplateRow) {
   const phase = parsePhase(row.phase);
   const phaseMeta = getPhaseMeta(phase);
+  const defaultDurationDays = Number(row.default_duration_days);
+  const duration = parseDuration(row.duration, defaultDurationDays);
 
   return {
     code: row.code.trim(),
@@ -63,10 +84,11 @@ export function mapCsvRowToTemplateData(row: CsvTaskTemplateRow) {
     phaseCode: phaseMeta.code,
     phaseName: phaseMeta.name,
     phaseOrder: phaseMeta.order,
-    phaseDuration: Number(row.default_duration_days),
+    phaseDuration: defaultDurationDays,
     name: row.name,
     defaultOffsetDays: Number(row.default_offset_days),
-    defaultDurationDays: Number(row.default_duration_days),
+    defaultDurationDays,
+    duration,
     defaultTeam: row.default_team,
     defaultInspector: row.default_inspector,
     materialsNeeded: row.materials_needed,
@@ -77,6 +99,7 @@ export function mapCsvRowToTemplateData(row: CsvTaskTemplateRow) {
     isMilestone: row.is_milestone.trim().toLowerCase() === "true",
     displayOrder: Number(row.display_order),
     templateCategory: row.template_category.trim() || "nha_pho_1t1l",
+    category: parseCategory(row.category),
     isActive: true,
   };
 }

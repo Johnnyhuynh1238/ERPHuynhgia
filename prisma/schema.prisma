@@ -75,6 +75,12 @@ enum TaskStatus {
   na
 }
 
+enum TaskCategory {
+  normal
+  internal_milestone
+  major_milestone
+}
+
 enum TaskLogType {
   status_change
   note
@@ -193,64 +199,65 @@ enum QcReviewAction {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  fullName     String   @map("full_name")
-  phone        String?
+  id                 String   @id @default(uuid()) @db.Uuid
+  email              String   @unique
+  passwordHash       String   @map("password_hash")
+  fullName           String   @map("full_name")
+  phone              String?
   role               UserRole
   isActive           Boolean  @default(true) @map("is_active")
   mustChangePassword Boolean  @default(true) @map("must_change_password")
   avatarUrl          String?  @map("avatar_url")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
-  managedProjects     Project[]       @relation("ProjectManager")
-  engineeredProjects  Project[]       @relation("MainEngineer")
-  assignedEngineerFor Task[]          @relation("AssignedEngineer")
-  assignedForemanFor  Task[]          @relation("AssignedForeman")
-  taskLogs            TaskLog[]
-  taskPhotos          TaskPhoto[]
-  qcItems             QcItem[]
-  qcProgressUpdates   QcProgress[]        @relation("QcProgressUpdatedBy")
-  qcPhotos            QcPhoto[]
-  qcLogs              QcLog[]
-  qcReviews           QcReview[]
-  taskQcLogs          TaskQcLog[] @relation("TaskQcLogChecker")
-  projectMembers      ProjectMember[]
-  addedProjectMembers ProjectMember[] @relation("ProjectMemberAddedBy")
-  projectAssignments          ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
-  projectAssignmentsAssigned  ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
-  declaredSiteRestDays SiteRestDay[]
-  morningCheckins     MorningCheckin[] @relation("MorningCheckinUser")
-  morningReports      MorningReport[]
-  eveningReports      EveningReport[]
-  technicalReportCreator TaskTechnicalReport[] @relation("TechReportCreator")
-  technicalReportUpdater TaskTechnicalReport[] @relation("TechReportUpdater")
-  materialReportCreator TaskMaterialReport[] @relation("MatReportCreator")
-  materialReportUpdater TaskMaterialReport[] @relation("MatReportUpdater")
-  laborReportCreator TaskLaborReport[] @relation("LaborReportCreator")
-  laborReportUpdater TaskLaborReport[] @relation("LaborReportUpdater")
-  equipmentReportCreator TaskEquipmentReport[] @relation("EquipReportCreator")
-  equipmentReportUpdater TaskEquipmentReport[] @relation("EquipReportUpdater")
+  managedProjects              Project[]                 @relation("ProjectManager")
+  engineeredProjects           Project[]                 @relation("MainEngineer")
+  assignedEngineerFor          Task[]                    @relation("AssignedEngineer")
+  assignedForemanFor           Task[]                    @relation("AssignedForeman")
+  taskLogs                     TaskLog[]
+  taskPhotos                   TaskPhoto[]
+  qcItems                      QcItem[]
+  qcProgressUpdates            QcProgress[]              @relation("QcProgressUpdatedBy")
+  qcPhotos                     QcPhoto[]
+  qcLogs                       QcLog[]
+  qcReviews                    QcReview[]
+  taskQcLogs                   TaskQcLog[]               @relation("TaskQcLogChecker")
+  projectMembers               ProjectMember[]
+  addedProjectMembers          ProjectMember[]           @relation("ProjectMemberAddedBy")
+  projectAssignments           ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
+  projectAssignmentsAssigned   ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
+  declaredSiteRestDays         SiteRestDay[]
+  morningCheckins              MorningCheckin[]          @relation("MorningCheckinUser")
+  morningReports               MorningReport[]
+  eveningReports               EveningReport[]
+  technicalReportCreator       TaskTechnicalReport[]     @relation("TechReportCreator")
+  technicalReportUpdater       TaskTechnicalReport[]     @relation("TechReportUpdater")
+  materialReportCreator        TaskMaterialReport[]      @relation("MatReportCreator")
+  materialReportUpdater        TaskMaterialReport[]      @relation("MatReportUpdater")
+  laborReportCreator           TaskLaborReport[]         @relation("LaborReportCreator")
+  laborReportUpdater           TaskLaborReport[]         @relation("LaborReportUpdater")
+  equipmentReportCreator       TaskEquipmentReport[]     @relation("EquipReportCreator")
+  equipmentReportUpdater       TaskEquipmentReport[]     @relation("EquipReportUpdater")
   technicalAttachmentsUploaded TaskTechnicalAttachment[]
-  reportPhotosUploaded TaskReportPhoto[]
-  kpiSnapshots        KpiSnapshot[]
-  engineerSalaryConfig       EngineerSalaryConfig?  @relation("EngineerSalary")
-  engineerSalaryUpdated      EngineerSalaryConfig[] @relation("EngineerSalaryUpdater")
-  engineerSalaryHistory      EngineerSalaryHistory[] @relation("EngineerSalaryChanger")
-  engineerKpiMonthly         EngineerKpiMonthly[]   @relation("EngineerKpiMonthlyUser")
-  engineerKpiMonthlyRated    EngineerKpiMonthly[]   @relation("EngineerKpiMonthlyRater")
-  engineerKpiMonthlyFinalized EngineerKpiMonthly[]  @relation("EngineerKpiMonthlyFinalizer")
-  customerCommentReplies CustomerCommentReply[]
-  subcontractorsCreated Subcontractor[] @relation("SubcontractorCreator")
-  subContractsCreated   SubContract[]   @relation("SubContractCreator")
-  subContractFiles      SubContractFile[]
-  subPaymentsRequested  SubPayment[]    @relation("SubPaymentRequester")
-  subPaymentsApproved   SubPayment[]    @relation("SubPaymentApprover")
-  subPaymentsPaid       SubPayment[]    @relation("SubPaymentPayer")
-  subEvaluations        SubEvaluation[]
-  createdProjectPhases  ProjectPhase[]
+  reportPhotosUploaded         TaskReportPhoto[]
+  kpiSnapshots                 KpiSnapshot[]
+  engineerSalaryConfig         EngineerSalaryConfig?     @relation("EngineerSalary")
+  engineerSalaryUpdated        EngineerSalaryConfig[]    @relation("EngineerSalaryUpdater")
+  engineerSalaryHistory        EngineerSalaryHistory[]   @relation("EngineerSalaryChanger")
+  engineerKpiMonthly           EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyUser")
+  engineerKpiMonthlyRated      EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyRater")
+  engineerKpiMonthlyFinalized  EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyFinalizer")
+  customerCommentReplies       CustomerCommentReply[]
+  subcontractorsCreated        Subcontractor[]           @relation("SubcontractorCreator")
+  subContractsCreated          SubContract[]             @relation("SubContractCreator")
+  subContractFiles             SubContractFile[]
+  subPaymentsRequested         SubPayment[]              @relation("SubPaymentRequester")
+  subPaymentsApproved          SubPayment[]              @relation("SubPaymentApprover")
+  subPaymentsPaid              SubPayment[]              @relation("SubPaymentPayer")
+  subEvaluations               SubEvaluation[]
+  createdProjectPhases         ProjectPhase[]
+  createdQcChecklistTemplates  QcChecklistTemplate[]
 
   @@map("users")
 }
@@ -281,8 +288,8 @@ model Project {
   createdAt              DateTime      @default(now()) @map("created_at")
   updatedAt              DateTime      @updatedAt @map("updated_at")
 
-  projectManager          User                     @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  mainEngineer            User                     @relation("MainEngineer", fields: [mainEngineerId], references: [id])
+  projectManager          User                      @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  mainEngineer            User                      @relation("MainEngineer", fields: [mainEngineerId], references: [id])
   tasks                   Task[]
   phases                  ProjectPhase[]
   paymentSchedules        PaymentSchedule[]
@@ -330,97 +337,133 @@ model ProjectPhase {
 }
 
 model TaskTemplate {
-  id                  String    @id @default(uuid()) @db.Uuid
+  id                  String       @id @default(uuid()) @db.Uuid
   code                String
   phase               TaskPhase
-  phaseCode           String    @map("phase_code")
-  phaseName           String    @map("phase_name")
-  phaseDuration       Int       @map("phase_duration")
-  phaseOrder          Int       @map("phase_order")
+  phaseCode           String       @map("phase_code")
+  phaseName           String       @map("phase_name")
+  phaseDuration       Int          @map("phase_duration")
+  phaseOrder          Int          @map("phase_order")
   name                String
-  defaultOffsetDays   Int       @map("default_offset_days")
-  defaultDurationDays Int       @map("default_duration_days")
-  defaultTeam         String    @map("default_team")
-  defaultInspector    String    @map("default_inspector")
-  materialsNeeded     String    @map("materials_needed") @db.Text
-  proposerRole        String    @map("proposer_role")
-  ordererRole         String    @map("orderer_role")
-  receiverRole        String    @map("receiver_role")
-  qcChecklist         String    @map("qc_checklist") @db.Text
-  isMilestone         Boolean   @default(false) @map("is_milestone")
-  displayOrder        Int       @map("display_order")
-  templateCategory    String    @map("template_category")
-  isActive            Boolean   @default(true) @map("is_active")
-  createdAt           DateTime  @default(now()) @map("created_at")
+  defaultOffsetDays   Int          @map("default_offset_days")
+  defaultDurationDays Int          @map("default_duration_days")
+  duration            Int          @default(1)
+  defaultTeam         String       @map("default_team")
+  defaultInspector    String       @map("default_inspector")
+  materialsNeeded     String       @map("materials_needed") @db.Text
+  proposerRole        String       @map("proposer_role")
+  ordererRole         String       @map("orderer_role")
+  receiverRole        String       @map("receiver_role")
+  qcChecklist         String       @map("qc_checklist") @db.Text
+  category            TaskCategory @default(normal)
+  isMilestone         Boolean      @default(false) @map("is_milestone")
+  displayOrder        Int          @map("display_order")
+  templateCategory    String       @map("template_category")
+  isActive            Boolean      @default(true) @map("is_active")
+  createdAt           DateTime     @default(now()) @map("created_at")
 
-  tasks Task[]
+  tasks      Task[]
+  qcTemplate QcChecklistTemplate?
 
   @@map("task_templates")
 }
 
-model Task {
-  id                 String     @id @default(uuid()) @db.Uuid
-  projectId          String     @map("project_id") @db.Uuid
-  templateId         String?    @map("template_id") @db.Uuid
-  phaseId            String?    @map("phase_id") @db.Uuid
-  code               String
-  phase              TaskPhase
-  name               String
-  offsetDays         Int        @map("offset_days")
-  durationDays       Int        @map("duration_days")
-  duration           Int        @default(1)
-  plannedStartDate   DateTime   @map("planned_start_date") @db.Date
-  plannedEndDate     DateTime   @map("planned_end_date") @db.Date
-  actualStartDate    DateTime?  @map("actual_start_date") @db.Date
-  actualEndDate      DateTime?  @map("actual_end_date") @db.Date
-  assignedEngineerId String?    @map("assigned_engineer_id") @db.Uuid
-  assignedForemanId  String?    @map("assigned_foreman_id") @db.Uuid
-  team               String?    @map("team")
-  inspectorName      String     @map("inspector_name")
-  materialsNeeded    String     @map("materials_needed") @db.Text
-  proposerRole       String     @map("proposer_role")
-  ordererRole        String     @map("orderer_role")
-  receiverRole       String     @map("receiver_role")
-  qcChecklist        String     @map("qc_checklist") @db.Text
-  isMilestone        Boolean    @default(false) @map("is_milestone")
-  visibleToCustomer  Boolean    @default(false) @map("visible_to_customer")
-  status             TaskStatus @default(not_started)
-  isActive           Boolean    @default(true) @map("is_active")
-  displayOrder       Int?       @map("display_order")
-  notes              String?    @db.Text
-  qcProgress         Json?      @map("qc_progress")
-  technicalRequirements String? @map("technical_requirements") @db.Text
-  constructionMethod String?    @map("construction_method") @db.Text
-  createdAt          DateTime   @default(now()) @map("created_at")
-  updatedAt          DateTime   @updatedAt @map("updated_at")
+model QcChecklistTemplate {
+  id               String   @id @default(uuid()) @db.Uuid
+  taskTemplateId   String   @unique @map("task_template_id") @db.Uuid
+  preparationSteps String?  @map("preparation_steps") @db.Text
+  executionSteps   String?  @map("execution_steps") @db.Text
+  commonMistakes   String?  @map("common_mistakes") @db.Text
+  beforeQcSteps    String?  @map("before_qc_steps") @db.Text
+  createdBy        String   @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  project               Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  template              TaskTemplate?            @relation(fields: [templateId], references: [id])
-  projectPhase          ProjectPhase?            @relation("TaskProjectPhase", fields: [phaseId], references: [id], onDelete: SetNull)
-  assignedEngineer      User?                    @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
-  assignedForeman       User?                    @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
-  taskLogs              TaskLog[]
-  taskPhotos            TaskPhoto[]
-  qcItems               QcItem[]
-  materialItems         TaskMaterialItem[]
-  qcProgressItems       QcProgress[]
-  qcPhotos              QcPhoto[]
-  qcLogs                QcLog[]
-  qcReviews             QcReview[]
-  taskQcLogs            TaskQcLog[]
-  morningCheckinTasks   MorningCheckinTask[] @relation("MorningCheckinTask")
-  morningReportTasks    MorningReportTask[]
-  eveningReportTasks    EveningReportTask[]
-  technicalReports      TaskTechnicalReport[]
-  materialReports       TaskMaterialReport[]
-  laborReports          TaskLaborReport[]
-  equipmentReports      TaskEquipmentReport[]
-  technicalAttachments  TaskTechnicalAttachment[]
-  reportPhotos          TaskReportPhoto[]
-  customerComments      CustomerComment[]
+  taskTemplate TaskTemplate      @relation(fields: [taskTemplateId], references: [id], onDelete: Cascade)
+  qcItems      QcChecklistItem[]
+  creator      User              @relation(fields: [createdBy], references: [id])
+
+  @@map("qc_checklist_templates")
+}
+
+model QcChecklistItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  templateId   String  @map("template_id") @db.Uuid
+  displayOrder Int     @map("display_order")
+  title        String
+  description  String? @db.Text
+  requirePhoto Boolean @default(false) @map("require_photo")
+
+  template QcChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, displayOrder])
+  @@index([templateId])
+  @@map("qc_checklist_items")
+}
+
+model Task {
+  id                    String     @id @default(uuid()) @db.Uuid
+  projectId             String     @map("project_id") @db.Uuid
+  templateId            String?    @map("template_id") @db.Uuid
+  phaseId               String?    @map("phase_id") @db.Uuid
+  code                  String
+  phase                 TaskPhase
+  name                  String
+  offsetDays            Int        @map("offset_days")
+  durationDays          Int        @map("duration_days")
+  duration              Int        @default(1)
+  plannedStartDate      DateTime   @map("planned_start_date") @db.Date
+  plannedEndDate        DateTime   @map("planned_end_date") @db.Date
+  actualStartDate       DateTime?  @map("actual_start_date") @db.Date
+  actualEndDate         DateTime?  @map("actual_end_date") @db.Date
+  assignedEngineerId    String?    @map("assigned_engineer_id") @db.Uuid
+  assignedForemanId     String?    @map("assigned_foreman_id") @db.Uuid
+  team                  String?    @map("team")
+  inspectorName         String     @map("inspector_name")
+  materialsNeeded       String     @map("materials_needed") @db.Text
+  proposerRole          String     @map("proposer_role")
+  ordererRole           String     @map("orderer_role")
+  receiverRole          String     @map("receiver_role")
+  qcChecklist           String     @map("qc_checklist") @db.Text
+  isMilestone           Boolean    @default(false) @map("is_milestone")
+  visibleToCustomer     Boolean    @default(false) @map("visible_to_customer")
+  status                TaskStatus @default(not_started)
+  isActive              Boolean    @default(true) @map("is_active")
+  displayOrder          Int?       @map("display_order")
+  notes                 String?    @db.Text
+  qcProgress            Json?      @map("qc_progress")
+  technicalRequirements String?    @map("technical_requirements") @db.Text
+  constructionMethod    String?    @map("construction_method") @db.Text
+  createdAt             DateTime   @default(now()) @map("created_at")
+  updatedAt             DateTime   @updatedAt @map("updated_at")
+
+  project                 Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template                TaskTemplate?             @relation(fields: [templateId], references: [id])
+  projectPhase            ProjectPhase?             @relation("TaskProjectPhase", fields: [phaseId], references: [id], onDelete: SetNull)
+  assignedEngineer        User?                     @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
+  assignedForeman         User?                     @relation("AssignedForeman", fields: [assignedForemanId], references: [id], onDelete: SetNull)
+  taskLogs                TaskLog[]
+  taskPhotos              TaskPhoto[]
+  qcItems                 QcItem[]
+  materialItems           TaskMaterialItem[]
+  qcProgressItems         QcProgress[]
+  qcPhotos                QcPhoto[]
+  qcLogs                  QcLog[]
+  qcReviews               QcReview[]
+  taskQcLogs              TaskQcLog[]
+  morningCheckinTasks     MorningCheckinTask[]      @relation("MorningCheckinTask")
+  morningReportTasks      MorningReportTask[]
+  eveningReportTasks      EveningReportTask[]
+  technicalReports        TaskTechnicalReport[]
+  materialReports         TaskMaterialReport[]
+  laborReports            TaskLaborReport[]
+  equipmentReports        TaskEquipmentReport[]
+  technicalAttachments    TaskTechnicalAttachment[]
+  reportPhotos            TaskReportPhoto[]
+  customerComments        CustomerComment[]
   customerAcknowledgments CustomerAcknowledgment[]
-  subContractTasks      SubContractTask[]
-  subPayments           SubPayment[]
+  subContractTasks        SubContractTask[]
+  subPayments             SubPayment[]
 
   @@unique([projectId, code])
   @@index([projectId, isActive, displayOrder, code])
@@ -463,16 +506,16 @@ model TaskLog {
 }
 
 model TaskPhoto {
-  id                  String     @id @default(uuid()) @db.Uuid
-  taskId              String     @map("task_id") @db.Uuid
-  uploadedBy          String     @map("uploaded_by") @db.Uuid
-  photoUrl            String     @map("photo_url")
-  thumbnailUrl        String     @map("thumbnail_url")
+  id                  String    @id @default(uuid()) @db.Uuid
+  taskId              String    @map("task_id") @db.Uuid
+  uploadedBy          String    @map("uploaded_by") @db.Uuid
+  photoUrl            String    @map("photo_url")
+  thumbnailUrl        String    @map("thumbnail_url")
   caption             String?
-  fileSizeKb          Int        @map("file_size_kb")
-  takenAt             DateTime?  @map("taken_at")
-  eveningReportTaskId String?    @map("evening_report_task_id") @db.Uuid
-  createdAt           DateTime   @default(now()) @map("created_at")
+  fileSizeKb          Int       @map("file_size_kb")
+  takenAt             DateTime? @map("taken_at")
+  eveningReportTaskId String?   @map("evening_report_task_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at")
 
   task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user              User               @relation(fields: [uploadedBy], references: [id])
@@ -494,11 +537,11 @@ model QcItem {
   orderIndex     Int      @map("order_index")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  task      Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  creator   User         @relation(fields: [createdBy], references: [id])
-  progress  QcProgress?
-  photos    QcPhoto[]
-  logs      QcLog[]
+  task       Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator    User        @relation(fields: [createdBy], references: [id])
+  progress   QcProgress?
+  photos     QcPhoto[]
+  logs       QcLog[]
   taskQcLogs TaskQcLog[]
 
   @@index([taskId, orderIndex])
@@ -541,15 +584,15 @@ model QcPhoto {
 }
 
 model QcLog {
-  id          String       @id @default(uuid()) @db.Uuid
-  taskId      String       @map("task_id") @db.Uuid
-  qcItemId    String?      @map("qc_item_id") @db.Uuid
+  id          String        @id @default(uuid()) @db.Uuid
+  taskId      String        @map("task_id") @db.Uuid
+  qcItemId    String?       @map("qc_item_id") @db.Uuid
   action      QcLogAction
   fromStatus  QcItemStatus? @map("from_status")
   toStatus    QcItemStatus? @map("to_status")
-  note        String?      @db.Text
-  performedBy String       @map("performed_by") @db.Uuid
-  performedAt DateTime     @default(now()) @map("performed_at")
+  note        String?       @db.Text
+  performedBy String        @map("performed_by") @db.Uuid
+  performedAt DateTime      @default(now()) @map("performed_at")
 
   task      Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   item      QcItem? @relation(fields: [qcItemId], references: [id], onDelete: SetNull)
@@ -571,10 +614,10 @@ model TaskQcLog {
   note            String?  @db.Text
   createdAt       DateTime @default(now()) @map("created_at")
 
-  task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  qcItem        QcItem        @relation(fields: [qcItemId], references: [id], onDelete: Cascade)
+  task          Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  qcItem        QcItem         @relation(fields: [qcItemId], references: [id], onDelete: Cascade)
   eveningReport EveningReport? @relation(fields: [eveningReportId], references: [id], onDelete: SetNull)
-  checker       User          @relation("TaskQcLogChecker", fields: [checkedBy], references: [id])
+  checker       User           @relation("TaskQcLogChecker", fields: [checkedBy], references: [id])
 
   @@index([taskId])
   @@index([qcItemId])
@@ -584,11 +627,11 @@ model TaskQcLog {
 
 model QcReview {
   id         String         @id @default(uuid()) @db.Uuid
-  taskId      String        @map("task_id") @db.Uuid
-  action      QcReviewAction
-  reviewerId  String        @map("reviewer_id") @db.Uuid
-  note        String?       @db.Text
-  reviewedAt  DateTime      @default(now()) @map("reviewed_at")
+  taskId     String         @map("task_id") @db.Uuid
+  action     QcReviewAction
+  reviewerId String         @map("reviewer_id") @db.Uuid
+  note       String?        @db.Text
+  reviewedAt DateTime       @default(now()) @map("reviewed_at")
 
   task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   reviewer User @relation(fields: [reviewerId], references: [id])
@@ -711,15 +754,15 @@ model MorningCheckinTask {
 }
 
 model MorningReport {
-  id          String     @id @default(uuid()) @db.Uuid
-  projectId   String     @map("project_id") @db.Uuid
-  reporterId  String     @map("reporter_id") @db.Uuid
-  reportDate  DateTime   @map("report_date") @db.Date
-  submittedAt DateTime?  @map("submitted_at")
-  isOnTime    Boolean    @default(false) @map("is_on_time")
-  overallNote String?    @map("overall_note") @db.Text
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  reporterId  String    @map("reporter_id") @db.Uuid
+  reportDate  DateTime  @map("report_date") @db.Date
+  submittedAt DateTime? @map("submitted_at")
+  isOnTime    Boolean   @default(false) @map("is_on_time")
+  overallNote String?   @map("overall_note") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   reporter      User                @relation(fields: [reporterId], references: [id])
@@ -749,22 +792,22 @@ model MorningReportTask {
 }
 
 model EveningReport {
-  id               String      @id @default(uuid()) @db.Uuid
-  projectId        String      @map("project_id") @db.Uuid
-  reporterId       String      @map("reporter_id") @db.Uuid
-  reportDate       DateTime    @map("report_date") @db.Date
-  morningReportId  String      @unique @map("morning_report_id") @db.Uuid
-  submittedAt      DateTime?   @map("submitted_at")
-  isOnTime         Boolean     @default(false) @map("is_on_time")
-  issues           String?     @db.Text
-  overallRating    DailyRating @map("overall_rating")
-  overallNote      String?     @map("overall_note") @db.Text
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
+  id              String      @id @default(uuid()) @db.Uuid
+  projectId       String      @map("project_id") @db.Uuid
+  reporterId      String      @map("reporter_id") @db.Uuid
+  reportDate      DateTime    @map("report_date") @db.Date
+  morningReportId String      @unique @map("morning_report_id") @db.Uuid
+  submittedAt     DateTime?   @map("submitted_at")
+  isOnTime        Boolean     @default(false) @map("is_on_time")
+  issues          String?     @db.Text
+  overallRating   DailyRating @map("overall_rating")
+  overallNote     String?     @map("overall_note") @db.Text
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reporter         User                   @relation(fields: [reporterId], references: [id])
-  morningReport    MorningReport          @relation(fields: [morningReportId], references: [id], onDelete: Cascade)
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter         User                 @relation(fields: [reporterId], references: [id])
+  morningReport    MorningReport        @relation(fields: [morningReportId], references: [id], onDelete: Cascade)
   taskReports      EveningReportTask[]
   sitePhotos       EveningReportPhoto[]
   taskQcLogs       TaskQcLog[]
@@ -776,17 +819,17 @@ model EveningReport {
 }
 
 model EveningReportTask {
-  id                  String      @id @default(uuid()) @db.Uuid
-  eveningReportId     String      @map("evening_report_id") @db.Uuid
-  taskId              String      @map("task_id") @db.Uuid
-  completionPercent   Int?        @map("completion_percent")
-  actualWork          String?     @map("actual_work") @db.Text
-  issues              String?     @db.Text
+  id                  String       @id @default(uuid()) @db.Uuid
+  eveningReportId     String       @map("evening_report_id") @db.Uuid
+  taskId              String       @map("task_id") @db.Uuid
+  completionPercent   Int?         @map("completion_percent")
+  actualWork          String?      @map("actual_work") @db.Text
+  issues              String?      @db.Text
   rating              DailyRating?
-  explanation         String?     @db.Text
-  stillPaused         Boolean?    @map("still_paused")
-  actualWorkIfStarted String?     @map("actual_work_if_started") @db.Text
-  createdAt           DateTime    @default(now()) @map("created_at")
+  explanation         String?      @db.Text
+  stillPaused         Boolean?     @map("still_paused")
+  actualWorkIfStarted String?      @map("actual_work_if_started") @db.Text
+  createdAt           DateTime     @default(now()) @map("created_at")
 
   eveningReport EveningReport @relation(fields: [eveningReportId], references: [id], onDelete: Cascade)
   task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -829,22 +872,22 @@ model TaskTechnicalAttachment {
 }
 
 model TaskTechnicalReport {
-  id             String               @id @default(uuid()) @db.Uuid
-  taskId         String               @map("task_id") @db.Uuid
-  reportDate     DateTime             @map("report_date") @db.Date
+  id             String                @id @default(uuid()) @db.Uuid
+  taskId         String                @map("task_id") @db.Uuid
+  reportDate     DateTime              @map("report_date") @db.Date
   status         TechnicalReportStatus @default(working)
-  pauseReason    String?              @map("pause_reason")
-  technicalIssue String?              @map("technical_issue") @db.Text
-  note           String?              @db.Text
-  createdAt      DateTime             @default(now()) @map("created_at")
-  createdBy      String               @map("created_by") @db.Uuid
-  updatedAt      DateTime             @updatedAt @map("updated_at")
-  updatedBy      String?              @map("updated_by") @db.Uuid
+  pauseReason    String?               @map("pause_reason")
+  technicalIssue String?               @map("technical_issue") @db.Text
+  note           String?               @db.Text
+  createdAt      DateTime              @default(now()) @map("created_at")
+  createdBy      String                @map("created_by") @db.Uuid
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  updatedBy      String?               @map("updated_by") @db.Uuid
 
-  task      Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  creator   User             @relation("TechReportCreator", fields: [createdBy], references: [id])
-  updater   User?            @relation("TechReportUpdater", fields: [updatedBy], references: [id])
-  photos    TaskReportPhoto[]
+  task    Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User              @relation("TechReportCreator", fields: [createdBy], references: [id])
+  updater User?             @relation("TechReportUpdater", fields: [updatedBy], references: [id])
+  photos  TaskReportPhoto[]
 
   @@unique([taskId, reportDate])
   @@index([taskId])
@@ -924,9 +967,9 @@ model TaskReportPhoto {
   uploadedAt        DateTime        @default(now()) @map("uploaded_at")
   uploadedBy        String          @map("uploaded_by") @db.Uuid
 
-  task            Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task            Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
   technicalReport TaskTechnicalReport? @relation(fields: [technicalReportId], references: [id], onDelete: Cascade)
-  uploader        User                @relation(fields: [uploadedBy], references: [id])
+  uploader        User                 @relation(fields: [uploadedBy], references: [id])
 
   @@index([taskId, reportDate])
   @@index([type])
@@ -957,17 +1000,17 @@ model KpiSnapshot {
 
 model EngineerSalaryConfig {
   id            String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @map("user_id") @db.Uuid
-  salaryMax      Decimal  @map("salary_max") @db.Decimal(15, 2)
-  effectiveFrom  DateTime @map("effective_from") @db.Date
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  updatedBy      String   @map("updated_by") @db.Uuid
+  userId        String   @unique @map("user_id") @db.Uuid
+  salaryMax     Decimal  @map("salary_max") @db.Decimal(15, 2)
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedBy     String   @map("updated_by") @db.Uuid
 
-  user           User                   @relation("EngineerSalary", fields: [userId], references: [id], onDelete: Cascade)
-  updater        User                   @relation("EngineerSalaryUpdater", fields: [updatedBy], references: [id])
-  history        EngineerSalaryHistory[]
+  user    User                    @relation("EngineerSalary", fields: [userId], references: [id], onDelete: Cascade)
+  updater User                    @relation("EngineerSalaryUpdater", fields: [updatedBy], references: [id])
+  history EngineerSalaryHistory[]
 
   @@index([isActive])
   @@map("engineer_salary_configs")
@@ -975,15 +1018,15 @@ model EngineerSalaryConfig {
 
 model EngineerSalaryHistory {
   id            String   @id @default(uuid()) @db.Uuid
-  configId       String   @map("config_id") @db.Uuid
-  salaryMax      Decimal  @map("salary_max") @db.Decimal(15, 2)
-  effectiveFrom  DateTime @map("effective_from") @db.Date
-  changeReason   String?  @map("change_reason") @db.Text
-  changedAt      DateTime @default(now()) @map("changed_at")
-  changedBy      String   @map("changed_by") @db.Uuid
+  configId      String   @map("config_id") @db.Uuid
+  salaryMax     Decimal  @map("salary_max") @db.Decimal(15, 2)
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  changeReason  String?  @map("change_reason") @db.Text
+  changedAt     DateTime @default(now()) @map("changed_at")
+  changedBy     String   @map("changed_by") @db.Uuid
 
-  config         EngineerSalaryConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-  changer        User                 @relation("EngineerSalaryChanger", fields: [changedBy], references: [id])
+  config  EngineerSalaryConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  changer User                 @relation("EngineerSalaryChanger", fields: [changedBy], references: [id])
 
   @@index([configId])
   @@index([changedAt])
@@ -991,38 +1034,38 @@ model EngineerSalaryHistory {
 }
 
 model EngineerKpiMonthly {
-  id                 String           @id @default(uuid()) @db.Uuid
-  userId             String           @map("user_id") @db.Uuid
-  year               Int
-  month              Int
-  scoreSchedule      Decimal          @default(0) @map("score_schedule") @db.Decimal(5, 2)
-  scoreQc            Decimal          @default(0) @map("score_qc") @db.Decimal(5, 2)
-  scoreReport        Decimal          @default(0) @map("score_report") @db.Decimal(5, 2)
-  scoreCustomer      Decimal          @default(0) @map("score_customer") @db.Decimal(5, 2)
-  scoreContribution  Decimal          @default(0) @map("score_contribution") @db.Decimal(5, 2)
-  contributionNote   String?          @map("contribution_note") @db.Text
-  contributionBy     String?          @map("contribution_by") @db.Uuid
-  contributionAt     DateTime?        @map("contribution_at")
-  totalScore         Decimal          @default(0) @map("total_score") @db.Decimal(5, 2)
-  salaryMax          Decimal          @map("salary_max") @db.Decimal(15, 2)
-  baseSalary         Decimal          @map("base_salary") @db.Decimal(15, 2)
-  bonusMax           Decimal          @map("bonus_max") @db.Decimal(15, 2)
-  bonusRatio         Decimal          @default(0) @map("bonus_ratio") @db.Decimal(5, 2)
-  bonusAmount        Decimal          @default(0) @map("bonus_amount") @db.Decimal(15, 2)
-  totalSalary        Decimal          @default(0) @map("total_salary") @db.Decimal(15, 2)
-  scheduleDetails    Json?            @map("schedule_details")
-  qcDetails          Json?            @map("qc_details")
-  reportDetails      Json?            @map("report_details")
-  customerDetails    Json?            @map("customer_details")
-  status             KpiMonthlyStatus @default(draft)
-  finalizedAt        DateTime?        @map("finalized_at")
-  finalizedBy        String?          @map("finalized_by") @db.Uuid
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  year              Int
+  month             Int
+  scoreSchedule     Decimal          @default(0) @map("score_schedule") @db.Decimal(5, 2)
+  scoreQc           Decimal          @default(0) @map("score_qc") @db.Decimal(5, 2)
+  scoreReport       Decimal          @default(0) @map("score_report") @db.Decimal(5, 2)
+  scoreCustomer     Decimal          @default(0) @map("score_customer") @db.Decimal(5, 2)
+  scoreContribution Decimal          @default(0) @map("score_contribution") @db.Decimal(5, 2)
+  contributionNote  String?          @map("contribution_note") @db.Text
+  contributionBy    String?          @map("contribution_by") @db.Uuid
+  contributionAt    DateTime?        @map("contribution_at")
+  totalScore        Decimal          @default(0) @map("total_score") @db.Decimal(5, 2)
+  salaryMax         Decimal          @map("salary_max") @db.Decimal(15, 2)
+  baseSalary        Decimal          @map("base_salary") @db.Decimal(15, 2)
+  bonusMax          Decimal          @map("bonus_max") @db.Decimal(15, 2)
+  bonusRatio        Decimal          @default(0) @map("bonus_ratio") @db.Decimal(5, 2)
+  bonusAmount       Decimal          @default(0) @map("bonus_amount") @db.Decimal(15, 2)
+  totalSalary       Decimal          @default(0) @map("total_salary") @db.Decimal(15, 2)
+  scheduleDetails   Json?            @map("schedule_details")
+  qcDetails         Json?            @map("qc_details")
+  reportDetails     Json?            @map("report_details")
+  customerDetails   Json?            @map("customer_details")
+  status            KpiMonthlyStatus @default(draft)
+  finalizedAt       DateTime?        @map("finalized_at")
+  finalizedBy       String?          @map("finalized_by") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  user               User             @relation("EngineerKpiMonthlyUser", fields: [userId], references: [id], onDelete: Cascade)
-  contributionRater  User?            @relation("EngineerKpiMonthlyRater", fields: [contributionBy], references: [id])
-  finalizer          User?            @relation("EngineerKpiMonthlyFinalizer", fields: [finalizedBy], references: [id])
+  user              User  @relation("EngineerKpiMonthlyUser", fields: [userId], references: [id], onDelete: Cascade)
+  contributionRater User? @relation("EngineerKpiMonthlyRater", fields: [contributionBy], references: [id])
+  finalizer         User? @relation("EngineerKpiMonthlyFinalizer", fields: [finalizedBy], references: [id])
 
   @@unique([userId, year, month])
   @@index([year, month])
@@ -1064,28 +1107,28 @@ model EvaluationCriterion {
 }
 
 model Subcontractor {
-  id              String            @id @default(uuid()) @db.Uuid
-  code            String            @unique
+  id              String              @id @default(uuid()) @db.Uuid
+  code            String              @unique
   name            String
-  type            SubcontractorType @default(individual)
-  taxCode         String?           @map("tax_code")
+  type            SubcontractorType   @default(individual)
+  taxCode         String?             @map("tax_code")
   phone           String
-  altPhone        String?           @map("alt_phone")
+  altPhone        String?             @map("alt_phone")
   email           String?
   address         String?
-  bankName        String?           @map("bank_name")
-  bankAccount     String?           @map("bank_account")
-  bankAccountName String?           @map("bank_account_name")
+  bankName        String?             @map("bank_name")
+  bankAccount     String?             @map("bank_account")
+  bankAccountName String?             @map("bank_account_name")
   status          SubcontractorStatus @default(active)
-  notes           String?           @db.Text
-  avgRating       Decimal?          @map("avg_rating") @db.Decimal(3, 2)
-  totalContracts  Int               @default(0) @map("total_contracts")
-  isActive        Boolean           @default(true) @map("is_active")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  createdBy       String            @map("created_by") @db.Uuid
-  updatedAt       DateTime          @updatedAt @map("updated_at")
+  notes           String?             @db.Text
+  avgRating       Decimal?            @map("avg_rating") @db.Decimal(3, 2)
+  totalContracts  Int                 @default(0) @map("total_contracts")
+  isActive        Boolean             @default(true) @map("is_active")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  createdBy       String              @map("created_by") @db.Uuid
+  updatedAt       DateTime            @updatedAt @map("updated_at")
 
-  creator     User                       @relation("SubcontractorCreator", fields: [createdBy], references: [id])
+  creator     User                        @relation("SubcontractorCreator", fields: [createdBy], references: [id])
   specialties SubcontractorSpecialtyMap[]
   contracts   SubContract[]
 
@@ -1095,9 +1138,9 @@ model Subcontractor {
 }
 
 model SubcontractorSpecialtyMap {
-  id              String   @id @default(uuid()) @db.Uuid
-  subcontractorId String   @map("subcontractor_id") @db.Uuid
-  specialtyId     String   @map("specialty_id") @db.Uuid
+  id              String @id @default(uuid()) @db.Uuid
+  subcontractorId String @map("subcontractor_id") @db.Uuid
+  specialtyId     String @map("specialty_id") @db.Uuid
 
   subcontractor Subcontractor          @relation(fields: [subcontractorId], references: [id], onDelete: Cascade)
   specialty     SubcontractorSpecialty @relation(fields: [specialtyId], references: [id])
@@ -1228,7 +1271,7 @@ model SubEvaluationScore {
   criterionId  String @map("criterion_id") @db.Uuid
   score        Int
 
-  evaluation SubEvaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  evaluation SubEvaluation       @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   criterion  EvaluationCriterion @relation(fields: [criterionId], references: [id])
 
   @@unique([evaluationId, criterionId])
@@ -1252,15 +1295,15 @@ model CustomerSession {
 }
 
 model CustomerComment {
-  id              String    @id @default(uuid()) @db.Uuid
-  projectId       String    @map("project_id") @db.Uuid
-  taskId          String?   @map("task_id") @db.Uuid
-  eveningReportId String?   @map("evening_report_id") @db.Uuid
-  content         String    @db.Text
-  ipAddress       String?   @map("ip_address")
-  userAgent       String?   @map("user_agent")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  readByStaff     Boolean   @default(false) @map("read_by_staff")
+  id              String   @id @default(uuid()) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  taskId          String?  @map("task_id") @db.Uuid
+  eveningReportId String?  @map("evening_report_id") @db.Uuid
+  content         String   @db.Text
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at")
+  readByStaff     Boolean  @default(false) @map("read_by_staff")
 
   project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   task          Task?                  @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -1306,13 +1349,13 @@ model CustomerAcknowledgment {
 }
 
 model CustomerLoginAttempt {
-  id          String   @id @default(uuid()) @db.Uuid
-  projectId   String   @map("project_id") @db.Uuid
-  token       String
-  ipAddress   String   @map("ip_address")
-  attemptCount Int     @default(0) @map("attempt_count")
-  blockedUntil DateTime? @map("blocked_until")
-  lastAttemptAt DateTime @default(now()) @map("last_attempt_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  projectId     String    @map("project_id") @db.Uuid
+  token         String
+  ipAddress     String    @map("ip_address")
+  attemptCount  Int       @default(0) @map("attempt_count")
+  blockedUntil  DateTime? @map("blocked_until")
+  lastAttemptAt DateTime  @default(now()) @map("last_attempt_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-helpers";
+import { getPhaseMeta } from "@/lib/task-template-csv";
 
 function mapAuthError(error: unknown) {
   const message = error instanceof Error ? error.message : "UNKNOWN";
@@ -29,11 +30,13 @@ export async function GET(request: Request) {
       isActive: true,
     },
     select: {
+      phase: true,
       phaseCode: true,
       phaseName: true,
       phaseOrder: true,
       phaseDuration: true,
       defaultDurationDays: true,
+      duration: true,
     },
     orderBy: [{ phaseOrder: "asc" }, { phaseCode: "asc" }],
   });
@@ -41,15 +44,18 @@ export async function GET(request: Request) {
   const phaseMap = new Map<string, { code: string; name: string; order: number; duration: number }>();
 
   for (const template of templates) {
-    if (!template.phaseCode || !template.phaseName || !template.phaseOrder) continue;
-    const duration = Math.max(1, Number(template.phaseDuration || template.defaultDurationDays || 1));
-    const current = phaseMap.get(template.phaseCode);
+    const fallback = getPhaseMeta(template.phase);
+    const phaseCode = template.phaseCode || fallback.code;
+    const phaseName = template.phaseName || fallback.name;
+    const phaseOrder = template.phaseOrder || fallback.order;
+    const duration = Math.max(1, Number(template.phaseDuration || template.duration || template.defaultDurationDays || 1));
+    const current = phaseMap.get(phaseCode);
 
     if (!current) {
-      phaseMap.set(template.phaseCode, {
-        code: template.phaseCode,
-        name: template.phaseName,
-        order: template.phaseOrder,
+      phaseMap.set(phaseCode, {
+        code: phaseCode,
+        name: phaseName,
+        order: phaseOrder,
         duration,
       });
       continue;

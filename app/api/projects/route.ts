@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
+import { getPhaseMeta } from "@/lib/task-template-csv";
 
 const STATUS_PRIORITY: Record<ProjectStatus, number> = {
   in_progress: 0,
@@ -346,8 +347,8 @@ export async function POST(request: Request) {
         orderBy: [{ displayOrder: "asc" }, { code: "asc" }],
       });
 
-      if (taskTemplates.length !== 69) {
-        throw new Error("Template chưa được seed, liên hệ admin hệ thống");
+      if (taskTemplates.length === 0) {
+        throw new Error("Chưa có template để tạo dự án");
       }
 
       const phaseTemplateMap = new Map<
@@ -356,18 +357,19 @@ export async function POST(request: Request) {
       >();
 
       taskTemplates.forEach((template) => {
-        if (!template.phaseCode || !template.phaseName || !template.phaseOrder || !template.phaseDuration) {
-          throw new Error("Template phase metadata chưa đầy đủ, liên hệ admin hệ thống");
-        }
+        const fallback = getPhaseMeta(template.phase);
+        const phaseCode = template.phaseCode || fallback.code;
+        const phaseName = template.phaseName || fallback.name;
+        const phaseOrder = template.phaseOrder || fallback.order;
+        const nextDuration = Math.max(1, Number(template.phaseDuration || template.duration || template.defaultDurationDays || 1));
 
-        const current = phaseTemplateMap.get(template.phaseCode);
-        const nextDuration = Math.max(1, Number(template.phaseDuration));
+        const current = phaseTemplateMap.get(phaseCode);
 
         if (!current) {
-          phaseTemplateMap.set(template.phaseCode, {
-            code: template.phaseCode,
-            name: template.phaseName,
-            displayOrder: template.phaseOrder,
+          phaseTemplateMap.set(phaseCode, {
+            code: phaseCode,
+            name: phaseName,
+            displayOrder: phaseOrder,
             duration: nextDuration,
           });
           return;
@@ -413,23 +415,23 @@ export async function POST(request: Request) {
 
       await tx.task.createMany({
         data: taskTemplates.map((template) => {
-          if (!template.phaseCode) {
-            throw new Error("Template phase metadata chưa đầy đủ, liên hệ admin hệ thống");
-          }
+          const phaseMeta = getPhaseMeta(template.phase);
+          const phaseCode = template.phaseCode || phaseMeta.code;
 
           const plannedStartDate = addDays(startDate, template.defaultOffsetDays);
-          const plannedEndDate = addDays(plannedStartDate, template.defaultDurationDays - 1);
+          const durationDays = Math.max(1, Number(template.defaultDurationDays || template.duration || 1));
+          const plannedEndDate = addDays(plannedStartDate, durationDays - 1);
 
           return {
             projectId: project.id,
             templateId: template.id,
-            phaseId: phaseIdByCode.get(template.phaseCode) || null,
+            phaseId: phaseIdByCode.get(phaseCode) || null,
             code: template.code,
             phase: template.phase,
             name: template.name,
             offsetDays: template.defaultOffsetDays,
-            durationDays: template.defaultDurationDays,
-            duration: template.defaultDurationDays,
+            durationDays,
+            duration: Math.max(1, Number(template.duration || durationDays)),
             plannedStartDate,
             plannedEndDate,
             actualStartDate: null,
@@ -500,12 +502,13 @@ export async function POST(request: Request) {
     });
 
     const elapsed = Date.now() - startedAt;
-    console.log(`Created project ${createdProject.code} with 69 tasks, 6 payments in ${elapsed}ms`);
+    const createdTaskCount = await prisma.task.count({ where: { projectId: createdProject.id } });
+    console.log(`Created project ${createdProject.code} with ${createdTaskCount} tasks, 6 payments in ${elapsed}ms`);
 
     return NextResponse.json({
       id: createdProject.id,
       code: createdProject.code,
-      message: `Đã tạo dự án ${createdProject.code}. Tự động sinh 69 task + 6 đợt thanh toán.`,
+      message: `Đã tạo dự án ${createdProject.code}. Tự động sinh ${createdTaskCount} task + 6 đợt thanh toán.`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Không thể tạo dự án";

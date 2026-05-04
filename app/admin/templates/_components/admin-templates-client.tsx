@@ -1,138 +1,106 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PHASE_COLOR, PHASE_LABEL } from "@/lib/task-display";
 
-type TaskPhase =
-  | "P1_CHUAN_BI"
-  | "P2_MONG"
-  | "P3_KHUNG_TRET"
-  | "P4_KHUNG_LAU"
-  | "P5_ME_XAY_TO"
-  | "P6_OP_LAT"
-  | "P7_SON_BA"
-  | "P8_LAP_TB"
-  | "P9_BAN_GIAO";
+type TaskCategory = "normal" | "internal_milestone" | "major_milestone";
+
+type QcItem = {
+  id: string;
+  displayOrder: number;
+  title: string;
+  description: string | null;
+  requirePhoto: boolean;
+};
+
+type QcTemplate = {
+  id: string;
+  preparationSteps: string | null;
+  executionSteps: string | null;
+  commonMistakes: string | null;
+  beforeQcSteps: string | null;
+  qcItems: QcItem[];
+};
 
 type TemplateItem = {
   id: string;
   code: string;
-  phase: TaskPhase;
   name: string;
-  defaultOffsetDays: number;
-  defaultDurationDays: number;
-  defaultTeam: string;
-  defaultInspector: string;
-  materialsNeeded: string;
-  proposerRole: string;
-  ordererRole: string;
-  receiverRole: string;
-  qcChecklist: string;
-  isMilestone: boolean;
+  phaseCode: string;
+  phaseName: string;
+  phaseOrder: number;
+  duration: number;
   displayOrder: number;
-  templateCategory: string;
+  category: TaskCategory;
   isActive: boolean;
+  templateCategory: string;
+  qcTemplate: QcTemplate | null;
 };
 
-type FormState = {
+type CloneState = {
+  source: TemplateItem;
   code: string;
-  phase: TaskPhase;
   name: string;
-  defaultOffsetDays: string;
-  defaultDurationDays: string;
-  defaultTeam: string;
-  defaultInspector: string;
-  materialsNeeded: string;
-  proposerRole: string;
-  ordererRole: string;
-  receiverRole: string;
-  qcChecklist: string;
-  isMilestone: boolean;
-  displayOrder: string;
-  templateCategory: string;
+  phaseCode: string;
 };
 
 const DEFAULT_CATEGORY = "nha_pho_1t1l";
 
-const EMPTY_FORM: FormState = {
-  code: "",
-  phase: "P1_CHUAN_BI",
-  name: "",
-  defaultOffsetDays: "0",
-  defaultDurationDays: "1",
-  defaultTeam: "",
-  defaultInspector: "",
-  materialsNeeded: "",
-  proposerRole: "",
-  ordererRole: "",
-  receiverRole: "",
-  qcChecklist: "• ",
-  isMilestone: false,
-  displayOrder: "1",
-  templateCategory: DEFAULT_CATEGORY,
+const CATEGORY_CHIPS: Array<{ value: "all" | TaskCategory; label: string }> = [
+  { value: "all", label: "Tất cả loại" },
+  { value: "normal", label: "Thường" },
+  { value: "internal_milestone", label: "Internal" },
+  { value: "major_milestone", label: "Major ⭐" },
+];
+
+const CATEGORY_LABEL: Record<TaskCategory, string> = {
+  normal: "Thường",
+  internal_milestone: "Internal",
+  major_milestone: "Major",
 };
 
-function toFormValue(t: TemplateItem): FormState {
-  return {
-    code: t.code,
-    phase: t.phase,
-    name: t.name,
-    defaultOffsetDays: String(t.defaultOffsetDays),
-    defaultDurationDays: String(t.defaultDurationDays),
-    defaultTeam: t.defaultTeam,
-    defaultInspector: t.defaultInspector,
-    materialsNeeded: t.materialsNeeded,
-    proposerRole: t.proposerRole,
-    ordererRole: t.ordererRole,
-    receiverRole: t.receiverRole,
-    qcChecklist: t.qcChecklist,
-    isMilestone: t.isMilestone,
-    displayOrder: String(t.displayOrder),
-    templateCategory: t.templateCategory,
-  };
-}
+const CARD_ACCENT: Record<TaskCategory, string> = {
+  normal: "border-l-[#6b7280]",
+  internal_milestone: "border-l-[#3b82f6]",
+  major_milestone: "border-l-[#ff8a3d]",
+};
 
-function toPayload(f: FormState) {
-  return {
-    code: f.code.trim(),
-    phase: f.phase,
-    name: f.name.trim(),
-    defaultOffsetDays: Number(f.defaultOffsetDays),
-    defaultDurationDays: Number(f.defaultDurationDays),
-    defaultTeam: f.defaultTeam.trim(),
-    defaultInspector: f.defaultInspector.trim(),
-    materialsNeeded: f.materialsNeeded,
-    proposerRole: f.proposerRole.trim(),
-    ordererRole: f.ordererRole.trim(),
-    receiverRole: f.receiverRole.trim(),
-    qcChecklist: f.qcChecklist,
-    isMilestone: f.isMilestone,
-    displayOrder: Number(f.displayOrder),
-    templateCategory: f.templateCategory,
-  };
-}
+const BADGE_CLASS: Record<TaskCategory, string> = {
+  normal: "bg-[#2a2a2a] text-[#aaa]",
+  internal_milestone: "bg-[#1a3a5a] text-[#60a5fa]",
+  major_milestone: "bg-[#2a1a05] text-[#ff8a3d]",
+};
 
 export function AdminTemplatesClient() {
-  const [category, setCategory] = useState(DEFAULT_CATEGORY);
-  const [includeInactive, setIncludeInactive] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<TemplateItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [includeInactive, setIncludeInactive] = useState(false);
 
-  const [editing, setEditing] = useState<TemplateItem | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [phaseFilter, setPhaseFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | TaskCategory>("all");
 
-  const [importing, setImporting] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  const [cloneModal, setCloneModal] = useState<CloneState | null>(null);
+  const [cloneSaving, setCloneSaving] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<TemplateItem | null>(null);
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   async function loadRows() {
     setLoading(true);
-    const q = new URLSearchParams({ category, includeInactive: includeInactive ? "1" : "0" });
-    const res = await fetch(`/api/admin/templates?${q.toString()}`, { cache: "no-store" });
+    const query = new URLSearchParams({
+      category: DEFAULT_CATEGORY,
+      includeInactive: includeInactive ? "1" : "0",
+    });
+
+    if (search.trim()) query.set("q", search.trim());
+    if (phaseFilter !== "all") query.set("phaseCode", phaseFilter);
+    if (categoryFilter !== "all") query.set("taskCategory", categoryFilter);
+
+    const res = await fetch(`/api/admin/templates?${query.toString()}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
     setLoading(false);
 
@@ -141,91 +109,66 @@ export function AdminTemplatesClient() {
       return;
     }
 
-    setRows(json.templates || []);
+    setRows((json.templates || []) as TemplateItem[]);
   }
 
   useEffect(() => {
     loadRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, includeInactive]);
+  }, [includeInactive, phaseFilter, categoryFilter]);
 
-  const nextDisplayOrder = useMemo(() => {
-    if (!rows.length) return 1;
-    return Math.max(...rows.map((r) => r.displayOrder)) + 1;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadRows();
+    }, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const phaseChips = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; order: number }>();
+    rows.forEach((row) => {
+      if (!map.has(row.phaseCode)) {
+        map.set(row.phaseCode, {
+          code: row.phaseCode,
+          name: row.phaseName,
+          order: row.phaseOrder,
+        });
+      }
+    });
+    return [{ code: "all", name: "Tất cả phase", order: 0 }, ...Array.from(map.values()).sort((a, b) => a.order - b.order)];
   }, [rows]);
 
-  function openCreate() {
-    setCreating(true);
-    setEditing(null);
-    setForm({ ...EMPTY_FORM, displayOrder: String(nextDisplayOrder), templateCategory: category });
-  }
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, { code: string; name: string; order: number; rows: TemplateItem[] }>();
 
-  function openEdit(row: TemplateItem) {
-    setEditing(row);
-    setCreating(false);
-    setForm(toFormValue(row));
-  }
-
-  function closeModal() {
-    setEditing(null);
-    setCreating(false);
-    setForm(EMPTY_FORM);
-  }
-
-  async function saveTemplate() {
-    const payload = toPayload(form);
-
-    setSaving(true);
-
-    const res = await fetch(creating ? "/api/admin/templates" : `/api/admin/templates/${editing?.id}`, {
-      method: creating ? "POST" : "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    rows.forEach((row) => {
+      const key = row.phaseCode;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          code: row.phaseCode,
+          name: row.phaseName,
+          order: row.phaseOrder,
+          rows: [row],
+        });
+      } else {
+        existing.rows.push(row);
+      }
     });
 
-    const json = await res.json().catch(() => ({}));
-    setSaving(false);
-
-    if (!res.ok) {
-      toast.error(json.message || "Lưu template thất bại");
-      return;
-    }
-
-    toast.success(json.message || "Đã lưu template");
-    closeModal();
-    await loadRows();
-  }
-
-  async function deleteTemplate(row: TemplateItem) {
-    const ok = window.confirm(
-      `Xóa template ${row.code}. Các dự án đã tạo dùng template này sẽ KHÔNG bị xóa tasks. Chỉ ảnh hưởng dự án tạo MỚI.`,
-    );
-    if (!ok) return;
-
-    const res = await fetch(`/api/admin/templates/${row.id}`, { method: "DELETE" });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json.message || "Xóa thất bại");
-      return;
-    }
-
-    toast.success(json.message || "Đã xóa mềm template");
-    await loadRows();
-  }
+    return Array.from(groups.values())
+      .sort((a, b) => a.order - b.order)
+      .map((group) => ({
+        ...group,
+        rows: group.rows.sort((a, b) => (a.displayOrder - b.displayOrder) || a.code.localeCompare(b.code, "vi", { numeric: true })),
+      }));
+  }, [rows]);
 
   async function restoreTemplate(row: TemplateItem) {
-    const payload = {
-      ...toPayload(toFormValue(row)),
-      isActive: true,
-    };
-
-    const res = await fetch(`/api/admin/templates/${row.id}/restore`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
+    const res = await fetch(`/api/admin/templates/${row.id}/restore`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
+
     if (!res.ok) {
       toast.error(json.message || "Khôi phục thất bại");
       return;
@@ -235,368 +178,317 @@ export function AdminTemplatesClient() {
     await loadRows();
   }
 
-  async function previewImport() {
-    if (!importFile) {
-      toast.error("Vui lòng chọn CSV trước");
+  async function submitClone() {
+    if (!cloneModal) return;
+    if (!cloneModal.code.trim() || !cloneModal.name.trim()) {
+      toast.error("Vui lòng nhập mã và tên task mới");
       return;
     }
 
-    const fd = new FormData();
-    fd.append("file", importFile);
-    fd.append("mode", "preview");
-
-    const res = await fetch("/api/admin/templates/import", { method: "POST", body: fd });
+    setCloneSaving(true);
+    const res = await fetch(`/api/admin/templates/${cloneModal.source.id}/clone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: cloneModal.code.trim(),
+        name: cloneModal.name.trim(),
+        phaseCode: cloneModal.phaseCode,
+      }),
+    });
     const json = await res.json().catch(() => ({}));
+    setCloneSaving(false);
 
     if (!res.ok) {
-      toast.error(json.message || "Preview import thất bại");
+      toast.error(json.message || "Clone thất bại");
       return;
     }
 
-    setPreviewRows(json.preview || []);
-    toast.success(`Preview ${json.total || 0} dòng`);
+    toast.success("Đã clone template");
+    setCloneModal(null);
+    await loadRows();
   }
 
-  async function confirmImport() {
-    if (!importFile) {
-      toast.error("Vui lòng chọn CSV trước");
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    if (deleteConfirmCode.trim() !== deleteTarget.code) {
+      toast.error(`Nhập đúng mã ${deleteTarget.code} để xác nhận`);
       return;
     }
 
-    setImporting(true);
-    const fd = new FormData();
-    fd.append("file", importFile);
-    fd.append("mode", "confirm");
-
-    const res = await fetch("/api/admin/templates/import", { method: "POST", body: fd });
+    setDeleting(true);
+    const res = await fetch(`/api/admin/templates/${deleteTarget.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmCode: deleteConfirmCode.trim() }),
+    });
     const json = await res.json().catch(() => ({}));
-    setImporting(false);
+    setDeleting(false);
 
     if (!res.ok) {
-      toast.error(json.message || "Import thất bại");
+      toast.error(json.message || "Xóa thất bại");
       return;
     }
 
-    toast.success(json.message || "Import thành công");
-    setPreviewRows([]);
-    setImportFile(null);
+    toast.success(json.message || "Đã xóa template");
+    setDeleteTarget(null);
+    setDeleteConfirmCode("");
     await loadRows();
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-[#f0f2ff]">Quản lý task templates</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={openCreate}>
-            Thêm template mới
-          </Button>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-[#f0f2ff]">📚 Thư viện Task Template</h1>
+        <Link href="/admin/templates/new">
+          <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]">+ Tạo</Button>
+        </Link>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-sm">Template category</label>
-            <select
-              className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled
-            >
-              <option value="nha_pho_1t1l">Nhà phố 1T1L</option>
-            </select>
-          </div>
-
-          <label className="mt-7 inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-            />
-            Hiển thị template đã xóa
-          </label>
-        </div>
-
-        <div className="mt-3 rounded-xl border border-[#2d3249] bg-[#13151f] border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
-          Mẫu công tác này dùng khi tạo dự án mới. Sửa KHÔNG ảnh hưởng các dự án đã tạo.
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <h2 className="mb-2 font-semibold">Import từ CSV</h2>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-xl bg-[#1a1a1a] px-3 py-2.5 text-sm text-[#e5e5e5]">
+        <div className="flex items-center gap-2">
+          <span>🔍</span>
           <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm task..."
+            className="w-full bg-transparent text-sm outline-none placeholder:text-[#7d7d7d]"
           />
-          <Button variant="outline" onClick={previewImport}>
-            Preview import
-          </Button>
-          <Button onClick={confirmImport} disabled={importing} className="bg-[#f97316] text-black hover:bg-[#fb923c]">
-            {importing ? "Đang import..." : "Confirm import"}
-          </Button>
         </div>
+      </div>
 
-        {previewRows.length ? (
-          <div className="mt-3 max-h-48 overflow-auto rounded-xl border border-[#2d3249] bg-[#13151f]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#252840] bg-[#171a27] text-left">
-                  <th className="px-2 py-1">Action</th>
-                  <th className="px-2 py-1">Code</th>
-                  <th className="px-2 py-1">Phase</th>
-                  <th className="px-2 py-1">Name</th>
-                  <th className="px-2 py-1">Order</th>
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((r, idx) => (
-                  <tr key={`${r.code}-${idx}`} className="border-b border-[#252840] last:border-0">
-                    <td className="px-2 py-1">{r.action}</td>
-                    <td className="px-2 py-1">{r.code}</td>
-                    <td className="px-2 py-1">{r.phase}</td>
-                    <td className="px-2 py-1">{r.name}</td>
-                    <td className="px-2 py-1">{r.displayOrder}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max gap-2">
+          {phaseChips.map((chip) => {
+            const active = phaseFilter === chip.code;
+            return (
+              <button
+                key={chip.code}
+                type="button"
+                onClick={() => setPhaseFilter(chip.code)}
+                className={`rounded-full border px-3 py-1.5 text-xs ${
+                  active
+                    ? "border-[#f97316] bg-[#f97316] text-black"
+                    : "border-[#2a2a2a] bg-[#1a1a1a] text-[#aaa]"
+                }`}
+              >
+                {chip.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max gap-2">
+          {CATEGORY_CHIPS.map((chip) => {
+            const active = categoryFilter === chip.value;
+            return (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => setCategoryFilter(chip.value)}
+                className={`rounded-full border px-3 py-1.5 text-xs ${
+                  active
+                    ? "border-[#f97316] bg-[#f97316] text-black"
+                    : "border-[#2a2a2a] bg-[#1a1a1a] text-[#aaa]"
+                }`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <label className="inline-flex items-center gap-2 text-xs text-[#9ca3af]">
+        <input
+          type="checkbox"
+          checked={includeInactive}
+          onChange={(event) => setIncludeInactive(event.target.checked)}
+        />
+        Hiển thị template đã xóa mềm
+      </label>
+
+      {loading ? <div className="text-sm text-[#9ca3af]">Đang tải template...</div> : null}
+
+      {!loading && groupedRows.length === 0 ? (
+        <div className="rounded-xl border border-[#2a2a2a] bg-[#171717] p-4 text-sm text-[#9ca3af]">
+          Không có template phù hợp bộ lọc.
+        </div>
+      ) : null}
+
+      {groupedRows.map((group) => (
+        <div key={group.code} className="space-y-2">
+          <div className="border-b border-[#2a2a2a] pb-1 text-xs font-semibold text-[#f97316]">
+            ━━━━ {group.code} - {group.name.toUpperCase()} ({group.rows.length} task) ━━━━
           </div>
-        ) : null}
-      </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[#252840] bg-[#171a27] text-[#8892b0]">
-                <th className="px-3 py-2">Order</th>
-                <th className="px-3 py-2">Mã</th>
-                <th className="px-3 py-2">Giai đoạn</th>
-                <th className="px-3 py-2">Tên công tác</th>
-                <th className="px-3 py-2">Offset</th>
-                <th className="px-3 py-2">Số ngày</th>
-                <th className="px-3 py-2">Đội</th>
-                <th className="px-3 py-2">Nghiệm thu</th>
-                <th className="px-3 py-2">Milestone</th>
-                <th className="px-3 py-2">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={10}>
-                    Đang tải...
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-6 text-center text-[#8892b0]" colSpan={10}>
-                    Không có template.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-[#252840] ${row.isMilestone ? "bg-red-50" : ""} ${!row.isActive ? "opacity-60" : ""}`}
+          {group.rows.map((row) => {
+            const qcItems = row.qcTemplate?.qcItems || [];
+            const photoRequired = qcItems.filter((item) => item.requirePhoto).length;
+
+            return (
+              <div
+                key={row.id}
+                className={`rounded-xl border border-[#232323] border-l-4 bg-[#1a1a1a] p-3 ${CARD_ACCENT[row.category]} ${
+                  row.isActive ? "" : "opacity-60"
+                }`}
+              >
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-[#888]">{row.code}</div>
+                    <div className="text-sm font-semibold text-[#f3f4f6]">{row.name}</div>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] ${BADGE_CLASS[row.category]}`}>
+                    {CATEGORY_LABEL[row.category]}
+                  </span>
+                </div>
+
+                <div className="mb-2 flex flex-wrap gap-3 text-xs text-[#9ca3af]">
+                  <span>⏱ {row.duration} ngày</span>
+                  <span>✅ {qcItems.length} tiêu chí</span>
+                  <span>📷 {photoRequired} ảnh</span>
+                </div>
+
+                {row.category === "major_milestone" ? (
+                  <div className="mb-2 text-[11px] text-[#f59e0b]">⭐ Cần TPTC duyệt + chủ nhà ký</div>
+                ) : null}
+
+                <div className="mt-2 grid grid-cols-3 gap-2 border-t border-[#2a2a2a] pt-2">
+                  <Link href={`/admin/templates/${row.id}`}>
+                    <Button variant="outline" className="h-8 w-full border-[#303030] bg-[#2a2a2a] text-xs text-[#d4d4d4]">
+                      Sửa
+                    </Button>
+                  </Link>
+
+                  <Button
+                    variant="outline"
+                    className="h-8 border-[#303030] bg-[#2a2a2a] text-xs text-[#d4d4d4]"
+                    onClick={() =>
+                      setCloneModal({
+                        source: row,
+                        code: "",
+                        name: `${row.name} (bản sao)`,
+                        phaseCode: row.phaseCode,
+                      })
+                    }
                   >
-                    <td className="px-3 py-2">{row.displayOrder}</td>
-                    <td className="px-3 py-2 font-medium">{row.code}</td>
-                    <td className="px-3 py-2">
-                      <span className="rounded px-2 py-1 text-xs" style={{ backgroundColor: PHASE_COLOR[row.phase] }}>
-                        {PHASE_LABEL[row.phase]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">{row.name}</td>
-                    <td className="px-3 py-2">{row.defaultOffsetDays}</td>
-                    <td className="px-3 py-2">{row.defaultDurationDays}</td>
-                    <td className="px-3 py-2">{row.defaultTeam}</td>
-                    <td className="px-3 py-2">{row.defaultInspector}</td>
-                    <td className="px-3 py-2">{row.isMilestone ? "✅" : "-"}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => openEdit(row)}>
-                          Sửa
-                        </Button>
-                        {row.isActive ? (
-                          <Button variant="outline" onClick={() => deleteTemplate(row)}>
-                            Xóa
-                          </Button>
-                        ) : (
-                          <Button variant="outline" onClick={() => restoreTemplate(row)}>
-                            Khôi phục
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    Clone
+                  </Button>
 
-      {editing || creating ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-            <h3 className="mb-2 text-lg font-semibold">{creating ? "Thêm template mới" : "Sửa template"}</h3>
-            <div className="mb-3 rounded-xl border border-[#2d3249] bg-[#13151f] border-red-500/30 bg-red-500/10 p-2 text-sm text-red-300">
-              ⚠️ Thay đổi template CHỈ áp dụng cho dự án TẠO MỚI sau khi sửa. Dự án hiện tại KHÔNG bị ảnh hưởng.
+                  {row.isActive ? (
+                    <Button
+                      variant="outline"
+                      className="h-8 border-[#4a1a1a] bg-[#2a2a2a] text-xs text-red-400"
+                      onClick={() => {
+                        setDeleteTarget(row);
+                        setDeleteConfirmCode("");
+                      }}
+                    >
+                      Xóa
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="h-8 border-[#1f3f2d] bg-[#2a2a2a] text-xs text-emerald-400"
+                      onClick={() => restoreTemplate(row)}
+                    >
+                      Khôi phục
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {cloneModal ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3">
+          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#1a1d2e] p-4">
+            <div className="mb-3 text-sm font-semibold text-[#f0f2ff]">🔄 Clone từ {cloneModal.source.code} {cloneModal.source.name}</div>
+            <div className="mb-3 rounded-lg bg-emerald-500/10 p-2 text-xs text-emerald-300">
+              Template mới sẽ copy toàn bộ thông tin cơ bản + QC template + checklist items.
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm">Mã</label>
+                <label className="mb-1 block text-xs text-[#9ca3af]">Mã task mới *</label>
                 <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.code}
-                  disabled={!creating}
-                  onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                  className="w-full rounded-lg border border-[#30364d] bg-[#11182d] px-3 py-2 text-sm text-[#f0f2ff]"
+                  value={cloneModal.code}
+                  onChange={(event) => setCloneModal((prev) => (prev ? { ...prev, code: event.target.value } : prev))}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm">Giai đoạn</label>
+                <label className="mb-1 block text-xs text-[#9ca3af]">Tên task mới *</label>
+                <input
+                  className="w-full rounded-lg border border-[#30364d] bg-[#11182d] px-3 py-2 text-sm text-[#f0f2ff]"
+                  value={cloneModal.name}
+                  onChange={(event) => setCloneModal((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-[#9ca3af]">Phase *</label>
                 <select
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.phase}
-                  onChange={(e) => setForm((p) => ({ ...p, phase: e.target.value as TaskPhase }))}
+                  className="w-full rounded-lg border border-[#30364d] bg-[#11182d] px-3 py-2 text-sm text-[#f0f2ff]"
+                  value={cloneModal.phaseCode}
+                  onChange={(event) => setCloneModal((prev) => (prev ? { ...prev, phaseCode: event.target.value } : prev))}
                 >
-                  {Object.entries(PHASE_LABEL).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
+                  {phaseChips
+                    .filter((item) => item.code !== "all")
+                    .map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.code} - {item.name}
+                      </option>
+                    ))}
                 </select>
               </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm">Tên công tác</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Default offset days</label>
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.defaultOffsetDays}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultOffsetDays: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Default duration days</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.defaultDurationDays}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultDurationDays: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Đội</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.defaultTeam}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultTeam: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Nghiệm thu</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.defaultInspector}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultInspector: e.target.value }))}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm">Materials needed</label>
-                <textarea
-                  rows={2}
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.materialsNeeded}
-                  onChange={(e) => setForm((p) => ({ ...p, materialsNeeded: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Proposer role</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.proposerRole}
-                  onChange={(e) => setForm((p) => ({ ...p, proposerRole: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Orderer role</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.ordererRole}
-                  onChange={(e) => setForm((p) => ({ ...p, ordererRole: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Receiver role</label>
-                <input
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.receiverRole}
-                  onChange={(e) => setForm((p) => ({ ...p, receiverRole: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Display order</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.displayOrder}
-                  onChange={(e) => setForm((p) => ({ ...p, displayOrder: e.target.value }))}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm">QC checklist</label>
-                <textarea
-                  rows={4}
-                  placeholder="Mỗi dòng 1 mục, bắt đầu bằng • "
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                  value={form.qcChecklist}
-                  onChange={(e) => setForm((p) => ({ ...p, qcChecklist: e.target.value }))}
-                />
-              </div>
-
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isMilestone}
-                  onChange={(e) => setForm((p) => ({ ...p, isMilestone: e.target.checked }))}
-                />
-                Is milestone
-              </label>
             </div>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={closeModal}>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setCloneModal(null)} disabled={cloneSaving}>
                 Hủy
               </Button>
-              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={saveTemplate} disabled={saving}>
-                {saving ? "Đang lưu..." : "Lưu"}
+              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={submitClone} disabled={cloneSaving}>
+                {cloneSaving ? "Đang clone..." : "Clone"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3">
+          <div className="w-full max-w-md rounded-xl border border-red-500/40 bg-[#1a1d2e] p-4">
+            <div className="mb-2 text-sm font-semibold text-red-300">⚠ Xác nhận xóa {deleteTarget.code} {deleteTarget.name}</div>
+            <div className="mb-3 text-xs text-[#d1d5db]">
+              Task trong dự án đã tạo sẽ không bị xóa, nhưng sẽ tách khỏi template này.
+            </div>
+            <div className="mb-3 rounded-lg bg-red-500/10 p-2 text-xs text-red-200">
+              Nhập <b>{deleteTarget.code}</b> để xác nhận xóa mềm template.
+            </div>
+            <input
+              className="w-full rounded-lg border border-[#30364d] bg-[#11182d] px-3 py-2 text-sm text-[#f0f2ff]"
+              value={deleteConfirmCode}
+              onChange={(event) => setDeleteConfirmCode(event.target.value)}
+              placeholder={deleteTarget.code}
+            />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteConfirmCode("");
+                }}
+                disabled={deleting}
+              >
+                Hủy
+              </Button>
+              <Button className="bg-red-500 text-white hover:bg-red-600" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? "Đang xóa..." : "Xóa"}
               </Button>
             </div>
           </div>
