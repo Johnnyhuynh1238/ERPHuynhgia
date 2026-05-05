@@ -33,6 +33,21 @@ function fmtDateTime(input: string | null) {
   return new Date(input).toLocaleString("vi-VN");
 }
 
+function statusLabel(status: string | null) {
+  const labels: Record<string, string> = {
+    not_started: "Chưa bắt đầu",
+    in_progress: "Đang làm",
+    done: "KS hoàn thành",
+    internal_approved: "Đã duyệt nội bộ",
+    completed: "Hoàn tất",
+    inspected: "Đã nghiệm thu",
+    delayed: "Trễ",
+    na: "Không áp dụng",
+  };
+
+  return status ? labels[status] || status : "-";
+}
+
 export function TaskProgressSection({
   taskId,
   canUpdate,
@@ -51,8 +66,10 @@ export function TaskProgressSection({
   const [status, setStatus] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [history, setHistory] = useState<ProgressHistory[]>([]);
+  const [hasInteractedWithProgress, setHasInteractedWithProgress] = useState(false);
 
   const isRollback = percent < savedPercent;
+  const showUpdateFields = canUpdate && hasInteractedWithProgress && percent !== savedPercent;
 
   const canSave = useMemo(() => {
     if (!canUpdate) return false;
@@ -79,6 +96,7 @@ export function TaskProgressSection({
       setPhotoUrl("");
       setReason("");
       setNote("");
+      setHasInteractedWithProgress(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không tải được tiến độ");
     } finally {
@@ -150,10 +168,10 @@ export function TaskProgressSection({
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Tiến độ hiện tại</div>
-            <div className="text-lg font-bold text-amber-300">{percent}%</div>
+            <div className="text-2xl font-bold text-amber-300 transition-all duration-200 ease-out">{percent}%</div>
           </div>
           <div className="text-right text-xs text-[#8891aa]">
-            <div>Trạng thái: {status || "-"}</div>
+            <div>Trạng thái: {statusLabel(status)}</div>
             <div>Cập nhật: {fmtDateTime(updatedAt)}</div>
           </div>
         </div>
@@ -163,83 +181,99 @@ export function TaskProgressSection({
           min={0}
           max={100}
           value={percent}
-          onChange={(e) => setPercent(Number(e.target.value))}
+          onPointerDown={() => setHasInteractedWithProgress(true)}
+          onChange={(e) => {
+            setHasInteractedWithProgress(true);
+            setPercent(Number(e.target.value));
+          }}
           disabled={!canUpdate || saving || loading}
-          className="w-full"
+          style={{ background: `linear-gradient(to right, #f59e0b 0%, #f59e0b ${percent}%, #2e3347 ${percent}%, #2e3347 100%)` }}
+          className="h-4 w-full cursor-pointer appearance-none rounded-full transition-[background] duration-300 ease-out accent-amber-500 disabled:cursor-not-allowed disabled:opacity-60 [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-4 [&::-moz-range-thumb]:border-[#11131b] [&::-moz-range-thumb]:bg-amber-500 [&::-moz-range-thumb]:shadow-lg [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-[#11131b] [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow-lg"
         />
 
-        <div className="grid gap-2 md:grid-cols-2">
-          <div>
-            <div className="mb-1 text-xs text-[#8891aa]">Ảnh minh chứng (bắt buộc)</div>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={!canUpdate || saving || uploading}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  await uploadPhoto(file);
-                }
-                e.currentTarget.value = "";
-              }}
-              className="block w-full text-xs"
-            />
-            {photoUrl ? (
-              <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-amber-300 underline">
-                Xem ảnh đã chọn
-              </a>
-            ) : null}
-          </div>
+        {showUpdateFields ? (
+          <div className="space-y-3 overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 transition-all duration-300 ease-out">
+            <div className={`grid gap-2 ${isRollback ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+              <div>
+                <div className="mb-1 text-xs text-[#8891aa]">Ảnh minh chứng (bắt buộc)</div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={!canUpdate || saving || uploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      await uploadPhoto(file);
+                    }
+                    e.currentTarget.value = "";
+                  }}
+                  className="block w-full text-xs"
+                />
+                {photoUrl ? (
+                  <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-amber-300 underline">
+                    Xem ảnh đã chọn
+                  </a>
+                ) : null}
+              </div>
 
-          <div>
-            <div className="mb-1 text-xs text-[#8891aa]">Lý do khi giảm tiến độ {isRollback ? "*" : "(không bắt buộc)"}</div>
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              {isRollback ? (
+                <div>
+                  <div className="mb-1 text-xs text-[#8891aa]">Lý do khi giảm tiến độ *</div>
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    disabled={!canUpdate || saving}
+                    placeholder="Nhập lý do"
+                    className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm transition-colors duration-200 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
               disabled={!canUpdate || saving}
-              placeholder="Nhập lý do"
-              className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm"
+              rows={2}
+              placeholder="Ghi chú cập nhật tiến độ"
+              className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm transition-colors duration-200 focus:border-amber-500 focus:outline-none"
             />
-          </div>
-        </div>
 
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          disabled={!canUpdate || saving}
-          rows={2}
-          placeholder="Ghi chú cập nhật tiến độ"
-          className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm"
-        />
-
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-[#8891aa]">
-            {isRollback ? "Đang giảm tiến độ, bắt buộc lý do." : "Mỗi lần cập nhật đều phải có ảnh."}
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-[#8891aa]">
+                {isRollback ? "Đang giảm tiến độ, bắt buộc lý do." : "Mỗi lần cập nhật đều phải có ảnh."}
+              </div>
+              <Button
+                onClick={saveProgress}
+                disabled={!canSave || saving || loading}
+                className="bg-amber-500 text-[#0f1117] transition-colors duration-200 hover:bg-amber-600"
+              >
+                {saving ? "Đang lưu..." : "Lưu tiến độ"}
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={saveProgress}
-            disabled={!canSave || saving || loading}
-            className="bg-amber-500 text-[#0f1117] hover:bg-amber-600"
-          >
-            {saving ? "Đang lưu..." : "Lưu tiến độ"}
-          </Button>
-        </div>
+        ) : null}
       </div>
 
-      <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
-        <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
+      <div className="space-y-2 pl-1">
+        <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
         {loading ? <div className="text-sm text-[#8891aa]">Đang tải...</div> : null}
         {!loading && history.length === 0 ? <div className="text-sm text-[#8891aa]">Chưa có lịch sử cập nhật</div> : null}
-        <div className="space-y-2">
-          {history.map((row) => (
-            <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm">
+        <div className="space-y-3 border-l border-[#2e3347] pl-4">
+          {history.slice(0, 3).map((row) => (
+            <div key={row.id} className="relative text-sm">
+              <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
               <div className="font-semibold text-[#f0f2f8]">
                 {row.fromPercent}% → {row.toPercent}%
               </div>
-              <div className="text-xs text-[#8891aa]">{fmtDateTime(row.createdAt)} · {row.user.fullName}</div>
+              <div className="text-xs text-[#8891aa]">
+                {fmtDateTime(row.createdAt)} · {row.user.fullName}
+              </div>
               {row.reason ? <div className="mt-1 text-xs text-rose-300">Lý do: {row.reason}</div> : null}
               {row.note ? <div className="mt-1 text-xs text-[#c8d0e8]">Ghi chú: {row.note}</div> : null}
-              <a href={row.photoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-amber-300 underline">Xem ảnh minh chứng</a>
+              <a href={row.photoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-amber-300 underline">
+                Xem ảnh minh chứng
+              </a>
             </div>
           ))}
         </div>
