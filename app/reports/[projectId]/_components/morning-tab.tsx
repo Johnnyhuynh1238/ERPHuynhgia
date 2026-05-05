@@ -165,7 +165,7 @@ export function MorningTab({ projectId }: { projectId: string }) {
                       {taskHint(row) ? <div className="text-xs text-[#98a0c2]">{taskHint(row)}</div> : null}
                     </div>
                   </div>
-                  <a href={`/tasks/${row.taskId}?tab=technical&subtab=today`} className="text-xs font-semibold text-[#f97316]">
+                  <a href={`/tasks/${row.taskId}?tab=progress`} className="text-xs font-semibold text-[#f97316]">
                     Vào task
                   </a>
                 </label>
@@ -204,7 +204,7 @@ export function MorningTab({ projectId }: { projectId: string }) {
                       </div>
                     </div>
                   </div>
-                  <a href={`/tasks/${row.taskId}?tab=technical&subtab=today`} className="text-xs font-semibold text-[#f97316]">
+                  <a href={`/tasks/${row.taskId}?tab=progress`} className="text-xs font-semibold text-[#f97316]">
                     Vào task
                   </a>
                 </label>

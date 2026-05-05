@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PHASE_LABEL, STATUS_CLASS, STATUS_LABEL } from "@/lib/task-display";
@@ -145,17 +146,19 @@ export function TaskDetailClient({
   currentUserRole: string;
   canManageQcItem: boolean;
 }) {
-  const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
-  const initialLegacySub = parseLegacySub(params.get("subTab"));
-  const initialMain = parseMainTab(params.get("tab")) === "technical" && params.get("tab") === "reports" ? detectMainFromReportType(initialLegacySub) : parseMainTab(params.get("tab"));
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const subTabParam = searchParams.get("subTab") || searchParams.get("subtab");
+  const initialLegacySub = parseLegacySub(subTabParam);
+  const initialMain = parseMainTab(tabParam) === "technical" && tabParam === "reports" ? detectMainFromReportType(initialLegacySub) : parseMainTab(tabParam);
 
   const [task] = useState<TaskDetail>(initialTask);
   const [logs] = useState<TaskLog[]>(initialLogs);
   const [activeTab, setActiveTab] = useState<MainTab>(initialMain);
-  const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(params.get("tab") === "history" ? "history" : "qc");
-  const [materialSubTab, setMaterialSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "material" ? "history" : "today");
-  const [laborSubTab, setLaborSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "labor" ? "history" : "today");
-  const [equipmentSubTab, setEquipmentSubTab] = useState<ResourceSubTab>(params.get("tab") === "history" && initialLegacySub === "equipment" ? "history" : "today");
+  const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(tabParam === "history" ? "history" : "qc");
+  const [materialSubTab, setMaterialSubTab] = useState<ResourceSubTab>(tabParam === "history" && initialLegacySub === "material" ? "history" : "today");
+  const [laborSubTab, setLaborSubTab] = useState<ResourceSubTab>(tabParam === "history" && initialLegacySub === "labor" ? "history" : "today");
+  const [equipmentSubTab, setEquipmentSubTab] = useState<ResourceSubTab>(tabParam === "history" && initialLegacySub === "equipment" ? "history" : "today");
   const [journalSubTab, setJournalSubTab] = useState<JournalSubTab>("all");
 
   const [reportRows, setReportRows] = useState<Record<ReportType, any[]>>({ technical: [], material: [], labor: [], equipment: [] });
@@ -189,6 +192,28 @@ export function TaskDetailClient({
     currentUserRole === "construction_manager" ||
     currentUserId === task.project.mainEngineerId ||
     currentUserId === task.assignedEngineer?.id;
+
+  useEffect(() => {
+    const legacySub = parseLegacySub(subTabParam);
+    const parsedMain = parseMainTab(tabParam);
+    setActiveTab(parsedMain === "technical" && tabParam === "reports" ? detectMainFromReportType(legacySub) : parsedMain);
+
+    if (tabParam === "history") {
+      if (legacySub === "material") setMaterialSubTab("history");
+      else if (legacySub === "labor") setLaborSubTab("history");
+      else if (legacySub === "equipment") setEquipmentSubTab("history");
+      else setTechnicalSubTab("history");
+    }
+  }, [tabParam, subTabParam]);
+
+  function goBack() {
+    if (typeof window === "undefined") return;
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.href = `/projects/${task.project.id}/tasks`;
+  }
 
   const tabs: { key: MainTab; label: string }[] = [
     { key: "overview", label: "Tổng quan" },
@@ -519,7 +544,18 @@ export function TaskDetailClient({
   return (
     <div className="min-h-screen bg-[#0f1117] text-[#f0f2f8]">
       <div className="sticky top-0 z-40 border-b border-[#2e3347] bg-[#0f1117] px-4 pb-0 pt-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2"><div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div><span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span></div>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={goBack}
+            className="rounded-full border border-[#2e3347] bg-[#1a1d27] px-3 py-1.5 text-xs font-semibold text-[#c8d0e8] transition hover:border-amber-500/60 hover:text-amber-300"
+          >
+            ← Quay lại
+          </button>
+          <div className="text-3xl font-extrabold leading-none text-amber-500">{task.code}</div>
+          <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">{PHASE_LABEL[task.phase]}</span>
+          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>
+        </div>
         <div className="mb-2 text-base font-bold">{task.name}</div>
 
         <div className="mt-3 flex overflow-x-auto border-b border-[#2e3347] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

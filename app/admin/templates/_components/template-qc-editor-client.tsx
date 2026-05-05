@@ -342,17 +342,22 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
       )}
 
       {itemModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3">
-          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#1a1d2e] p-4">
-            <div className="mb-3 text-sm font-semibold text-[#f0f2ff]">{editingIndex === null ? "➕ Thêm tiêu chí QC" : "✏️ Sửa tiêu chí QC"}</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#f97316]/50 bg-[#1a1d2e] p-4 shadow-2xl">
+            <div className="mb-4">
+              <div className="text-base font-semibold text-[#f0f2ff]">{editingIndex === null ? "Thêm tiêu chí QC" : "Sửa tiêu chí QC"}</div>
+              <div className="mt-1 text-xs text-[#98a0c2]">Tên QC là bắt buộc để lưu checklist.</div>
+            </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs text-[#98a0c2]">Tên tiêu chí *</label>
+              <div className="rounded-xl border border-[#f97316]/40 bg-[#11182d] p-3">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#f7c58a]">Tên QC *</label>
                 <input
+                  autoFocus
                   value={itemDraft.title}
                   onChange={(event) => setItemDraft((prev) => ({ ...prev, title: event.target.value }))}
-                  className="w-full rounded-lg border border-[#30364d] bg-[#11182d] px-3 py-2 text-sm text-[#f0f2ff]"
+                  placeholder="Nhập tên tiêu chí QC bắt buộc"
+                  className="w-full rounded-lg border border-[#f97316]/60 bg-[#0f1424] px-3 py-3 text-sm text-[#f0f2ff] outline-none focus:border-[#fb923c]"
                 />
               </div>
 

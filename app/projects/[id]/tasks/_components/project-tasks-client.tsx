@@ -33,6 +33,7 @@ type TaskRow = {
   receiverRole: string;
   qcChecklist: string;
   status: TaskStatus;
+  progressPercent: number | null;
   isMilestone: boolean;
   visibleToCustomer?: boolean;
   isActive: boolean;
@@ -238,9 +239,13 @@ function statusBorderColor(status: TaskStatus) {
 }
 
 function calcProgress(task: TaskRow) {
-  if (task.status === "done" || task.status === "inspected") return 100;
-  if (task.status === "in_progress") return 60;
+  if (typeof task.progressPercent === "number") return Math.max(0, Math.min(100, task.progressPercent));
+  if (task.status === "done" || task.status === "inspected" || task.status === "internal_approved" || task.status === "completed") return 100;
   return 0;
+}
+
+function shouldShowProgressBar(task: TaskRow, progress: number) {
+  return progress > 0 || task.status === "in_progress";
 }
 
 function phaseStatusText(status: PhaseRow["status"]) {
@@ -482,6 +487,18 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     loadTasks();
     return () => {
       abortControllerRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reloadTasks = () => void loadTasks();
+    window.addEventListener("focus", reloadTasks);
+    window.addEventListener("pageshow", reloadTasks);
+    return () => {
+      window.removeEventListener("focus", reloadTasks);
+      window.removeEventListener("pageshow", reloadTasks);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
@@ -1102,7 +1119,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                             <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
                                             <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
                                             <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
-                                            {task.status === "in_progress" ? (
+                                            {shouldShowProgressBar(task, progress) ? (
                                               <div className="mt-3">
                                                 <div className="h-[5px] rounded bg-[#252840]"><div className="h-[5px] rounded bg-[#f97316]" style={{ width: `${progress}%` }} /></div>
                                                 <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
@@ -1132,7 +1149,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                       <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
                                       <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
                                       <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
-                                      {task.status === "in_progress" ? (
+                                      {shouldShowProgressBar(task, progress) ? (
                                         <div className="mt-3">
                                           <div className="h-[5px] rounded bg-[#252840]"><div className="h-[5px] rounded bg-[#f97316]" style={{ width: `${progress}%` }} /></div>
                                           <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>

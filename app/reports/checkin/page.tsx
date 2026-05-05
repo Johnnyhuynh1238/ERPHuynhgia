@@ -55,7 +55,7 @@ export default function CheckinPage() {
                   {items.map((t) => (
                     <div key={t.id} className="flex items-center justify-between rounded-md border px-2 py-2 text-sm">
                       <label className="flex items-center gap-2"><input type="checkbox" checked={!!picked[t.id]} onChange={(e) => setPicked((s) => ({ ...s, [t.id]: e.target.checked }))} />{t.code} - {t.name}</label>
-                      <Link className="text-orange-600 text-xs" href={`/tasks/${t.id}?tab=technical&subTab=today`}>Vào task</Link>
+                      <Link className="text-orange-600 text-xs" href={`/tasks/${t.id}?tab=progress`}>Vào task</Link>
                     </div>
                   ))}
                 </div>

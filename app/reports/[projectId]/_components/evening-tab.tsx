@@ -110,7 +110,7 @@ export function EveningTab({ projectId }: { projectId: string }) {
                   {task.report.status} · {task.report.progress ?? 0}% · {task.report.photoCount} ảnh
                 </div>
                 <a
-                  href={`/tasks/${task.taskId}?tab=technical&subtab=today`}
+                  href={`/tasks/${task.taskId}?tab=progress`}
                   className="mt-3 inline-flex rounded-lg border border-[#2f3555] bg-[#11182d] px-3 py-1.5 text-xs font-semibold text-[#d9def3]"
                 >
                   Xem trong task →
@@ -120,7 +120,7 @@ export function EveningTab({ projectId }: { projectId: string }) {
               <>
                 <div className="mt-2 text-sm text-amber-300">⚠ Chưa cập nhật</div>
                 <a
-                  href={`/tasks/${task.taskId}?tab=technical&subtab=today`}
+                  href={`/tasks/${task.taskId}?tab=progress`}
                   className="mt-3 inline-flex rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-3 py-1.5 text-xs font-semibold text-[#f97316]"
                 >
                   Cập nhật ngay →
