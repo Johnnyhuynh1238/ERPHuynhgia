@@ -92,7 +92,48 @@ export async function GET(_: Request, { params }: Params) {
     });
   }
 
-  const pickedTaskIds = checkin.tasks.map((item) => item.taskId);
+  const assignedTaskIds =
+    user.role === UserRole.engineer && user.id !== project.mainEngineerId
+      ? new Set(
+          (
+            await prisma.task.findMany({
+              where: {
+                projectId: params.projectId,
+                assignedEngineerId: user.id,
+                isActive: true,
+              },
+              select: { id: true },
+            })
+          ).map((task) => task.id),
+        )
+      : null;
+  const visibleCheckinTasks = assignedTaskIds ? checkin.tasks.filter((item) => assignedTaskIds.has(item.taskId)) : checkin.tasks;
+
+  if (visibleCheckinTasks.length === 0) {
+    return NextResponse.json({
+      summary: {
+        totalPicked: 0,
+        totalUpdated: 0,
+        allCompleted: false,
+        completionRate: 0,
+      },
+      tasks: [],
+      kpiToday: {
+        morningOnTime: !checkin.isLate,
+        morningComplete: false,
+        eveningOnTime: null,
+        eveningComplete: false,
+        currentScore: scoreFromCriteria({
+          morningOnTime: !checkin.isLate,
+          morningComplete: false,
+          eveningOnTime: null,
+          eveningComplete: false,
+        }),
+      },
+    });
+  }
+
+  const pickedTaskIds = visibleCheckinTasks.map((item) => item.taskId);
   const [technicalReports, candidates] = await Promise.all([
     prisma.taskTechnicalReport.findMany({
       where: {
@@ -111,13 +152,14 @@ export async function GET(_: Request, { params }: Params) {
     getMorningTaskCandidates(params.projectId, reportDate),
   ]);
 
+  const visibleCandidates = assignedTaskIds ? candidates.filter((row) => assignedTaskIds.has(row.taskId)) : candidates;
   const reportByTask = new Map(technicalReports.map((row) => [row.taskId, row]));
   const totalPicked = pickedTaskIds.length;
   const totalUpdated = technicalReports.length;
   const allCompleted = totalPicked > 0 && totalUpdated === totalPicked;
   const completionRate = totalPicked === 0 ? 0 : Math.round((totalUpdated / totalPicked) * 100);
 
-  const requiredIds = candidates.filter((row) => row.group === "in_progress" || row.group === "overdue").map((row) => row.taskId);
+  const requiredIds = visibleCandidates.filter((row) => row.group === "in_progress" || row.group === "overdue").map((row) => row.taskId);
   const pickedSet = new Set(pickedTaskIds);
   const morningComplete = requiredIds.length === 0 || requiredIds.every((taskId) => pickedSet.has(taskId));
 
@@ -126,7 +168,7 @@ export async function GET(_: Request, { params }: Params) {
 
   const morningOnTime = !checkin.isLate;
 
-  const tasks = checkin.tasks
+  const tasks = visibleCheckinTasks
     .map((item) => {
       const report = reportByTask.get(item.taskId);
       const progress = report

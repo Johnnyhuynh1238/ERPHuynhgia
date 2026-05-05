@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 8 * 1024 * 1024;
 
 function safeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ message: `File ${file.name} không đúng định dạng ảnh` }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ message: `File ${file.name} vượt quá 5MB` }, { status: 400 });
+      return NextResponse.json({ message: `File ${file.name} vượt quá 8MB` }, { status: 400 });
     }
   }
 
