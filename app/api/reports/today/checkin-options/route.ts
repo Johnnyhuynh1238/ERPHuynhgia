@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ProjectRoleType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTodayDateVn } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
@@ -11,12 +12,24 @@ export async function GET() {
   const in3Days = new Date(today);
   in3Days.setUTCDate(in3Days.getUTCDate() + 3);
 
-  const assignments = await prisma.projectMemberAssignment.findMany({ where: { userId: user.id }, select: { projectId: true }, distinct: ["projectId"] });
+  const assignments = await prisma.projectMemberAssignment.findMany({ where: { userId: user.id, role: ProjectRoleType.pm_engineer }, select: { projectId: true }, distinct: ["projectId"] });
   const projectIds = assignments.map((a) => a.projectId);
 
   const projects = await prisma.project.findMany({
     where: { id: { in: projectIds } },
-    select: { id: true, code: true, name: true, tasks: { where: { status: { notIn: ["done", "na"] } }, orderBy: { displayOrder: "asc" }, select: { id: true, code: true, name: true, status: true, plannedStartDate: true, plannedEndDate: true } } },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      tasks: {
+        where: {
+          status: { notIn: ["done", "na"] },
+          assignedEngineerId: user.id,
+        },
+        orderBy: { displayOrder: "asc" },
+        select: { id: true, code: true, name: true, status: true, plannedStartDate: true, plannedEndDate: true },
+      },
+    },
   });
 
   const data = projects.map((p) => ({

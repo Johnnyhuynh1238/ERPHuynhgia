@@ -1,4 +1,4 @@
-import { ProjectMemberRole, TaskStatus, UserRole } from "@prisma/client";
+import { ProjectRoleType, TaskStatus, UserRole } from "@prisma/client";
 import { addUtcDays, formatUtcYmd, toUtcEndOfDay, toUtcStartOfDay } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
 
@@ -45,16 +45,16 @@ export async function getProjectForReports(projectId: string) {
 }
 
 export async function isEngineerMemberOfProject(userId: string, projectId: string) {
-  const member = await prisma.projectMember.findFirst({
+  const assignment = await prisma.projectMemberAssignment.findFirst({
     where: {
       projectId,
       userId,
-      roleInProject: ProjectMemberRole.engineer,
+      role: ProjectRoleType.pm_engineer,
     },
     select: { id: true },
   });
 
-  return Boolean(member);
+  return Boolean(assignment);
 }
 
 export async function canAccessProjectReports(input: { userId: string; role: string; projectId: string }) {
@@ -66,10 +66,16 @@ export async function canAccessProjectReports(input: { userId: string; role: str
     return false;
   }
 
-  const project = await getProjectForReports(input.projectId);
-  if (!project) return false;
-  if (project.mainEngineerId === input.userId) return true;
-  return isEngineerMemberOfProject(input.userId, input.projectId);
+  const assignment = await prisma.projectMemberAssignment.findFirst({
+    where: {
+      projectId: input.projectId,
+      userId: input.userId,
+      role: ProjectRoleType.pm_engineer,
+    },
+    select: { id: true },
+  });
+
+  return Boolean(assignment);
 }
 
 export async function getVisibleProjectsForUser(user: { id: string; role: string }) {
@@ -92,37 +98,25 @@ export async function getVisibleProjectsForUser(user: { id: string; role: string
     return [] as Array<{ id: string; code: string; name: string; mainEngineerId: string }>;
   }
 
-  const [mainProjects, memberRows] = await Promise.all([
-    prisma.project.findMany({
-      where: {
-        mainEngineerId: user.id,
-        status: { in: ["planning", "in_progress", "paused"] },
-      },
-      select: { id: true, code: true, name: true, mainEngineerId: true },
-    }),
-    prisma.projectMember.findMany({
-      where: {
-        userId: user.id,
-        roleInProject: ProjectMemberRole.engineer,
-      },
-      select: { projectId: true },
-    }),
-  ]);
+  const assignmentRows = await prisma.projectMemberAssignment.findMany({
+    where: {
+      userId: user.id,
+      role: ProjectRoleType.pm_engineer,
+    },
+    select: { projectId: true },
+  });
 
-  const memberProjectIds = memberRows.map((row) => row.projectId);
-  const memberProjects = memberProjectIds.length
-    ? await prisma.project.findMany({
-        where: {
-          id: { in: memberProjectIds },
-          status: { in: ["planning", "in_progress", "paused"] },
-        },
-        select: { id: true, code: true, name: true, mainEngineerId: true },
-      })
-    : [];
+  const projectIds = Array.from(new Set(assignmentRows.map((row) => row.projectId)));
+  if (projectIds.length === 0) return [];
 
-  const merged = new Map<string, { id: string; code: string; name: string; mainEngineerId: string }>();
-  [...mainProjects, ...memberProjects].forEach((item) => merged.set(item.id, item));
-  return Array.from(merged.values()).sort((a, b) => a.code.localeCompare(b.code, "vi"));
+  return prisma.project.findMany({
+    where: {
+      id: { in: projectIds },
+      status: { in: ["planning", "in_progress", "paused"] },
+    },
+    select: { id: true, code: true, name: true, mainEngineerId: true },
+    orderBy: { code: "asc" },
+  });
 }
 
 export function mapTaskToMorningRow(
