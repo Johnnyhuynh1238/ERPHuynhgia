@@ -1,9 +1,17 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { deleteObjectFromMinio } from "@/lib/minio";
+
+function extractMinioKey(value: string) {
+  if (value.startsWith("minio://")) return value.slice("minio://".length);
+  try {
+    return new URL(value, "http://local").searchParams.get("key");
+  } catch {
+    return null;
+  }
+}
 
 export async function DELETE(
   _request: Request,
@@ -31,16 +39,19 @@ export async function DELETE(
     return NextResponse.json({ message: "Không tìm thấy ảnh" }, { status: 404 });
   }
 
-  if (user.role !== UserRole.admin && photo.uploadedBy !== user.id) {
+  if (user.role !== UserRole.admin && user.role !== UserRole.construction_manager && photo.uploadedBy !== user.id) {
     return NextResponse.json({ message: "Không có quyền xóa ảnh này" }, { status: 403 });
   }
 
   await prisma.taskPhoto.delete({ where: { id: photo.id } });
 
-  const absolutePhoto = path.join(process.cwd(), "public", photo.photoUrl.replace(/^\//, ""));
-  const absoluteThumb = path.join(process.cwd(), "public", photo.thumbnailUrl.replace(/^\//, ""));
+  const photoKey = extractMinioKey(photo.photoUrl);
+  const thumbKey = extractMinioKey(photo.thumbnailUrl);
 
-  await Promise.allSettled([fs.unlink(absolutePhoto), fs.unlink(absoluteThumb)]);
+  await Promise.allSettled([
+    photoKey ? deleteObjectFromMinio(photoKey) : Promise.resolve(),
+    thumbKey ? deleteObjectFromMinio(thumbKey) : Promise.resolve(),
+  ]);
 
   return NextResponse.json({ message: "Đã xóa ảnh" });
 }

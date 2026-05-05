@@ -1,10 +1,10 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { NextResponse } from "next/server";
-import { TaskLogType, UserRole } from "@prisma/client";
+import { TaskLogType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { putObjectToMinio } from "@/lib/minio";
 import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -42,9 +42,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "tasks", params.id);
-  await fs.mkdir(uploadDir, { recursive: true });
-
   const created = [];
 
   for (const file of files) {
@@ -52,27 +49,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const buffer = Buffer.from(arrayBuffer);
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const id = randomUUID();
     const baseName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeFilename(file.name)}`;
+    const photoKey = `tasks/${params.id}/${id}_${baseName}.${ext}`;
+    const thumbKey = `tasks/${params.id}/${id}_${baseName}_thumb.jpg`;
+    const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    const thumbBuffer = await sharp(buffer).resize(200, 200, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
 
-    const photoFilename = `${baseName}.${ext}`;
-    const thumbFilename = `${baseName}_thumb.jpg`;
-
-    const photoPath = path.join(uploadDir, photoFilename);
-    const thumbPath = path.join(uploadDir, thumbFilename);
-
-    await fs.writeFile(photoPath, buffer);
-
-    await sharp(buffer)
-      .resize(200, 200, { fit: "cover" })
-      .jpeg({ quality: 80 })
-      .toFile(thumbPath);
+    await Promise.all([
+      putObjectToMinio({ key: photoKey, body: buffer, contentType }),
+      putObjectToMinio({ key: thumbKey, body: thumbBuffer, contentType: "image/jpeg" }),
+    ]);
 
     const row = await prisma.taskPhoto.create({
       data: {
+        id,
         taskId: params.id,
         uploadedBy: user.id,
-        photoUrl: `/uploads/tasks/${params.id}/${photoFilename}`,
-        thumbnailUrl: `/uploads/tasks/${params.id}/${thumbFilename}`,
+        photoUrl: `/api/tasks/${params.id}/photos/${id}/file?key=${encodeURIComponent(photoKey)}`,
+        thumbnailUrl: `/api/tasks/${params.id}/photos/${id}/file?key=${encodeURIComponent(thumbKey)}`,
         caption: null,
         fileSizeKb: Math.ceil(file.size / 1024),
         takenAt: null,
