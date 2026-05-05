@@ -43,6 +43,18 @@ function mergeMorningRows(...sources: MorningTaskRow[][]) {
   return Array.from(merged.values());
 }
 
+function getVisibleCandidateRows(input: {
+  candidates: MorningTaskRow[];
+  assignedTasks: MorningTaskRow[];
+  userId: string;
+  role: string;
+  mainEngineerId: string;
+}) {
+  if (input.role !== UserRole.engineer || input.userId === input.mainEngineerId) return input.candidates;
+  const assignedTaskIds = new Set(input.assignedTasks.map((row) => row.taskId));
+  return input.candidates.filter((row) => assignedTaskIds.has(row.taskId));
+}
+
 export async function GET(_: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user?.id) {
@@ -90,9 +102,17 @@ export async function GET(_: Request, { params }: Params) {
     }),
   ]);
 
-  const selectedTaskIds = checkin
+  const visibleCandidates = getVisibleCandidateRows({
+    candidates,
+    assignedTasks,
+    userId: user.id,
+    role: user.role,
+    mainEngineerId: project.mainEngineerId,
+  });
+  const visibleTaskIds = new Set(mergeMorningRows(visibleCandidates, assignedTasks).map((row) => row.taskId));
+  const selectedTaskIds = (checkin
     ? checkin.tasks.map((row) => row.taskId)
-    : defaultSelectedTaskIds(candidates);
+    : defaultSelectedTaskIds(visibleCandidates)).filter((taskId) => visibleTaskIds.has(taskId));
 
   return NextResponse.json({
     checkin: {
@@ -101,7 +121,7 @@ export async function GET(_: Request, { params }: Params) {
       isLate: checkin?.isLate || false,
       selectedTaskIds,
     },
-    groups: toGroupedResponse(candidates),
+    groups: toGroupedResponse(visibleCandidates),
     assignedTasks: sortByTaskCode(assignedTasks),
   });
 }
@@ -124,6 +144,11 @@ export async function POST(request: Request, { params }: Params) {
 
   if (!hasAccess) {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  const project = await getProjectForReports(params.projectId);
+  if (!project) {
+    return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
 
   const reportDate = getTodayDateVn();
@@ -150,7 +175,14 @@ export async function POST(request: Request, { params }: Params) {
     getMorningTaskCandidates(params.projectId, reportDate),
     getEngineerAssignedTasksForMorning(params.projectId, user.id, reportDate),
   ]);
-  const allowedRows = mergeMorningRows(candidates, assignedTasks);
+  const visibleCandidates = getVisibleCandidateRows({
+    candidates,
+    assignedTasks,
+    userId: user.id,
+    role: user.role,
+    mainEngineerId: project.mainEngineerId,
+  });
+  const allowedRows = mergeMorningRows(visibleCandidates, assignedTasks);
   const allowedMap = new Map(allowedRows.map((row) => [row.taskId, row]));
   const invalidTaskId = taskIds.find((taskId) => !allowedMap.has(taskId));
 
@@ -246,6 +278,11 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 
+  const project = await getProjectForReports(params.projectId);
+  if (!project) {
+    return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+  }
+
   const reportDate = getTodayDateVn();
   const body = await request.json().catch(() => ({}));
   const nextTaskIds = normalizeTaskIds(body?.taskIds);
@@ -274,7 +311,14 @@ export async function PATCH(request: Request, { params }: Params) {
     getMorningTaskCandidates(params.projectId, reportDate),
     getEngineerAssignedTasksForMorning(params.projectId, user.id, reportDate),
   ]);
-  const allowedRows = mergeMorningRows(candidates, assignedTasks);
+  const visibleCandidates = getVisibleCandidateRows({
+    candidates,
+    assignedTasks,
+    userId: user.id,
+    role: user.role,
+    mainEngineerId: project.mainEngineerId,
+  });
+  const allowedRows = mergeMorningRows(visibleCandidates, assignedTasks);
   const allowedMap = new Map(allowedRows.map((row) => [row.taskId, row]));
   const invalidTaskId = nextTaskIds.find((taskId) => !allowedMap.has(taskId));
 
