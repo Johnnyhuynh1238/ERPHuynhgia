@@ -1,9 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  TaskPhotoAlbumViewer,
+  TaskPhotoImage,
+  TaskPhotoUploadStatus,
+  useTaskPhotoUploader,
+  type TaskPhotoAlbumState,
+  type TaskPhotoItem,
+} from "./task-photo-tools";
 
 type ProgressHistory = {
   id: string;
@@ -27,18 +34,6 @@ type ProgressPayload = {
     status: string | null;
   };
   history: ProgressHistory[];
-};
-
-type UploadedPhoto = {
-  id: string;
-  photoUrl: string;
-  thumbnailUrl: string;
-};
-
-type PhotoAlbum = {
-  title: string;
-  photos: string[];
-  index: number;
 };
 
 function fmtDateTime(input: string | null) {
@@ -75,14 +70,15 @@ export function TaskProgressSection({
   const [percent, setPercent] = useState(0);
   const [savedPercent, setSavedPercent] = useState(0);
   const [photoUrl, setPhotoUrl] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
-  const [photoAlbum, setPhotoAlbum] = useState<PhotoAlbum | null>(null);
+  const [uploadedPhotos, setUploadedPhotos] = useState<TaskPhotoItem[]>([]);
+  const [photoAlbum, setPhotoAlbum] = useState<TaskPhotoAlbumState | null>(null);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [history, setHistory] = useState<ProgressHistory[]>([]);
   const [hasInteractedWithProgress, setHasInteractedWithProgress] = useState(false);
+  const photoUploader = useTaskPhotoUploader(taskId);
 
   const isRollback = percent < savedPercent;
   const showUpdateFields = canUpdate && hasInteractedWithProgress && percent !== savedPercent;
@@ -115,6 +111,7 @@ export function TaskProgressSection({
       setReason("");
       setNote("");
       setHasInteractedWithProgress(false);
+      photoUploader.clear();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không tải được tiến độ");
     } finally {
@@ -122,51 +119,38 @@ export function TaskProgressSection({
     }
   }
 
-  async function uploadPhotoFile(file: File) {
-    const form = new FormData();
-    form.append("files", file);
-    const res = await fetch(`/api/tasks/${taskId}/photos`, {
-      method: "POST",
-      body: form,
-    });
-    const contentType = res.headers.get("content-type") || "";
-    const json = contentType.includes("application/json")
-      ? ((await res.json().catch(() => ({}))) as { message?: string; photos?: UploadedPhoto[] })
-      : ({} as { message?: string; photos?: UploadedPhoto[] });
-    const text = contentType.includes("application/json") ? "" : await res.text().catch(() => "");
-    if (!res.ok) {
-      throw new Error(json.message || `Upload ${file.name} thất bại (${res.status})${text ? `: ${text.slice(0, 120)}` : ""}`);
-    }
-    const photo = (json.photos || []).find((item) => item.photoUrl);
-    if (!photo) {
-      throw new Error(`Không lấy được URL ảnh ${file.name}`);
-    }
-    return photo;
-  }
-
   async function uploadPhotos(files: File[]) {
     if (!files.length) return;
-    const uploaded: UploadedPhoto[] = [];
     setUploading(true);
     try {
-      for (const file of files) {
-        uploaded.push(await uploadPhotoFile(file));
+      const result = await photoUploader.upload(files);
+      if (result.uploaded.length) {
+        setUploadedPhotos((prev) => [...prev, ...result.uploaded]);
+        setPhotoUrl((current) => current || result.uploaded[0]?.photoUrl || "");
+        toast.success(`Đã tải ${result.uploaded.length} ảnh tiến độ`);
       }
-      setUploadedPhotos((prev) => [...prev, ...uploaded]);
-      setPhotoUrl((current) => current || uploaded[0]?.photoUrl || "");
-      toast.success(`Đã tải ${uploaded.length} ảnh tiến độ`);
+      if (result.failed.length) {
+        toast.error(`${result.failed.length} ảnh tiến độ upload lỗi. Xem chi tiết bên dưới.`);
+      }
     } catch (error) {
-      if (uploaded.length) {
-        setUploadedPhotos((prev) => [...prev, ...uploaded]);
-        setPhotoUrl((current) => current || uploaded[0]?.photoUrl || "");
-      }
       toast.error(error instanceof Error ? error.message : "Upload ảnh thất bại");
     } finally {
       setUploading(false);
     }
   }
 
-  async function deleteUploadedPhoto(photo: UploadedPhoto) {
+  async function deleteUploadedPhoto(photo: TaskPhotoItem) {
+    if (!photo.id) {
+      setUploadedPhotos((prev) => {
+        const next = prev.filter((item) => item.photoUrl !== photo.photoUrl);
+        if (photoUrl === photo.photoUrl) {
+          setPhotoUrl(next[0]?.photoUrl || "");
+        }
+        return next;
+      });
+      return;
+    }
+
     setDeletingPhotoId(photo.id);
     try {
       const res = await fetch(`/api/tasks/${taskId}/photos/${photo.id}`, { method: "DELETE" });
@@ -183,7 +167,7 @@ export function TaskProgressSection({
       });
       setPhotoAlbum((current) => {
         if (!current) return current;
-        const nextPhotos = current.photos.filter((url) => url !== photo.photoUrl);
+        const nextPhotos = current.photos.filter((item) => (item.id || item.photoUrl) !== (photo.id || photo.photoUrl));
         if (!nextPhotos.length) return null;
         return { ...current, photos: nextPhotos, index: Math.min(current.index, nextPhotos.length - 1) };
       });
@@ -273,6 +257,7 @@ export function TaskProgressSection({
                   className="block w-full text-xs"
                 />
                 {uploading ? <div className="mt-1 text-xs text-[#8891aa]">Đang tải ảnh...</div> : null}
+                <TaskPhotoUploadStatus items={photoUploader.items} onClear={photoUploader.clear} />
                 {uploadedPhotos.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -280,20 +265,20 @@ export function TaskProgressSection({
                       <Button
                         variant="outline"
                         className="h-8 border-[#2e3347] bg-[#1a1d27] px-2 text-xs"
-                        onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos.map((photo) => photo.photoUrl), index: 0 })}
+                        onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index: 0 })}
                       >
                         Xem album
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {uploadedPhotos.map((photo, index) => (
-                        <div key={photo.id} className={`rounded-xl border p-2 ${photoUrl === photo.photoUrl ? "border-amber-500 bg-amber-500/10" : "border-[#2e3347] bg-[#1a1d27]"}`}>
+                        <div key={photo.id || photo.photoUrl} className={`rounded-xl border p-2 ${photoUrl === photo.photoUrl ? "border-amber-500 bg-amber-500/10" : "border-[#2e3347] bg-[#1a1d27]"}`}>
                           <button
                             type="button"
-                            onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos.map((item) => item.photoUrl), index })}
-                            className="relative block h-20 w-full overflow-hidden rounded-lg bg-[#11131b]"
+                            onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index })}
+                            className="block h-20 w-full overflow-hidden rounded-lg bg-[#11131b]"
                           >
-                            <Image src={photo.thumbnailUrl || photo.photoUrl} alt="Ảnh tiến độ" fill sizes="160px" className="object-cover" unoptimized />
+                            <TaskPhotoImage src={photo.thumbnailUrl || photo.photoUrl} alt="Ảnh tiến độ" className="h-full w-full object-cover" />
                           </button>
                           <div className="mt-2 flex items-center gap-1">
                             <Button
@@ -376,7 +361,7 @@ export function TaskProgressSection({
               {row.note ? <div className="mt-1 text-xs text-[#c8d0e8]">Ghi chú: {row.note}</div> : null}
               <button
                 type="button"
-                onClick={() => setPhotoAlbum({ title: `Ảnh minh chứng ${row.fromPercent}% → ${row.toPercent}%`, photos: [row.photoUrl], index: 0 })}
+                onClick={() => setPhotoAlbum({ title: `Ảnh minh chứng ${row.fromPercent}% → ${row.toPercent}%`, photos: [{ photoUrl: row.photoUrl }], index: 0 })}
                 className="mt-1 inline-block text-xs text-amber-300 underline"
               >
                 Xem ảnh minh chứng
@@ -386,44 +371,7 @@ export function TaskProgressSection({
         </div>
       </div>
 
-      {photoAlbum ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3" onClick={() => setPhotoAlbum(null)}>
-          <div className="w-full max-w-5xl rounded-2xl border border-[#2e3347] bg-[#11131b] p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-bold text-[#f0f2f8]">{photoAlbum.title}</div>
-                <div className="text-xs text-[#8891aa]">Ảnh {photoAlbum.index + 1}/{photoAlbum.photos.length}</div>
-              </div>
-              <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setPhotoAlbum(null)}>
-                Đóng
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              {photoAlbum.photos.length > 1 ? (
-                <Button
-                  variant="outline"
-                  className="border-[#2e3347] bg-[#1a1d27]"
-                  onClick={() => setPhotoAlbum((current) => (current ? { ...current, index: (current.index - 1 + current.photos.length) % current.photos.length } : current))}
-                >
-                  Trước
-                </Button>
-              ) : null}
-              <div className="relative h-[70vh] min-h-[280px] flex-1 overflow-hidden rounded-xl bg-black">
-                <Image src={photoAlbum.photos[photoAlbum.index]} alt={photoAlbum.title} fill sizes="90vw" className="object-contain" unoptimized />
-              </div>
-              {photoAlbum.photos.length > 1 ? (
-                <Button
-                  variant="outline"
-                  className="border-[#2e3347] bg-[#1a1d27]"
-                  onClick={() => setPhotoAlbum((current) => (current ? { ...current, index: (current.index + 1) % current.photos.length } : current))}
-                >
-                  Sau
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TaskPhotoAlbumViewer album={photoAlbum} onChange={setPhotoAlbum} onClose={() => setPhotoAlbum(null)} />
     </div>
   );
 }
