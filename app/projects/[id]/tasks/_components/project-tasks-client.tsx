@@ -7,7 +7,7 @@ import { TaskCategory, TaskPhase, TaskStatus } from "@prisma/client";
 import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, GripVertical, ListFilter, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, GripVertical, ListFilter, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -305,6 +305,8 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [savingPhase, setSavingPhase] = useState(false);
   const [deletingPhaseId, setDeletingPhaseId] = useState<string | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [restoringTaskId, setRestoringTaskId] = useState<string | null>(null);
   const [reorderingPhaseId, setReorderingPhaseId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [phases, setPhases] = useState<PhaseRow[]>([]);
@@ -516,6 +518,51 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setSearchInput("");
     setSearch("");
     setShowDeleted(false);
+  }
+
+  function openTask(task: TaskRow) {
+    if (task.isActive) router.push(`/tasks/${task.id}`);
+  }
+
+  async function deleteTask(task: TaskRow, event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (!canDeleteTask) return;
+    if (!window.confirm(`Xóa task ${task.code} - ${task.name}?`)) return;
+
+    setDeletingTaskId(task.id);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể xóa task");
+        return;
+      }
+
+      toast.success(data.message || "Đã xóa task");
+      await loadTasks();
+    } finally {
+      setDeletingTaskId(null);
+    }
+  }
+
+  async function restoreTask(task: TaskRow, event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (!canDeleteTask) return;
+
+    setRestoringTaskId(task.id);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/restore`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error(data.message || "Không thể khôi phục task");
+        return;
+      }
+
+      toast.success(data.message || "Đã khôi phục task");
+      await loadTasks();
+    } finally {
+      setRestoringTaskId(null);
+    }
   }
 
   function openCreateTaskModal() {
@@ -881,6 +928,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const isCanExport = role === "admin" || role === "accountant";
   const canManagePhase = role === "admin" || role === "construction_manager";
   const canCreateTask = role === "admin" || role === "construction_manager";
+  const canDeleteTask = role === "admin" || role === "construction_manager";
   const canDeletePhase = role === "admin";
 
   const activeFilterCount = [phaseFilter !== "all", statusFilter !== "all", !!engineerFilter, !!search, showDeleted].filter(Boolean).length;
@@ -1105,19 +1153,34 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                       {tasksInPhase.map((task) => {
                                         const progress = calcProgress(task);
                                         return (
-                                          <button
+                                          <div
                                             key={task.id}
-                                            type="button"
-                                            onClick={() => router.push(`/tasks/${task.id}`)}
-                                            className="w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
-                                            style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}`, cursor: task.isActive ? "pointer" : "default" }}
+                                            onClick={() => openTask(task)}
+                                            className={`w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97] ${task.isActive ? "cursor-pointer" : "opacity-70"}`}
+                                            style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
                                           >
                                             <div className="flex items-center justify-between gap-2">
                                               <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
-                                              <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                              <div className="flex items-center gap-2">
+                                                {!task.isActive ? <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">Đã xóa</span> : null}
+                                                <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                                {canDeleteTask && task.isActive ? (
+                                                  <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </button>
+                                                ) : null}
+                                                {canDeleteTask && !task.isActive ? (
+                                                  <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
+                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                  </button>
+                                                ) : null}
+                                              </div>
                                             </div>
                                             <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
-                                            <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
+                                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8892b0]">
+                                              <span>⏱ {task.durationDays} ngày</span>
+                                              <span>📅 Bắt đầu: {fmtDate(task.plannedStartDate)} → Hạn: {fmtDate(task.plannedEndDate)}</span>
+                                            </div>
                                             <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
                                             {shouldShowProgressBar(task, progress) ? (
                                               <div className="mt-3">
@@ -1125,7 +1188,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                                 <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
                                               </div>
                                             ) : null}
-                                          </button>
+                                          </div>
                                         );
                                       })}
                                     </div>
@@ -1135,19 +1198,34 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                 phaseTasks.map((task) => {
                                   const progress = calcProgress(task);
                                   return (
-                                    <button
+                                    <div
                                       key={task.id}
-                                      type="button"
-                                      onClick={() => router.push(`/tasks/${task.id}`)}
-                                      className="w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97]"
-                                      style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}`, cursor: task.isActive ? "pointer" : "default" }}
+                                      onClick={() => openTask(task)}
+                                      className={`w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97] ${task.isActive ? "cursor-pointer" : "opacity-70"}`}
+                                      style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
                                     >
                                       <div className="flex items-center justify-between gap-2">
                                         <span className="rounded-md border border-[#2d3249] bg-[#13151f] px-2 py-0.5 text-[10px] uppercase tracking-[1px] text-[#8892b0]">{PHASE_LABEL[task.phase]}</span>
-                                        <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                        <div className="flex items-center gap-2">
+                                          {!task.isActive ? <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">Đã xóa</span> : null}
+                                          <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
+                                          {canDeleteTask && task.isActive ? (
+                                            <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                          ) : null}
+                                          {canDeleteTask && !task.isActive ? (
+                                            <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
+                                              <RotateCcw className="h-3.5 w-3.5" />
+                                            </button>
+                                          ) : null}
+                                        </div>
                                       </div>
                                       <div className="mt-2 text-[15px] font-bold text-[#f0f2ff]">{task.code} - {task.name}</div>
-                                      <div className="mt-2 text-xs text-[#8892b0]">📅 Bắt đầu: {fmtDate(task.plannedStartDate)}  →  Hạn: {fmtDate(task.plannedEndDate)}</div>
+                                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8892b0]">
+                                        <span>⏱ {task.durationDays} ngày</span>
+                                        <span>📅 Bắt đầu: {fmtDate(task.plannedStartDate)} → Hạn: {fmtDate(task.plannedEndDate)}</span>
+                                      </div>
                                       <div className="mt-1 text-xs text-[#8892b0]">👷 {task.assignedEngineer?.fullName || "Chưa phân công"}</div>
                                       {shouldShowProgressBar(task, progress) ? (
                                         <div className="mt-3">
@@ -1155,7 +1233,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                           <div className="mt-1 text-right text-xs text-[#8892b0]">{progress}%</div>
                                         </div>
                                       ) : null}
-                                    </button>
+                                    </div>
                                   );
                                 })
                               )}
