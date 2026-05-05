@@ -1,15 +1,11 @@
 import { Prisma } from "@prisma/client";
+import { DEFAULT_KPI_SETTINGS_WEIGHTS } from "@/lib/kpi";
+import type { ActiveKpiSettings, KpiComponentScores } from "@/lib/kpi";
 
 export const BASE_SALARY_RATIO = 0.5;
 export const BONUS_MAX_RATIO = 0.5;
 
-export const KPI_WEIGHTS = {
-  schedule: 0.3,
-  qc: 0.4,
-  report: 0.1,
-  customer: 0.1,
-  contribution: 0.1,
-} as const;
+type KpiWeightInput = Pick<ActiveKpiSettings, "weightTienDo" | "weightQc" | "weightBaoCao" | "weightChuNha" | "weightDongGop">;
 
 const BONUS_TIERS = [
   { min: 90, ratio: 1, label: "Xuất sắc" },
@@ -51,19 +47,13 @@ export function calculateBonusRatio(totalScore: number) {
   return calculateBonusTier(totalScore).ratio;
 }
 
-export function calculateTotalScore(input: {
-  schedule: number;
-  qc: number;
-  report: number;
-  customer: number;
-  contribution: number;
-}) {
+export function calculateTotalScore(input: KpiComponentScores, settings: KpiWeightInput = DEFAULT_KPI_SETTINGS_WEIGHTS) {
   const total =
-    input.schedule * KPI_WEIGHTS.schedule +
-    input.qc * KPI_WEIGHTS.qc +
-    input.report * KPI_WEIGHTS.report +
-    input.customer * KPI_WEIGHTS.customer +
-    input.contribution * KPI_WEIGHTS.contribution;
+    input.schedule * (settings.weightTienDo / 100) +
+    input.qc * (settings.weightQc / 100) +
+    input.report * (settings.weightBaoCao / 100) +
+    input.customer * (settings.weightChuNha / 100) +
+    input.contribution * (settings.weightDongGop / 100);
 
   return round2(total);
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { parseMonthInput } from "@/lib/date";
-import { calculateKpiForProjectEngineer } from "@/lib/kpi";
+import { calculateKpiForProjectEngineer, type KpiComponentScores } from "@/lib/kpi";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { parseKpiRoleFilter } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
@@ -98,14 +98,7 @@ export async function GET(request: Request) {
     projectName: string;
     score: number;
     rank: string;
-    breakdown?: {
-      morningOnTime: number;
-      eveningOnTime: number;
-      taskOnSchedule: number;
-      dailyPlanMet: number;
-      inspectionQuality: number;
-      reportProactivity: number;
-    };
+    breakdown?: KpiComponentScores;
   }> = [];
 
   for (const project of projects) {
@@ -136,7 +129,7 @@ export async function GET(request: Request) {
         projectName: project.name,
         score: kpi.score,
         rank: kpi.rank,
-        ...(canSeeDetail ? { breakdown: kpi.breakdown } : {}),
+        ...(canSeeDetail ? { breakdown: kpi.scores } : {}),
       });
     }
   }
@@ -155,12 +148,11 @@ export async function GET(request: Request) {
       { header: "Mã dự án", key: "projectCode", width: 14 },
       { header: `Điểm KPI (${month})`, key: "score", width: 16 },
       { header: "Xếp hạng", key: "rank", width: 12 },
-      { header: "Sáng đúng giờ", key: "morningOnTime", width: 16 },
-      { header: "Chiều đúng giờ", key: "eveningOnTime", width: 16 },
-      { header: "Task đúng tiến độ", key: "taskOnSchedule", width: 18 },
-      { header: "Đạt KH ngày", key: "dailyPlanMet", width: 14 },
-      { header: "CL nghiệm thu", key: "inspectionQuality", width: 14 },
-      { header: "Chủ động BC", key: "reportProactivity", width: 14 },
+      { header: "KPI 1 - Tiến độ", key: "schedule", width: 16 },
+      { header: "KPI 2 - QC", key: "qc", width: 14 },
+      { header: "KPI 3 - Báo cáo", key: "report", width: 16 },
+      { header: "KPI 4 - Chủ nhà", key: "customer", width: 16 },
+      { header: "KPI 5 - Đóng góp", key: "contribution", width: 16 },
     ];
 
     rows.forEach((row) => {
@@ -172,12 +164,11 @@ export async function GET(request: Request) {
         projectCode: row.projectCode,
         score: row.score.toFixed(2),
         rank: row.rank,
-        morningOnTime: row.breakdown?.morningOnTime.toFixed(2) ?? "-",
-        eveningOnTime: row.breakdown?.eveningOnTime.toFixed(2) ?? "-",
-        taskOnSchedule: row.breakdown?.taskOnSchedule.toFixed(2) ?? "-",
-        dailyPlanMet: row.breakdown?.dailyPlanMet.toFixed(2) ?? "-",
-        inspectionQuality: row.breakdown?.inspectionQuality.toFixed(2) ?? "-",
-        reportProactivity: row.breakdown?.reportProactivity.toFixed(2) ?? "-",
+        schedule: row.breakdown?.schedule.toFixed(2) ?? "-",
+        qc: row.breakdown?.qc.toFixed(2) ?? "-",
+        report: row.breakdown?.report.toFixed(2) ?? "-",
+        customer: row.breakdown?.customer.toFixed(2) ?? "-",
+        contribution: row.breakdown?.contribution.toFixed(2) ?? "-",
       });
     });
   } else {

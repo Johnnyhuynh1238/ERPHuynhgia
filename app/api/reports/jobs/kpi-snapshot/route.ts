@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { formatUtcYmd } from "@/lib/date";
 import type { KpiResult } from "@/lib/kpi";
 import { calculateKpiForProjectEngineer } from "@/lib/kpi";
-import { asPrismaDecimal, calculateSalary, calculateTotalScore, toNumber } from "@/lib/kpi-salary";
+import { asPrismaDecimal, calculateSalary, toNumber } from "@/lib/kpi-salary";
 import {
   getReminderTargetProjects,
   monthStringOfDate,
@@ -128,19 +128,12 @@ export async function POST(request: Request) {
       });
 
       if (salaryConfig?.isActive) {
-        const scoreSchedule = Number(monthlyKpi.breakdown.taskOnSchedule.toFixed(2));
-        const scoreQc = Number(monthlyKpi.breakdown.inspectionQuality.toFixed(2));
-        const scoreReport = Number(monthlyKpi.breakdown.reportProactivity.toFixed(2));
-        const scoreCustomer = 100;
-        const scoreContribution = 0;
-
-        const totalScore = calculateTotalScore({
-          schedule: scoreSchedule,
-          qc: scoreQc,
-          report: scoreReport,
-          customer: scoreCustomer,
-          contribution: scoreContribution,
-        });
+        const scoreSchedule = Number(monthlyKpi.scores.schedule.toFixed(2));
+        const scoreQc = Number(monthlyKpi.scores.qc.toFixed(2));
+        const scoreReport = Number(monthlyKpi.scores.report.toFixed(2));
+        const scoreCustomer = Number(monthlyKpi.scores.customer.toFixed(2));
+        const scoreContribution = Number(monthlyKpi.scores.contribution.toFixed(2));
+        const totalScore = monthlyKpi.score;
 
         const salary = calculateSalary(toNumber(salaryConfig.salaryMax), totalScore);
 
@@ -180,10 +173,10 @@ export async function POST(request: Request) {
               bonusRatio: asPrismaDecimal(salary.bonusRatio),
               bonusAmount: asPrismaDecimal(salary.bonusAmount),
               totalSalary: asPrismaDecimal(salary.totalSalary),
-              scheduleDetails: monthlyKpi.detail,
-              qcDetails: monthlyKpi.detail,
-              reportDetails: monthlyKpi.detail,
-              customerDetails: monthlyKpi.detail,
+              scheduleDetails: monthlyKpi.detail.schedule,
+              qcDetails: monthlyKpi.detail.qc,
+              reportDetails: monthlyKpi.detail.report,
+              customerDetails: monthlyKpi.detail.customer,
               status: "pending",
             },
             update: {
@@ -191,6 +184,7 @@ export async function POST(request: Request) {
               scoreQc: asPrismaDecimal(scoreQc),
               scoreReport: asPrismaDecimal(scoreReport),
               scoreCustomer: asPrismaDecimal(scoreCustomer),
+              scoreContribution: asPrismaDecimal(scoreContribution),
               totalScore: asPrismaDecimal(totalScore),
               salaryMax: salaryConfig.salaryMax,
               baseSalary: asPrismaDecimal(salary.baseSalary),
@@ -198,10 +192,10 @@ export async function POST(request: Request) {
               bonusRatio: asPrismaDecimal(salary.bonusRatio),
               bonusAmount: asPrismaDecimal(salary.bonusAmount),
               totalSalary: asPrismaDecimal(salary.totalSalary),
-              scheduleDetails: monthlyKpi.detail,
-              qcDetails: monthlyKpi.detail,
-              reportDetails: monthlyKpi.detail,
-              customerDetails: monthlyKpi.detail,
+              scheduleDetails: monthlyKpi.detail.schedule,
+              qcDetails: monthlyKpi.detail.qc,
+              reportDetails: monthlyKpi.detail.report,
+              customerDetails: monthlyKpi.detail.customer,
               status: "pending",
             },
           });

@@ -1,15 +1,117 @@
-import { TaskLogType, TaskStatus } from "@prisma/client";
+import { TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { addUtcDays, formatUtcYmd, nowUtcDateOnly, toUtcStartOfDay } from "@/lib/date";
-import { getActivityDates, getProjectSiteRestDates } from "@/lib/reporting";
+import { formatUtcYmd, nowUtcDateOnly, toUtcStartOfDay } from "@/lib/date";
+import { getActivityDates, getProjectSiteRestDates, getReportProjectIdsForEngineer } from "@/lib/reporting";
 
-export type KpiBreakdown = {
-  morningOnTime: number;
-  eveningOnTime: number;
-  taskOnSchedule: number;
-  dailyPlanMet: number;
-  inspectionQuality: number;
-  reportProactivity: number;
+const DEFAULT_SCORE = 70;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const COMPLETED_TASK_STATUSES = [TaskStatus.done, TaskStatus.internal_approved, TaskStatus.completed, TaskStatus.inspected];
+
+export const DEFAULT_KPI_SETTINGS_WEIGHTS = {
+  weightTienDo: 30,
+  weightQc: 40,
+  weightBaoCao: 10,
+  weightChuNha: 10,
+  weightDongGop: 10,
+} as const;
+
+export type KpiWeights = {
+  schedule: number;
+  qc: number;
+  report: number;
+  customer: number;
+  contribution: number;
+};
+
+export type ActiveKpiSettings = {
+  id: string | null;
+  weightTienDo: number;
+  weightQc: number;
+  weightBaoCao: number;
+  weightChuNha: number;
+  weightDongGop: number;
+  effectiveFromMonth: string;
+  changedBy: string | null;
+  changedAt: Date | null;
+  reason: string | null;
+  isFallback: boolean;
+  weights: KpiWeights;
+};
+
+export type KpiComponentScores = {
+  schedule: number;
+  qc: number;
+  report: number;
+  customer: number;
+  contribution: number;
+};
+
+export type KpiBreakdown = KpiComponentScores;
+
+export type ScheduleKpiDetail = {
+  defaultApplied: boolean;
+  totalCompletedTasks: number;
+  onScheduleTasks: number;
+  lateOneToTwoDaysTasks: number;
+  lateThreeToFiveDaysTasks: number;
+  lateOverFiveDaysTasks: number;
+  taskScores: Array<{
+    taskId: string;
+    plannedEndDate: string;
+    actualEndDate: string;
+    daysLate: number;
+    score: number;
+  }>;
+};
+
+export type QcKpiDetail = {
+  defaultApplied: boolean;
+  totalTasksWithQc: number;
+  totalQcResults: number;
+  passedAtFirstAttempt: number;
+  unknownFirstAttempt: number;
+  taskScores: Array<{
+    taskId: string;
+    totalQcResults: number;
+    passedAtFirstAttempt: number;
+    score: number;
+  }>;
+};
+
+export type ReportKpiDetail = {
+  defaultApplied: boolean;
+  requiredDays: number;
+  totalCheckins: number;
+  morningOnTimeDays: number;
+  morningCompleteDays: number;
+  totalEvening: number;
+  eveningOnTimeDays: number;
+  eveningCompleteDays: number;
+  components: {
+    morningOnTime: number;
+    morningComplete: number;
+    eveningOnTime: number;
+    eveningComplete: number;
+  };
+};
+
+export type CustomerKpiDetail = {
+  defaultApplied: boolean;
+  taskRatingsCount: number;
+  ksRatingsCount: number;
+  averageTaskRating: number | null;
+  averageKsRating: number | null;
+  taskScore: number;
+  ksScore: number;
+};
+
+export type ContributionKpiDetail = {
+  defaultApplied: boolean;
+  monthlyRecordId: string | null;
+  contributionAt: string | null;
+  contributionBy: string | null;
+  note: string | null;
 };
 
 export type KpiDetail = {
@@ -23,46 +125,76 @@ export type KpiDetail = {
   totalInspected: number;
   inspectedPassFirstTime: number;
   proactivityRaw: number;
+  schedule: ScheduleKpiDetail;
+  qc: QcKpiDetail;
+  report: ReportKpiDetail;
+  customer: CustomerKpiDetail;
+  contribution: ContributionKpiDetail;
+  settings: ActiveKpiSettings;
 };
 
 export type KpiResult = {
   score: number;
   rank: string;
-  weights: typeof WEIGHTS;
+  weights: KpiWeights;
+  settings: ActiveKpiSettings;
+  scores: KpiComponentScores;
   breakdown: KpiBreakdown;
   detail: KpiDetail;
 };
 
-const WEIGHTS = {
-  morningOnTime: 15,
-  eveningOnTime: 15,
-  taskOnSchedule: 25,
-  dailyPlanMet: 20,
-  inspectionQuality: 15,
-  reportProactivity: 10,
-} as const;
+function round2(value: number) {
+  return Number(value.toFixed(2));
+}
 
-const EMPTY_BREAKDOWN: KpiBreakdown = {
-  morningOnTime: 0,
-  eveningOnTime: 0,
-  taskOnSchedule: 0,
-  dailyPlanMet: 0,
-  inspectionQuality: 0,
-  reportProactivity: 0,
-};
+function mean(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
 
-const EMPTY_DETAIL: KpiDetail = {
-  requiredDays: 0,
-  morningOnTimeDays: 0,
-  eveningOnTimeDays: 0,
-  totalCompletedTasks: 0,
-  onScheduleTasks: 0,
-  totalEvening: 0,
-  metOrOverCount: 0,
-  totalInspected: 0,
-  inspectedPassFirstTime: 0,
-  proactivityRaw: 0,
-};
+function ratioToPercent(numerator: number, denominator: number) {
+  if (denominator <= 0) return 0;
+  return (numerator / denominator) * 100;
+}
+
+function clampScore(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function monthStringFromDate(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthParts(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return { year, month: monthNumber };
+}
+
+function mapSettings(row: {
+  id: string | null;
+  weightTienDo: number;
+  weightQc: number;
+  weightBaoCao: number;
+  weightChuNha: number;
+  weightDongGop: number;
+  effectiveFromMonth: string;
+  changedBy: string | null;
+  changedAt: Date | null;
+  reason: string | null;
+  isFallback: boolean;
+}): ActiveKpiSettings {
+  return {
+    ...row,
+    weights: {
+      schedule: row.weightTienDo,
+      qc: row.weightQc,
+      report: row.weightBaoCao,
+      customer: row.weightChuNha,
+      contribution: row.weightDongGop,
+    },
+  };
+}
 
 export function scoreToRank(score: number) {
   if (score >= 90) return "A";
@@ -71,93 +203,485 @@ export function scoreToRank(score: number) {
   return "D";
 }
 
-function ratioToPercent(numerator: number, denominator: number) {
-  if (denominator <= 0) return 0;
-  return (numerator / denominator) * 100;
-}
-
-function emptyKpiResult(): KpiResult {
-  return {
-    score: 0,
-    rank: "D",
-    weights: WEIGHTS,
-    breakdown: { ...EMPTY_BREAKDOWN } satisfies KpiBreakdown,
-    detail: { ...EMPTY_DETAIL } satisfies KpiDetail,
-  };
-}
-
-async function calculateInspectionQuality(input: {
-  projectId: string;
-  from: Date;
-  to: Date;
-  activeDaySet: Set<string>;
-}) {
-  const logs = await prisma.taskLog.findMany({
-    where: {
-      task: {
-        projectId: input.projectId,
-        isActive: true,
-      },
-      logType: TaskLogType.status_change,
-      OR: [{ newValue: TaskStatus.inspected }, { oldValue: TaskStatus.inspected }],
-    },
+export async function getActiveKpiSettings(month: string): Promise<ActiveKpiSettings> {
+  const row = await prisma.kpiSettings.findFirst({
+    where: { effectiveFromMonth: { lte: month } },
+    orderBy: { effectiveFromMonth: "desc" },
     select: {
-      taskId: true,
-      oldValue: true,
-      newValue: true,
-      createdAt: true,
+      id: true,
+      weightTienDo: true,
+      weightQc: true,
+      weightBaoCao: true,
+      weightChuNha: true,
+      weightDongGop: true,
+      effectiveFromMonth: true,
+      changedBy: true,
+      changedAt: true,
+      reason: true,
     },
-    orderBy: [{ taskId: "asc" }, { createdAt: "asc" }],
   });
 
-  if (!logs.length) {
+  if (row) {
+    return mapSettings({ ...row, isFallback: false });
+  }
+
+  return mapSettings({
+    id: null,
+    ...DEFAULT_KPI_SETTINGS_WEIGHTS,
+    effectiveFromMonth: month,
+    changedBy: null,
+    changedAt: null,
+    reason: "Fallback KPI v2 settings",
+    isFallback: true,
+  });
+}
+
+export function calculateWeightedKpiTotal(scores: KpiComponentScores, settings: ActiveKpiSettings) {
+  const total =
+    clampScore(scores.schedule) * (settings.weightTienDo / 100) +
+    clampScore(scores.qc) * (settings.weightQc / 100) +
+    clampScore(scores.report) * (settings.weightBaoCao / 100) +
+    clampScore(scores.customer) * (settings.weightChuNha / 100) +
+    clampScore(scores.contribution) * (settings.weightDongGop / 100);
+
+  return round2(total);
+}
+
+async function resolveProjectIds(ksUserId: string, projectId?: string | null) {
+  if (projectId) return [projectId];
+  return getReportProjectIdsForEngineer(ksUserId);
+}
+
+async function calcKpiTienDo(input: { ksUserId: string; projectId?: string | null; from: Date; to: Date }) {
+  const tasks = await prisma.task.findMany({
+    where: {
+      assignedEngineerId: input.ksUserId,
+      projectId: input.projectId || undefined,
+      isActive: true,
+      status: { in: COMPLETED_TASK_STATUSES },
+      actualEndDate: { gte: input.from, lte: input.to },
+    },
+    select: {
+      id: true,
+      plannedEndDate: true,
+      actualEndDate: true,
+    },
+  });
+
+  if (tasks.length === 0) {
     return {
-      totalInspected: 0,
-      inspectedPassFirstTime: 0,
+      score: DEFAULT_SCORE,
+      detail: {
+        defaultApplied: true,
+        totalCompletedTasks: 0,
+        onScheduleTasks: 0,
+        lateOneToTwoDaysTasks: 0,
+        lateThreeToFiveDaysTasks: 0,
+        lateOverFiveDaysTasks: 0,
+        taskScores: [],
+      } satisfies ScheduleKpiDetail,
     };
   }
 
-  const logsByTaskId = new Map<
-    string,
-    Array<{
-      taskId: string;
-      oldValue: string | null;
-      newValue: string | null;
-      createdAt: Date;
-    }>
-  >();
+  let onScheduleTasks = 0;
+  let lateOneToTwoDaysTasks = 0;
+  let lateThreeToFiveDaysTasks = 0;
+  let lateOverFiveDaysTasks = 0;
 
-  for (const row of logs) {
-    const list = logsByTaskId.get(row.taskId) ?? [];
-    list.push(row);
-    logsByTaskId.set(row.taskId, list);
-  }
+  const taskScores = tasks.flatMap((task) => {
+    if (!task.actualEndDate) return [];
 
-  let totalInspected = 0;
-  let inspectedPassFirstTime = 0;
+    const daysLate = Math.max(0, Math.round((toUtcStartOfDay(task.actualEndDate).getTime() - toUtcStartOfDay(task.plannedEndDate).getTime()) / MS_PER_DAY));
+    let score = 0;
 
-  for (const taskLogs of Array.from(logsByTaskId.values())) {
-    const firstInspected = taskLogs.find((row) => row.newValue === TaskStatus.inspected);
-    if (!firstInspected) continue;
-
-    const firstInspectedDay = toUtcStartOfDay(firstInspected.createdAt);
-    if (firstInspectedDay < input.from || firstInspectedDay > input.to) continue;
-    if (!input.activeDaySet.has(formatUtcYmd(firstInspectedDay))) continue;
-
-    totalInspected += 1;
-
-    const rejectedAfterFirstInspection = taskLogs.some(
-      (row) => row.createdAt > firstInspected.createdAt && row.oldValue === TaskStatus.inspected && row.newValue !== TaskStatus.inspected,
-    );
-
-    if (!rejectedAfterFirstInspection) {
-      inspectedPassFirstTime += 1;
+    if (daysLate <= 0) {
+      score = 100;
+      onScheduleTasks += 1;
+    } else if (daysLate <= 2) {
+      score = 80;
+      lateOneToTwoDaysTasks += 1;
+    } else if (daysLate <= 5) {
+      score = 50;
+      lateThreeToFiveDaysTasks += 1;
+    } else {
+      lateOverFiveDaysTasks += 1;
     }
+
+    return [
+      {
+        taskId: task.id,
+        plannedEndDate: formatUtcYmd(task.plannedEndDate),
+        actualEndDate: formatUtcYmd(task.actualEndDate),
+        daysLate,
+        score,
+      },
+    ];
+  });
+
+  return {
+    score: round2(mean(taskScores.map((task) => task.score))),
+    detail: {
+      defaultApplied: false,
+      totalCompletedTasks: taskScores.length,
+      onScheduleTasks,
+      lateOneToTwoDaysTasks,
+      lateThreeToFiveDaysTasks,
+      lateOverFiveDaysTasks,
+      taskScores,
+    } satisfies ScheduleKpiDetail,
+  };
+}
+
+async function calcKpiQc(input: { ksUserId: string; projectId?: string | null; from: Date; to: Date }) {
+  const tasks = await prisma.task.findMany({
+    where: {
+      assignedEngineerId: input.ksUserId,
+      projectId: input.projectId || undefined,
+      isActive: true,
+      status: { in: COMPLETED_TASK_STATUSES },
+      actualEndDate: { gte: input.from, lte: input.to },
+      taskQcResults: { some: {} },
+    },
+    select: {
+      id: true,
+      taskQcResults: {
+        select: {
+          passedAtFirstAttempt: true,
+        },
+      },
+    },
+  });
+
+  let unknownFirstAttempt = 0;
+  let totalQcResults = 0;
+  let passedAtFirstAttempt = 0;
+
+  const taskScores = tasks.flatMap((task) => {
+    const knownRows = task.taskQcResults.filter((row) => row.passedAtFirstAttempt !== null);
+    unknownFirstAttempt += task.taskQcResults.length - knownRows.length;
+
+    if (knownRows.length === 0) return [];
+
+    const passed = knownRows.filter((row) => row.passedAtFirstAttempt).length;
+    totalQcResults += knownRows.length;
+    passedAtFirstAttempt += passed;
+
+    return [
+      {
+        taskId: task.id,
+        totalQcResults: knownRows.length,
+        passedAtFirstAttempt: passed,
+        score: round2(ratioToPercent(passed, knownRows.length)),
+      },
+    ];
+  });
+
+  if (taskScores.length === 0) {
+    return {
+      score: DEFAULT_SCORE,
+      detail: {
+        defaultApplied: true,
+        totalTasksWithQc: 0,
+        totalQcResults,
+        passedAtFirstAttempt,
+        unknownFirstAttempt,
+        taskScores: [],
+      } satisfies QcKpiDetail,
+    };
   }
 
   return {
-    totalInspected,
-    inspectedPassFirstTime,
+    score: round2(mean(taskScores.map((task) => task.score))),
+    detail: {
+      defaultApplied: false,
+      totalTasksWithQc: taskScores.length,
+      totalQcResults,
+      passedAtFirstAttempt,
+      unknownFirstAttempt,
+      taskScores,
+    } satisfies QcKpiDetail,
+  };
+}
+
+async function calcKpiBaoCao(input: { ksUserId: string; projectId?: string | null; from: Date; to: Date }) {
+  const projectIds = await resolveProjectIds(input.ksUserId, input.projectId);
+  if (projectIds.length === 0) {
+    return {
+      score: DEFAULT_SCORE,
+      detail: emptyReportDetail(true),
+    };
+  }
+
+  const rangeTo = toUtcStartOfDay(input.to) > nowUtcDateOnly() ? nowUtcDateOnly() : toUtcStartOfDay(input.to);
+  if (toUtcStartOfDay(input.from) > rangeTo) {
+    return {
+      score: DEFAULT_SCORE,
+      detail: emptyReportDetail(true),
+    };
+  }
+
+  const projects = await prisma.project.findMany({
+    where: { id: { in: projectIds }, goLiveDate: { not: null } },
+    select: { id: true, goLiveDate: true },
+  });
+
+  let requiredDays = 0;
+  let totalCheckins = 0;
+  let morningOnTimeDays = 0;
+  let morningCompleteDays = 0;
+  let totalEvening = 0;
+  let eveningOnTimeDays = 0;
+  let eveningCompleteDays = 0;
+
+  for (const project of projects) {
+    const restDates = await getProjectSiteRestDates(project.id, input.from, rangeTo);
+    const activeDays = getActivityDates(project, input.from, rangeTo, restDates);
+    const activeDaySet = new Set(activeDays.map((day) => formatUtcYmd(day)));
+    requiredDays += activeDays.length;
+
+    const [morningCheckins, eveningReports] = await Promise.all([
+      prisma.morningCheckin.findMany({
+        where: {
+          projectId: project.id,
+          userId: input.ksUserId,
+          reportDate: { gte: input.from, lte: rangeTo },
+        },
+        select: {
+          reportDate: true,
+          isLate: true,
+          tasks: { select: { taskId: true } },
+        },
+      }),
+      prisma.eveningReport.findMany({
+        where: {
+          projectId: project.id,
+          reporterId: input.ksUserId,
+          reportDate: { gte: input.from, lte: rangeTo },
+        },
+        select: {
+          reportDate: true,
+          isOnTime: true,
+          taskReports: { select: { taskId: true } },
+        },
+      }),
+    ]);
+
+    const eveningByDate = new Map(eveningReports.map((report) => [formatUtcYmd(report.reportDate), report]));
+
+    for (const checkin of morningCheckins) {
+      const dateKey = formatUtcYmd(checkin.reportDate);
+      if (!activeDaySet.has(dateKey)) continue;
+
+      const pickedTaskIds = checkin.tasks.map((task) => task.taskId);
+      const eveningReport = eveningByDate.get(dateKey);
+      totalCheckins += 1;
+      totalEvening += 1;
+
+      if (!checkin.isLate) {
+        morningOnTimeDays += 1;
+      }
+
+      if (pickedTaskIds.length > 0) {
+        morningCompleteDays += 1;
+      }
+
+      if (eveningReport?.isOnTime) {
+        eveningOnTimeDays += 1;
+      }
+
+      if (eveningReport) {
+        const reportedTaskIds = new Set(eveningReport.taskReports.map((task) => task.taskId));
+        if (pickedTaskIds.length === 0 || pickedTaskIds.every((taskId) => reportedTaskIds.has(taskId))) {
+          eveningCompleteDays += 1;
+        }
+      }
+    }
+  }
+
+  if (totalCheckins === 0) {
+    return {
+      score: DEFAULT_SCORE,
+      detail: emptyReportDetail(true, requiredDays),
+    };
+  }
+
+  const components = {
+    morningOnTime: round2(ratioToPercent(morningOnTimeDays, requiredDays)),
+    morningComplete: round2(ratioToPercent(morningCompleteDays, totalCheckins)),
+    eveningOnTime: round2(ratioToPercent(eveningOnTimeDays, totalEvening)),
+    eveningComplete: round2(ratioToPercent(eveningCompleteDays, totalEvening)),
+  };
+
+  return {
+    score: round2(mean(Object.values(components))),
+    detail: {
+      defaultApplied: false,
+      requiredDays,
+      totalCheckins,
+      morningOnTimeDays,
+      morningCompleteDays,
+      totalEvening,
+      eveningOnTimeDays,
+      eveningCompleteDays,
+      components,
+    } satisfies ReportKpiDetail,
+  };
+}
+
+function emptyReportDetail(defaultApplied: boolean, requiredDays = 0): ReportKpiDetail {
+  return {
+    defaultApplied,
+    requiredDays,
+    totalCheckins: 0,
+    morningOnTimeDays: 0,
+    morningCompleteDays: 0,
+    totalEvening: 0,
+    eveningOnTimeDays: 0,
+    eveningCompleteDays: 0,
+    components: {
+      morningOnTime: 0,
+      morningComplete: 0,
+      eveningOnTime: 0,
+      eveningComplete: 0,
+    },
+  };
+}
+
+async function calcKpiChuNha(input: { ksUserId: string; projectId?: string | null; from: Date; to: Date }) {
+  const [taskRatings, ksRatings] = await Promise.all([
+    prisma.customerTaskRating.findMany({
+      where: {
+        ksUserId: input.ksUserId,
+        projectId: input.projectId || undefined,
+        ratedAt: { gte: input.from, lte: input.to },
+      },
+      select: { rating: true },
+    }),
+    prisma.customerKsRating.findMany({
+      where: {
+        ksUserId: input.ksUserId,
+        projectId: input.projectId || undefined,
+        ratedAt: { gte: input.from, lte: input.to },
+      },
+      select: {
+        ratingExpertise: true,
+        ratingAttitude: true,
+        ratingCommunication: true,
+      },
+    }),
+  ]);
+
+  const averageTaskRating = taskRatings.length > 0 ? mean(taskRatings.map((rating) => rating.rating)) : null;
+  const averageKsRating =
+    ksRatings.length > 0
+      ? mean(ksRatings.map((rating) => mean([rating.ratingExpertise, rating.ratingAttitude, rating.ratingCommunication])))
+      : null;
+
+  const taskScore = averageTaskRating === null ? DEFAULT_SCORE : round2((averageTaskRating / 5) * 100);
+  const ksScore = averageKsRating === null ? DEFAULT_SCORE : round2((averageKsRating / 5) * 100);
+
+  return {
+    score: round2(taskScore * 0.5 + ksScore * 0.5),
+    detail: {
+      defaultApplied: taskRatings.length === 0 && ksRatings.length === 0,
+      taskRatingsCount: taskRatings.length,
+      ksRatingsCount: ksRatings.length,
+      averageTaskRating: averageTaskRating === null ? null : round2(averageTaskRating),
+      averageKsRating: averageKsRating === null ? null : round2(averageKsRating),
+      taskScore,
+      ksScore,
+    } satisfies CustomerKpiDetail,
+  };
+}
+
+async function calcKpiDongGop(input: { ksUserId: string; month: string }) {
+  const { year, month } = monthParts(input.month);
+  const monthly = await prisma.engineerKpiMonthly.findUnique({
+    where: {
+      userId_year_month: {
+        userId: input.ksUserId,
+        year,
+        month,
+      },
+    },
+    select: {
+      id: true,
+      scoreContribution: true,
+      contributionAt: true,
+      contributionBy: true,
+      contributionNote: true,
+    },
+  });
+
+  const hasManualScore = Boolean(monthly?.contributionAt || monthly?.contributionBy);
+  const score = hasManualScore ? round2(monthly!.scoreContribution.toNumber()) : DEFAULT_SCORE;
+
+  return {
+    score,
+    detail: {
+      defaultApplied: !hasManualScore,
+      monthlyRecordId: monthly?.id ?? null,
+      contributionAt: monthly?.contributionAt?.toISOString() ?? null,
+      contributionBy: monthly?.contributionBy ?? null,
+      note: monthly?.contributionNote ?? null,
+    } satisfies ContributionKpiDetail,
+  };
+}
+
+export async function calculateEngineerKpiV2(input: {
+  ksUserId: string;
+  projectId?: string | null;
+  from: Date;
+  to: Date;
+  month?: string | null;
+}): Promise<KpiResult> {
+  const month = input.month || monthStringFromDate(input.from);
+  const settings = await getActiveKpiSettings(month);
+
+  const [schedule, qc, report, customer, contribution] = await Promise.all([
+    calcKpiTienDo(input),
+    calcKpiQc(input),
+    calcKpiBaoCao(input),
+    calcKpiChuNha(input),
+    calcKpiDongGop({ ksUserId: input.ksUserId, month }),
+  ]);
+
+  const scores: KpiComponentScores = {
+    schedule: schedule.score,
+    qc: qc.score,
+    report: report.score,
+    customer: customer.score,
+    contribution: contribution.score,
+  };
+  const score = calculateWeightedKpiTotal(scores, settings);
+
+  const breakdown: KpiBreakdown = { ...scores };
+
+  return {
+    score,
+    rank: scoreToRank(score),
+    weights: settings.weights,
+    settings,
+    scores,
+    breakdown,
+    detail: {
+      requiredDays: report.detail.requiredDays,
+      morningOnTimeDays: report.detail.morningOnTimeDays,
+      eveningOnTimeDays: report.detail.eveningOnTimeDays,
+      totalCompletedTasks: schedule.detail.totalCompletedTasks,
+      onScheduleTasks: schedule.detail.onScheduleTasks,
+      totalEvening: report.detail.totalEvening,
+      metOrOverCount: report.detail.eveningCompleteDays,
+      totalInspected: qc.detail.totalQcResults,
+      inspectedPassFirstTime: qc.detail.passedAtFirstAttempt,
+      proactivityRaw: scores.report,
+      schedule: schedule.detail,
+      qc: qc.detail,
+      report: report.detail,
+      customer: customer.detail,
+      contribution: contribution.detail,
+      settings,
+    },
   };
 }
 
@@ -167,191 +691,12 @@ export async function calculateKpiForProjectEngineer(input: {
   from: Date;
   to: Date;
 }) {
-  const project = await prisma.project.findUnique({
-    where: { id: input.projectId },
-    select: { id: true, goLiveDate: true },
+  return calculateEngineerKpiV2({
+    ksUserId: input.reporterId,
+    projectId: input.projectId,
+    from: input.from,
+    to: input.to,
   });
-
-  if (!project || !project.goLiveDate) {
-    return emptyKpiResult();
-  }
-
-  const goLiveStart = toUtcStartOfDay(project.goLiveDate);
-  const today = nowUtcDateOnly();
-  const inputFrom = toUtcStartOfDay(input.from);
-  const inputTo = toUtcStartOfDay(input.to);
-
-  const from = inputFrom < goLiveStart ? goLiveStart : inputFrom;
-  const to = inputTo > today ? today : inputTo;
-
-  if (from > to) {
-    return emptyKpiResult();
-  }
-
-  const restDates = await getProjectSiteRestDates(input.projectId, from, to);
-  const activeDays = getActivityDates(project, from, to, restDates);
-  const requiredDays = activeDays.length;
-  const activeDaySet = new Set(activeDays.map((d) => formatUtcYmd(d)));
-
-  const [morningCheckins, completedTasks, inspectionQuality, technicalReports] = await Promise.all([
-    prisma.morningCheckin.findMany({
-      where: {
-        projectId: input.projectId,
-        userId: input.reporterId,
-        reportDate: { gte: from, lte: to },
-      },
-      select: {
-        reportDate: true,
-        submittedAt: true,
-        isLate: true,
-        tasks: {
-          select: {
-            taskId: true,
-          },
-        },
-      },
-    }),
-    prisma.task.findMany({
-      where: {
-        projectId: input.projectId,
-        isActive: true,
-        status: { in: [TaskStatus.done, TaskStatus.inspected] },
-        actualEndDate: { gte: from, lte: to },
-      },
-      select: {
-        id: true,
-        plannedEndDate: true,
-        actualEndDate: true,
-      },
-    }),
-    calculateInspectionQuality({
-      projectId: input.projectId,
-      from,
-      to,
-      activeDaySet,
-    }),
-    prisma.taskTechnicalReport.findMany({
-      where: {
-        task: {
-          projectId: input.projectId,
-        },
-        reportDate: { gte: from, lte: to },
-      },
-      select: {
-        taskId: true,
-        reportDate: true,
-        updatedAt: true,
-        note: true,
-        technicalIssue: true,
-        photos: {
-          select: { id: true },
-        },
-      },
-    }),
-  ]);
-
-  const morningOnTimeDays = morningCheckins.filter((row) => !row.isLate && activeDaySet.has(formatUtcYmd(row.reportDate))).length;
-
-  const reportMap = new Map<string, Array<(typeof technicalReports)[number]>>();
-  for (const report of technicalReports) {
-    const key = `${formatUtcYmd(report.reportDate)}:${report.taskId}`;
-    const bucket = reportMap.get(key) || [];
-    bucket.push(report);
-    reportMap.set(key, bucket);
-  }
-
-  let eveningOnTimeDays = 0;
-  let totalEvening = 0;
-  let metOrOverCount = 0;
-  let proactiveAccumulator = 0;
-  let proactiveCount = 0;
-
-  for (const checkin of morningCheckins) {
-    const dateKey = formatUtcYmd(checkin.reportDate);
-    if (!activeDaySet.has(dateKey)) continue;
-
-    const pickedTaskIds = checkin.tasks.map((row) => row.taskId);
-    totalEvening += 1;
-
-    const reportsForCheckin = pickedTaskIds
-      .flatMap((taskId) => reportMap.get(`${dateKey}:${taskId}`) || [])
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-
-    const uniqueReports = new Map<string, (typeof reportsForCheckin)[number]>();
-    for (const row of reportsForCheckin) {
-      if (!uniqueReports.has(row.taskId)) {
-        uniqueReports.set(row.taskId, row);
-      }
-    }
-
-    const reportRows = Array.from(uniqueReports.values());
-    const allCompleted = pickedTaskIds.length === 0 || reportRows.length === pickedTaskIds.length;
-
-    if (allCompleted) {
-      metOrOverCount += 1;
-
-      const deadline = new Date(`${dateKey}T19:00:00+07:00`);
-      const allBeforeDeadline = reportRows.every((row) => row.updatedAt.getTime() <= deadline.getTime());
-      if (allBeforeDeadline) {
-        eveningOnTimeDays += 1;
-      }
-    }
-
-    for (const row of reportRows) {
-      const hasNote = Boolean((row.note || row.technicalIssue || "").trim());
-      proactiveAccumulator += row.photos.length + (hasNote ? 1 : 0);
-      proactiveCount += 1;
-    }
-  }
-
-  const completedTasksInActiveDays = completedTasks.filter((task) => task.actualEndDate && activeDaySet.has(formatUtcYmd(task.actualEndDate)));
-  const totalCompletedTasks = completedTasksInActiveDays.length;
-  const onScheduleTasks = completedTasksInActiveDays.filter((task) => task.actualEndDate && task.actualEndDate <= task.plannedEndDate).length;
-
-  const totalInspected = inspectionQuality.totalInspected;
-  const inspectedPassFirstTime = inspectionQuality.inspectedPassFirstTime;
-
-  const proactivityRaw = proactiveCount > 0 ? (proactiveAccumulator / proactiveCount) * 10 : 0;
-  const reportProactivity = Math.min(100, proactivityRaw);
-
-  const breakdown: KpiBreakdown = {
-    morningOnTime: ratioToPercent(morningOnTimeDays, requiredDays),
-    eveningOnTime: ratioToPercent(eveningOnTimeDays, requiredDays),
-    taskOnSchedule: ratioToPercent(onScheduleTasks, totalCompletedTasks),
-    dailyPlanMet: ratioToPercent(metOrOverCount, totalEvening),
-    inspectionQuality: ratioToPercent(inspectedPassFirstTime, totalInspected),
-    reportProactivity,
-  };
-
-  const weightedScore =
-    (breakdown.morningOnTime * WEIGHTS.morningOnTime +
-      breakdown.eveningOnTime * WEIGHTS.eveningOnTime +
-      breakdown.taskOnSchedule * WEIGHTS.taskOnSchedule +
-      breakdown.dailyPlanMet * WEIGHTS.dailyPlanMet +
-      breakdown.inspectionQuality * WEIGHTS.inspectionQuality +
-      breakdown.reportProactivity * WEIGHTS.reportProactivity) /
-    100;
-
-  const score = Number(weightedScore.toFixed(2));
-
-  return {
-    score,
-    rank: scoreToRank(score),
-    weights: WEIGHTS,
-    breakdown,
-    detail: {
-      requiredDays,
-      morningOnTimeDays,
-      eveningOnTimeDays,
-      totalCompletedTasks,
-      onScheduleTasks,
-      totalEvening,
-      metOrOverCount,
-      totalInspected,
-      inspectedPassFirstTime,
-      proactivityRaw: Number(proactivityRaw.toFixed(2)),
-    } satisfies KpiDetail,
-  };
 }
 
 export async function calculateKpiHistoryForMonths(input: {
@@ -371,18 +716,22 @@ export async function calculateKpiHistoryForMonths(input: {
   for (let i = 0; i < input.months; i += 1) {
     const start = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), 1, 0, 0, 0));
     const end = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-    const kpi = await calculateKpiForProjectEngineer({
+    const month = monthStringFromDate(start);
+    const kpi = await calculateEngineerKpiV2({
+      ksUserId: input.reporterId,
       projectId: input.projectId,
-      reporterId: input.reporterId,
       from: start,
       to: end,
+      month,
     });
+
     rows.push({
-      month: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`,
+      month,
       score: kpi.score,
       rank: kpi.rank,
     });
-    cursor = addUtcDays(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1, 0, 0, 0)), 0);
+
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1, 0, 0, 0));
   }
 
   return rows.reverse();

@@ -93,12 +93,20 @@ export async function POST(request: Request, { params }: { params: { id: string;
     select: {
       id: true,
       isPassed: true,
+      passedAtFirstAttempt: true,
       photoUrl: true,
       note: true,
     },
   });
 
   const now = new Date();
+  const passedAtFirstAttempt = !previous
+    ? parsed.data.isPassed
+    : previous.passedAtFirstAttempt === false
+      ? false
+      : parsed.data.isPassed
+        ? previous.passedAtFirstAttempt ?? (previous.isPassed ? null : false)
+        : false;
 
   const result = await prisma.$transaction(async (tx) => {
     const saved = await tx.taskQcResult.upsert({
@@ -112,6 +120,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
         taskId: params.id,
         itemId: item.id,
         isPassed: parsed.data.isPassed,
+        passedAtFirstAttempt,
         photoUrl: photoUrl || null,
         note: note || null,
         checkedBy: user.id,
@@ -119,6 +128,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
       },
       update: {
         isPassed: parsed.data.isPassed,
+        passedAtFirstAttempt,
         photoUrl: photoUrl || null,
         note: note || null,
         checkedBy: user.id,
@@ -205,6 +215,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
       id: result.saved.id,
       itemId: result.saved.itemId,
       isPassed: result.saved.isPassed,
+      passedAtFirstAttempt: result.saved.passedAtFirstAttempt,
       photoUrl: result.saved.photoUrl,
       note: result.saved.note,
       checkedAt: result.saved.checkedAt,

@@ -15,20 +15,18 @@ type MyKpiResponse = {
   selectedProjectId: string | null;
   totals: { score: number; rank: string };
   weights: {
-    morningOnTime: number;
-    eveningOnTime: number;
-    taskOnSchedule: number;
-    dailyPlanMet: number;
-    inspectionQuality: number;
-    reportProactivity: number;
+    schedule: number;
+    qc: number;
+    report: number;
+    customer: number;
+    contribution: number;
   };
   breakdown: {
-    morningOnTime: number;
-    eveningOnTime: number;
-    taskOnSchedule: number;
-    dailyPlanMet: number;
-    inspectionQuality: number;
-    reportProactivity: number;
+    schedule: number;
+    qc: number;
+    report: number;
+    customer: number;
+    contribution: number;
   };
   detail: {
     requiredDays: number;
@@ -54,13 +52,14 @@ type MyKpiResponse = {
 };
 
 const METRIC_LABELS = {
-  morningOnTime: "Báo cáo sáng đúng giờ",
-  eveningOnTime: "Báo cáo chiều đúng giờ",
-  taskOnSchedule: "Task đúng tiến độ",
-  dailyPlanMet: "Đạt kế hoạch ngày",
-  inspectionQuality: "Chất lượng nghiệm thu",
-  reportProactivity: "Chủ động báo cáo",
+  schedule: "KPI 1 · Tiến độ",
+  qc: "KPI 2 · Chất lượng QC",
+  report: "KPI 3 · Báo cáo",
+  customer: "KPI 4 · Chủ nhà",
+  contribution: "KPI 5 · Đóng góp",
 } as const;
+
+const METRIC_KEYS = Object.keys(METRIC_LABELS) as Array<keyof typeof METRIC_LABELS>;
 
 function rankClass(rank: string) {
   if (rank === "A") return "bg-emerald-500/15 text-emerald-300";
@@ -155,11 +154,11 @@ export function MyKpiClient() {
 
   const metricRows = useMemo(() => {
     if (!payload) return [];
-    return Object.entries(payload.breakdown).map(([key, value]) => ({
+    return METRIC_KEYS.map((key) => ({
       key,
-      label: METRIC_LABELS[key as keyof typeof METRIC_LABELS],
-      score: Number(value.toFixed(2)),
-      weight: payload.weights[key as keyof typeof payload.weights],
+      label: METRIC_LABELS[key],
+      score: Number((payload.breakdown[key] || 0).toFixed(2)),
+      weight: payload.weights[key],
     }));
   }, [payload]);
 
@@ -212,7 +211,7 @@ export function MyKpiClient() {
           </div>
 
           <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-            <h2 className="mb-3 font-semibold">Breakdown 6 tiêu chí</h2>
+            <h2 className="mb-3 font-semibold">Breakdown 5 KPI v2</h2>
             <div className="space-y-2">
               {metricRows.map((row) => (
                 <div key={row.key} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm">
@@ -304,13 +303,13 @@ export function MyKpiClient() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">
           <div className="w-full max-w-2xl rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
             <h3 className="mb-3 text-lg font-semibold">Công thức tính KPI</h3>
-            <ul className="space-y-2 text-sm text-slate-700">
-              <li>• Báo cáo sáng đúng giờ: số ngày sáng đúng giờ / số ngày cần báo cáo × 100 (15%).</li>
-              <li>• Báo cáo chiều đúng giờ: số ngày chiều đúng giờ / số ngày cần báo cáo × 100 (15%).</li>
-              <li>• Task đúng tiến độ: task hoàn thành đúng hạn / tổng task đã xong × 100 (25%).</li>
-              <li>• Đạt kế hoạch ngày: số ngày MET/OVER / tổng báo cáo chiều × 100 (20%).</li>
-              <li>• Chất lượng nghiệm thu: inspected không reject lần đầu / tổng inspected × 100 (15%).</li>
-              <li>• Chủ động báo cáo: min(100, trung bình (ảnh + note)/task × 10) (10%).</li>
+            <ul className="space-y-2 text-sm text-[#c8d0e8]">
+              <li>• KPI 1 Tiến độ: trung bình điểm task hoàn thành theo mức đúng hạn/trễ hạn.</li>
+              <li>• KPI 2 QC: tỷ lệ checklist QC đạt ngay lần đầu.</li>
+              <li>• KPI 3 Báo cáo: trung bình đúng giờ/đầy đủ của báo cáo sáng và chiều.</li>
+              <li>• KPI 4 Chủ nhà: 50% rating task + 50% rating kỹ sư từ chủ nhà.</li>
+              <li>• KPI 5 Đóng góp: điểm TPTC/Admin chấm tay, mặc định 70 khi chưa chấm.</li>
+              <li>• Tổng KPI dùng trọng số đang có hiệu lực trong trang Cài đặt KPI.</li>
             </ul>
             <div className="mt-4 flex justify-end">
               <Button variant="outline" onClick={() => setShowFormula(false)}>

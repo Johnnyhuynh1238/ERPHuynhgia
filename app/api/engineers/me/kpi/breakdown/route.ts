@@ -62,7 +62,8 @@ export async function GET(request: Request) {
     score: kpi.score,
     rank: kpi.rank,
     weights: kpi.weights,
-    breakdown: kpi.breakdown,
+    settings: kpi.settings,
+    breakdown: kpi.scores,
     detail: kpi.detail,
   });
 }

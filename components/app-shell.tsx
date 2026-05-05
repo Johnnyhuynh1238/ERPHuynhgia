@@ -42,6 +42,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Chi thầu phụ", href: "/sub-payments" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI tổng", href: "/admin/kpi" },
+    { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
     { label: "Lương KS", href: "/admin/engineers/salary" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
     { label: "User", href: "/admin/users" },

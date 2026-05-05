@@ -271,6 +271,9 @@ model User {
   engineerKpiMonthly           EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyUser")
   engineerKpiMonthlyRated      EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyRater")
   engineerKpiMonthlyFinalized  EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyFinalizer")
+  kpiSettingsChanged           KpiSettings[]             @relation("KpiSettingsChanger")
+  customerTaskRatings          CustomerTaskRating[]      @relation("KsRatedTask")
+  customerKsRatings            CustomerKsRating[]        @relation("KsRatedDirectly")
   customerCommentReplies       CustomerCommentReply[]
   subcontractorsCreated        Subcontractor[]           @relation("SubcontractorCreator")
   subContractsCreated          SubContract[]             @relation("SubContractCreator")
@@ -325,6 +328,8 @@ model Project {
   kpiSnapshots            KpiSnapshot[]
   customerComments        CustomerComment[]
   customerAcknowledgments CustomerAcknowledgment[]
+  customerTaskRatings     CustomerTaskRating[]
+  customerKsRatings       CustomerKsRating[]
   customerSessions        CustomerSession[]
   customerLoginAttempts   CustomerLoginAttempt[]
   subContracts            SubContract[]
@@ -500,6 +505,8 @@ model Task {
   reportPhotos            TaskReportPhoto[]
   customerComments        CustomerComment[]
   customerAcknowledgments CustomerAcknowledgment[]
+  customerTaskRating      CustomerTaskRating?
+  customerKsRating        CustomerKsRating?
   subContractTasks        SubContractTask[]
   subPayments             SubPayment[]
 
@@ -700,9 +707,10 @@ model TaskQcResult {
   id        String   @id @default(uuid()) @db.Uuid
   taskId    String   @map("task_id") @db.Uuid
   itemId    String   @map("item_id") @db.Uuid
-  isPassed  Boolean  @default(false) @map("is_passed")
-  photoUrl  String?  @map("photo_url")
-  note      String?  @db.Text
+  isPassed             Boolean  @default(false) @map("is_passed")
+  passedAtFirstAttempt Boolean? @map("passed_at_first_attempt")
+  photoUrl             String?  @map("photo_url")
+  note                 String?  @db.Text
   checkedBy String   @map("checked_by") @db.Uuid
   checkedAt DateTime @default(now()) @map("checked_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1370,6 +1378,62 @@ model SubEvaluationScore {
 
   @@unique([evaluationId, criterionId])
   @@map("sub_evaluation_scores")
+}
+
+model KpiSettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  weightTienDo       Int      @map("weight_tien_do")
+  weightQc           Int      @map("weight_qc")
+  weightBaoCao       Int      @map("weight_bao_cao")
+  weightChuNha       Int      @map("weight_chu_nha")
+  weightDongGop      Int      @map("weight_dong_gop")
+  effectiveFromMonth String   @unique @map("effective_from_month")
+  changedBy          String   @map("changed_by") @db.Uuid
+  changedAt          DateTime @default(now()) @map("changed_at")
+  reason             String?  @db.Text
+
+  changer User @relation("KpiSettingsChanger", fields: [changedBy], references: [id])
+
+  @@index([effectiveFromMonth])
+  @@map("kpi_settings")
+}
+
+model CustomerTaskRating {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @unique @map("task_id") @db.Uuid
+  ksUserId  String   @map("ks_user_id") @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  rating    Int
+  note      String?  @db.Text
+  ratedAt   DateTime @default(now()) @map("rated_at")
+
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  ksUser  User    @relation("KsRatedTask", fields: [ksUserId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([ksUserId, ratedAt])
+  @@index([projectId])
+  @@map("customer_task_ratings")
+}
+
+model CustomerKsRating {
+  id                    String   @id @default(uuid()) @db.Uuid
+  taskId                String   @unique @map("task_id") @db.Uuid
+  ksUserId              String   @map("ks_user_id") @db.Uuid
+  projectId             String   @map("project_id") @db.Uuid
+  ratingExpertise       Int      @map("rating_expertise")
+  ratingAttitude        Int      @map("rating_attitude")
+  ratingCommunication   Int      @map("rating_communication")
+  note                  String?  @db.Text
+  ratedAt               DateTime @default(now()) @map("rated_at")
+
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  ksUser  User    @relation("KsRatedDirectly", fields: [ksUserId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([ksUserId, ratedAt])
+  @@index([projectId])
+  @@map("customer_ks_ratings")
 }
 
 model CustomerSession {

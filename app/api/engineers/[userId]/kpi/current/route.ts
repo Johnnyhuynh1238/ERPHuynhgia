@@ -3,7 +3,7 @@ import { UserRole } from "@prisma/client";
 import { parseMonthInput } from "@/lib/date";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { calculateKpiForProjectEngineer } from "@/lib/kpi";
-import { calculateSalary, calculateTotalScore, toNumber } from "@/lib/kpi-salary";
+import { calculateSalary, toNumber } from "@/lib/kpi-salary";
 import { getReportProjectIdsForEngineer } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
 
@@ -71,24 +71,19 @@ export async function GET(request: Request, { params }: { params: { userId: stri
     to: parsedMonth.end,
   });
 
-  const scoreSchedule = Number(kpi.breakdown.taskOnSchedule.toFixed(2));
-  const scoreQc = Number(kpi.breakdown.inspectionQuality.toFixed(2));
-  const scoreReport = Number(kpi.breakdown.reportProactivity.toFixed(2));
-  const scoreCustomer = 100;
+  const scoreSchedule = Number(kpi.scores.schedule.toFixed(2));
+  const scoreQc = Number(kpi.scores.qc.toFixed(2));
+  const scoreReport = Number(kpi.scores.report.toFixed(2));
+  const scoreCustomer = Number(kpi.scores.customer.toFixed(2));
+  const scoreContribution = Number(kpi.scores.contribution.toFixed(2));
 
-  const hasData = kpi.detail.totalCompletedTasks > 0 || kpi.detail.totalInspected > 0 || kpi.detail.totalEvening > 0;
-  const estimatedContribution = hasData ? 80 : 100;
-
-  const totalScore =
-    !hasData
-      ? 100
-      : calculateTotalScore({
-          schedule: scoreSchedule,
-          qc: scoreQc,
-          report: scoreReport,
-          customer: scoreCustomer,
-          contribution: estimatedContribution,
-        });
+  const hasData =
+    !kpi.detail.schedule.defaultApplied ||
+    !kpi.detail.qc.defaultApplied ||
+    !kpi.detail.report.defaultApplied ||
+    !kpi.detail.customer.defaultApplied ||
+    !kpi.detail.contribution.defaultApplied;
+  const totalScore = kpi.score;
 
   const salaryConfig = await prisma.engineerSalaryConfig.findUnique({
     where: { userId: targetUser.id },
@@ -113,8 +108,9 @@ export async function GET(request: Request, { params }: { params: { userId: stri
         qc: scoreQc,
         report: scoreReport,
         customer: scoreCustomer,
-        contribution: null,
+        contribution: scoreContribution,
       },
+      settings: kpi.settings,
       totalScore,
       salary: null,
     });
@@ -134,8 +130,9 @@ export async function GET(request: Request, { params }: { params: { userId: stri
       qc: scoreQc,
       report: scoreReport,
       customer: scoreCustomer,
-      contribution: null,
+      contribution: scoreContribution,
     },
+    settings: kpi.settings,
     totalScore,
     estimatedBonusRatio: salary.bonusRatio,
     salary: {

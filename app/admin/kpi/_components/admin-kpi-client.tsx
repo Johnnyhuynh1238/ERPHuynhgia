@@ -5,12 +5,11 @@ import { UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 
 type KpiBreakdown = {
-  morningOnTime: number;
-  eveningOnTime: number;
-  taskOnSchedule: number;
-  dailyPlanMet: number;
-  inspectionQuality: number;
-  reportProactivity: number;
+  schedule: number;
+  qc: number;
+  report: number;
+  customer: number;
+  contribution: number;
 };
 
 type AdminKpiRow = {
@@ -89,13 +88,14 @@ function toLinePoints(history: Array<{ month: string; score: number }>) {
 }
 
 const METRIC_LABELS: Record<keyof KpiBreakdown, string> = {
-  morningOnTime: "Sáng đúng giờ",
-  eveningOnTime: "Chiều đúng giờ",
-  taskOnSchedule: "Task đúng tiến độ",
-  dailyPlanMet: "Đạt kế hoạch ngày",
-  inspectionQuality: "Chất lượng nghiệm thu",
-  reportProactivity: "Chủ động báo cáo",
+  schedule: "KPI 1 · Tiến độ",
+  qc: "KPI 2 · Chất lượng QC",
+  report: "KPI 3 · Báo cáo",
+  customer: "KPI 4 · Chủ nhà",
+  contribution: "KPI 5 · Đóng góp",
 };
+
+const METRIC_KEYS = Object.keys(METRIC_LABELS) as Array<keyof KpiBreakdown>;
 
 export function AdminKpiClient({ initialData, canSeeDetail }: { initialData: AdminKpiPayload; canSeeDetail: boolean }) {
   const [month, setMonth] = useState(initialData.month);
@@ -241,9 +241,9 @@ export function AdminKpiClient({ initialData, canSeeDetail }: { initialData: Adm
             ) : detailPayload ? (
               <div className="space-y-4">
                 <div className="grid gap-2 md:grid-cols-2">
-                  {Object.entries(detailPayload.breakdown).map(([metricKey, metricValue]) => (
+                  {METRIC_KEYS.map((metricKey) => (
                     <div key={metricKey} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm">
-                      {METRIC_LABELS[metricKey as keyof KpiBreakdown]}: {metricValue.toFixed(2)}
+                      {METRIC_LABELS[metricKey]}: {Number(detailPayload.breakdown[metricKey] || 0).toFixed(2)}
                     </div>
                   ))}
                 </div>

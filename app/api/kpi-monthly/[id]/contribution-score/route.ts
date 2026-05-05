@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { getActiveKpiSettings } from "@/lib/kpi";
 import { calculateSalary, calculateTotalScore, asPrismaDecimal, toNumber } from "@/lib/kpi-salary";
 import { prisma } from "@/lib/prisma";
 
@@ -31,6 +32,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     select: {
       id: true,
       status: true,
+      year: true,
+      month: true,
       scoreSchedule: true,
       scoreQc: true,
       scoreReport: true,
@@ -47,13 +50,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Kỳ KPI tháng đã chốt, không thể sửa" }, { status: 400 });
   }
 
-  const totalScore = calculateTotalScore({
-    schedule: toNumber(existed.scoreSchedule),
-    qc: toNumber(existed.scoreQc),
-    report: toNumber(existed.scoreReport),
-    customer: toNumber(existed.scoreCustomer),
-    contribution: parsed.data.score,
-  });
+  const settings = await getActiveKpiSettings(`${existed.year}-${String(existed.month).padStart(2, "0")}`);
+  const totalScore = calculateTotalScore(
+    {
+      schedule: toNumber(existed.scoreSchedule),
+      qc: toNumber(existed.scoreQc),
+      report: toNumber(existed.scoreReport),
+      customer: toNumber(existed.scoreCustomer),
+      contribution: parsed.data.score,
+    },
+    settings,
+  );
 
   const salary = calculateSalary(toNumber(existed.salaryMax), totalScore);
 

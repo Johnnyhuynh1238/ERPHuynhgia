@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { TaskStatus } from "@prisma/client";
+import { TaskCategory, TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { PHASE_LABEL } from "@/lib/task-display";
@@ -43,6 +43,8 @@ export default async function CustomerTaskDetailPage({
         },
       },
       customerAcknowledgments: true,
+      customerTaskRating: true,
+      customerKsRating: true,
     },
   });
 
@@ -50,8 +52,11 @@ export default async function CustomerTaskDetailPage({
 
   const canAck =
     task.isMilestone &&
-    (task.status === TaskStatus.done || task.status === TaskStatus.inspected) &&
-    task.customerAcknowledgments.length === 0;
+    task.category === TaskCategory.major_milestone &&
+    task.status === TaskStatus.internal_approved &&
+    task.customerAcknowledgments.length === 0 &&
+    !task.customerTaskRating &&
+    !task.customerKsRating;
 
   return (
     <div className="space-y-4">

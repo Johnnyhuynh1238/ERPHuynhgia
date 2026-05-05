@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { parseMonthInput, parseYmdToUtcDate, toUtcEndOfDay, toUtcStartOfDay } from "@/lib/date";
-import { calculateKpiForProjectEngineer, calculateKpiHistoryForMonths } from "@/lib/kpi";
+import { calculateKpiForProjectEngineer, calculateKpiHistoryForMonths, getActiveKpiSettings } from "@/lib/kpi";
 import { getReportProjectIdsForEngineer, toProjectAccessWhere } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
 
@@ -39,6 +39,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Khoảng thời gian không hợp lệ" }, { status: 400 });
   }
 
+  const activeSettings = await getActiveKpiSettings(month);
+
   const accessibleProjects = await prisma.project.findMany({
     where: {
       id: projectIdInput || undefined,
@@ -65,12 +67,11 @@ export async function GET(request: Request) {
         rank: "D",
       },
       breakdown: {
-        morningOnTime: 0,
-        eveningOnTime: 0,
-        taskOnSchedule: 0,
-        dailyPlanMet: 0,
-        inspectionQuality: 0,
-        reportProactivity: 0,
+        schedule: 0,
+        qc: 0,
+        report: 0,
+        customer: 0,
+        contribution: 0,
       },
       detail: {
         requiredDays: 0,
@@ -89,14 +90,8 @@ export async function GET(request: Request) {
         to: end.toISOString().slice(0, 10),
       },
       history: [],
-      weights: {
-        morningOnTime: 15,
-        eveningOnTime: 15,
-        taskOnSchedule: 25,
-        dailyPlanMet: 20,
-        inspectionQuality: 15,
-        reportProactivity: 10,
-      },
+      weights: activeSettings.weights,
+      settings: activeSettings,
       dailyRows: [],
     });
   }
@@ -187,7 +182,8 @@ export async function GET(request: Request) {
       rank: kpi.rank,
     },
     weights: kpi.weights,
-    breakdown: kpi.breakdown,
+    settings: kpi.settings,
+    breakdown: kpi.scores,
     detail: kpi.detail,
     history,
     dailyRows: activeDays.map((morning) => {

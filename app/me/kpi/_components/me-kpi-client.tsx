@@ -14,7 +14,10 @@ type KpiCurrentResponse = {
     qc: number;
     report: number;
     customer: number;
-    contribution: number | null;
+    contribution: number;
+  };
+  settings?: {
+    weights: Record<keyof KpiCurrentResponse["scores"], number>;
   };
   salary: {
     salaryMax: number;
@@ -29,7 +32,6 @@ type KpiRow = {
   key: keyof KpiCurrentResponse["scores"];
   icon: string;
   label: string;
-  weight: string;
   note: string;
   color: "orange" | "green";
 };
@@ -39,7 +41,6 @@ const KPI_ROWS: KpiRow[] = [
     key: "schedule",
     icon: "📊",
     label: "Tiến độ",
-    weight: "30%",
     note: "Tỷ lệ công việc đúng hạn",
     color: "orange",
   },
@@ -47,7 +48,6 @@ const KPI_ROWS: KpiRow[] = [
     key: "qc",
     icon: "✅",
     label: "Chất lượng QC",
-    weight: "40%",
     note: "Tỷ lệ QC đạt ngay lần đầu",
     color: "green",
   },
@@ -55,7 +55,6 @@ const KPI_ROWS: KpiRow[] = [
     key: "report",
     icon: "📝",
     label: "Báo cáo",
-    weight: "10%",
     note: "Độ đầy đủ báo cáo ngày",
     color: "orange",
   },
@@ -63,15 +62,13 @@ const KPI_ROWS: KpiRow[] = [
     key: "customer",
     icon: "😊",
     label: "Chủ nhà hài lòng",
-    weight: "10%",
-    note: "Mặc định 100/100 nếu không phàn nàn",
+    note: "50% rating task + 50% rating kỹ sư, fallback 70 khi thiếu",
     color: "green",
   },
   {
     key: "contribution",
     icon: "🎯",
     label: "Đóng góp",
-    weight: "10%",
     note: "TPTC chấm cuối tháng",
     color: "orange",
   },
@@ -230,7 +227,7 @@ export function MeKpiClient() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <div className="text-sm font-bold text-[#f0f2ff]">{row.label}</div>
-                          <span className="rounded bg-[#f97316]/12 px-1.5 py-0.5 text-[9px] font-bold text-[#f97316]">{row.weight}</span>
+                          <span className="rounded bg-[#f97316]/12 px-1.5 py-0.5 text-[9px] font-bold text-[#f97316]">{data.settings?.weights?.[row.key] ?? 0}%</span>
                         </div>
                         <div className="mt-0.5 text-[11px] text-[#4a5568]">{row.note}</div>
                         {hasScore ? (

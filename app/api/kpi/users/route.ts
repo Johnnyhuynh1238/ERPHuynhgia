@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { parseMonthInput } from "@/lib/date";
-import { calculateKpiForProjectEngineer } from "@/lib/kpi";
+import { calculateKpiForProjectEngineer, type KpiComponentScores } from "@/lib/kpi";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { parseKpiRoleFilter } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
@@ -10,15 +10,6 @@ import { prisma } from "@/lib/prisma";
 function canViewKpiUsers(role: string) {
   return role === UserRole.admin || role === UserRole.accountant || role === UserRole.construction_manager;
 }
-
-type KpiBreakdown = {
-  morningOnTime: number;
-  eveningOnTime: number;
-  taskOnSchedule: number;
-  dailyPlanMet: number;
-  inspectionQuality: number;
-  reportProactivity: number;
-};
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -111,7 +102,7 @@ export async function GET(request: Request) {
     projectName: string;
     score: number;
     rank: string;
-    breakdown?: KpiBreakdown;
+    breakdown?: KpiComponentScores;
   }> = [];
 
   for (const project of projects) {
@@ -146,7 +137,7 @@ export async function GET(request: Request) {
         projectName: project.name,
         score: kpi.score,
         rank: kpi.rank,
-        ...(canSeeDetail ? { breakdown: kpi.breakdown } : {}),
+        ...(canSeeDetail ? { breakdown: kpi.scores } : {}),
       });
     }
   }
