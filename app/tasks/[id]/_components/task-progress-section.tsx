@@ -122,28 +122,44 @@ export function TaskProgressSection({
     }
   }
 
+  async function uploadPhotoFile(file: File) {
+    const form = new FormData();
+    form.append("files", file);
+    const res = await fetch(`/api/tasks/${taskId}/photos`, {
+      method: "POST",
+      body: form,
+    });
+    const contentType = res.headers.get("content-type") || "";
+    const json = contentType.includes("application/json")
+      ? ((await res.json().catch(() => ({}))) as { message?: string; photos?: UploadedPhoto[] })
+      : ({} as { message?: string; photos?: UploadedPhoto[] });
+    const text = contentType.includes("application/json") ? "" : await res.text().catch(() => "");
+    if (!res.ok) {
+      throw new Error(json.message || `Upload ${file.name} thất bại (${res.status})${text ? `: ${text.slice(0, 120)}` : ""}`);
+    }
+    const photo = (json.photos || []).find((item) => item.photoUrl);
+    if (!photo) {
+      throw new Error(`Không lấy được URL ảnh ${file.name}`);
+    }
+    return photo;
+  }
+
   async function uploadPhotos(files: File[]) {
     if (!files.length) return;
-    const form = new FormData();
-    files.forEach((file) => form.append("files", file));
+    const uploaded: UploadedPhoto[] = [];
     setUploading(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/photos`, {
-        method: "POST",
-        body: form,
-      });
-      const json = await res.json().catch(() => ({} as { message?: string; photos?: UploadedPhoto[] }));
-      if (!res.ok) {
-        throw new Error(json.message || "Upload ảnh thất bại");
+      for (const file of files) {
+        uploaded.push(await uploadPhotoFile(file));
       }
-      const photos = json.photos || [];
-      if (!photos.length || !photos[0]?.photoUrl) {
-        throw new Error("Không lấy được URL ảnh vừa upload");
-      }
-      setUploadedPhotos((prev) => [...prev, ...photos]);
-      setPhotoUrl((current) => current || photos[0].photoUrl);
-      toast.success(`Đã tải ${photos.length} ảnh tiến độ`);
+      setUploadedPhotos((prev) => [...prev, ...uploaded]);
+      setPhotoUrl((current) => current || uploaded[0]?.photoUrl || "");
+      toast.success(`Đã tải ${uploaded.length} ảnh tiến độ`);
     } catch (error) {
+      if (uploaded.length) {
+        setUploadedPhotos((prev) => [...prev, ...uploaded]);
+        setPhotoUrl((current) => current || uploaded[0]?.photoUrl || "");
+      }
       toast.error(error instanceof Error ? error.message : "Upload ảnh thất bại");
     } finally {
       setUploading(false);

@@ -150,23 +150,35 @@ export function QcSection({
     }
   }
 
-  async function uploadPhotos(files: File[]) {
-    if (!files.length) return [];
+  async function uploadPhotoFile(file: File) {
     const form = new FormData();
-    files.forEach((file) => form.append("files", file));
+    form.append("files", file);
     const res = await fetch(`/api/tasks/${taskId}/photos`, {
       method: "POST",
       body: form,
     });
-    const json = (await res.json().catch(() => ({}))) as { message?: string; photos?: QcStoredPhoto[] };
+    const contentType = res.headers.get("content-type") || "";
+    const json = contentType.includes("application/json")
+      ? ((await res.json().catch(() => ({}))) as { message?: string; photos?: QcStoredPhoto[] })
+      : ({} as { message?: string; photos?: QcStoredPhoto[] });
+    const text = contentType.includes("application/json") ? "" : await res.text().catch(() => "");
     if (!res.ok) {
-      throw new Error(json.message || "Upload ảnh thất bại");
+      throw new Error(json.message || `Upload ${file.name} thất bại (${res.status})${text ? `: ${text.slice(0, 120)}` : ""}`);
     }
-    const photos = (json.photos || []).filter((photo) => photo.photoUrl);
-    if (!photos.length) {
-      throw new Error("Không lấy được URL ảnh upload");
+    const photo = (json.photos || []).find((item) => item.photoUrl);
+    if (!photo) {
+      throw new Error(`Không lấy được URL ảnh ${file.name}`);
     }
-    return photos;
+    return photo;
+  }
+
+  async function uploadPhotos(files: File[]) {
+    if (!files.length) return [];
+    const uploaded: QcStoredPhoto[] = [];
+    for (const file of files) {
+      uploaded.push(await uploadPhotoFile(file));
+    }
+    return uploaded;
   }
 
   async function saveItem(itemId: string, isPassed: boolean, photosOverride?: QcStoredPhoto[]) {
