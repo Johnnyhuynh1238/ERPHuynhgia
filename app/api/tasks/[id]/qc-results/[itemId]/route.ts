@@ -5,13 +5,48 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 
+type StoredQcPhoto = {
+  id?: string;
+  photoUrl: string;
+  thumbnailUrl?: string;
+};
+
+const storedPhotoSchema = z.object({
+  id: z.string().optional(),
+  photoUrl: z.string().trim().min(1),
+  thumbnailUrl: z.string().trim().optional(),
+});
+
 const saveResultSchema = z.object({
   isPassed: z.boolean(),
   photoUrl: z.string().trim().optional(),
+  photos: z.array(storedPhotoSchema).optional(),
   note: z.string().optional(),
 });
 
 const LOCKED_STATUSES = new Set<TaskStatus>([TaskStatus.done, TaskStatus.internal_approved, TaskStatus.completed]);
+
+function parseStoredPhotos(value: string | null): StoredQcPhoto[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed?.photos)) {
+      return parsed.photos
+        .map((photo: Partial<StoredQcPhoto>) => ({
+          id: typeof photo.id === "string" ? photo.id : undefined,
+          photoUrl: typeof photo.photoUrl === "string" ? photo.photoUrl : "",
+          thumbnailUrl: typeof photo.thumbnailUrl === "string" ? photo.thumbnailUrl : undefined,
+        }))
+        .filter((photo: StoredQcPhoto) => Boolean(photo.photoUrl));
+    }
+  } catch {}
+  return [{ photoUrl: value }];
+}
+
+function serializeStoredPhotos(photos: StoredQcPhoto[]) {
+  if (!photos.length) return null;
+  return JSON.stringify({ photos });
+}
 
 export async function POST(request: Request, { params }: { params: { id: string; itemId: string } }) {
   const user = await getCurrentUser();
@@ -76,13 +111,6 @@ export async function POST(request: Request, { params }: { params: { id: string;
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const photoUrl = String(parsed.data.photoUrl || "").trim();
-  const note = String(parsed.data.note || "").trim();
-
-  if (parsed.data.isPassed && item.requirePhoto && !photoUrl) {
-    return NextResponse.json({ message: "Tiêu chí này bắt buộc ảnh minh chứng" }, { status: 400 });
-  }
-
   const previous = await prisma.taskQcResult.findUnique({
     where: {
       taskId_itemId: {
@@ -98,6 +126,20 @@ export async function POST(request: Request, { params }: { params: { id: string;
       note: true,
     },
   });
+
+  const submittedPhotos = parsed.data.photos?.filter((photo) => photo.photoUrl) || [];
+  const previousPhotos = parseStoredPhotos(previous?.photoUrl || null);
+  const photos = submittedPhotos.length
+    ? submittedPhotos
+    : parsed.data.photoUrl
+      ? [{ photoUrl: parsed.data.photoUrl }]
+      : previousPhotos;
+  const firstPhotoUrl = photos[0]?.photoUrl || "";
+  const note = String(parsed.data.note || "").trim();
+
+  if (parsed.data.isPassed && item.requirePhoto && !photos.length) {
+    return NextResponse.json({ message: "Tiêu chí này bắt buộc ảnh minh chứng" }, { status: 400 });
+  }
 
   const now = new Date();
   const passedAtFirstAttempt = !previous
@@ -121,7 +163,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
         itemId: item.id,
         isPassed: parsed.data.isPassed,
         passedAtFirstAttempt,
-        photoUrl: photoUrl || null,
+        photoUrl: serializeStoredPhotos(photos),
         note: note || null,
         checkedBy: user.id,
         checkedAt: now,
@@ -129,7 +171,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
       update: {
         isPassed: parsed.data.isPassed,
         passedAtFirstAttempt,
-        photoUrl: photoUrl || null,
+        photoUrl: serializeStoredPhotos(photos),
         note: note || null,
         checkedBy: user.id,
         checkedAt: now,
@@ -180,7 +222,8 @@ export async function POST(request: Request, { params }: { params: { id: string;
         metadata: {
           itemId: item.id,
           itemTitle: item.title,
-          photoUrl: photoUrl || null,
+          photoUrl: firstPhotoUrl || null,
+          photos,
           note: note || null,
         },
         description: `${parsed.data.isPassed ? "Đạt" : "Bỏ đạt"} tiêu chí QC: ${item.title}`,
@@ -216,7 +259,8 @@ export async function POST(request: Request, { params }: { params: { id: string;
       itemId: result.saved.itemId,
       isPassed: result.saved.isPassed,
       passedAtFirstAttempt: result.saved.passedAtFirstAttempt,
-      photoUrl: result.saved.photoUrl,
+      photoUrl: firstPhotoUrl || null,
+      photos,
       note: result.saved.note,
       checkedAt: result.saved.checkedAt,
       updatedAt: result.saved.updatedAt,

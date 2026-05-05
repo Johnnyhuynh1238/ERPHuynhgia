@@ -172,6 +172,7 @@ export function TaskDetailClient({
   const [technicalReportOpen, setTechnicalReportOpen] = useState(false);
   const [technicalReportStep, setTechnicalReportStep] = useState(1);
   const [savingTechnicalStatus, setSavingTechnicalStatus] = useState(false);
+  const [deletingReportPhotoId, setDeletingReportPhotoId] = useState<string | null>(null);
 
   const [status, setStatus] = useState<TaskDetail["status"]>(initialTask.status);
   const [plannedStart, setPlannedStart] = useState(toInputDate(initialTask.plannedStartDate));
@@ -256,10 +257,25 @@ export function TaskDetailClient({
 
   const loadReportRows = useCallback(async (type: ReportType) => {
     const endpoint = reportTypeConfig[type].endpoint;
-    const res = await fetch(`/api/tasks/${task.id}/${endpoint}`, { cache: "no-store" });
+    const [res, photoRes] = await Promise.all([
+      fetch(`/api/tasks/${task.id}/${endpoint}`, { cache: "no-store" }),
+      fetch(`/api/tasks/${task.id}/report-photos?type=${type}`, { cache: "no-store" }),
+    ]);
     const json = await res.json().catch(() => ({}));
+    const photoJson = await photoRes.json().catch(() => ({}));
     if (!res.ok) return;
-    setReportRows((prev) => ({ ...prev, [type]: json.reports || [] }));
+    const photos = photoRes.ok && Array.isArray(photoJson.photos) ? photoJson.photos : [];
+    const photosByDay = photos.reduce((acc: Record<string, any[]>, photo: any) => {
+      const day = String(photo.reportDate).slice(0, 10);
+      acc[day] = acc[day] || [];
+      acc[day].push(photo);
+      return acc;
+    }, {});
+    const reports = (json.reports || []).map((row: any) => ({
+      ...row,
+      photos: photosByDay[String(row.reportDate).slice(0, 10)] || [],
+    }));
+    setReportRows((prev) => ({ ...prev, [type]: reports }));
   }, [task.id]);
 
   const ensureRowsLoaded = useCallback(async (type: ReportType) => {
@@ -367,6 +383,58 @@ export function TaskDetailClient({
     setTechnicalReportStep(1);
     setTechnicalSubTab("today");
     await loadReportRows("technical");
+  }
+
+  function canDeleteReportPhoto(photo: any) {
+    return currentUserRole === "admin" || currentUserRole === "construction_manager" || photo.uploadedBy === currentUserId;
+  }
+
+  async function deleteReportPhoto(type: ReportType, photoId: string) {
+    setDeletingReportPhotoId(photoId);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/report-photos/${photoId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({} as { message?: string }));
+      if (!res.ok) {
+        throw new Error(json.message || "Xóa ảnh thất bại");
+      }
+      toast.success(json.message || "Đã xóa ảnh");
+      await loadReportRows(type);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Xóa ảnh thất bại");
+    } finally {
+      setDeletingReportPhotoId(null);
+    }
+  }
+
+  function renderReportPhotos(row: any, type: ReportType) {
+    const photos = Array.isArray(row.photos) ? row.photos : [];
+    if (!photos.length) return null;
+
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="text-xs font-semibold text-[#c8d0e8]">Ảnh đính kèm ({photos.length})</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {photos.map((photo: any, index: number) => (
+            <div key={photo.id || `${row.id}-${index}`} className="flex items-center justify-between gap-2 rounded-lg border border-[#343a50] bg-[#1a1d27] p-2 text-xs">
+              <a href={`/api/tasks/${task.id}/report-photos/${photo.id}/file`} target="_blank" rel="noreferrer" className="text-amber-300 underline">
+                Xem ảnh #{index + 1}
+              </a>
+              {canDeleteReportPhoto(photo) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-7 border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-200"
+                  disabled={deletingReportPhotoId === photo.id}
+                  onClick={() => deleteReportPhoto(type, photo.id)}
+                >
+                  {deletingReportPhotoId === photo.id ? "Đang xóa" : "Xóa"}
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   function renderTechnicalTodayFlow() {
@@ -521,7 +589,7 @@ export function TaskDetailClient({
                           {entry.lesson ? <div>Kinh nghiệm: {entry.lesson}</div> : null}
                         </div>
                       ))}
-                      {Array.isArray(row.photos) && row.photos.length > 0 ? <div className="mt-2 text-xs text-[#8891aa]">Ảnh đính kèm: {row.photos.length}</div> : null}
+                      {renderReportPhotos(row, "technical")}
                     </div>
                   );
                 })}</div>
@@ -535,7 +603,15 @@ export function TaskDetailClient({
       <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử · {reportTypeConfig[type].label}</div>
         {rows.length === 0 ? <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-4 text-sm text-[#8891aa]">Chưa có dữ liệu</div> : (
-          <div className="space-y-2">{rows.map((row: any) => <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm"><div className="font-semibold">{fmtDate(row.reportDate)}</div><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-[#c8d0e8]">{JSON.stringify(row, null, 2)}</pre></div>)}</div>
+          <div className="space-y-2">
+            {rows.map((row: any) => (
+              <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 text-sm">
+                <div className="font-semibold">{fmtDate(row.reportDate)}</div>
+                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-[#c8d0e8]">{JSON.stringify(row, null, 2)}</pre>
+                {renderReportPhotos(row, type)}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,12 @@ type QcTemplateResponse = {
   }>;
 };
 
+type QcStoredPhoto = {
+  id?: string;
+  photoUrl: string;
+  thumbnailUrl?: string;
+};
+
 type QcResultRow = {
   item: {
     id: string;
@@ -37,6 +44,7 @@ type QcResultRow = {
     id: string;
     isPassed: boolean;
     photoUrl: string | null;
+    photos: QcStoredPhoto[];
     note: string | null;
     checkedAt: string;
     updatedAt: string;
@@ -59,9 +67,30 @@ type QcResultsResponse = {
 
 type QcSubTab = "missions" | "checklist";
 
+type PhotoPreview = {
+  title: string;
+  photos: QcStoredPhoto[];
+  index: number;
+};
+
 function fmtDateTime(input: string | null | undefined) {
   if (!input) return "-";
   return new Date(input).toLocaleString("vi-VN");
+}
+
+function getRowPhotos(row: QcResultRow) {
+  if (row.result?.photos?.length) return row.result.photos;
+  return row.result?.photoUrl ? [{ photoUrl: row.result.photoUrl }] : [];
+}
+
+function mergePhotos(existing: QcStoredPhoto[], incoming: QcStoredPhoto[]) {
+  const seen = new Set<string>();
+  return [...existing, ...incoming].filter((photo) => {
+    const key = photo.id || photo.photoUrl;
+    if (!photo.photoUrl || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function QcSection({
@@ -75,13 +104,14 @@ export function QcSection({
   const [activeTab, setActiveTab] = useState<QcSubTab>("missions");
   const [loading, setLoading] = useState(false);
   const [savingByItem, setSavingByItem] = useState<Record<string, boolean>>({});
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [mission, setMission] = useState<QcTemplateResponse | null>(null);
   const [results, setResults] = useState<QcResultsResponse | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [files, setFiles] = useState<Record<string, File | null>>({});
+  const [pendingPhotos, setPendingPhotos] = useState<Record<string, QcStoredPhoto[]>>({});
   const [pendingPassedItems, setPendingPassedItems] = useState<Record<string, boolean>>({});
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-  const [photoPreview, setPhotoPreview] = useState<{ title: string; photos: string[]; index: number } | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<PhotoPreview | null>(null);
 
   const locked = useMemo(() => {
     const status = results?.status || "";
@@ -105,10 +135,11 @@ export function QcSection({
       if (!resultsRes.ok) throw new Error(resultsJson.message || "Không tải được checklist QC");
 
       setMission(templateJson);
-      setResults(resultsJson);
+      setResults(resultsJson as QcResultsResponse);
       setPendingPassedItems({});
+      setPendingPhotos({});
       const nextNotes: Record<string, string> = {};
-      (resultsJson.items || []).forEach((row: QcResultRow) => {
+      ((resultsJson as QcResultsResponse).items || []).forEach((row: QcResultRow) => {
         nextNotes[row.item.id] = row.result?.note || "";
       });
       setNotes(nextNotes);
@@ -119,38 +150,36 @@ export function QcSection({
     }
   }
 
-  async function uploadPhoto(file: File) {
+  async function uploadPhotos(files: File[]) {
+    if (!files.length) return [];
     const form = new FormData();
-    form.append("files", file);
+    files.forEach((file) => form.append("files", file));
     const res = await fetch(`/api/tasks/${taskId}/photos`, {
       method: "POST",
       body: form,
     });
-    const json = await res.json().catch(() => ({} as { message?: string; photos?: Array<{ photoUrl: string }> }));
+    const json = (await res.json().catch(() => ({}))) as { message?: string; photos?: QcStoredPhoto[] };
     if (!res.ok) {
       throw new Error(json.message || "Upload ảnh thất bại");
     }
-    const photoUrl = json.photos?.[0]?.photoUrl;
-    if (!photoUrl) {
+    const photos = (json.photos || []).filter((photo) => photo.photoUrl);
+    if (!photos.length) {
       throw new Error("Không lấy được URL ảnh upload");
     }
-    return photoUrl;
+    return photos;
   }
 
-  async function saveItem(itemId: string, isPassed: boolean, photoFile?: File | null) {
+  async function saveItem(itemId: string, isPassed: boolean, photosOverride?: QcStoredPhoto[]) {
     const row = results?.items.find((x) => x.item.id === itemId);
     if (!row || !results) return;
 
     setSavingByItem((prev) => ({ ...prev, [itemId]: true }));
 
     try {
-      let photoUrl = row.result?.photoUrl || "";
-      const picked = photoFile ?? files[itemId];
-      if (picked) {
-        photoUrl = await uploadPhoto(picked);
-      }
+      const savedPhotos = getRowPhotos(row);
+      const photos = photosOverride ?? mergePhotos(savedPhotos, pendingPhotos[itemId] || []);
 
-      if (isPassed && row.item.requirePhoto && !photoUrl) {
+      if (isPassed && row.item.requirePhoto && photos.length === 0) {
         throw new Error("Tiêu chí này bắt buộc ảnh minh chứng");
       }
 
@@ -159,7 +188,7 @@ export function QcSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           isPassed,
-          photoUrl: photoUrl || undefined,
+          photos,
           note: notes[itemId] || undefined,
         }),
       });
@@ -169,7 +198,7 @@ export function QcSection({
         throw new Error(json.message || "Lưu checklist QC thất bại");
       }
 
-      setFiles((prev) => ({ ...prev, [itemId]: null }));
+      setPendingPhotos((prev) => ({ ...prev, [itemId]: [] }));
       toast.success("Đã auto-save checklist QC");
       await loadData();
     } catch (error) {
@@ -179,15 +208,62 @@ export function QcSection({
     }
   }
 
+  async function uploadItemPhotos(row: QcResultRow, files: File[]) {
+    if (!files.length) return;
+    setSavingByItem((prev) => ({ ...prev, [row.item.id]: true }));
+    try {
+      const uploaded = await uploadPhotos(files);
+      const photos = mergePhotos(mergePhotos(getRowPhotos(row), pendingPhotos[row.item.id] || []), uploaded);
+      setPendingPhotos((prev) => ({ ...prev, [row.item.id]: photos.filter((photo) => !getRowPhotos(row).some((saved) => (saved.id || saved.photoUrl) === (photo.id || photo.photoUrl))) }));
+      toast.success(`Đã upload ${uploaded.length} ảnh QC`);
+      const checked = Boolean(row.result?.isPassed) || Boolean(pendingPassedItems[row.item.id]);
+      if (checked) {
+        await saveItem(row.item.id, true, photos);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload ảnh thất bại");
+    } finally {
+      setSavingByItem((prev) => ({ ...prev, [row.item.id]: false }));
+    }
+  }
+
+  async function deletePhoto(row: QcResultRow, photo: QcStoredPhoto) {
+    if (!photo.id) {
+      const nextPhotos = mergePhotos(getRowPhotos(row), pendingPhotos[row.item.id] || []).filter((item) => item.photoUrl !== photo.photoUrl);
+      await saveItem(row.item.id, Boolean(row.result?.isPassed) || Boolean(pendingPassedItems[row.item.id]), nextPhotos);
+      return;
+    }
+
+    setDeletingPhotoId(photo.id);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/photos/${photo.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({} as { message?: string }));
+      if (!res.ok) throw new Error(json.message || "Xóa ảnh thất bại");
+      const nextPhotos = mergePhotos(getRowPhotos(row), pendingPhotos[row.item.id] || []).filter((item) => item.id !== photo.id);
+      await saveItem(row.item.id, Boolean(row.result?.isPassed) || Boolean(pendingPassedItems[row.item.id]), nextPhotos);
+      setPhotoPreview((current) => {
+        if (!current) return current;
+        const nextPreviewPhotos = current.photos.filter((item) => item.id !== photo.id);
+        if (!nextPreviewPhotos.length) return null;
+        return { ...current, photos: nextPreviewPhotos, index: Math.min(current.index, nextPreviewPhotos.length - 1) };
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Xóa ảnh thất bại");
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  }
+
   function handlePassedChange(row: QcResultRow, isPassed: boolean) {
     setPendingPassedItems((prev) => ({ ...prev, [row.item.id]: isPassed }));
     setExpandedItems((prev) => ({ ...prev, [row.item.id]: isPassed }));
 
-    if (isPassed && row.item.requirePhoto && !row.result?.photoUrl && !files[row.item.id]) {
+    const photos = mergePhotos(getRowPhotos(row), pendingPhotos[row.item.id] || []);
+    if (isPassed && row.item.requirePhoto && photos.length === 0) {
       return;
     }
 
-    void saveItem(row.item.id, isPassed);
+    void saveItem(row.item.id, isPassed, photos);
   }
 
   useEffect(() => {
@@ -286,9 +362,9 @@ export function QcSection({
               const saving = Boolean(savingByItem[row.item.id]);
               const checked = Boolean(row.result?.isPassed) || Boolean(pendingPassedItems[row.item.id]);
               const requirePhoto = row.item.requirePhoto;
-
               const expanded = Boolean(expandedItems[row.item.id]);
-              const hasSavedPhoto = Boolean(row.result?.photoUrl);
+              const photos = mergePhotos(getRowPhotos(row), pendingPhotos[row.item.id] || []);
+              const hasSavedPhoto = photos.length > 0;
 
               return (
                 <div key={row.item.id} className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-3">
@@ -303,10 +379,10 @@ export function QcSection({
                       {hasSavedPhoto ? (
                         <button
                           type="button"
-                          onClick={() => setPhotoPreview({ title: row.item.title, photos: [row.result!.photoUrl!], index: 0 })}
+                          onClick={() => setPhotoPreview({ title: row.item.title, photos, index: 0 })}
                           className="rounded-full border border-amber-500/50 px-3 py-1 text-xs text-amber-300"
                         >
-                          Xem ảnh
+                          Album ({photos.length})
                         </button>
                       ) : null}
                       {canEdit ? (
@@ -338,27 +414,61 @@ export function QcSection({
                       {canEdit ? (
                         <input
                           type="file"
+                          multiple
                           accept="image/jpeg,image/png,image/webp"
                           className="block w-full text-xs"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setFiles((prev) => ({ ...prev, [row.item.id]: file }));
+                          disabled={saving}
+                          onChange={async (e) => {
+                            await uploadItemPhotos(row, Array.from(e.target.files || []));
                             e.currentTarget.value = "";
-                            if (file && checked) {
-                              void saveItem(row.item.id, true, file);
-                            }
                           }}
                         />
                       ) : null}
 
-                      {files[row.item.id] ? <div className="text-xs text-amber-300">Đã chọn ảnh mới: {files[row.item.id]?.name}</div> : null}
+                      {photos.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-[#c8d0e8]">Ảnh checklist ({photos.length})</div>
+                            <Button
+                              variant="outline"
+                              className="h-8 border-[#2e3347] bg-[#1a1d27] px-2 text-xs"
+                              onClick={() => setPhotoPreview({ title: row.item.title, photos, index: 0 })}
+                            >
+                              Xem album
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {photos.map((photo, index) => (
+                              <div key={photo.id || photo.photoUrl} className="rounded-xl border border-[#2e3347] bg-[#1a1d27] p-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setPhotoPreview({ title: row.item.title, photos, index })}
+                                  className="relative block h-20 w-full overflow-hidden rounded-lg bg-[#11131b]"
+                                >
+                                  <Image src={photo.thumbnailUrl || photo.photoUrl} alt={row.item.title} fill sizes="160px" className="object-cover" unoptimized />
+                                </button>
+                                {canEdit ? (
+                                  <Button
+                                    variant="outline"
+                                    className="mt-2 h-7 w-full border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-200"
+                                    disabled={deletingPhotoId === photo.id || saving}
+                                    onClick={() => deletePhoto(row, photo)}
+                                  >
+                                    Xóa ảnh
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
                       <textarea
                         value={notes[row.item.id] || ""}
                         onChange={(e) => setNotes((prev) => ({ ...prev, [row.item.id]: e.target.value }))}
                         onBlur={() => {
                           if (!canEdit || saving) return;
-                          void saveItem(row.item.id, checked || Boolean(files[row.item.id]));
+                          void saveItem(row.item.id, checked || photos.length > 0, photos);
                         }}
                         disabled={!canEdit || saving}
                         rows={2}
@@ -378,7 +488,7 @@ export function QcSection({
 
       {photoPreview ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPhotoPreview(null)}>
-          <div className="w-full max-w-3xl rounded-2xl border border-[#2e3347] bg-[#11131b] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-5xl rounded-2xl border border-[#2e3347] bg-[#11131b] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-[#f0f2f8]">{photoPreview.title}</div>
@@ -405,16 +515,14 @@ export function QcSection({
                   ‹
                 </button>
               ) : null}
-              <div className="min-h-[240px] flex-1 overflow-hidden rounded-xl border border-[#2e3347] bg-black">
-                <img src={photoPreview.photos[photoPreview.index]} alt={photoPreview.title} className="max-h-[75vh] w-full object-contain" />
+              <div className="relative h-[70vh] min-h-[280px] flex-1 overflow-hidden rounded-xl border border-[#2e3347] bg-black">
+                <Image src={photoPreview.photos[photoPreview.index].photoUrl} alt={photoPreview.title} fill sizes="90vw" className="object-contain" unoptimized />
               </div>
               {photoPreview.photos.length > 1 ? (
                 <button
                   type="button"
                   className="rounded-full border border-[#2e3347] px-3 py-2 text-sm text-[#c8d0e8]"
-                  onClick={() =>
-                    setPhotoPreview((prev) => (prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : prev))
-                  }
+                  onClick={() => setPhotoPreview((prev) => (prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : prev))}
                 >
                   ›
                 </button>

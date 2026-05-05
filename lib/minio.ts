@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 let cachedClient: S3Client | null = null;
 
@@ -54,6 +54,18 @@ export async function putObjectToMinio({
       Key: key,
       Body: body,
       ContentType: contentType,
+    }),
+  );
+}
+
+export async function deleteObjectFromMinio(key: string) {
+  const client = getMinioClient();
+  const bucket = getMinioBucket();
+
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
     }),
   );
 }

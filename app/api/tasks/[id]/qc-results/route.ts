@@ -3,6 +3,29 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 
+type StoredQcPhoto = {
+  id?: string;
+  photoUrl: string;
+  thumbnailUrl?: string;
+};
+
+function parseStoredPhotos(value: string | null): StoredQcPhoto[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed?.photos)) {
+      return parsed.photos
+        .map((photo: Partial<StoredQcPhoto>) => ({
+          id: typeof photo.id === "string" ? photo.id : undefined,
+          photoUrl: typeof photo.photoUrl === "string" ? photo.photoUrl : "",
+          thumbnailUrl: typeof photo.thumbnailUrl === "string" ? photo.thumbnailUrl : undefined,
+        }))
+        .filter((photo: StoredQcPhoto) => Boolean(photo.photoUrl));
+    }
+  } catch {}
+  return [{ photoUrl: value }];
+}
+
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) {
@@ -86,13 +109,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const rows = templateItems.map((item) => {
     const result = resultMap.get(item.id);
+    const photos = parseStoredPhotos(result?.photoUrl || null);
     return {
       item,
       result: result
         ? {
             id: result.id,
             isPassed: result.isPassed,
-            photoUrl: result.photoUrl,
+            photoUrl: photos[0]?.photoUrl || null,
+            photos,
             note: result.note,
             checkedAt: result.checkedAt,
             updatedAt: result.updatedAt,
