@@ -30,6 +30,28 @@ function serializeProgressPhotos(input: z.infer<typeof createProgressSchema>) {
   return JSON.stringify({ photos: uniquePhotos });
 }
 
+function publicPhotoUrls(taskId: string, photoId: string) {
+  return {
+    id: photoId,
+    photoUrl: `/api/tasks/${taskId}/photos/${photoId}/file?variant=photo`,
+    thumbnailUrl: `/api/tasks/${taskId}/photos/${photoId}/file?variant=thumb`,
+  };
+}
+
+function extractTaskPhotoId(value: string) {
+  const match = value.match(/\/photos\/([^/]+)\/file/);
+  return match?.[1] || null;
+}
+
+function hasProgressPhotoAlbum(value: string) {
+  try {
+    const parsed = JSON.parse(value) as { photos?: unknown[] };
+    return Array.isArray(parsed.photos) && parsed.photos.length > 1;
+  } catch {
+    return false;
+  }
+}
+
 const LOCKED_STATUSES = new Set<TaskStatus>([TaskStatus.done, TaskStatus.internal_approved, TaskStatus.completed]);
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -46,7 +68,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 
-  const [taskDetail, history] = await Promise.all([
+  const [taskDetail, history, taskPhotos] = await Promise.all([
     prisma.task.findUnique({
       where: { id: params.id },
       select: {
@@ -69,7 +91,39 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         },
       },
     }),
+    prisma.taskPhoto.findMany({
+      where: { taskId: params.id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        uploadedBy: true,
+        createdAt: true,
+      },
+    }),
   ]);
+
+  const historyWithAlbums = history.map((row) => {
+    if (hasProgressPhotoAlbum(row.photoUrl)) return row;
+
+    const selectedPhotoId = extractTaskPhotoId(row.photoUrl);
+    const selectedPhoto = selectedPhotoId ? taskPhotos.find((photo) => photo.id === selectedPhotoId) : null;
+    if (!selectedPhoto) return row;
+
+    const batchStart = new Date(row.createdAt.getTime() - 5 * 60 * 1000);
+    const batchPhotos = taskPhotos.filter(
+      (photo) =>
+        photo.uploadedBy === row.userId &&
+        photo.createdAt >= batchStart &&
+        photo.createdAt <= row.createdAt &&
+        Math.abs(photo.createdAt.getTime() - selectedPhoto.createdAt.getTime()) <= 5 * 60 * 1000,
+    );
+
+    if (batchPhotos.length <= 1) return row;
+    return {
+      ...row,
+      photoUrl: JSON.stringify({ photos: batchPhotos.map((photo) => publicPhotoUrls(params.id, photo.id)) }),
+    };
+  });
 
   return NextResponse.json({
     progress: {
@@ -77,7 +131,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       updatedAt: taskDetail?.progressUpdatedAt ?? null,
       status: taskDetail?.status ?? null,
     },
-    history,
+    history: historyWithAlbums,
   });
 }
 
