@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { AcknowledgmentForm } from "../../_components/acknowledgment-form";
+import { CustomerPhotoAlbum } from "../../_components/customer-photo-album";
 
 const completedStatuses: TaskStatus[] = [TaskStatus.done, TaskStatus.inspected, TaskStatus.internal_approved, TaskStatus.completed];
 
@@ -127,13 +128,9 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
           {Object.entries(photosByDate).map(([date, photos]) => (
             <div key={date}>
               <div className="mb-2 text-xs font-semibold owner-muted">{date}</div>
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo) => (
-                  <a key={photo.id} href={photo.photoUrl} target="_blank" className="block overflow-hidden rounded-lg bg-[#2a2a2a]">
-                    <img alt={photo.caption || task.name} src={photo.thumbnailUrl || photo.photoUrl} className="h-24 w-full object-cover" />
-                  </a>
-                ))}
-              </div>
+              <CustomerPhotoAlbum
+                photos={photos.map((photo) => ({ id: photo.id, url: photo.photoUrl, thumbnailUrl: photo.thumbnailUrl, caption: photo.caption || task.name }))}
+              />
             </div>
           ))}
         </div>
@@ -158,13 +155,11 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
                 </div>
                 {item.progress?.note ? <div className="mt-2 text-sm text-neutral-300">{item.progress.note}</div> : null}
                 {item.photos.length ? (
-                  <div className="mt-3 grid grid-cols-4 gap-2">
-                    {item.photos.map((photo) => (
-                      <a key={photo.id} href={photo.url} target="_blank" className="block overflow-hidden rounded-lg bg-[#1a1a1a]">
-                        <img alt={item.content} src={photo.url} className="h-16 w-full object-cover" />
-                      </a>
-                    ))}
-                  </div>
+                  <CustomerPhotoAlbum
+                    photos={item.photos.map((photo) => ({ id: photo.id, url: photo.url, caption: item.content }))}
+                    gridClassName="mt-3 grid grid-cols-4 gap-2"
+                    thumbnailClassName="h-16"
+                  />
                 ) : null}
               </div>
             );

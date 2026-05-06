@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { buildCustomerJournalEvents } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
+import { CustomerPhotoAlbum } from "../_components/customer-photo-album";
 
 const typeOptions = [
   { value: "all", label: "Tất cả" },
@@ -117,13 +118,15 @@ export default async function CustomerJournalPage({
             {event.taskId ? <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="mt-2 inline-block text-xs font-semibold text-[#ff8a3d] underline">Xem task {event.taskCode}</a> : null}
 
             {event.photos?.length ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {event.photos.slice(0, 6).map((photo, index) => (
-                  <a key={`${event.id}-photo-${index}`} href={photo.url} target="_blank" className="block overflow-hidden rounded-lg bg-[#1a1a1a]">
-                    <img src={photo.thumbnailUrl || photo.url} alt={event.title} className="h-24 w-full object-cover" />
-                  </a>
-                ))}
-              </div>
+              <CustomerPhotoAlbum
+                photos={event.photos.slice(0, 6).map((photo, index) => ({
+                  id: `${event.id}-photo-${index}`,
+                  url: photo.url,
+                  thumbnailUrl: photo.thumbnailUrl,
+                  caption: event.title,
+                }))}
+                gridClassName="mt-3 grid grid-cols-3 gap-2"
+              />
             ) : null}
 
             <div className="mt-4 border-t border-[#3a3a3a] pt-3">
