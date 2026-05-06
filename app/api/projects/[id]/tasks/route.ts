@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { LEGACY_PHASE_META } from "@/lib/project-phase";
+import { LEGACY_PHASE_META, resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
 
 const createTaskSchema = z.object({
   insertAfterTaskId: z.string().uuid("Task chèn sau không hợp lệ"),
@@ -291,13 +291,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         displayOrder = Math.floor((refreshedCurrent + refreshedNext) / 2);
       }
 
-      const targetPhase = await tx.projectPhase.findFirst({
-        where: {
-          projectId: params.id,
-          code: phaseMeta.code,
-        },
-        select: { id: true },
-      });
+      const targetPhaseId = await resolveProjectPhaseIdForTaskPhase(tx, params.id, phase, phaseMeta.code);
 
       const offsetDays = afterTask.offsetDays + afterTask.durationDays;
       const plannedStartDate = addDays(project.startDate, offsetDays);
@@ -307,7 +301,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         data: {
           projectId: params.id,
           templateId: afterTask.templateId,
-          phaseId: targetPhase?.id || null,
+          phaseId: targetPhaseId,
           code,
           phase,
           name: payload.name,

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { LEGACY_PHASE_META } from "@/lib/project-phase";
+import { LEGACY_PHASE_META, resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
 
 const createCustomTaskSchema = z.object({
   name: z.string().trim().min(3, "Tên task tối thiểu 3 ký tự"),
@@ -87,29 +87,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const payload = parsed.data;
   const phaseMeta = LEGACY_PHASE_META[payload.phase];
 
-  const [targetPhase, maxDisplayOrder] = await Promise.all([
-    prisma.projectPhase.findFirst({
-      where: {
-        projectId: params.id,
-        code: phaseMeta.code,
-      },
-      select: {
-        id: true,
-      },
-    }),
-    prisma.task.aggregate({
-      where: {
-        projectId: params.id,
-        isActive: true,
-      },
-      _max: {
-        displayOrder: true,
-      },
-    }),
-  ]);
+  const maxDisplayOrder = await prisma.task.aggregate({
+    where: {
+      projectId: params.id,
+      isActive: true,
+    },
+    _max: {
+      displayOrder: true,
+    },
+  });
 
   const created = await prisma.$transaction(async (tx) => {
     const code = await buildCustomCode(tx, params.id);
+    const targetPhaseId = await resolveProjectPhaseIdForTaskPhase(tx, params.id, payload.phase, phaseMeta.code);
     const offsetDays = payload.offsetDays ?? 0;
     const plannedStartDate = addDays(project.startDate, offsetDays);
     const plannedEndDate = addDays(plannedStartDate, payload.durationDays - 1);
@@ -118,7 +108,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       data: {
         projectId: params.id,
         templateId: null,
-        phaseId: targetPhase?.id || null,
+        phaseId: targetPhaseId,
         code,
         phase: payload.phase,
         name: payload.name,

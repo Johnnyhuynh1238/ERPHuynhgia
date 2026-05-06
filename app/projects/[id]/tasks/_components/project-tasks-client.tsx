@@ -114,6 +114,13 @@ type DeadlineCheckResponse = {
   exceedDays: number;
 };
 
+type CreateTaskResponse = {
+  message?: string;
+  task?: {
+    phaseId?: string | null;
+  };
+};
+
 type PersistedTaskFilter = {
   phase: string;
   status: string;
@@ -582,6 +589,11 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setCreateTaskMode("none");
   }
 
+  function revealCreatedTask(task: CreateTaskResponse["task"]) {
+    if (!task?.phaseId) return;
+    setExpandedPhaseIds((prev) => ({ ...prev, [task.phaseId!]: true }));
+  }
+
   async function loadTemplateLibrary() {
     setTemplateLoading(true);
     try {
@@ -626,13 +638,14 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templateId: selectedTemplateId }),
       });
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      const data = (await res.json().catch(() => ({}))) as CreateTaskResponse;
       if (!res.ok) {
         toast.error(data.message || "Không thể tạo task từ thư viện");
         return;
       }
 
       toast.success(data.message || "Đã thêm task từ thư viện");
+      revealCreatedTask(data.task);
       setCreateTaskOpen(false);
       setCreateTaskMode("none");
       await loadTasks();
@@ -692,13 +705,14 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
           category: customTaskForm.category,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      const data = (await res.json().catch(() => ({}))) as CreateTaskResponse;
       if (!res.ok) {
         toast.error(data.message || "Không thể tạo task tùy ý");
         return;
       }
 
       toast.success(data.message || "Đã thêm task tùy ý");
+      revealCreatedTask(data.task);
       setCreateTaskOpen(false);
       setCreateTaskMode("none");
       setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);

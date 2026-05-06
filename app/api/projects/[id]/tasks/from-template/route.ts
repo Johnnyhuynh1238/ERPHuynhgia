@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
 
 const createFromTemplateSchema = z.object({
   templateId: z.string().uuid("Template không hợp lệ"),
@@ -96,28 +97,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không tìm thấy template" }, { status: 404 });
   }
 
-  const targetPhase = parsed.data.phaseId
-    ? await prisma.projectPhase.findFirst({
-        where: {
-          id: parsed.data.phaseId,
-          projectId: params.id,
-        },
-        select: {
-          id: true,
-          displayOrder: true,
-        },
-      })
-    : await prisma.projectPhase.findFirst({
-        where: {
-          projectId: params.id,
-          code: template.phaseCode,
-        },
-        select: {
-          id: true,
-          displayOrder: true,
-        },
-      });
-
   const maxDisplayOrder = await prisma.task.aggregate({
     where: { projectId: params.id, isActive: true },
     _max: { displayOrder: true },
@@ -125,6 +104,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const created = await prisma.$transaction(async (tx) => {
     const code = await resolveUniqueCode(tx, params.id, template.code);
+    const targetPhaseId = parsed.data.phaseId
+      ? (await tx.projectPhase.findFirst({ where: { id: parsed.data.phaseId, projectId: params.id }, select: { id: true } }))?.id || null
+      : await resolveProjectPhaseIdForTaskPhase(tx, params.id, template.phase, template.phaseCode);
 
     const plannedStartDate = addDays(project.startDate, template.defaultOffsetDays);
     const durationDays = Math.max(template.defaultDurationDays || template.duration || 1, 1);
@@ -134,7 +116,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       data: {
         projectId: params.id,
         templateId: template.id,
-        phaseId: targetPhase?.id || null,
+        phaseId: targetPhaseId,
         code,
         phase: template.phase,
         name: template.name,

@@ -30,6 +30,52 @@ export function diffDaysUtc(fromDate: Date, toDate: Date) {
   return Math.floor((to - from) / DAY_MS);
 }
 
+export async function resolveProjectPhaseIdForTaskPhase(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  taskPhase: TaskPhase,
+  fallbackCode?: string | null,
+) {
+  const phaseMeta = LEGACY_PHASE_META[taskPhase];
+
+  if (phaseMeta?.name) {
+    const phaseByName = await tx.projectPhase.findFirst({
+      where: {
+        projectId,
+        name: { equals: phaseMeta.name, mode: "insensitive" },
+      },
+      select: { id: true },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    });
+    if (phaseByName) return phaseByName.id;
+  }
+
+  const existingTask = await tx.task.findFirst({
+    where: {
+      projectId,
+      phase: taskPhase,
+      phaseId: { not: null },
+    },
+    select: { phaseId: true },
+    orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+  });
+  if (existingTask?.phaseId) return existingTask.phaseId;
+
+  const phaseCode = fallbackCode || phaseMeta?.code;
+  if (!phaseCode) return null;
+
+  const phaseByCode = await tx.projectPhase.findFirst({
+    where: {
+      projectId,
+      code: phaseCode,
+    },
+    select: { id: true },
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  return phaseByCode?.id || null;
+}
+
 export function inferPhaseStatus(tasks: Array<{ status: TaskStatus; actualStartDate: Date | null }>) {
   if (tasks.length === 0) return PhaseStatus.not_started;
 
