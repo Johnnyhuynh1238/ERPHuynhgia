@@ -20,12 +20,6 @@ function currentMonthString() {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function nextMonthString() {
-  const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 function isValidMonth(value: string) {
   const [year, month] = value.split("-").map(Number);
   return Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
@@ -108,20 +102,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Tổng trọng số phải bằng 100%" }, { status: 400 });
   }
 
-  if (data.effectiveFromMonth < nextMonthString()) {
-    return NextResponse.json({ message: "Tháng hiệu lực phải từ tháng tiếp theo trở đi" }, { status: 400 });
+  if (data.effectiveFromMonth < currentMonthString()) {
+    return NextResponse.json({ message: "Tháng hiệu lực phải từ tháng hiện tại trở đi" }, { status: 400 });
   }
 
-  const existed = await prisma.kpiSettings.findUnique({
+  const saved = await prisma.kpiSettings.upsert({
     where: { effectiveFromMonth: data.effectiveFromMonth },
-    select: { id: true },
-  });
-  if (existed) {
-    return NextResponse.json({ message: "Đã có cấu hình cho tháng hiệu lực này" }, { status: 409 });
-  }
-
-  const created = await prisma.kpiSettings.create({
-    data: {
+    create: {
       weightTienDo: data.weightTienDo,
       weightQc: data.weightQc,
       weightBaoCao: data.weightBaoCao,
@@ -129,6 +116,16 @@ export async function POST(request: Request) {
       weightDongGop: data.weightDongGop,
       effectiveFromMonth: data.effectiveFromMonth,
       changedBy: user.id,
+      reason: data.reason,
+    },
+    update: {
+      weightTienDo: data.weightTienDo,
+      weightQc: data.weightQc,
+      weightBaoCao: data.weightBaoCao,
+      weightChuNha: data.weightChuNha,
+      weightDongGop: data.weightDongGop,
+      changedBy: user.id,
+      changedAt: new Date(),
       reason: data.reason,
     },
     include: {
@@ -139,10 +136,10 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    message: "Đã lưu cấu hình KPI mới",
+    message: "Đã lưu cấu hình KPI",
     setting: {
-      ...serialize(created),
-      changer: created.changer,
+      ...serialize(saved),
+      changer: saved.changer,
     },
   });
 }

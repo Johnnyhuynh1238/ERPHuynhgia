@@ -41,10 +41,9 @@ const ITEMS = [
 
 type WeightKey = (typeof ITEMS)[number]["key"];
 
-function nextMonthString() {
+function currentMonthString() {
   const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function formatDateTime(value: string | null) {
@@ -53,21 +52,21 @@ function formatDateTime(value: string | null) {
 }
 
 export function KpiSettingsClient({ initialData }: Props) {
-  const [active] = useState(initialData.active);
+  const [active, setActive] = useState(initialData.active);
   const [history, setHistory] = useState(initialData.history);
   const [weights, setWeights] = useState<Record<WeightKey, number>>({
-    weightTienDo: active.weightTienDo,
-    weightQc: active.weightQc,
-    weightBaoCao: active.weightBaoCao,
-    weightChuNha: active.weightChuNha,
-    weightDongGop: active.weightDongGop,
+    weightTienDo: initialData.active.weightTienDo,
+    weightQc: initialData.active.weightQc,
+    weightBaoCao: initialData.active.weightBaoCao,
+    weightChuNha: initialData.active.weightChuNha,
+    weightDongGop: initialData.active.weightDongGop,
   });
-  const [effectiveFromMonth, setEffectiveFromMonth] = useState(nextMonthString());
+  const [effectiveFromMonth, setEffectiveFromMonth] = useState(initialData.month || currentMonthString());
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
   const total = useMemo(() => ITEMS.reduce((sum, item) => sum + weights[item.key], 0), [weights]);
-  const canSave = total === 100 && Boolean(reason.trim()) && effectiveFromMonth >= nextMonthString() && !saving;
+  const canSave = total === 100 && Boolean(reason.trim()) && effectiveFromMonth >= currentMonthString() && !saving;
 
   function setWeight(key: WeightKey, value: string) {
     const next = Number(value);
@@ -93,9 +92,12 @@ export function KpiSettingsClient({ initialData }: Props) {
       }
       if (json.setting) {
         setHistory((prev) => [json.setting!, ...prev.filter((row) => row.id !== json.setting!.id)]);
+        if (json.setting.effectiveFromMonth <= initialData.month) {
+          setActive(json.setting);
+        }
       }
       setReason("");
-      toast.success(json.message || "Đã lưu cấu hình KPI mới");
+      toast.success(json.message || "Đã lưu cấu hình KPI");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không lưu được cấu hình KPI");
     } finally {
@@ -117,7 +119,7 @@ export function KpiSettingsClient({ initialData }: Props) {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Trọng số mới</div>
-                <div className="text-sm text-[#c8d0e8]">Chỉ tạo record mới, không sửa lịch sử cũ.</div>
+                <div className="text-sm text-[#c8d0e8]">Lưu cho tháng hiện tại để KS thấy ngay, hoặc chọn tháng tương lai.</div>
               </div>
               <div className={`rounded-2xl px-4 py-2 text-center ${total === 100 ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
                 <div className="text-xs uppercase tracking-wide">Tổng</div>
@@ -159,7 +161,7 @@ export function KpiSettingsClient({ initialData }: Props) {
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#8891aa]">Áp dụng từ tháng</div>
                 <input
                   type="month"
-                  min={nextMonthString()}
+                  min={currentMonthString()}
                   value={effectiveFromMonth}
                   onChange={(event) => setEffectiveFromMonth(event.target.value)}
                   className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2 text-sm outline-none focus:border-amber-500"
