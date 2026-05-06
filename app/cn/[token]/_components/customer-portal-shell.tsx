@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ClipboardList, CreditCard, Home, NotebookPen } from "lucide-react";
 import { InstallAppBanner } from "./install-app-banner";
 
-type NavItem = { href: string; label: string };
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 type CustomerPortalShellProps = {
   token: string;
@@ -17,10 +18,10 @@ export function CustomerPortalShell({ token, projectName, customerName, children
   const pathname = usePathname();
 
   const items: NavItem[] = [
-    { href: `/cn/${token}/dashboard`, label: "Tổng quan" },
-    { href: `/cn/${token}/timeline`, label: "Tiến độ" },
-    { href: `/cn/${token}/payments`, label: "Tài chính" },
-    { href: `/cn/${token}/journal`, label: "Nhật ký" },
+    { href: `/cn/${token}/dashboard`, label: "Tổng quan", icon: Home },
+    { href: `/cn/${token}/timeline`, label: "Tiến độ", icon: ClipboardList },
+    { href: `/cn/${token}/payments`, label: "Tài chính", icon: CreditCard },
+    { href: `/cn/${token}/journal`, label: "Nhật ký", icon: NotebookPen },
   ];
 
   return (
@@ -31,18 +32,22 @@ export function CustomerPortalShell({ token, projectName, customerName, children
         <div className="owner-app-title">{projectName}</div>
         <div className="owner-app-subtitle">Xin chào {customerName}</div>
       </header>
-      <nav className="owner-tab-nav" aria-label="Cổng chủ nhà">
-        {items.map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link key={item.href} href={item.href} className={`owner-tab-btn${active ? " active" : ""}`}>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
       <main className="owner-portal-main">{children}</main>
       <InstallAppBanner />
+      <nav className="owner-bottom-nav" aria-label="Cổng chủ nhà">
+        <div className="owner-bottom-nav-grid">
+          {items.map((item) => {
+            const active = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={`owner-tab-btn${active ? " active" : ""}`}>
+                <Icon className="mb-1 h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

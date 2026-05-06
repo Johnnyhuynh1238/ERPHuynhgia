@@ -136,6 +136,7 @@ body {
   max-width: 420px;
   min-height: 100vh;
   margin: 0 auto;
+  overflow-x: hidden;
   padding: 16px;
   background: #0f0f0f;
   color: #e5e5e5;
@@ -149,7 +150,9 @@ body {
 
 .owner-portal-main {
   min-height: calc(100vh - 142px);
-  padding: 0 0 18px;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 0 0 92px;
 }
 
 .owner-app-bar {
@@ -211,12 +214,54 @@ body {
   color: #000;
 }
 
+.owner-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  z-index: 40;
+  width: 100%;
+  max-width: 420px;
+  transform: translateX(-50%);
+  border-top: 1px solid #2a2a2a;
+  background: rgba(26, 26, 26, 0.97);
+  padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  backdrop-filter: blur(16px);
+}
+
+.owner-bottom-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.owner-bottom-nav .owner-tab-btn {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  font-size: 10px;
+}
+
+.owner-bottom-nav .owner-tab-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .owner-portal-page {
   display: grid;
+  min-width: 0;
   gap: 12px;
 }
 
 .owner-section {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   border-radius: 14px;
   background: #1a1a1a;
   padding: 16px;
@@ -233,6 +278,9 @@ body {
 }
 
 .owner-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   border-radius: 10px;
   background: #2a2a2a;
   padding: 12px;
