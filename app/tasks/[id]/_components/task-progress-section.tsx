@@ -258,7 +258,7 @@ export function TaskProgressSection({
   }, [taskId]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-320px)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-3 rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="flex items-center justify-between">
           <div>

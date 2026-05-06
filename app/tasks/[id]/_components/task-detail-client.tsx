@@ -618,7 +618,7 @@ export function TaskDetailClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-[#f0f2f8]">
+    <div className="flex min-h-screen flex-col bg-[#0f1117] text-[#f0f2f8]">
       <div className="sticky top-0 z-40 border-b border-[#2e3347] bg-[#0f1117] px-4 pb-0 pt-3">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <button
@@ -678,7 +678,7 @@ export function TaskDetailClient({
         ) : null}
       </div>
 
-      <div className="space-y-3 p-4">
+      <div className={activeTab === "progress" ? "flex min-h-0 flex-1 flex-col p-4" : "space-y-3 p-4"}>
         {activeTab === "overview" ? (
           <div className="space-y-3">
             <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
