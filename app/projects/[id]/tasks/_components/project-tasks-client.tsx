@@ -528,12 +528,13 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   }
 
   function openTask(task: TaskRow, event?: React.MouseEvent<HTMLElement>) {
-    const target = event?.target instanceof HTMLElement ? event.target : null;
+    const target = event?.target instanceof Element ? event.target : null;
     if (target?.closest("button,a,input,select,textarea")) return;
     if (task.isActive) router.push(`/tasks/${task.id}`);
   }
 
   async function deleteTask(task: TaskRow, event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
     event.stopPropagation();
     if (!canDeleteTask) return;
     if (!window.confirm(`Xóa task ${task.code} - ${task.name}?`)) return;
@@ -555,6 +556,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   }
 
   async function restoreTask(task: TaskRow, event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
     event.stopPropagation();
     if (!canDeleteTask) return;
 
@@ -1181,12 +1183,12 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                                 {!task.isActive ? <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">Đã xóa</span> : null}
                                                 <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
                                                 {canDeleteTask && task.isActive ? (
-                                                  <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
+                                                  <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                   </button>
                                                 ) : null}
                                                 {canDeleteTask && !task.isActive ? (
-                                                  <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
+                                                  <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
                                                     <RotateCcw className="h-3.5 w-3.5" />
                                                   </button>
                                                 ) : null}
@@ -1226,12 +1228,12 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                           {!task.isActive ? <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">Đã xóa</span> : null}
                                           <span className={`rounded-full px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>{STATUS_LABEL[task.status]}</span>
                                           {canDeleteTask && task.isActive ? (
-                                            <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
+                                            <button type="button" className="rounded-full border border-red-500/40 bg-red-500/10 p-1 text-red-300 hover:bg-red-500/20" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => deleteTask(task, event)} disabled={deletingTaskId === task.id} title="Xóa task">
                                               <Trash2 className="h-3.5 w-3.5" />
                                             </button>
                                           ) : null}
                                           {canDeleteTask && !task.isActive ? (
-                                            <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
+                                            <button type="button" className="rounded-full border border-emerald-500/40 bg-emerald-500/10 p-1 text-emerald-300 hover:bg-emerald-500/20" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => restoreTask(task, event)} disabled={restoringTaskId === task.id} title="Khôi phục task">
                                               <RotateCcw className="h-3.5 w-3.5" />
                                             </button>
                                           ) : null}
