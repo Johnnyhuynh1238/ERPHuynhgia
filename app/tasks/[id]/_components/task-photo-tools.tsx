@@ -34,6 +34,9 @@ type UploadBatchOptions = {
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 25 * 1024 * 1024;
+const RESIZE_MAX_DIMENSION = 1800;
+const RESIZE_QUALITY = 0.82;
+const RESIZE_MIN_BYTES = 900 * 1024;
 
 function fileSizeLabel(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -51,6 +54,66 @@ function validateFile(file: File) {
   if (file.size > MAX_BYTES) {
     throw new Error(`${file.name}: vượt quá 25MB`);
   }
+}
+
+function compressedFileName(fileName: string) {
+  const baseName = fileName.replace(/\.[^.]+$/, "") || "photo";
+  return `${baseName}.jpg`;
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`${file.name}: không đọc được ảnh để nén`));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Không nén được ảnh"));
+    }, type, quality);
+  });
+}
+
+async function resizeImageForUpload(file: File) {
+  const image = await loadImage(file);
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  if (!width || !height) {
+    throw new Error(`${file.name}: kích thước ảnh không hợp lệ`);
+  }
+
+  const scale = Math.min(1, RESIZE_MAX_DIMENSION / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Trình duyệt không hỗ trợ nén ảnh trước khi upload");
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, targetWidth, targetHeight);
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const blob = await canvasToBlob(canvas, "image/jpeg", RESIZE_QUALITY);
+  if (file.size < RESIZE_MIN_BYTES && blob.size >= file.size) return file;
+
+  return new File([blob], compressedFileName(file.name), { type: "image/jpeg", lastModified: Date.now() });
 }
 
 function normalizePhoto(input: Partial<TaskPhotoItem>): TaskPhotoItem | null {
@@ -73,9 +136,11 @@ async function readUploadBody(res: Response) {
 
 async function uploadTaskPhotoFile(taskId: string, file: File) {
   validateFile(file);
+  const uploadFile = await resizeImageForUpload(file);
+  validateFile(uploadFile);
 
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", uploadFile);
 
   const res = await fetch(`/api/tasks/${taskId}/photos`, {
     method: "POST",
@@ -115,7 +180,7 @@ export async function uploadTaskPhotoBatch({ taskId, files, queue, onItemChange 
     const item = queue[index];
     if (!file || !item) continue;
 
-    onItemChange?.({ ...item, status: "uploading", message: "Đang tải..." });
+    onItemChange?.({ ...item, status: "uploading", message: "Đang nén và tải..." });
 
     try {
       const photo = await uploadTaskPhotoFile(taskId, file);
