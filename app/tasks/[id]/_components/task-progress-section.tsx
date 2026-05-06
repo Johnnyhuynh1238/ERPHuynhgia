@@ -258,7 +258,7 @@ export function TaskProgressSection({
   }, [taskId]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-120px)] flex-col">
+    <div className="flex min-h-[calc(100dvh-320px)] flex-col">
       <div className="space-y-3 rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -389,7 +389,7 @@ export function TaskProgressSection({
         ) : null}
       </div>
 
-      <div className="mt-auto pt-8">
+      <div className="mt-auto pt-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
