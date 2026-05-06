@@ -34,9 +34,9 @@ type UploadBatchOptions = {
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 25 * 1024 * 1024;
-const RESIZE_MAX_DIMENSION = 1800;
-const RESIZE_QUALITY = 0.82;
-const RESIZE_MIN_BYTES = 900 * 1024;
+const RESIZE_TARGET_BYTES = 850 * 1024;
+const RESIZE_DIMENSIONS = [1800, 1600, 1400, 1200, 1000, 800];
+const RESIZE_QUALITIES = [0.82, 0.76, 0.7, 0.64, 0.58, 0.52];
 
 function fileSizeLabel(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -87,6 +87,8 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) 
 }
 
 async function resizeImageForUpload(file: File) {
+  if (file.size <= RESIZE_TARGET_BYTES) return file;
+
   const image = await loadImage(file);
   const width = image.naturalWidth || image.width;
   const height = image.naturalHeight || image.height;
@@ -94,26 +96,35 @@ async function resizeImageForUpload(file: File) {
     throw new Error(`${file.name}: kích thước ảnh không hợp lệ`);
   }
 
-  const scale = Math.min(1, RESIZE_MAX_DIMENSION / Math.max(width, height));
-  const targetWidth = Math.max(1, Math.round(width * scale));
-  const targetHeight = Math.max(1, Math.round(height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
+  let bestBlob: Blob | null = null;
+  for (const maxDimension of RESIZE_DIMENSIONS) {
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Trình duyệt không hỗ trợ nén ảnh trước khi upload");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Trình duyệt không hỗ trợ nén ảnh trước khi upload");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    for (const quality of RESIZE_QUALITIES) {
+      const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+      if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+      if (blob.size <= RESIZE_TARGET_BYTES) {
+        return new File([blob], compressedFileName(file.name), { type: "image/jpeg", lastModified: Date.now() });
+      }
+    }
   }
 
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, targetWidth, targetHeight);
-  context.drawImage(image, 0, 0, targetWidth, targetHeight);
-
-  const blob = await canvasToBlob(canvas, "image/jpeg", RESIZE_QUALITY);
-  if (file.size < RESIZE_MIN_BYTES && blob.size >= file.size) return file;
-
-  return new File([blob], compressedFileName(file.name), { type: "image/jpeg", lastModified: Date.now() });
+  if (!bestBlob) return file;
+  return new File([bestBlob], compressedFileName(file.name), { type: "image/jpeg", lastModified: Date.now() });
 }
 
 function normalizePhoto(input: Partial<TaskPhotoItem>): TaskPhotoItem | null {

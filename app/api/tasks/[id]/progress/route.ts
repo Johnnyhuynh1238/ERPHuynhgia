@@ -5,12 +5,30 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 
+const progressPhotoSchema = z.object({
+  id: z.string().optional(),
+  photoUrl: z.string().trim().min(1),
+  thumbnailUrl: z.string().trim().optional(),
+});
+
 const createProgressSchema = z.object({
   progressPercent: z.number().int().min(0).max(100),
   photoUrl: z.string().trim().min(1, "Ảnh tiến độ là bắt buộc"),
+  photos: z.array(progressPhotoSchema).max(20).optional(),
   reason: z.string().optional(),
   note: z.string().optional(),
 });
+
+function serializeProgressPhotos(input: z.infer<typeof createProgressSchema>) {
+  const photos = [...(input.photos || [])];
+  if (!photos.some((photo) => photo.photoUrl === input.photoUrl)) {
+    photos.unshift({ photoUrl: input.photoUrl });
+  }
+
+  const uniquePhotos = photos.filter((photo, index, list) => list.findIndex((item) => item.photoUrl === photo.photoUrl) === index);
+  if (uniquePhotos.length <= 1) return input.photoUrl;
+  return JSON.stringify({ photos: uniquePhotos });
+}
 
 const LOCKED_STATUSES = new Set<TaskStatus>([TaskStatus.done, TaskStatus.internal_approved, TaskStatus.completed]);
 
@@ -107,6 +125,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const reason = String(parsed.data.reason || "").trim();
   const note = String(parsed.data.note || "").trim();
+  const storedPhotoUrl = serializeProgressPhotos(parsed.data);
 
   if (parsed.data.progressPercent < taskDetail.progressPercent && !reason) {
     return NextResponse.json({ message: "Giảm tiến độ bắt buộc nhập lý do" }, { status: 400 });
@@ -135,7 +154,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         userId: user.id,
         fromPercent: taskDetail.progressPercent,
         toPercent: parsed.data.progressPercent,
-        photoUrl: parsed.data.photoUrl,
+        photoUrl: storedPhotoUrl,
         reason: reason || null,
         note: note || null,
       },
@@ -158,7 +177,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         fromValue: String(taskDetail.progressPercent),
         toValue: String(parsed.data.progressPercent),
         metadata: {
-          photoUrl: parsed.data.photoUrl,
+          photoUrl: storedPhotoUrl,
+          photos: parsed.data.photos || null,
           reason: reason || null,
           note: note || null,
         },
