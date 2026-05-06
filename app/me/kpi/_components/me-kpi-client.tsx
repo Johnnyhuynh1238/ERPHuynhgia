@@ -97,6 +97,7 @@ export function MeKpiClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<KpiCurrentResponse | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -148,7 +149,17 @@ export function MeKpiClient() {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
-        <div className="mb-2 text-sm font-semibold text-[#d9def3]">KPI / Lương kỹ sư</div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-[#d9def3]">KPI / Lương kỹ sư</div>
+          <button
+            type="button"
+            onClick={() => setShowGuide(true)}
+            aria-label="Xem hướng dẫn tính KPI"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#f97316]/50 bg-[#f97316]/10 text-sm font-extrabold text-[#f97316] transition hover:bg-[#f97316] hover:text-white"
+          >
+            ?
+          </button>
+        </div>
         <label className="text-xs text-[#98a0c2]">Tháng</label>
         <input
           type="month"
@@ -282,6 +293,24 @@ export function MeKpiClient() {
         </>
       ) : data?.message ? (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">{data.message}</div>
+      ) : null}
+
+      {showGuide ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3" onClick={() => setShowGuide(false)}>
+          <div className="flex h-[92vh] w-full max-w-[460px] flex-col overflow-hidden rounded-2xl border border-[#2f3555] bg-[#0f1424] shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 border-b border-[#2f3555] px-4 py-3">
+              <div className="text-sm font-bold text-[#f0f2ff]">Hướng dẫn tính KPI</div>
+              <button
+                type="button"
+                onClick={() => setShowGuide(false)}
+                className="rounded-full border border-[#3a446d] bg-[#171c2f] px-3 py-1 text-xs font-semibold text-[#d9def3]"
+              >
+                Đóng
+              </button>
+            </div>
+            <iframe src="/kpi-huong-dan-ks-v2.html" title="Hướng dẫn tính KPI cho kỹ sư" className="min-h-0 flex-1 bg-[#0f0f0f]" />
+          </div>
+        </div>
       ) : null}
     </div>
   );

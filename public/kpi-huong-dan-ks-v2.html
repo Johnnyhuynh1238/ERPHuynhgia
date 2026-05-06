@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn KPI cho Kỹ sư v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f0f;
+  color: #e5e5e5;
+  padding: 16px;
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+.back-btn { font-size: 18px; color: #ff8a3d; cursor: pointer; }
+.header-title { font-size: 17px; font-weight: 600; }
+.intro {
+  background: linear-gradient(135deg, #2a1a05, #1a1a1a);
+  border-left: 4px solid #ff8a3d;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.intro-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff8a3d;
+  margin-bottom: 8px;
+}
+.intro-text { font-size: 13px; color: #ccc; }
+
+section {
+  background: #1a1a1a;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ff8a3d;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: #ccc;
+  margin-bottom: 12px;
+}
+.formula-box {
+  background: #2a2a2a;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 10px 0;
+  text-align: center;
+  font-size: 14px;
+}
+.formula-equal { color: #ff8a3d; font-weight: 700; margin: 0 6px; }
+
+/* Split bar */
+.split-bar {
+  display: flex;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0 8px;
+}
+.split-fixed {
+  flex: 1;
+  background: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+.split-bonus {
+  flex: 1;
+  background: linear-gradient(90deg, #ff8a3d, #ffb347);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #000;
+}
+
+.example-box {
+  background: #0a2a0a;
+  border-left: 3px solid #22c55e;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.example-title { color: #22c55e; font-weight: 600; margin-bottom: 6px; }
+
+/* Tables */
+table.compact {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 12px;
+}
+table.compact th, table.compact td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a2a2a;
+  text-align: left;
+}
+table.compact th {
+  background: #2a2a2a;
+  color: #ff8a3d;
+  font-size: 11px;
+  font-weight: 600;
+}
+table.compact td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* KPI table 5 items */
+.kpi-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+.kpi-row:last-child { border: none; }
+.kpi-icon {
+  width: 38px;
+  height: 38px;
+  background: #2a2a2a;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.kpi-info { flex: 1; }
+.kpi-name { font-size: 14px; font-weight: 600; }
+.kpi-desc { font-size: 11px; color: #888; }
+.kpi-weight {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ff8a3d;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Tier rows */
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.tier-row.excellent { background: linear-gradient(90deg, #1a3a05, #0f1f05); border-left: 4px solid #22c55e; }
+.tier-row.good { background: linear-gradient(90deg, #0a2a3a, #050f1a); border-left: 4px solid #3b82f6; }
+.tier-row.average { background: linear-gradient(90deg, #2a1a05, #1a0f00); border-left: 4px solid #f59e0b; }
+.tier-row.weak { background: linear-gradient(90deg, #2a0a0a, #1a0505); border-left: 4px solid #ef4444; }
+.tier-row.poor { background: linear-gradient(90deg, #1a0a0a, #0a0505); border-left: 4px solid #6b7280; }
+.tier-emoji { font-size: 22px; flex-shrink: 0; }
+.tier-info { flex: 1; }
+.tier-label { font-size: 14px; font-weight: 700; }
+.tier-range { font-size: 12px; color: #aaa; }
+.tier-bonus { font-size: 13px; font-weight: 700; text-align: right; }
+
+/* Detail KPI */
+.kpi-detail {
+  background: #2a2a2a;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.kpi-detail-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kpi-detail-weight {
+  background: #ff8a3d;
+  color: #000;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.kpi-detail-section {
+  font-size: 13px;
+  color: #ccc;
+  margin-top: 10px;
+}
+.kpi-detail-section strong { color: #ff8a3d; }
+
+/* 4-block structure */
+.block-4 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.block-4-item {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 12px;
+  border-left: 3px solid #ff8a3d;
+}
+.block-4-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff8a3d;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.block-4-content {
+  font-size: 13px;
+  color: #ddd;
+}
+.block-4-formula {
+  background: #1a1a1a;
+  padding: 10px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  color: #ff8a3d;
+  margin-top: 8px;
+}
+
+/* Tip */
+.tip {
+  background: #0a2a0a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  border-left: 3px solid #22c55e;
+}
+.warn {
+  background: #2a0a0a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  border-left: 3px solid #ef4444;
+}
+.tip-emoji, .warn-emoji { margin-right: 6px; }
+
+/* Salary */
+.salary-demo {
+  background: #2a2a2a;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 10px 0;
+}
+.salary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+.salary-row:last-child {
+  border: none;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 2px solid #ff8a3d;
+  font-weight: 700;
+  color: #ff8a3d;
+  font-size: 15px;
+}
+
+/* Scenario */
+.scenario {
+  background: #1a1a1a;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.scenario-good { background: linear-gradient(90deg, #0a2a0a, #1a1a1a); border-left: 3px solid #22c55e; }
+.scenario-bad { background: linear-gradient(90deg, #2a0a0a, #1a1a1a); border-left: 3px solid #ef4444; }
+.scenario-name { font-size: 14px; font-weight: 600; color: #ff8a3d; margin-bottom: 4px; }
+.scenario-action { font-size: 13px; color: #ccc; margin-bottom: 6px; }
+.scenario-result { font-size: 12px; color: #888; }
+
+ul.simple { list-style: none; padding: 0; }
+ul.simple li {
+  padding: 4px 0;
+  font-size: 13px;
+  color: #ccc;
+  padding-left: 20px;
+  position: relative;
+}
+ul.simple li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #22c55e;
+}
+ul.simple.warn li::before { content: '✗'; color: #ef4444; }
+
+/* ROI table */
+.roi-table {
+  background: linear-gradient(135deg, #2a0a0a, #1a0505);
+  border: 1px solid #ef4444;
+  border-radius: 12px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.roi-title { color: #ef4444; font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.roi-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #3a1a1a;
+  font-size: 13px;
+}
+.roi-row:last-child { border: none; }
+.roi-action { color: #ddd; flex: 1; padding-right: 8px; }
+.roi-loss {
+  color: #ef4444;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.faq-item {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.faq-q {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff8a3d;
+  margin-bottom: 6px;
+}
+.faq-a { font-size: 13px; color: #ccc; }
+
+.cta-box {
+  background: linear-gradient(135deg, #2a1a05, #1a0a00);
+  border: 1px solid #ff8a3d;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 20px 0;
+  text-align: center;
+}
+.cta-title { font-size: 14px; font-weight: 700; color: #ff8a3d; margin-bottom: 8px; }
+.cta-text { font-size: 13px; color: #ccc; }
+
+.highlight-num { color: #ff8a3d; font-weight: 700; }
+
+/* Star display */
+.stars { color: #ff8a3d; font-size: 16px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="back-btn">←</span>
+  <span class="header-title">📊 Hướng dẫn KPI cho KS</span>
+</div>
+
+<div class="intro">
+  <div class="intro-title">💡 Bảng này dành cho ai?</div>
+  <div class="intro-text">
+    Anh đọc 1 lần để hiểu lương được tính ra sao. Mỗi KPI có công thức cụ thể + ví dụ. Cuối cùng có bảng cảnh báo "Lỗi nào mất bao nhiêu tiền".
+  </div>
+</div>
+
+<!-- ========== PHẦN 1: LƯƠNG CHIA THẾ NÀO ========== -->
+
+<section>
+  <div class="section-title">💰 1. Lương được chia làm 2 phần</div>
+  
+  <div class="formula-box">
+    <strong>Lương tháng</strong>
+    <span class="formula-equal">=</span>
+    <strong>Lương cứng</strong>
+    <span class="formula-equal">+</span>
+    <strong>Thưởng KPI</strong>
+  </div>
+  
+  <div class="split-bar">
+    <div class="split-fixed">Cứng 50%</div>
+    <div class="split-bonus">Thưởng 50%</div>
+  </div>
+  
+  <div class="kpi-detail">
+    <div class="kpi-detail-title">
+      🔵 Lương cứng (50%)
+      <span style="background:#3b82f6; color:#fff; padding:2px 10px; border-radius:12px; font-size:12px;">Cố định</span>
+    </div>
+    <div class="kpi-detail-section">
+      Phần này anh <strong>luôn nhận đủ</strong>, dù KPI bao nhiêu. KPI = 0 vẫn nhận đủ phần này.
+    </div>
+  </div>
+  
+  <div class="kpi-detail">
+    <div class="kpi-detail-title">
+      🟧 Thưởng KPI (50%)
+      <span style="background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">Theo KPI</span>
+    </div>
+    <div class="kpi-detail-section">
+      Dao động theo KPI tháng. <strong>Đây là phần anh có thể "kéo" lên bằng cách làm tốt.</strong>
+    </div>
+  </div>
+
+  <div class="example-box">
+    <div class="example-title">📌 Ví dụ với lương max [Lương max]</div>
+    <div style="font-size:13px; color:#ccc;">
+      Giả sử lương max = <span class="highlight-num">18tr/tháng</span>:
+    </div>
+    <div class="salary-demo">
+      <div class="salary-row">
+        <span>Lương cứng</span>
+        <span>9,000,000đ</span>
+      </div>
+      <div class="salary-row">
+        <span>Thưởng KPI tối đa</span>
+        <span>9,000,000đ</span>
+      </div>
+      <div class="salary-row">
+        <span>Tổng tối đa</span>
+        <span>18,000,000đ</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PHẦN 2: 5 KPI ========== -->
+
+<section>
+  <div class="section-title">🎯 2. KPI = 5 việc cộng lại</div>
+  <div class="section-subtitle">
+    Mỗi việc có trọng số (ví dụ dưới đây là mặc định). <strong>Admin có thể chỉnh trọng số</strong> nếu công ty thay đổi định hướng.
+  </div>
+  
+  <div class="kpi-row">
+    <div class="kpi-icon">📅</div>
+    <div class="kpi-info">
+      <div class="kpi-name">Tiến độ</div>
+      <div class="kpi-desc">Task có hoàn thành đúng hạn không</div>
+    </div>
+    <div class="kpi-weight">30%</div>
+  </div>
+  
+  <div class="kpi-row">
+    <div class="kpi-icon">✅</div>
+    <div class="kpi-info">
+      <div class="kpi-name">Chất lượng QC</div>
+      <div class="kpi-desc">QC pass ngay lần đầu, không phải sửa</div>
+    </div>
+    <div class="kpi-weight">40%</div>
+  </div>
+  
+  <div class="kpi-row">
+    <div class="kpi-icon">📝</div>
+    <div class="kpi-info">
+      <div class="kpi-name">Báo cáo</div>
+      <div class="kpi-desc">Sáng + chiều, đúng giờ + đầy đủ</div>
+    </div>
+    <div class="kpi-weight">10%</div>
+  </div>
+  
+  <div class="kpi-row">
+    <div class="kpi-icon">😊</div>
+    <div class="kpi-info">
+      <div class="kpi-name">Chủ nhà</div>
+      <div class="kpi-desc">Chủ nhà rate khi ký nghiệm thu</div>
+    </div>
+    <div class="kpi-weight">10%</div>
+  </div>
+  
+  <div class="kpi-row">
+    <div class="kpi-icon">⭐</div>
+    <div class="kpi-info">
+      <div class="kpi-name">Đóng góp</div>
+      <div class="kpi-desc">TPTC chấm tay cuối tháng</div>
+    </div>
+    <div class="kpi-weight">10%</div>
+  </div>
+  
+  <div class="formula-box" style="margin-top:14px;">
+    <span style="font-size:13px;">KPI tổng</span>
+    <br>
+    <span style="font-size:11px;">=</span>
+    <br>
+    <span style="font-size:12px;">
+      Tiến độ × <span style="color:#ff8a3d;">30%</span> + QC × <span style="color:#ff8a3d;">40%</span> + Báo cáo × <span style="color:#ff8a3d;">10%</span> + Chủ nhà × <span style="color:#ff8a3d;">10%</span> + Đóng góp × <span style="color:#ff8a3d;">10%</span>
+    </span>
+  </div>
+</section>
+
+<!-- ========== PHẦN 3: BẬC THƯỞNG ========== -->
+
+<section>
+  <div class="section-title">🏆 3. Bậc thưởng theo điểm KPI tổng</div>
+  
+  <div class="tier-row excellent">
+    <div class="tier-emoji">🌟</div>
+    <div class="tier-info">
+      <div class="tier-label">Xuất sắc</div>
+      <div class="tier-range">90 - 100 điểm</div>
+    </div>
+    <div class="tier-bonus" style="color:#22c55e;">100% thưởng</div>
+  </div>
+  
+  <div class="tier-row good">
+    <div class="tier-emoji">✅</div>
+    <div class="tier-info">
+      <div class="tier-label">Tốt</div>
+      <div class="tier-range">75 - 89 điểm</div>
+    </div>
+    <div class="tier-bonus" style="color:#3b82f6;">75% thưởng</div>
+  </div>
+  
+  <div class="tier-row average">
+    <div class="tier-emoji">⚠️</div>
+    <div class="tier-info">
+      <div class="tier-label">Đạt</div>
+      <div class="tier-range">60 - 74 điểm</div>
+    </div>
+    <div class="tier-bonus" style="color:#f59e0b;">50% thưởng</div>
+  </div>
+  
+  <div class="tier-row weak">
+    <div class="tier-emoji">🔻</div>
+    <div class="tier-info">
+      <div class="tier-label">Yếu</div>
+      <div class="tier-range">40 - 59 điểm</div>
+    </div>
+    <div class="tier-bonus" style="color:#ef4444;">25% thưởng</div>
+  </div>
+  
+  <div class="tier-row poor">
+    <div class="tier-emoji">⛔</div>
+    <div class="tier-info">
+      <div class="tier-label">Kém</div>
+      <div class="tier-range">Dưới 40 điểm</div>
+    </div>
+    <div class="tier-bonus" style="color:#6b7280;">0% thưởng</div>
+  </div>
+</section>
+
+<!-- ========== KPI 1 - TIẾN ĐỘ ========== -->
+
+<section>
+  <div class="section-title">📅 4. KPI Tiến độ <span style="margin-left:auto; background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">30%</span></div>
+  
+  <div class="block-4">
+    <div class="block-4-item">
+      <div class="block-4-title">1. Hệ thống đo cái gì?</div>
+      <div class="block-4-content">
+        Khi anh mark task "Done", hệ thống so sánh ngày anh hoàn thành thực tế với ngày kế hoạch.
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">2. Điểm cho 1 task</div>
+      <div class="block-4-content">
+        <table class="compact">
+          <tr><th>Tình huống</th><th>Điểm</th></tr>
+          <tr><td>Đúng hạn / sớm</td><td style="color:#22c55e;">100</td></tr>
+          <tr><td>Trễ 1-2 ngày</td><td style="color:#3b82f6;">80</td></tr>
+          <tr><td>Trễ 3-5 ngày</td><td style="color:#f59e0b;">50</td></tr>
+          <tr><td>Trễ trên 5 ngày</td><td style="color:#ef4444;">0</td></tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">3. KPI Tiến độ tháng</div>
+      <div class="block-4-formula">= Trung bình điểm tất cả task hoàn thành tháng đó</div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">4. Ví dụ thực tế</div>
+      <div class="block-4-content">
+        Tháng 4 anh hoàn thành 10 task:<br>
+        • 7 task đúng hạn → 7 × 100 = 700<br>
+        • 2 task trễ 2 ngày → 2 × 80 = 160<br>
+        • 1 task trễ 4 ngày → 1 × 50 = 50<br>
+        <br>
+        <strong>Tổng: 910 / 10 task = 91 điểm</strong><br>
+        Đóng góp KPI tổng: <span class="highlight-num">91 × 30% = 27.3 điểm</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tip">
+    <span class="tip-emoji">💡</span> <strong>Bí quyết:</strong>
+    <ul class="simple" style="margin-top:6px;">
+      <li>Check-in sáng đầy đủ để hệ thống biết task đang chạy</li>
+      <li>Sắp trễ → báo TPTC ngay, không giấu</li>
+      <li>Có vấn đề (mưa, thiếu vật tư...) → ghi note rõ trong báo cáo</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== KPI 2 - QC ========== -->
+
+<section>
+  <div class="section-title">✅ 5. KPI Chất lượng QC <span style="margin-left:auto; background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">40%</span></div>
+  
+  <div class="warn">
+    ⚠ <strong>Đây là KPI quan trọng nhất</strong> (40%). Sai 1 chút mất rất nhiều điểm.
+  </div>
+  
+  <div class="block-4">
+    <div class="block-4-item">
+      <div class="block-4-title">1. Hệ thống đo cái gì?</div>
+      <div class="block-4-content">
+        Khi anh tick QC tiêu chí <strong>"đạt" ngay lần đầu</strong> (chưa từng tick "không đạt") → hệ thống ghi nhận pass.<br>
+        Nếu anh đã từng tick "không đạt" rồi sau sửa → KHÔNG được tính pass lần đầu.
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">2. Điểm cho 1 task</div>
+      <div class="block-4-formula">= (Số tiêu chí đạt lần đầu / Tổng tiêu chí) × 100</div>
+      <div class="block-4-content" style="margin-top:8px;">
+        Vd: Task có 7 tiêu chí, 6 đạt lần đầu, 1 phải sửa<br>
+        → Điểm task = 6/7 × 100 = <strong>86 điểm</strong>
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">3. KPI QC tháng</div>
+      <div class="block-4-formula">= Trung bình điểm QC các task hoàn thành tháng đó</div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">4. Ví dụ thực tế</div>
+      <div class="block-4-content">
+        Tháng 4 anh hoàn thành 10 task QC:<br>
+        • 5 task pass 100% lần đầu → 5 × 100 = 500<br>
+        • 3 task pass 6/7 lần đầu → 3 × 86 = 258<br>
+        • 2 task pass 5/7 lần đầu → 2 × 71 = 142<br>
+        <br>
+        <strong>Tổng: 900 / 10 task = 90 điểm</strong><br>
+        Đóng góp KPI tổng: <span class="highlight-num">90 × 40% = 36 điểm</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tip">
+    <span class="tip-emoji">💡</span> <strong>Bí quyết QC pass lần đầu:</strong>
+    <ul class="simple" style="margin-top:6px;">
+      <li>Đọc kỹ tab "Nhiệm vụ" trước khi cho thợ làm</li>
+      <li>Giám sát thợ liên tục, sửa lỗi ngay - đừng đợi xong mới phát hiện</li>
+      <li>Tiêu chí khó (đo, đếm, chính xác) → kiểm tra cẩn thận từ đầu</li>
+      <li>Với task lạ → hỏi TPTC trước khi làm</li>
+    </ul>
+  </div>
+  
+  <div class="warn">
+    ⚠ <strong>Đặc biệt cẩn thận:</strong> Tick "đạt" mà thực tế chưa đạt → TPTC duyệt phát hiện ra → có thể bị TPTC chấm điểm Đóng góp thấp + ghi nhận vào hồ sơ.
+  </div>
+</section>
+
+<!-- ========== KPI 3 - BÁO CÁO ========== -->
+
+<section>
+  <div class="section-title">📝 6. KPI Báo cáo <span style="margin-left:auto; background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">10%</span></div>
+  
+  <div class="block-4">
+    <div class="block-4-item">
+      <div class="block-4-title">1. Hệ thống đo 4 thứ</div>
+      <div class="block-4-content">
+        <strong style="color:#22c55e;">a.</strong> Sáng đúng giờ (trước 8:00)<br>
+        <strong style="color:#22c55e;">b.</strong> Sáng đầy đủ (tick hết task đang làm + đến hạn)<br>
+        <strong style="color:#22c55e;">c.</strong> Chiều đúng giờ (cập nhật trước 19:00)<br>
+        <strong style="color:#22c55e;">d.</strong> Chiều đầy đủ (cập nhật 100% task đã tick)
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">2. Điểm 4 tiêu chí</div>
+      <div class="block-4-formula">a = (Số ngày BC sáng đúng giờ / Số ngày làm việc) × 100<br>
+b = (Số ngày BC sáng đầy đủ / Số ngày BC sáng) × 100<br>
+c = (Số ngày BC chiều đúng giờ / Số ngày BC sáng) × 100<br>
+d = (Số ngày BC chiều đầy đủ / Số ngày BC sáng) × 100</div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">3. KPI Báo cáo tháng</div>
+      <div class="block-4-formula">= (a + b + c + d) / 4</div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">4. Ví dụ thực tế</div>
+      <div class="block-4-content">
+        Tháng 4 có 22 ngày làm việc:<br>
+        • Anh BC sáng đúng giờ 20/22 → a = 91<br>
+        • BC sáng đầy đủ 22/22 → b = 100<br>
+        • BC chiều đúng giờ 18/22 → c = 82<br>
+        • BC chiều đầy đủ 19/22 → d = 86<br>
+        <br>
+        <strong>KPI Báo cáo = (91+100+82+86)/4 = 90 điểm</strong><br>
+        Đóng góp KPI tổng: <span class="highlight-num">90 × 10% = 9 điểm</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tip">
+    <span class="tip-emoji">💡</span> <strong>Bí quyết:</strong>
+    <ul class="simple" style="margin-top:6px;">
+      <li>Đặt nhắc 7:30 sáng để check-in</li>
+      <li>Đặt nhắc 17:30 chiều để cập nhật task</li>
+      <li>Trễ hơn 1-2 lần/tháng OK, đừng để thành thói quen</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== KPI 4 - CHỦ NHÀ ========== -->
+
+<section>
+  <div class="section-title">😊 7. KPI Chủ nhà <span style="margin-left:auto; background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">10%</span></div>
+  
+  <div class="block-4">
+    <div class="block-4-item">
+      <div class="block-4-title">1. Hệ thống đo cái gì?</div>
+      <div class="block-4-content">
+        Khi chủ nhà ký nghiệm thu <strong>major milestone</strong> (đổ BT móng, đổ BT sàn, hoàn thành phần thô...), chủ nhà sẽ:<br>
+        • Đánh giá <strong>task</strong> bằng 1-5 sao<br>
+        • Đánh giá <strong>KS</strong> theo 3 tiêu chí, mỗi cái 1-5 sao:<br>
+        &nbsp;&nbsp;<strong style="color:#ff8a3d;">- Chuyên môn & kỹ thuật</strong><br>
+        &nbsp;&nbsp;<strong style="color:#ff8a3d;">- Thái độ & lễ phép</strong><br>
+        &nbsp;&nbsp;<strong style="color:#ff8a3d;">- Giao tiếp & trao đổi</strong>
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">2. Quy đổi sao → điểm</div>
+      <div class="block-4-content">
+        <table class="compact">
+          <tr><th>Sao</th><th>Điểm</th></tr>
+          <tr><td><span class="stars">★★★★★</span></td><td style="color:#22c55e;">100</td></tr>
+          <tr><td><span class="stars">★★★★</span><span style="color:#444;">★</span></td><td style="color:#3b82f6;">80</td></tr>
+          <tr><td><span class="stars">★★★</span><span style="color:#444;">★★</span></td><td style="color:#f59e0b;">60</td></tr>
+          <tr><td><span class="stars">★★</span><span style="color:#444;">★★★</span></td><td style="color:#ef4444;">40</td></tr>
+          <tr><td><span class="stars">★</span><span style="color:#444;">★★★★</span></td><td style="color:#ef4444;">20</td></tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">3. KPI Chủ nhà tháng</div>
+      <div class="block-4-formula">= (Rating Task TB × 50%) + (Rating KS TB × 50%)
+      
+Rating Task TB = TB rating tất cả task milestone tháng
+Rating KS TB = TB của 3 tiêu chí Chuyên môn/Thái độ/Giao tiếp</div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">4. Ví dụ thực tế</div>
+      <div class="block-4-content">
+        Tháng 4 anh có 3 task milestone được ký:<br>
+        <br>
+        <strong>Rating task:</strong><br>
+        • Task 1: 5 sao → 100<br>
+        • Task 2: 4 sao → 80<br>
+        • Task 3: 5 sao → 100<br>
+        TB: (100+80+100)/3 = <strong>93</strong><br>
+        <br>
+        <strong>Rating KS:</strong><br>
+        • Lần 1: CM 5★ + TĐ 4★ + GT 5★ = 4.67 → 93<br>
+        • Lần 2: CM 4★ + TĐ 4★ + GT 4★ = 4.0 → 80<br>
+        • Lần 3: CM 5★ + TĐ 5★ + GT 4★ = 4.67 → 93<br>
+        TB: (93+80+93)/3 = <strong>89</strong><br>
+        <br>
+        <strong>KPI Chủ nhà = 93×50% + 89×50% = 91 điểm</strong><br>
+        Đóng góp KPI tổng: <span class="highlight-num">91 × 10% = 9.1 điểm</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tip">
+    💡 <strong>KS không có milestone tháng đó</strong> → KPI Chủ nhà mặc định 70 điểm (không bị trừ).
+  </div>
+  
+  <div class="tip">
+    <span class="tip-emoji">💡</span> <strong>Bí quyết được rating cao:</strong>
+    <ul class="simple" style="margin-top:6px;">
+      <li>Lễ phép khi chủ nhà ra công trường</li>
+      <li>Trả lời tin nhắn/cuộc gọi nhanh (trong 4h)</li>
+      <li>Giải thích bằng từ đơn giản, không quá chuyên môn</li>
+      <li>Báo cáo tiến độ rõ ràng - chủ nhà yên tâm</li>
+      <li>Ảnh tiến độ đẹp, đầy đủ</li>
+      <li>Có vấn đề → báo TPTC trước, không tự hứa với chủ nhà</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== KPI 5 - ĐÓNG GÓP ========== -->
+
+<section>
+  <div class="section-title">⭐ 8. KPI Đóng góp <span style="margin-left:auto; background:#ff8a3d; color:#000; padding:2px 10px; border-radius:12px; font-size:12px;">10%</span></div>
+  
+  <div class="block-4">
+    <div class="block-4-item">
+      <div class="block-4-title">1. Hệ thống đo cái gì?</div>
+      <div class="block-4-content">
+        TPTC chấm tay 0-100 cuối tháng dựa trên những gì anh đóng góp <strong>ngoài việc cốt lõi</strong>.
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">2. Bậc điểm TPTC dùng</div>
+      <div class="block-4-content">
+        <table class="compact">
+          <tr><th>Mức</th><th>Điểm</th></tr>
+          <tr><td>Sáng kiến lớn (cải tiến quy trình, tiết kiệm chi phí ≥10tr)</td><td style="color:#22c55e;">90-100</td></tr>
+          <tr><td>Đóng góp đáng kể (giúp KS khác, xử lý sự cố tốt)</td><td style="color:#3b82f6;">75-89</td></tr>
+          <tr><td>Hoàn thành tốt việc cơ bản, không gì nổi bật</td><td style="color:#f59e0b;">60-74</td></tr>
+          <tr><td>Có thiếu sót nhỏ</td><td style="color:#ef4444;">40-59</td></tr>
+          <tr><td>Có vấn đề thái độ / hành vi</td><td style="color:#6b7280;">&lt; 40</td></tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">3. Mặc định</div>
+      <div class="block-4-content">
+        KS hoàn thành đúng việc cơ bản → mặc định <strong>70 điểm</strong>.
+      </div>
+    </div>
+    
+    <div class="block-4-item">
+      <div class="block-4-title">4. Ví dụ</div>
+      <div class="block-4-content">
+        Tháng 4 anh giúp KS Hùng xử lý sự cố thấm tường + đề xuất cách buộc thép tiết kiệm 5% kẽm<br>
+        → TPTC chấm <strong>82 điểm</strong><br>
+        Đóng góp KPI tổng: <span class="highlight-num">82 × 10% = 8.2 điểm</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="warn">
+    ⚠ Đi làm đúng giờ + làm xong việc cốt lõi <strong>không phải đóng góp</strong> - đó là việc cơ bản. Đóng góp = làm thêm cái gì đó <strong>vượt khỏi việc thường ngày</strong>.
+  </div>
+</section>
+
+<!-- ========== TỔNG VÍ DỤ ========== -->
+
+<section>
+  <div class="section-title">💵 9. Ví dụ TỔNG: Lương thực nhận theo KPI</div>
+  <div class="section-subtitle">
+    Lương max [Lương max] = giả sử 18tr (cứng 9tr + thưởng max 9tr):
+  </div>
+  
+  <div class="scenario scenario-good">
+    <div class="scenario-name">🌟 KPI 92 điểm (Xuất sắc)</div>
+    <div class="scenario-action">
+      Tiến độ 95 + QC 90 + BC 90 + CN 91 + ĐG 82<br>
+      = 95×0.3 + 90×0.4 + 90×0.1 + 91×0.1 + 82×0.1<br>
+      = 28.5 + 36 + 9 + 9.1 + 8.2 = <span class="highlight-num">90.8</span>
+    </div>
+    <div class="scenario-result">9tr + (9tr × 100%) = <strong style="color:#22c55e;">18,000,000đ</strong></div>
+  </div>
+  
+  <div class="scenario scenario-good">
+    <div class="scenario-name">✅ KPI 80 điểm (Tốt)</div>
+    <div class="scenario-action">9tr + (9tr × 75%) = <strong style="color:#3b82f6;">15,750,000đ</strong></div>
+    <div class="scenario-result">Mất 2.25tr so với max</div>
+  </div>
+  
+  <div class="scenario">
+    <div class="scenario-name">⚠️ KPI 65 điểm (Đạt)</div>
+    <div class="scenario-action">9tr + (9tr × 50%) = <strong style="color:#f59e0b;">13,500,000đ</strong></div>
+    <div class="scenario-result">Mất 4.5tr so với max</div>
+  </div>
+  
+  <div class="scenario scenario-bad">
+    <div class="scenario-name">🔻 KPI 50 điểm (Yếu)</div>
+    <div class="scenario-action">9tr + (9tr × 25%) = <strong style="color:#ef4444;">11,250,000đ</strong></div>
+    <div class="scenario-result">Mất 6.75tr so với max</div>
+  </div>
+  
+  <div class="scenario scenario-bad">
+    <div class="scenario-name">⛔ KPI 35 điểm (Kém)</div>
+    <div class="scenario-action">9tr + (9tr × 0%) = <strong style="color:#6b7280;">9,000,000đ</strong></div>
+    <div class="scenario-result">Chỉ có lương cứng. Mất hết thưởng.</div>
+  </div>
+</section>
+
+<!-- ========== ROI MẤT TIỀN ========== -->
+
+<section>
+  <div class="section-title">⚠ 10. Lỗi nào MẤT BAO NHIÊU TIỀN?</div>
+  <div class="section-subtitle">
+    Bảng dưới tính cho lương max 18tr, KS đang ở mức KPI 85 (Tốt - thưởng 75%):
+  </div>
+  
+  <div class="roi-table">
+    <div class="roi-title">💸 Lỗi đắt giá</div>
+    
+    <div class="roi-row">
+      <div class="roi-action">1 task trễ 4 ngày (trong tháng có 10 task)</div>
+      <div class="roi-loss">~150k</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">1 tiêu chí QC fail rồi sửa (trong task 7 tiêu chí)</div>
+      <div class="roi-loss">~80k</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">5 ngày trễ báo cáo sáng/chiều</div>
+      <div class="roi-loss">~50k</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">1 chủ nhà rate 3 sao thay vì 5 sao (1 task)</div>
+      <div class="roi-loss">~60k</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">1 chủ nhà rate KS 3★ (1 trong 3 tiêu chí)</div>
+      <div class="roi-loss">~30k</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">TPTC chấm Đóng góp 50 thay vì 70 (yếu)</div>
+      <div class="roi-loss">~180k</div>
+    </div>
+  </div>
+  
+  <div class="roi-table" style="background: linear-gradient(135deg, #2a0a0a, #3a1010); border-color: #ef4444;">
+    <div class="roi-title">🚨 Lỗi NGHIÊM TRỌNG (rớt bậc thưởng)</div>
+    
+    <div class="roi-row">
+      <div class="roi-action">Để 1 task trễ trên 5 ngày → -10đ KPI tổng → có thể rớt từ Tốt xuống Đạt</div>
+      <div class="roi-loss">~2.25tr</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">3 task QC fail tích lũy → -10đ KPI tổng</div>
+      <div class="roi-loss">~2.25tr</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">Bị 1 chủ nhà rate 1-2 sao + chấm KS 1-2★</div>
+      <div class="roi-loss">~500k - 2tr</div>
+    </div>
+    <div class="roi-row">
+      <div class="roi-action">TPTC chấm Đóng góp dưới 40 (có vấn đề thái độ)</div>
+      <div class="roi-loss">~600k</div>
+    </div>
+  </div>
+  
+  <div class="warn">
+    ⚠ <strong>Lưu ý:</strong> Nếu KPI rớt từ <strong>bậc Tốt (75-89)</strong> xuống <strong>bậc Đạt (60-74)</strong>, thưởng giảm từ 75% → 50% = <strong>mất 2.25tr/tháng</strong>. Một lỗi nhỏ có thể đẩy anh xuống cả bậc.
+  </div>
+</section>
+
+<!-- ========== AN TOÀN LƯƠNG ========== -->
+
+<section>
+  <div class="section-title">🛡 11. An toàn lương của anh</div>
+  
+  <div class="tip">
+    <strong>✓ Lương cứng anh LUÔN nhận đủ</strong> dù KPI thấp đến đâu. Đây là cam kết của công ty.
+  </div>
+  
+  <div class="warn">
+    <strong>⚠ Cảnh báo:</strong> Nếu KPI dưới 40 điểm <strong>2 tháng liên tiếp</strong> - hệ thống cảnh báo Admin.
+  </div>
+  
+  <div class="tip">
+    <strong>📊 Anh xem KPI real-time:</strong> Trong app có màn KPI cá nhân, cập nhật mỗi ngày. Biết mình đang ở mức nào để điều chỉnh kịp thời.
+  </div>
+</section>
+
+<!-- ========== FAQ ========== -->
+
+<section>
+  <div class="section-title">❓ 12. Câu hỏi thường gặp</div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Em mới vào, KPI thấp có bị đuổi không?</div>
+    <div class="faq-a">A: Không. 2 tháng đầu là thời gian thích nghi. Từ tháng 3 trở đi, KPI cần ổn định ít nhất ở mức "Đạt" (60+).</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Tháng này em làm dự án ít task, KPI tính sao?</div>
+    <div class="faq-a">A: Tiến độ + QC tính trên các task có hoạt động. Nếu không có task nào hoàn thành → KPI mặc định 70 điểm.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: KS khác làm cùng dự án, KPI tính chung không?</div>
+    <div class="faq-a">A: Không. KPI tính riêng từng KS. Mỗi task có người phụ trách chính, người đó chịu trách nhiệm KPI task.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Em nghỉ phép có ảnh hưởng KPI không?</div>
+    <div class="faq-a">A: Không. Ngày nghỉ phép không tính. Tiến độ task: deadline tự dời nếu task được giao ngày nghỉ.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Trễ task không phải lỗi em (mưa, thiếu vật tư), KPI có trừ không?</div>
+    <div class="faq-a">A: Có trừ ban đầu (hệ thống tự tính). Cuối tháng anh + TPTC review, lỗi không phải của em → TPTC ghi nhận, có thể chấm Đóng góp cao hơn để bù lại.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: KPI 89 với 90 chênh 1 điểm mà thưởng chênh 25%, công bằng không?</div>
+    <div class="faq-a">A: Để được "Xuất sắc" anh phải vào top thực sự. Nếu ở 89 → động lực để tháng sau lên 90+.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Em không đồng ý điểm Đóng góp của TPTC, làm sao?</div>
+    <div class="faq-a">A: Anh có quyền phản hồi với TPTC. Nếu vẫn không đồng ý, có thể nhờ Admin review và điều chỉnh.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Trọng số KPI có thể thay đổi không?</div>
+    <div class="faq-a">A: Có. Admin có thể điều chỉnh trọng số 5 KPI theo định hướng công ty từng quý. Khi thay đổi sẽ thông báo trước, có hiệu lực từ tháng sau.</div>
+  </div>
+  
+  <div class="faq-item">
+    <div class="faq-q">Q: Em bị chủ nhà rate thấp oan thì sao?</div>
+    <div class="faq-a">A: Anh có thể phản hồi với TPTC để xem note của chủ nhà. Nếu rate không công bằng, TPTC có thể chấm Đóng góp cao hơn để bù.</div>
+  </div>
+</section>
+
+<div class="cta-box">
+  <div class="cta-title">🎯 Tóm lại</div>
+  <div class="cta-text">
+    Lương cứng anh luôn có. Thưởng KPI là phần "kéo lên" bằng:<br><br>
+    <strong>✓ Task đúng hạn (Tiến độ 30%)</strong><br>
+    <strong>✓ QC pass NGAY LẦN ĐẦU (QC 40%)</strong><br>
+    <strong>✓ Báo cáo sáng/chiều đúng giờ (BC 10%)</strong><br>
+    <strong>✓ Chủ nhà rate cao (CN 10%)</strong><br>
+    <strong>✓ Đóng góp thêm cho công ty (ĐG 10%)</strong>
+  </div>
+</div>
+
+<div style="text-align:center; padding:20px 0; font-size:11px; color:#666;">
+  Có thắc mắc thêm? Anh hỏi TPTC hoặc Admin.<br>
+  Phiên bản 2.0 - Cập nhật 04/05/2026
+</div>
+
+</body>
+</html>
