@@ -33,7 +33,7 @@ type UploadBatchOptions = {
 };
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
 
 function fileSizeLabel(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -49,7 +49,7 @@ function validateFile(file: File) {
     throw new Error(`${file.name}: chỉ nhận ảnh JPG, PNG hoặc WEBP`);
   }
   if (file.size > MAX_BYTES) {
-    throw new Error(`${file.name}: vượt quá 8MB`);
+    throw new Error(`${file.name}: vượt quá 25MB`);
   }
 }
 

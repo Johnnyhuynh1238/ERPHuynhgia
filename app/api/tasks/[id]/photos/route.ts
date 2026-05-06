@@ -10,7 +10,7 @@ import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
 export const runtime = "nodejs";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 20;
 
 function safeFilename(name: string) {
@@ -72,7 +72,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         return NextResponse.json({ message: `File ${file.name} không đúng định dạng ảnh` }, { status: 400 });
       }
       if (file.size > MAX_BYTES) {
-        return NextResponse.json({ message: `File ${file.name} vượt quá 8MB` }, { status: 400 });
+        return NextResponse.json({ message: `File ${file.name} vượt quá 25MB` }, { status: 400 });
       }
     }
 
