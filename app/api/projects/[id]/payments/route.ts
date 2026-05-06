@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PaymentStatus, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
@@ -45,29 +46,45 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const today = startOfTodayUtc();
 
-  await prisma.paymentSchedule.updateMany({
-    where: {
-      projectId: params.id,
-      status: PaymentStatus.not_collected,
-      expectedDate: { lt: today },
-    },
-    data: {
-      status: PaymentStatus.customer_late,
-    },
-  });
+  await prisma.$transaction([
+    prisma.paymentSchedule.updateMany({
+      where: {
+        projectId: params.id,
+        status: PaymentStatus.not_collected,
+        expectedDate: { lt: today },
+      },
+      data: { status: PaymentStatus.customer_late },
+    }),
+    prisma.paymentSchedule.updateMany({
+      where: {
+        projectId: params.id,
+        status: PaymentStatus.pending,
+        OR: [{ dueDate: { lt: today } }, { expectedDate: { lt: today } }],
+      },
+      data: { status: PaymentStatus.overdue },
+    }),
+  ]);
 
   const rows = await prisma.paymentSchedule.findMany({
     where: { projectId: params.id },
-    orderBy: { phaseNumber: "asc" },
+    orderBy: [{ type: "asc" }, { installmentNo: "asc" }, { phaseNumber: "asc" }],
     select: {
       id: true,
+      type: true,
+      installmentNo: true,
       phaseNumber: true,
+      description: true,
       milestoneDescription: true,
       percent: true,
       amount: true,
+      dueDate: true,
       expectedDate: true,
+      paidAt: true,
+      paidAmount: true,
       actualPaidDate: true,
       actualPaidAmount: true,
+      receiptUrl: true,
+      paymentNote: true,
       status: true,
       notes: true,
     },
@@ -80,12 +97,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       ...project,
       contractValue: Number(project.contractValue),
     },
-    payments: rows.map((r) => ({
-      ...r,
-      percent: Number(r.percent),
-      amount: Number(r.amount),
-      actualPaidAmount: r.actualPaidAmount ? Number(r.actualPaidAmount) : null,
-    })),
+    payments: rows.map((row) => {
+      const normalized = normalizePaymentSchedule(row);
+      return {
+        ...row,
+        percent: Number(row.percent),
+        amount: Number(row.amount),
+        actualPaidAmount: row.actualPaidAmount ? Number(row.actualPaidAmount) : null,
+        paidAmount: row.paidAmount ? Number(row.paidAmount) : null,
+        normalized,
+      };
+    }),
     canEdit,
   });
 }

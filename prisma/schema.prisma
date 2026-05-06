@@ -114,6 +114,34 @@ enum PaymentStatus {
   request_sent
   collected
   customer_late
+  pending
+  paid
+  overdue
+  cancelled
+}
+
+enum PaymentScheduleType {
+  contract
+  addendum
+}
+
+enum CommentTargetType {
+  project
+  task
+  payment_schedule
+  journal_entry
+}
+
+enum CustomerExportJobType {
+  pdf
+  zip
+}
+
+enum CustomerExportJobStatus {
+  queued
+  processing
+  ready
+  failed
 }
 
 enum PhaseStatus {
@@ -274,7 +302,10 @@ model User {
   kpiSettingsChanged           KpiSettings[]             @relation("KpiSettingsChanger")
   customerTaskRatings          CustomerTaskRating[]      @relation("KsRatedTask")
   customerKsRatings            CustomerKsRating[]        @relation("KsRatedDirectly")
+  customerCommentsAuthored     CustomerComment[]         @relation("CustomerCommentAuthor")
   customerCommentReplies       CustomerCommentReply[]
+  projectDrawingsUploaded      ProjectDrawing[]          @relation("ProjectDrawingUploader")
+  paymentSchedulesCreated      PaymentSchedule[]         @relation("PaymentScheduleCreator")
   subcontractorsCreated        Subcontractor[]           @relation("SubcontractorCreator")
   subContractsCreated          SubContract[]             @relation("SubContractCreator")
   subContractFiles             SubContractFile[]
@@ -319,6 +350,8 @@ model Project {
   tasks                   Task[]
   phases                  ProjectPhase[]
   paymentSchedules        PaymentSchedule[]
+  drawings                ProjectDrawing[]
+  customerExportJobs      CustomerExportJob[]
   projectMembers          ProjectMember[]
   memberAssignments       ProjectMemberAssignment[]
   siteRestDays            SiteRestDay[]
@@ -743,27 +776,77 @@ model TaskActivityLog {
 }
 
 model PaymentSchedule {
-  id                   String        @id @default(uuid()) @db.Uuid
-  projectId            String        @map("project_id") @db.Uuid
-  phaseNumber          Int           @map("phase_number")
-  milestoneDescription String        @map("milestone_description")
-  percent              Decimal       @db.Decimal(5, 2)
-  amount               Decimal       @db.Decimal(15, 2)
-  expectedDate         DateTime      @map("expected_date") @db.Date
-  dayOffset            Int           @map("day_offset")
-  status               PaymentStatus @default(not_collected)
-  actualPaidDate       DateTime?     @map("actual_paid_date") @db.Date
-  actualPaidAmount     Decimal?      @map("actual_paid_amount") @db.Decimal(15, 2)
-  notes                String?       @db.Text
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
+  id                   String              @id @default(uuid()) @db.Uuid
+  projectId            String              @map("project_id") @db.Uuid
+  phaseNumber          Int                 @map("phase_number")
+  milestoneDescription String              @map("milestone_description")
+  percent              Decimal             @db.Decimal(5, 2)
+  amount               Decimal             @db.Decimal(15, 2)
+  expectedDate         DateTime            @map("expected_date") @db.Date
+  dayOffset            Int                 @map("day_offset")
+  status               PaymentStatus       @default(not_collected)
+  actualPaidDate       DateTime?           @map("actual_paid_date") @db.Date
+  actualPaidAmount     Decimal?            @map("actual_paid_amount") @db.Decimal(15, 2)
+  notes                String?             @db.Text
+  type                 PaymentScheduleType @default(contract)
+  installmentNo        Int?                @map("installment_no")
+  description          String?             @db.Text
+  dueDate              DateTime?           @map("due_date") @db.Date
+  paidAt               DateTime?           @map("paid_at") @db.Date
+  paidAmount           Decimal?            @map("paid_amount") @db.Decimal(15, 2)
+  receiptUrl           String?             @map("receipt_url") @db.Text
+  paymentNote          String?             @map("payment_note") @db.Text
+  createdBy            String?             @map("created_by") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User?   @relation("PaymentScheduleCreator", fields: [createdBy], references: [id])
+
+  @@index([projectId, phaseNumber])
+  @@index([projectId, dueDate])
+  @@index([status])
+  @@index([type])
+  @@index([expectedDate])
+  @@map("payment_schedules")
+}
+
+model ProjectDrawing {
+  id            String   @id @default(uuid()) @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  name          String
+  description   String?  @db.Text
+  fileUrl       String   @map("file_url") @db.Text
+  fileSizeBytes Int      @map("file_size_bytes")
+  displayOrder  Int      @default(0) @map("display_order")
+  uploadedBy    String   @map("uploaded_by") @db.Uuid
+  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User    @relation("ProjectDrawingUploader", fields: [uploadedBy], references: [id])
+
+  @@index([projectId, displayOrder])
+  @@map("project_drawings")
+}
+
+model CustomerExportJob {
+  id          String                  @id @default(uuid()) @db.Uuid
+  projectId   String                  @map("project_id") @db.Uuid
+  type        CustomerExportJobType
+  status      CustomerExportJobStatus @default(queued)
+  fileUrl     String?                 @map("file_url") @db.Text
+  expiresAt   DateTime?               @map("expires_at")
+  error       String?                 @db.Text
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+  completedAt DateTime?               @map("completed_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([projectId, phaseNumber])
-  @@index([status])
-  @@index([expectedDate])
-  @@map("payment_schedules")
+  @@index([projectId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@map("customer_export_jobs")
 }
 
 model ProjectMember {
@@ -1453,24 +1536,37 @@ model CustomerSession {
 }
 
 model CustomerComment {
-  id              String   @id @default(uuid()) @db.Uuid
-  projectId       String   @map("project_id") @db.Uuid
-  taskId          String?  @map("task_id") @db.Uuid
-  eveningReportId String?  @map("evening_report_id") @db.Uuid
-  content         String   @db.Text
-  ipAddress       String?  @map("ip_address")
-  userAgent       String?  @map("user_agent")
-  createdAt       DateTime @default(now()) @map("created_at")
-  readByStaff     Boolean  @default(false) @map("read_by_staff")
+  id              String             @id @default(uuid()) @db.Uuid
+  projectId       String             @map("project_id") @db.Uuid
+  taskId          String?            @map("task_id") @db.Uuid
+  eveningReportId String?            @map("evening_report_id") @db.Uuid
+  targetType      CommentTargetType? @map("target_type")
+  targetId        String?            @map("target_id") @db.Uuid
+  authorType      String?            @map("author_type")
+  authorId        String?            @map("author_id") @db.Uuid
+  authorName      String?            @map("author_name")
+  content         String             @db.Text
+  parentId        String?            @map("parent_id") @db.Uuid
+  ipAddress       String?            @map("ip_address")
+  userAgent       String?            @map("user_agent")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  readByStaff     Boolean            @default(false) @map("read_by_staff")
 
   project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   task          Task?                  @relation(fields: [taskId], references: [id], onDelete: SetNull)
   eveningReport EveningReport?         @relation(fields: [eveningReportId], references: [id], onDelete: SetNull)
+  author        User?                  @relation("CustomerCommentAuthor", fields: [authorId], references: [id])
+  parent        CustomerComment?       @relation("CommentThread", fields: [parentId], references: [id])
+  threadReplies CustomerComment[]      @relation("CommentThread")
   replies       CustomerCommentReply[]
 
   @@index([projectId])
+  @@index([projectId, targetType, targetId])
+  @@index([targetType, targetId, createdAt])
   @@index([taskId])
   @@index([eveningReportId])
+  @@index([authorId])
+  @@index([parentId])
   @@index([readByStaff])
   @@map("customer_comments")
 }

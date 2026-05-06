@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Camera, ClipboardList, CreditCard, Home, NotebookPen } from "lucide-react";
+import { ClipboardList, CreditCard, Home, NotebookPen } from "lucide-react";
 import { InstallAppBanner } from "./install-app-banner";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -13,8 +13,7 @@ export function CustomerPortalShell({ token, children }: { token: string; childr
   const items: NavItem[] = [
     { href: `/cn/${token}/dashboard`, label: "Tổng quan", icon: Home },
     { href: `/cn/${token}/timeline`, label: "Tiến độ", icon: ClipboardList },
-    { href: `/cn/${token}/photos`, label: "Ảnh", icon: Camera },
-    { href: `/cn/${token}/payments`, label: "Thanh toán", icon: CreditCard },
+    { href: `/cn/${token}/payments`, label: "Tài chính", icon: CreditCard },
     { href: `/cn/${token}/journal`, label: "Nhật ký", icon: NotebookPen },
   ];
 
@@ -24,7 +23,7 @@ export function CustomerPortalShell({ token, children }: { token: string; childr
       <main className="relative z-10 min-h-[calc(100vh-56px)] px-4 pb-24 pt-4">{children}</main>
       <InstallAppBanner />
       <nav className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-[#252840] bg-[#13151f]/96 px-2 pb-2 pt-2 backdrop-blur-xl">
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {items.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
