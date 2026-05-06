@@ -229,7 +229,7 @@ export function TaskProgressSection({
   function renderHistoryRow(row: ProgressHistory) {
     const photos = parseProgressPhotos(row.photoUrl);
     return (
-      <div key={row.id} className="relative rounded-xl border border-[#2e3347] bg-[#1a1d27] p-3 text-sm">
+      <div key={row.id} className="relative rounded-xl bg-[#1a1d27]/70 p-3 text-sm">
         <span className="absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
         <div className="font-semibold text-[#f0f2f8]">
           {row.fromPercent}% → {row.toPercent}%
@@ -258,8 +258,8 @@ export function TaskProgressSection({
   }, [taskId]);
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4 space-y-3">
+    <div className="flex min-h-[calc(100dvh-120px)] flex-col">
+      <div className="space-y-3 rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Tiến độ hiện tại</div>
@@ -389,7 +389,7 @@ export function TaskProgressSection({
         ) : null}
       </div>
 
-      <div className="mt-8 rounded-2xl border border-[#2e3347] bg-[#11131b] p-4">
+      <div className="mt-auto pt-8">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
