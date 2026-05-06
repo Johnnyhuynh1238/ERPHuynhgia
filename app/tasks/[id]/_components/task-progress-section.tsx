@@ -226,8 +226,36 @@ export function TaskProgressSection({
     }
   }
 
-  function renderHistoryRow(row: ProgressHistory) {
+  function renderHistoryRow(row: ProgressHistory, compact = false) {
     const photos = parseProgressPhotos(row.photoUrl);
+
+    if (compact) {
+      return (
+        <div key={row.id} className="relative rounded-lg bg-[#1a1d27]/60 px-2.5 py-2 text-xs">
+          <span className="absolute -left-[19px] top-3 h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-[#f0f2f8]">
+                {row.fromPercent}% → {row.toPercent}%
+              </div>
+              <div className="truncate text-[11px] text-[#8891aa]">
+                {fmtDateTime(row.createdAt)} · {row.user.fullName}
+              </div>
+            </div>
+            {photos.length ? (
+              <button
+                type="button"
+                onClick={() => setPhotoAlbum({ title: `Ảnh minh chứng ${row.fromPercent}% → ${row.toPercent}%`, photos, index: 0 })}
+                className="shrink-0 text-[11px] text-amber-300 underline"
+              >
+                Ảnh{photos.length > 1 ? ` (${photos.length})` : ""}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div key={row.id} className="relative rounded-xl bg-[#1a1d27]/70 p-3 text-sm">
         <span className="absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
@@ -258,7 +286,7 @@ export function TaskProgressSection({
   }, [taskId]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="space-y-3 rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -389,8 +417,8 @@ export function TaskProgressSection({
         ) : null}
       </div>
 
-      <div className="mt-auto pt-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mt-auto shrink-0 pt-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
             <div className="mt-0.5 text-xs text-[#8891aa]">Hiển thị 3 nhật ký gần nhất</div>
@@ -403,8 +431,8 @@ export function TaskProgressSection({
         </div>
         {loading ? <div className="text-sm text-[#8891aa]">Đang tải...</div> : null}
         {!loading && history.length === 0 ? <div className="text-sm text-[#8891aa]">Chưa có lịch sử cập nhật</div> : null}
-        <div className="space-y-3 border-l border-[#2e3347] pl-4">
-          {history.slice(0, 3).map(renderHistoryRow)}
+        <div className="space-y-2 border-l border-[#2e3347] pl-4">
+          {history.slice(0, 3).map((row) => renderHistoryRow(row, true))}
         </div>
       </div>
 
@@ -423,7 +451,7 @@ export function TaskProgressSection({
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {history.length === 0 ? <div className="text-sm text-[#8891aa]">Chưa có lịch sử cập nhật</div> : null}
               <div className="space-y-3 border-l border-[#2e3347] pl-4">
-                {history.map(renderHistoryRow)}
+                {history.map((row) => renderHistoryRow(row))}
               </div>
             </div>
           </div>
