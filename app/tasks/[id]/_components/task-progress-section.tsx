@@ -89,6 +89,7 @@ export function TaskProgressSection({
   const [photoUrl, setPhotoUrl] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<TaskPhotoItem[]>([]);
   const [photoAlbum, setPhotoAlbum] = useState<TaskPhotoAlbumState | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export function TaskProgressSection({
       setPhotoUrl("");
       setUploadedPhotos([]);
       setPhotoAlbum(null);
+      setShowHistoryModal(false);
       setReason("");
       setNote("");
       setHasInteractedWithProgress(false);
@@ -222,6 +224,32 @@ export function TaskProgressSection({
     } finally {
       setSaving(false);
     }
+  }
+
+  function renderHistoryRow(row: ProgressHistory) {
+    const photos = parseProgressPhotos(row.photoUrl);
+    return (
+      <div key={row.id} className="relative rounded-xl border border-[#2e3347] bg-[#1a1d27] p-3 text-sm">
+        <span className="absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
+        <div className="font-semibold text-[#f0f2f8]">
+          {row.fromPercent}% → {row.toPercent}%
+        </div>
+        <div className="text-xs text-[#8891aa]">
+          {fmtDateTime(row.createdAt)} · {row.user.fullName}
+        </div>
+        {row.reason ? <div className="mt-1 text-xs text-rose-300">Lý do: {row.reason}</div> : null}
+        {row.note ? <div className="mt-1 text-xs text-[#c8d0e8]">Ghi chú: {row.note}</div> : null}
+        {photos.length ? (
+          <button
+            type="button"
+            onClick={() => setPhotoAlbum({ title: `Ảnh minh chứng ${row.fromPercent}% → ${row.toPercent}%`, photos, index: 0 })}
+            className="mt-1 inline-block text-xs text-amber-300 underline"
+          >
+            Xem ảnh minh chứng{photos.length > 1 ? ` (${photos.length} ảnh)` : ""}
+          </button>
+        ) : null}
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -361,38 +389,46 @@ export function TaskProgressSection({
         ) : null}
       </div>
 
-      <div className="space-y-2 pl-1">
-        <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
+      <div className="mt-8 rounded-2xl border border-[#2e3347] bg-[#11131b] p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Lịch sử tiến độ</div>
+            <div className="mt-0.5 text-xs text-[#8891aa]">Hiển thị 3 nhật ký gần nhất</div>
+          </div>
+          {history.length > 3 ? (
+            <Button variant="outline" className="h-8 border-[#2e3347] bg-[#1a1d27] px-3 text-xs" onClick={() => setShowHistoryModal(true)}>
+              Xem thêm
+            </Button>
+          ) : null}
+        </div>
         {loading ? <div className="text-sm text-[#8891aa]">Đang tải...</div> : null}
         {!loading && history.length === 0 ? <div className="text-sm text-[#8891aa]">Chưa có lịch sử cập nhật</div> : null}
         <div className="space-y-3 border-l border-[#2e3347] pl-4">
-          {history.slice(0, 3).map((row) => {
-            const photos = parseProgressPhotos(row.photoUrl);
-            return (
-              <div key={row.id} className="relative text-sm">
-                <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]" />
-                <div className="font-semibold text-[#f0f2f8]">
-                  {row.fromPercent}% → {row.toPercent}%
-                </div>
-                <div className="text-xs text-[#8891aa]">
-                  {fmtDateTime(row.createdAt)} · {row.user.fullName}
-                </div>
-                {row.reason ? <div className="mt-1 text-xs text-rose-300">Lý do: {row.reason}</div> : null}
-                {row.note ? <div className="mt-1 text-xs text-[#c8d0e8]">Ghi chú: {row.note}</div> : null}
-                {photos.length ? (
-                  <button
-                    type="button"
-                    onClick={() => setPhotoAlbum({ title: `Ảnh minh chứng ${row.fromPercent}% → ${row.toPercent}%`, photos, index: 0 })}
-                    className="mt-1 inline-block text-xs text-amber-300 underline"
-                  >
-                    Xem ảnh minh chứng{photos.length > 1 ? ` (${photos.length} ảnh)` : ""}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
+          {history.slice(0, 3).map(renderHistoryRow)}
         </div>
       </div>
+
+      {showHistoryModal ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-3" onClick={() => setShowHistoryModal(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-[#2e3347] bg-[#11131b] p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-[#f0f2f8]">Toàn bộ lịch sử tiến độ</div>
+                <div className="text-xs text-[#8891aa]">{history.length} nhật ký</div>
+              </div>
+              <button type="button" className="rounded-full border border-[#2e3347] bg-[#1a1d27] px-3 py-1 text-xs text-[#c8d0e8]" onClick={() => setShowHistoryModal(false)}>
+                Đóng
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {history.length === 0 ? <div className="text-sm text-[#8891aa]">Chưa có lịch sử cập nhật</div> : null}
+              <div className="space-y-3 border-l border-[#2e3347] pl-4">
+                {history.map(renderHistoryRow)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <TaskPhotoAlbumViewer album={photoAlbum} onChange={setPhotoAlbum} onClose={() => setPhotoAlbum(null)} />
     </div>
