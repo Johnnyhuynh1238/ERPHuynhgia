@@ -17,14 +17,14 @@ const KS_RATING_FIELDS: Array<{ name: RatingField; label: string }> = [
 function RatingInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
     <div>
-      <div className="mb-1 text-sm font-medium text-[#f0f2ff]">{label}</div>
+      <div className="mb-1 text-sm font-medium text-white">{label}</div>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
             onClick={() => onChange(star)}
-            className={`h-10 w-10 rounded-xl border text-xl transition ${star <= value ? "border-amber-400 bg-amber-400/15 text-amber-300" : "border-[#2d3249] bg-[#13151f] text-[#697089]"}`}
+            className={`h-10 w-10 rounded-xl border text-xl transition ${star <= value ? "border-amber-400 bg-amber-400/15 text-amber-300" : "border-[#444] bg-[#2a2a2a] text-neutral-500"}`}
             aria-label={`${label}: ${star} sao`}
           >
             ★
@@ -124,19 +124,19 @@ export function AcknowledgmentForm({ action }: Props) {
   }
 
   return (
-    <form action={action} method="post" className="rounded-2xl border border-amber-500/25 bg-[#1a1d2e] p-4 text-sm" onSubmit={onSubmit}>
-      <div className="font-semibold">Đánh giá và xác nhận nghiệm thu</div>
-      <p className="mt-1 text-xs text-[#8892b0]">Sau khi xác nhận, task sẽ hoàn tất và đánh giá không thể sửa.</p>
+    <form action={action} method="post" className="owner-section border border-amber-500/25 text-sm" onSubmit={onSubmit}>
+      <div className="owner-section-title">ĐÁNH GIÁ VÀ XÁC NHẬN NGHIỆM THU</div>
+      <p className="mt-1 text-xs owner-muted">Sau khi xác nhận, task sẽ hoàn tất và đánh giá không thể sửa.</p>
 
       <div className="mt-4 space-y-5">
-        <div className="rounded-2xl border border-[#2d3249] bg-[#13151f] p-3">
+        <div className="owner-card">
           <RatingInput label="Mức độ hài lòng với chất lượng task" value={ratings.taskRating} onChange={(value) => updateRating("taskRating", value)} />
           <input type="hidden" name="taskRating" value={ratings.taskRating || ""} readOnly />
-          <textarea name="taskNote" rows={2} className="mt-3 w-full rounded-xl border border-[#2d3249] bg-[#0f1117] px-3 py-2" placeholder="Ghi chú task (tùy chọn)" />
+          <textarea name="taskNote" rows={2} className="owner-textarea mt-3 placeholder:text-neutral-500" placeholder="Ghi chú task (tùy chọn)" />
         </div>
 
-        <div className="rounded-2xl border border-[#2d3249] bg-[#13151f] p-3">
-          <div className="mb-3 font-semibold">Đánh giá kỹ sư</div>
+        <div className="owner-card">
+          <div className="mb-3 font-semibold text-white">Đánh giá kỹ sư</div>
           <div className="space-y-4">
             {KS_RATING_FIELDS.map((field) => (
               <div key={field.name}>
@@ -145,14 +145,14 @@ export function AcknowledgmentForm({ action }: Props) {
               </div>
             ))}
           </div>
-          <textarea name="ksNote" rows={2} className="mt-3 w-full rounded-xl border border-[#2d3249] bg-[#0f1117] px-3 py-2" placeholder="Ghi chú kỹ sư (tùy chọn)" />
+          <textarea name="ksNote" rows={2} className="owner-textarea mt-3 placeholder:text-neutral-500" placeholder="Ghi chú kỹ sư (tùy chọn)" />
         </div>
       </div>
 
-      <div className="mt-4 font-semibold">Chữ ký nghiệm thu</div>
-      <p className="mt-1 text-xs text-[#8892b0]">Vui lòng ký tên vào khung bên dưới.</p>
+      <div className="mt-4 font-semibold text-white">Chữ ký nghiệm thu</div>
+      <p className="mt-1 text-xs owner-muted">Vui lòng ký tên vào khung bên dưới.</p>
 
-      <div className="mt-2 overflow-hidden rounded-xl border border-[#2d3249] bg-[#13151f]">
+      <div className="mt-2 overflow-hidden rounded-xl border border-[#444] bg-[#2a2a2a]">
         <canvas
           ref={canvasRef}
           width={760}
@@ -168,18 +168,18 @@ export function AcknowledgmentForm({ action }: Props) {
       <input type="hidden" name="signatureUrl" value={signatureData} readOnly />
 
       <div className="mt-2 flex justify-end">
-        <button type="button" className="rounded-lg border border-[#2d3249] px-3 py-1 text-xs" onClick={clearSignature}>
+        <button type="button" className="rounded-lg border border-[#444] px-3 py-1 text-xs text-neutral-200" onClick={clearSignature}>
           Xóa chữ ký
         </button>
       </div>
 
-      <textarea name="note" rows={2} className="mt-2 w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2" placeholder="Ghi chú nghiệm thu (tùy chọn)" />
-      <label className="mt-2 flex items-center gap-2 text-xs">
+      <textarea name="note" rows={2} className="owner-textarea mt-2 placeholder:text-neutral-500" placeholder="Ghi chú nghiệm thu (tùy chọn)" />
+      <label className="mt-2 flex items-center gap-2 text-xs text-neutral-300">
         <input type="checkbox" required name="confirmed" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
         Tôi đã kiểm tra, đồng ý nghiệm thu và xác nhận các đánh giá trên.
       </label>
       {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
-      <button disabled={!canSubmit} className="mt-3 rounded-lg bg-[#f97316] px-3 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50">
+      <button disabled={!canSubmit} className="owner-button mt-3 disabled:cursor-not-allowed disabled:opacity-50">
         Xác nhận nghiệm thu
       </button>
     </form>

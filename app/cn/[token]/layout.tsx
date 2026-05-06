@@ -8,11 +8,15 @@ export default async function CustomerPortalLayout({
   children: React.ReactNode;
   params: { token: string };
 }) {
-  const { session } = await requirePortalPageAccess(params.token);
+  const { project, session } = await requirePortalPageAccess(params.token);
 
-  if (!session) {
+  if (!project || !session) {
     return <>{children}</>;
   }
 
-  return <CustomerPortalShell token={params.token}>{children}</CustomerPortalShell>;
+  return (
+    <CustomerPortalShell token={params.token} projectName={project.name} customerName={project.customerName}>
+      {children}
+    </CustomerPortalShell>
+  );
 }

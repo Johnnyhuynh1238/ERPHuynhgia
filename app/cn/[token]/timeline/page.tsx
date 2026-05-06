@@ -51,16 +51,16 @@ export default async function CustomerTimelinePage({ params }: { params: { token
   });
 
   return (
-    <div className="space-y-4 pb-2">
-      <section className="rounded-3xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="text-xs text-[#8892b0]">Theo dõi từng giai đoạn</div>
-        <h1 className="mt-1 text-xl font-bold text-[#f8fafc]">Tiến độ thi công</h1>
+    <div className="owner-portal-page">
+      <section className="owner-section">
+        <div className="owner-section-title">TIẾN ĐỘ THI CÔNG</div>
+        <div className="text-sm owner-muted">Theo dõi từng giai đoạn và các công việc đang mở cho chủ nhà.</div>
       </section>
 
       {phases.length === 0 ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-sm text-[#8892b0]">
+        <section className="owner-section text-sm owner-muted">
           Dự án chưa có giai đoạn hiển thị cho chủ nhà.
-        </div>
+        </section>
       ) : null}
 
       {phases.map((phase, index) => {
@@ -71,39 +71,39 @@ export default async function CustomerTimelinePage({ params }: { params: { token
         const completed = total > 0 && percent === 100;
 
         return (
-          <section key={phase.id} className={`rounded-3xl border p-4 ${active ? "border-orange-500/40 bg-orange-500/10" : "border-[#252840] bg-[#1a1d2e]"}`}>
+          <section key={phase.id} className="owner-section">
             <div className="flex items-start gap-3">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${completed ? "bg-emerald-500 text-white" : active ? "bg-[#f97316] text-white" : "bg-[#252840] text-[#8892b0]"}`}>
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${completed ? "bg-emerald-500 text-black" : active ? "bg-[#ff8a3d] text-black" : "bg-[#2a2a2a] text-neutral-400"}`}>
                 {index + 1}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-semibold text-[#f8fafc]">{phase.name}</h2>
-                    <div className="text-xs text-[#8892b0]">{phase.code} · {dateText(phase.plannedStartDate)} - {dateText(phase.plannedEndDate)}</div>
+                    <h2 className="font-semibold text-white">{phase.name}</h2>
+                    <div className="text-xs owner-muted">{phase.code} · {dateText(phase.plannedStartDate)} - {dateText(phase.plannedEndDate)}</div>
                   </div>
-                  <div className="text-right text-xs text-[#a8b0c8]">{done}/{total}<br />{percent}%</div>
+                  <div className="text-right text-xs owner-muted">{done}/{total}<br />{percent}%</div>
                 </div>
-                <div className="mt-3 h-2 rounded-full bg-[#252840]">
-                  <div className={`h-2 rounded-full ${completed ? "bg-emerald-500" : "bg-[#f97316]"}`} style={{ width: `${percent}%` }} />
+                <div className="mt-3 owner-progress-track">
+                  <div className={completed ? "h-full rounded-full bg-emerald-500" : "owner-progress-fill"} style={{ width: `${percent}%` }} />
                 </div>
               </div>
             </div>
 
             <div className="mt-4 space-y-2">
-              {phase.tasks.length === 0 ? <div className="rounded-xl bg-[#13151f] p-3 text-sm text-[#8892b0]">Chưa có task hiển thị.</div> : null}
+              {phase.tasks.length === 0 ? <div className="owner-card text-sm owner-muted">Chưa có task hiển thị.</div> : null}
               {phase.tasks.map((task) => (
-                <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}`} className="block rounded-2xl border border-[#2d3249] bg-[#13151f] p-3">
+                <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}`} className="owner-card block">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-xs text-[#8892b0]">{task.code}</div>
-                      <div className="font-semibold text-[#f8fafc]">{task.name}</div>
-                      <div className="mt-1 text-xs text-[#8892b0]">Dự kiến: {dateText(task.plannedStartDate)} - {dateText(task.plannedEndDate)}</div>
+                      <div className="text-xs owner-muted">{task.code}</div>
+                      <div className="font-semibold text-white">{task.name}</div>
+                      <div className="mt-1 text-xs owner-muted">Dự kiến: {dateText(task.plannedStartDate)} - {dateText(task.plannedEndDate)}</div>
                     </div>
                     <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusTone(task.status)}`}>{statusText(task.status)}</span>
                   </div>
-                  <div className="mt-3 h-1.5 rounded-full bg-[#252840]">
-                    <div className="h-1.5 rounded-full bg-[#fb923c]" style={{ width: `${task.progressPercent || 0}%` }} />
+                  <div className="mt-3 owner-progress-track h-1.5">
+                    <div className="owner-progress-fill" style={{ width: `${task.progressPercent || 0}%` }} />
                   </div>
                 </Link>
               ))}

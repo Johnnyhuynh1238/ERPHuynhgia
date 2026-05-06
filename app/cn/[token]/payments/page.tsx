@@ -88,31 +88,31 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
     const dueSoon = payment.status !== "paid" && days !== null && days >= 0 && days <= 30;
 
     return (
-      <article key={payment.id} className="rounded-3xl border border-[#252840] bg-[#1a1d2e] p-4">
+      <article key={payment.id} className="owner-card">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs text-[#8892b0]">Đợt {payment.installmentNo}</div>
-            <h2 className="font-semibold text-[#f8fafc]">{payment.description}</h2>
+            <div className="text-xs owner-muted">Đợt {payment.installmentNo}</div>
+            <h2 className="font-semibold text-white">{payment.description}</h2>
           </div>
           <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusClass(payment.status)}`}>{statusText(payment.status)}</span>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-2xl bg-[#13151f] p-3">
-            <div className="text-xs text-[#8892b0]">Số tiền</div>
-            <div className="font-semibold text-[#f8fafc]">{money(payment.amount)}</div>
+          <div className="rounded-xl bg-[#1a1a1a] p-3">
+            <div className="text-xs owner-muted">Số tiền</div>
+            <div className="font-semibold text-white">{money(payment.amount)}</div>
           </div>
-          <div className="rounded-2xl bg-[#13151f] p-3">
-            <div className="text-xs text-[#8892b0]">Hạn thu</div>
-            <div className="font-semibold text-[#f8fafc]">{dateText(payment.dueDate)}</div>
+          <div className="rounded-xl bg-[#1a1a1a] p-3">
+            <div className="text-xs owner-muted">Hạn thu</div>
+            <div className="font-semibold text-white">{dateText(payment.dueDate)}</div>
           </div>
           {payment.status === "paid" ? (
             <>
-              <div className="rounded-2xl bg-emerald-500/10 p-3">
+              <div className="rounded-xl bg-emerald-500/10 p-3">
                 <div className="text-xs text-emerald-200/70">Đã thu</div>
                 <div className="font-semibold text-emerald-200">{money(payment.paidAmount || payment.amount)}</div>
               </div>
-              <div className="rounded-2xl bg-emerald-500/10 p-3">
+              <div className="rounded-xl bg-emerald-500/10 p-3">
                 <div className="text-xs text-emerald-200/70">Ngày thu</div>
                 <div className="font-semibold text-emerald-200">{dateText(payment.paidAt)}</div>
               </div>
@@ -121,25 +121,25 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
         </div>
 
         {dueSoon ? <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">Đợt này đến hạn trong {days} ngày.</div> : null}
-        {payment.receiptUrl ? <a href={payment.receiptUrl} target="_blank" className="mt-3 block rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-200">Xem biên lai</a> : null}
-        {payment.paymentNote ? <div className="mt-3 rounded-xl bg-[#13151f] p-3 text-sm text-[#d9def3]">{payment.paymentNote}</div> : null}
+        {payment.receiptUrl ? <a href={payment.receiptUrl} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a> : null}
+        {payment.paymentNote ? <div className="owner-card mt-3 bg-[#1a1a1a] text-sm">{payment.paymentNote}</div> : null}
 
-        <div className="mt-4 border-t border-[#252840] pt-4">
-          <div className="mb-2 text-sm font-semibold text-[#f8fafc]">Trao đổi về đợt này</div>
+        <div className="mt-4 border-t border-[#3a3a3a] pt-4">
+          <div className="mb-2 text-sm font-semibold text-white">Trao đổi về đợt này</div>
           <form action={`/cn/${params.token}/comments/new`} method="post" className="space-y-2">
             <input type="hidden" name="targetType" value={CommentTargetType.payment_schedule} />
             <input type="hidden" name="targetId" value={payment.id} />
-            <textarea name="content" rows={2} placeholder="Nhập câu hỏi về đợt thanh toán..." className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#f8fafc] outline-none placeholder:text-[#647089]" />
-            <button type="submit" className="w-full rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white">Gửi bình luận</button>
+            <textarea name="content" rows={2} placeholder="Nhập câu hỏi về đợt thanh toán..." className="owner-textarea placeholder:text-neutral-500" />
+            <button type="submit" className="owner-button w-full">Gửi bình luận</button>
           </form>
           <div className="mt-3 space-y-2">
             {paymentComments.map((comment) => (
-              <div key={comment.id} className="rounded-xl bg-[#13151f] p-3 text-sm">
-                <div className="text-xs text-[#8892b0]">{comment.authorName || comment.author?.fullName || "Chủ nhà"} · {dateText(comment.createdAt)}</div>
-                <div className="mt-1 text-[#f8fafc]">{comment.content}</div>
+              <div key={comment.id} className="owner-comment bg-[#1a1a1a]">
+                <div className="text-xs owner-muted">{comment.authorName || comment.author?.fullName || "Chủ nhà"} · {dateText(comment.createdAt)}</div>
+                <div className="mt-1 text-white">{comment.content}</div>
                 {[...comment.replies, ...comment.threadReplies].map((reply) => (
-                  <div key={reply.id} className="mt-2 rounded-lg bg-[#1a1d2e] p-2 text-xs text-[#d9def3]">
-                    <span className="font-semibold text-[#fb923c]">{reply.author?.fullName || ("authorName" in reply ? reply.authorName : null) || "Nhân sự"}: </span>{reply.content}
+                  <div key={reply.id} className="owner-reply">
+                    <span className="font-semibold text-[#ff8a3d]">{reply.author?.fullName || ("authorName" in reply ? reply.authorName : null) || "Nhân sự"}: </span>{reply.content}
                   </div>
                 ))}
               </div>
@@ -151,27 +151,26 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
   };
 
   return (
-    <div className="space-y-4 pb-2">
-      <section className="rounded-3xl border border-[#252840] bg-gradient-to-br from-[#242132] to-[#13151f] p-4">
-        <div className="text-xs text-[#8892b0]">Theo dõi hợp đồng và thanh toán</div>
-        <h1 className="mt-1 text-xl font-bold text-[#f8fafc]">Tài chính</h1>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-2xl bg-white/5 p-3"><div className="text-sm font-bold text-[#f8fafc]">{money(contractValue)}</div><div className="text-[#8892b0]">Tổng</div></div>
-          <div className="rounded-2xl bg-white/5 p-3"><div className="text-sm font-bold text-emerald-300">{money(paidTotal)}</div><div className="text-[#8892b0]">Đã thu</div></div>
-          <div className="rounded-2xl bg-white/5 p-3"><div className="text-sm font-bold text-amber-200">{money(remaining)}</div><div className="text-[#8892b0]">Còn lại</div></div>
+    <div className="owner-portal-page">
+      <section className="owner-section">
+        <div className="owner-section-title">TÀI CHÍNH</div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="owner-card"><div className="text-sm font-bold text-white">{money(contractValue)}</div><div className="owner-muted">Tổng</div></div>
+          <div className="owner-card"><div className="text-sm font-bold text-emerald-300">{money(paidTotal)}</div><div className="owner-muted">Đã thu</div></div>
+          <div className="owner-card"><div className="text-sm font-bold text-amber-200">{money(remaining)}</div><div className="owner-muted">Còn lại</div></div>
         </div>
-        <div className="mt-4 h-2 rounded-full bg-[#252840]"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${paidPercent}%` }} /></div>
+        <div className="mt-4 owner-progress-track"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${paidPercent}%` }} /></div>
       </section>
 
-      <section className="space-y-3">
-        <div className="text-sm font-semibold text-[#f8fafc]">Theo hợp đồng</div>
-        {contractPayments.length === 0 ? <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-sm text-[#8892b0]">Chưa có lịch thanh toán hợp đồng.</div> : null}
+      <section className="owner-section space-y-3">
+        <div className="owner-section-title">THEO HỢP ĐỒNG</div>
+        {contractPayments.length === 0 ? <div className="text-sm owner-muted">Chưa có lịch thanh toán hợp đồng.</div> : null}
         {contractPayments.map(renderPayment)}
       </section>
 
       {addendumPayments.length ? (
-        <section className="space-y-3">
-          <div className="text-sm font-semibold text-[#f8fafc]">Phụ lục phát sinh</div>
+        <section className="owner-section space-y-3">
+          <div className="owner-section-title">PHỤ LỤC PHÁT SINH</div>
           {addendumPayments.map(renderPayment)}
         </section>
       ) : null}
