@@ -527,7 +527,9 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setShowDeleted(false);
   }
 
-  function openTask(task: TaskRow) {
+  function openTask(task: TaskRow, event?: React.MouseEvent<HTMLElement>) {
+    const target = event?.target instanceof HTMLElement ? event.target : null;
+    if (target?.closest("button,a,input,select,textarea")) return;
     if (task.isActive) router.push(`/tasks/${task.id}`);
   }
 
@@ -1169,7 +1171,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                         return (
                                           <div
                                             key={task.id}
-                                            onClick={() => openTask(task)}
+                                            onClick={(event) => openTask(task, event)}
                                             className={`w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97] ${task.isActive ? "cursor-pointer" : "opacity-70"}`}
                                             style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
                                           >
@@ -1214,7 +1216,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                                   return (
                                     <div
                                       key={task.id}
-                                      onClick={() => openTask(task)}
+                                      onClick={(event) => openTask(task, event)}
                                       className={`w-full rounded-[18px] border border-[#252840] bg-[#1a1d2e] px-4 py-[14px] text-left transition active:scale-[0.97] ${task.isActive ? "cursor-pointer" : "opacity-70"}`}
                                       style={{ borderLeft: `3px solid ${statusBorderColor(task.status)}` }}
                                     >
