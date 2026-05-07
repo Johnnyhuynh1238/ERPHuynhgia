@@ -5,6 +5,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getReportProjectsForUser } from "@/lib/reporting";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getTodayDateVn } from "@/lib/task-centric";
 
 function startOfTodayUtc() {
   const now = new Date();
@@ -94,6 +95,8 @@ export async function GET() {
   const now = new Date();
   const today = startOfTodayUtc();
   const todayEnd = endOfTodayUtc();
+  const todayVn = getTodayDateVn();
+  const todayVnEnd = new Date(addDays(todayVn, 1).getTime() - 1);
   const in7Days = addDays(today, 7);
   const in3Days = addDays(today, 3);
 
@@ -240,7 +243,7 @@ export async function GET() {
           }),
           prisma.taskProgressHistory.findMany({
             where: {
-              createdAt: { gte: today, lte: todayEnd },
+              createdAt: { gte: todayVn, lte: todayVnEnd },
               task: {
                 projectId: { in: reportProjectIds },
               },
@@ -531,7 +534,7 @@ export async function GET() {
           prisma.taskProgressHistory.findMany({
             where: {
               userId: user.id,
-              createdAt: { gte: today, lte: todayEnd },
+              createdAt: { gte: todayVn, lte: todayVnEnd },
               task: {
                 projectId: { in: reportProjectIds },
               },
