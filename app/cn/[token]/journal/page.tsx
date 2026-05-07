@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { buildCustomerJournalEvents } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
+import { CustomerJournalDownloadButtons } from "../_components/customer-journal-download-buttons";
 import { CustomerPhotoAlbum } from "../_components/customer-photo-album";
 
 const typeOptions = [
@@ -64,20 +65,36 @@ export default async function CustomerJournalPage({
     }),
     buildCustomerJournalEvents(project.id, { phase: selectedPhase, type: selectedType }),
   ]);
+  const eventComments = events.length
+    ? await prisma.customerComment.findMany({
+        where: {
+          projectId: project.id,
+          parentId: null,
+          OR: events.map((event) => ({ targetType: event.targetType, targetId: event.targetId })),
+        },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        include: {
+          author: { select: { fullName: true } },
+          replies: { include: { author: { select: { fullName: true } } }, orderBy: { createdAt: "asc" } },
+          threadReplies: { include: { author: { select: { fullName: true } } }, orderBy: { createdAt: "asc" } },
+        },
+      })
+    : [];
+  const commentsByTarget = eventComments.reduce<Record<string, typeof eventComments>>((groups, comment) => {
+    const key = `${comment.targetType}:${comment.targetId}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(comment);
+    return groups;
+  }, {});
 
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
         <div className="owner-section-title">NHẬT KÝ CÔNG TRÌNH</div>
         <div className="text-sm owner-muted">Timeline thi công theo ngày, ảnh, QC, nghiệm thu và thanh toán.</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <form action={`/api/customer/${params.token}/journal/download/pdf`} method="post">
-            <button type="submit" className="owner-card w-full text-sm font-semibold text-white">Tạo PDF tóm tắt</button>
-          </form>
-          <form action={`/api/customer/${params.token}/journal/download/zip`} method="post">
-            <button type="submit" className="owner-button w-full">Tạo ZIP đầy đủ</button>
-          </form>
-        </div>
+        <a href={`/cn/${params.token}/journal?view=photos`} className="owner-card mt-4 block py-2 text-center text-sm font-semibold text-white">Xem toàn bộ ảnh</a>
+        <CustomerJournalDownloadButtons token={params.token} />
       </section>
 
       <section className="owner-section">
@@ -117,26 +134,46 @@ export default async function CustomerJournalPage({
             {event.description ? <div className="mt-2 text-sm text-neutral-300">{event.description}</div> : null}
             {event.taskId ? <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="mt-2 inline-block text-xs font-semibold text-[#ff8a3d] underline">Xem task {event.taskCode}</a> : null}
 
-            {event.photos?.length ? (
+            {event.type === "payment" && event.photos?.length ? (
+              <a href={`/api/payment-schedules/${event.targetId}/receipt?token=${params.token}`} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a>
+            ) : event.photos?.length ? (
               <CustomerPhotoAlbum
-                photos={event.photos.slice(0, 6).map((photo, index) => ({
-                  id: `${event.id}-photo-${index}`,
-                  url: photo.url,
-                  thumbnailUrl: photo.thumbnailUrl,
-                  caption: event.title,
-                }))}
+                photos={event.photos.slice(0, 6).map((photo, index) => {
+                  const taskPhotoUrl = event.type === "photo" && event.taskId && photo.id ? `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file?variant=photo` : null;
+                  const taskThumbnailUrl = event.type === "photo" && event.taskId && photo.id ? `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file?variant=thumb` : null;
+                  const qcPhotoUrl = event.type === "qc" ? `/api/customer/${params.token}/journal/qc-logs/${event.targetId}/photos/${index}/file` : null;
+                  return {
+                    id: `${event.id}-photo-${index}`,
+                    url: taskPhotoUrl || qcPhotoUrl || photo.url,
+                    thumbnailUrl: taskThumbnailUrl || qcPhotoUrl || photo.thumbnailUrl,
+                    caption: event.title,
+                  };
+                })}
                 gridClassName="mt-3 grid grid-cols-3 gap-2"
               />
             ) : null}
 
             <div className="mt-4 border-t border-[#3a3a3a] pt-3">
-              <div className="mb-2 text-xs owner-muted">{event.commentCount} bình luận</div>
+              <div className="mb-2 text-xs owner-muted">{commentsByTarget[`${event.targetType}:${event.targetId}`]?.length ?? event.commentCount} bình luận</div>
               <form action={`/cn/${params.token}/comments/new`} method="post" className="space-y-2">
                 <input type="hidden" name="targetType" value={event.targetType || CommentTargetType.journal_entry} />
                 <input type="hidden" name="targetId" value={event.targetId} />
-                <textarea name="content" rows={2} placeholder="Bình luận về sự kiện này..." className="owner-textarea placeholder:text-neutral-500" />
+                <textarea required name="content" rows={2} placeholder="Bình luận về sự kiện này..." className="owner-textarea placeholder:text-neutral-500" />
                 <button type="submit" className="owner-button w-full">Gửi bình luận</button>
               </form>
+              <div className="mt-3 space-y-2">
+                {(commentsByTarget[`${event.targetType}:${event.targetId}`] || []).map((comment) => (
+                  <div key={comment.id} className="owner-comment bg-[#1a1a1a]">
+                    <div className="text-xs owner-muted">{comment.authorName || comment.author?.fullName || "Chủ nhà"} · {dateText(comment.createdAt)}</div>
+                    <div className="mt-1 text-white">{comment.content}</div>
+                    {[...comment.replies, ...comment.threadReplies].map((reply) => (
+                      <div key={reply.id} className="owner-reply">
+                        <span className="font-semibold text-[#ff8a3d]">{reply.author?.fullName || ("authorName" in reply ? reply.authorName : null) || "Nhân sự"}: </span>{reply.content}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           </article>
         ))}

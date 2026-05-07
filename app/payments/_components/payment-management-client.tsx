@@ -157,14 +157,30 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
 
   async function markPaid(event: FormEvent<HTMLFormElement>, payment: Payment) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const receipt = formData.get("receipt");
+    if (!(receipt instanceof File) || !receipt.name) {
+      toast.error("Vui lòng chọn file biên lai");
+      return;
+    }
+
+    const receiptData = new FormData();
+    receiptData.append("receipt", receipt);
+    const receiptRes = await fetch(`/api/payment-schedules/${payment.id}/receipt`, { method: "POST", body: receiptData });
+    const receiptJson = await receiptRes.json().catch(() => ({}));
+    if (!receiptRes.ok) {
+      toast.error(receiptJson.message || "Không upload được biên lai");
+      return;
+    }
+
     const res = await fetch(`/api/payment-schedules/${payment.id}/mark-paid`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         paidAt: formData.get("paidAt"),
         paidAmount: formData.get("paidAmount"),
-        receiptUrl: formData.get("receiptUrl"),
+        receiptUrl: receiptJson.receiptUrl,
         paymentNote: formData.get("paymentNote"),
       }),
     });
@@ -174,7 +190,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
       return;
     }
     toast.success(json.message || "Đã đánh dấu đã thu");
-    event.currentTarget.reset();
+    form.reset();
     await loadProject(selectedProjectId);
   }
 
@@ -204,6 +220,28 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
       return;
     }
     toast.success(json.message || "Đã xóa bản vẽ");
+    await loadProject(selectedProjectId);
+  }
+
+  async function editDrawing(drawing: Drawing) {
+    const name = window.prompt("Tên bản vẽ", drawing.name);
+    if (name === null) return;
+    const description = window.prompt("Mô tả", drawing.description || "");
+    if (description === null) return;
+    const displayOrder = window.prompt("Thứ tự", "0");
+    if (displayOrder === null) return;
+
+    const res = await fetch(`/api/drawings/${drawing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description, displayOrder }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Không cập nhật được bản vẽ");
+      return;
+    }
+    toast.success(json.message || "Đã cập nhật bản vẽ");
     await loadProject(selectedProjectId);
   }
 
@@ -271,7 +309,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
                   </div>
                   <div className="text-right text-sm">
                     <div className={payment.status === "paid" ? "text-emerald-300" : "text-amber-200"}>{statusText(payment.status)}</div>
-                    {payment.receiptUrl ? <a href={payment.receiptUrl} target="_blank" className="text-xs text-orange-300 underline">Biên lai</a> : null}
+                    {payment.receiptUrl ? <a href={`/api/payment-schedules/${payment.id}/receipt`} target="_blank" className="text-xs text-orange-300 underline">Biên lai</a> : null}
                   </div>
                 </div>
 
@@ -286,7 +324,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
                   <form onSubmit={(event) => void markPaid(event, payment)} className="mt-3 grid gap-2 md:grid-cols-4">
                     <input required name="paidAt" type="date" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
                     <input required name="paidAmount" placeholder="Số tiền thu" defaultValue={payment.amount} className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
-                    <input required name="receiptUrl" placeholder="URL biên lai" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
+                    <input required name="receipt" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
                     <input name="paymentNote" placeholder="Ghi chú" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
                     <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white md:col-span-4">Đánh dấu đã thu</button>
                   </form>
@@ -320,6 +358,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
                 </div>
                 <div className="flex gap-2">
                   <a href={drawing.viewUrl} target="_blank" className="rounded-lg border border-[#2d3249] px-3 py-1 text-xs text-orange-200">Xem</a>
+                  {isAdmin ? <button type="button" onClick={() => void editDrawing(drawing)} className="rounded-lg border border-[#2d3249] px-3 py-1 text-xs text-[#d9def3]">Sửa</button> : null}
                   {isAdmin ? <button type="button" onClick={() => void deleteDrawing(drawing)} className="rounded-lg border border-red-500/30 px-3 py-1 text-xs text-red-200">Xóa</button> : null}
                 </div>
               </div>

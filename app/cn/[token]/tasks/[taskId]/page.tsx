@@ -129,7 +129,12 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
             <div key={date}>
               <div className="mb-2 text-xs font-semibold owner-muted">{date}</div>
               <CustomerPhotoAlbum
-                photos={photos.map((photo) => ({ id: photo.id, url: photo.photoUrl, thumbnailUrl: photo.thumbnailUrl, caption: photo.caption || task.name }))}
+                photos={photos.map((photo) => ({
+                  id: photo.id,
+                  url: `/api/customer/${params.token}/tasks/${task.id}/photos/${photo.id}/file?variant=photo`,
+                  thumbnailUrl: `/api/customer/${params.token}/tasks/${task.id}/photos/${photo.id}/file?variant=thumb`,
+                  caption: photo.caption || task.name,
+                }))}
               />
             </div>
           ))}
@@ -156,7 +161,11 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
                 {item.progress?.note ? <div className="mt-2 text-sm text-neutral-300">{item.progress.note}</div> : null}
                 {item.photos.length ? (
                   <CustomerPhotoAlbum
-                    photos={item.photos.map((photo) => ({ id: photo.id, url: photo.url, caption: item.content }))}
+                    photos={item.photos.map((photo) => ({
+                      id: photo.id,
+                      url: `/api/customer/${params.token}/tasks/${task.id}/qc-photos/${photo.id}/file`,
+                      caption: item.content,
+                    }))}
                     gridClassName="mt-3 grid grid-cols-4 gap-2"
                     thumbnailClassName="h-16"
                   />

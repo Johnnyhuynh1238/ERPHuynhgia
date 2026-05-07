@@ -15,18 +15,37 @@ const commentSchema = z.object({
   content: z.string().trim().min(1, "Nội dung là bắt buộc"),
 });
 
-function canComment(role: UserRole) {
-  return role === UserRole.admin || role === UserRole.accountant || role === UserRole.construction_manager || role === UserRole.engineer;
+const allCommentTargetTypes = Object.values(CommentTargetType) as CommentTargetType[];
+
+function allowedTargetTypes(role: UserRole) {
+  if (role === UserRole.admin || role === UserRole.construction_manager) return allCommentTargetTypes;
+  if (role === UserRole.engineer) return [CommentTargetType.project, CommentTargetType.task, CommentTargetType.journal_entry];
+  if (role === UserRole.accountant) return [CommentTargetType.payment_schedule];
+  return [];
+}
+
+function canComment(role: UserRole, targetType?: CommentTargetType | null) {
+  const allowed = allowedTargetTypes(role);
+  return targetType ? allowed.includes(targetType) : allowed.length > 0;
+}
+
+function commentVisibilityWhere(role: UserRole, targetType?: CommentTargetType | null) {
+  if (targetType) return { targetType };
+  const allowed = allowedTargetTypes(role);
+  if (allowed.length === allCommentTargetTypes.length) return {};
+  if (allowed.length === 0) return { targetType: { in: [] as CommentTargetType[] } };
+  const includeLegacyComments = allowed.includes(CommentTargetType.task) || allowed.includes(CommentTargetType.journal_entry) || allowed.includes(CommentTargetType.project);
+  return includeLegacyComments ? { OR: [{ targetType: { in: allowed } }, { targetType: null }] } : { targetType: { in: allowed } };
 }
 
 function parseTargetType(value: string | null) {
   return value && Object.values(CommentTargetType).includes(value as CommentTargetType) ? (value as CommentTargetType) : null;
 }
 
-async function requireStaffProjectAccess(projectId: string) {
+async function requireStaffProjectAccess(projectId: string, targetType?: CommentTargetType | null) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) return { error: NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 }) };
-  if (!canComment(user.role as UserRole)) return { error: NextResponse.json({ message: "Không có quyền" }, { status: 403 }) };
+  if (!canComment(user.role as UserRole, targetType)) return { error: NextResponse.json({ message: "Không có quyền" }, { status: 403 }) };
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, ...buildProjectAccessWhere({ id: user.id, role: user.role }) },
@@ -45,14 +64,15 @@ export async function GET(request: Request) {
   const targetId = url.searchParams.get("targetId") || "";
 
   if (!projectId) return NextResponse.json({ message: "Thiếu dự án" }, { status: 400 });
-  const access = await requireStaffProjectAccess(projectId);
+  const access = await requireStaffProjectAccess(projectId, targetType);
   if (access.error) return access.error;
 
+  const targetWhere = commentVisibilityWhere(access.user.role as UserRole, targetType);
   const comments = await prisma.customerComment.findMany({
     where: {
       projectId,
       parentId: null,
-      ...(targetType ? { targetType } : {}),
+      ...targetWhere,
       ...(targetId ? { targetId } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -79,7 +99,7 @@ export async function POST(request: Request) {
   const parsed = commentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
 
-  const access = await requireStaffProjectAccess(parsed.data.projectId);
+  const access = await requireStaffProjectAccess(parsed.data.projectId, parsed.data.targetType);
   if (access.error) return access.error;
 
   const target = await validateCustomerCommentTarget(prisma, parsed.data.projectId, parsed.data.targetType, parsed.data.targetId);

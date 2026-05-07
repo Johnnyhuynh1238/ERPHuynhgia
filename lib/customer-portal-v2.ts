@@ -72,7 +72,7 @@ export type CustomerJournalEvent = {
   taskName?: string;
   phase?: string | null;
   phaseName?: string | null;
-  photos?: Array<{ url: string; thumbnailUrl?: string | null }>;
+  photos?: Array<{ id?: string; url: string; thumbnailUrl?: string | null }>;
   targetType: CommentTargetType;
   targetId: string;
   commentCount?: number;
@@ -366,7 +366,7 @@ export async function buildCustomerJournalEvents(
       taskName: photo.task.name,
       phase: photo.task.phase,
       phaseName: photo.task.projectPhase?.name || null,
-      photos: [{ url: photo.photoUrl, thumbnailUrl: photo.thumbnailUrl }],
+      photos: [{ id: photo.id, url: photo.photoUrl, thumbnailUrl: photo.thumbnailUrl }],
       targetType: CommentTargetType.journal_entry,
       targetId: photo.id,
       commentCount: withCommentCount(CommentTargetType.journal_entry, photo.id),

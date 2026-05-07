@@ -195,9 +195,22 @@ async function buildZip(projectId: string) {
   const files: Array<{ name: string; data: Buffer; mtime?: Date }> = [
     { name: "00_TomTat.pdf", data: summaryPdf },
     {
-      name: "03_Anh/index.csv",
+      name: "04_QC_Logs/qc.csv",
       data: Buffer.from(
-        ["date,type,title,url", ...events.flatMap((event) => (event.photos || []).map((photo) => [event.date, event.type, event.title, photo.url].map(csvEscape).join(",")))].join("\n"),
+        [
+          "date,task,title,note,photoCount",
+          ...events.filter((event) => event.type === "qc").map((event) => [event.date, event.taskCode, event.title, event.description, event.photos?.length || 0].map(csvEscape).join(",")),
+        ].join("\n"),
+        "utf8",
+      ),
+    },
+    {
+      name: "05_NghiemThu/acknowledgments.csv",
+      data: Buffer.from(
+        [
+          "date,task,title,description",
+          ...events.filter((event) => event.type === "acknowledgment").map((event) => [event.date, event.taskCode, event.title, event.description].map(csvEscape).join(",")),
+        ].join("\n"),
         "utf8",
       ),
     },
@@ -215,6 +228,31 @@ async function buildZip(projectId: string) {
       ),
     },
   ];
+  const photoRows = ["date,type,title,sourceUrl,filename"];
+  const usedPhotoNames = new Set<string>();
+
+  for (const event of events) {
+    if (event.type !== "photo" && event.type !== "qc") continue;
+    const photos = event.photos || [];
+    for (let index = 0; index < photos.length; index += 1) {
+      const photo = photos[index];
+      const key = minioKey(photo.url);
+      const extension = key?.match(/\.[a-zA-Z0-9]+$/)?.[0] || ".jpg";
+      const baseName = safeFilename(`${event.date.toISOString().slice(0, 10)}_${event.type}_${event.taskCode || event.id}_${index + 1}`);
+      let filename = `${baseName}${extension}`;
+      let suffix = 2;
+      while (usedPhotoNames.has(filename)) {
+        filename = `${baseName}_${suffix}${extension}`;
+        suffix += 1;
+      }
+      usedPhotoNames.add(filename);
+      photoRows.push([event.date, event.type, event.title, photo.url, key ? filename : ""].map(csvEscape).join(","));
+      if (!key) continue;
+      const file = await getObjectFromMinio(key);
+      files.push({ name: `03_Anh/${filename}`, data: file.buffer, mtime: event.date });
+    }
+  }
+  files.push({ name: "03_Anh/index.csv", data: Buffer.from(photoRows.join("\n"), "utf8") });
 
   files.push({
     name: "02_BanVe/drawings.csv",

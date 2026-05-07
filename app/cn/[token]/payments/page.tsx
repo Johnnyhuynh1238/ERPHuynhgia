@@ -121,7 +121,7 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
         </div>
 
         {dueSoon ? <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">Đợt này đến hạn trong {days} ngày.</div> : null}
-        {payment.receiptUrl ? <a href={payment.receiptUrl} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a> : null}
+        {payment.receiptUrl ? <a href={`/api/payment-schedules/${payment.id}/receipt?token=${params.token}`} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a> : null}
         {payment.paymentNote ? <div className="owner-card mt-3 bg-[#1a1a1a] text-sm">{payment.paymentNote}</div> : null}
 
         <div className="mt-4 border-t border-[#3a3a3a] pt-4">

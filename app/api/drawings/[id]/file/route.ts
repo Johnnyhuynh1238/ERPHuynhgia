@@ -7,7 +7,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { requireCustomerPortalApiAccess } from "@/lib/customer-portal-v2";
 
 function canViewDrawing(role: UserRole) {
-  return role === UserRole.admin || role === UserRole.construction_manager || role === UserRole.engineer;
+  return role === UserRole.admin || role === UserRole.accountant || role === UserRole.construction_manager || role === UserRole.engineer;
 }
 
 function minioKey(url: string) {

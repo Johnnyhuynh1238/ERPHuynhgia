@@ -15,7 +15,7 @@ function safeFilename(name: string) {
 }
 
 function canViewDrawings(role: UserRole) {
-  return role === UserRole.admin || role === UserRole.construction_manager || role === UserRole.engineer;
+  return role === UserRole.admin || role === UserRole.accountant || role === UserRole.construction_manager || role === UserRole.engineer;
 }
 
 function drawingViewUrl(id: string) {
