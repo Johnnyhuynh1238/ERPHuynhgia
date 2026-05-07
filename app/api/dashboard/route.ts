@@ -215,7 +215,7 @@ export async function GET() {
 
     const reportProjectIds = reportProjectsRaw.map((project) => project.id);
 
-    const [siteRestRows, technicalSubmittedRows] = reportProjectIds.length
+    const [siteRestRows, technicalSubmittedRows, progressSubmittedRows] = reportProjectIds.length
       ? await Promise.all([
           prisma.siteRestDay.findMany({
             where: {
@@ -238,13 +238,27 @@ export async function GET() {
               task: { select: { projectId: true } },
             },
           }),
+          prisma.taskProgressHistory.findMany({
+            where: {
+              createdAt: { gte: today, lte: todayEnd },
+              task: {
+                projectId: { in: reportProjectIds },
+              },
+            },
+            select: {
+              userId: true,
+              task: { select: { projectId: true } },
+            },
+          }),
         ])
-      : [[], []];
+      : [[], [], []];
 
     const restProjectSet = new Set(siteRestRows.map((row) => row.projectId));
     const activeReportProjects = reportProjectsRaw.filter((project) => !restProjectSet.has(project.id));
 
     const technicalSet = new Set(technicalSubmittedRows.map((row) => `${row.task.projectId}_${row.createdBy}`));
+    const progressSet = new Set(progressSubmittedRows.map((row) => `${row.task.projectId}_${row.userId}`));
+    const eveningSet = new Set([...technicalSet, ...progressSet]);
 
     const missingMorning = activeReportProjects
       .filter((project) => !technicalSet.has(`${project.id}_${project.mainEngineerId}`))
@@ -256,8 +270,15 @@ export async function GET() {
         engineerName: project.mainEngineer.fullName,
       }));
 
-    // Legacy evening/morning report đã bỏ; tạm dùng cùng nguồn technical report hôm nay.
-    const missingEvening = [...missingMorning];
+    const missingEvening = activeReportProjects
+      .filter((project) => !eveningSet.has(`${project.id}_${project.mainEngineerId}`))
+      .map((project) => ({
+        projectId: project.id,
+        projectCode: project.code,
+        projectName: project.name,
+        engineerId: project.mainEngineerId,
+        engineerName: project.mainEngineer.fullName,
+      }));
 
     const issueProjects: Array<{
       projectId: string;
@@ -480,7 +501,7 @@ export async function GET() {
     }
 
     const reportProjectIds = reportProjects.map((project) => project.id);
-    const [siteRestRows, technicalRows] = reportProjectIds.length
+    const [siteRestRows, technicalRows, progressRows] = reportProjectIds.length
       ? await Promise.all([
           prisma.siteRestDay.findMany({
             where: {
@@ -505,8 +526,21 @@ export async function GET() {
               task: { select: { projectId: true } },
             },
           }),
+          prisma.taskProgressHistory.findMany({
+            where: {
+              userId: user.id,
+              createdAt: { gte: today, lte: todayEnd },
+              task: {
+                projectId: { in: reportProjectIds },
+              },
+            },
+            select: {
+              createdAt: true,
+              task: { select: { projectId: true } },
+            },
+          }),
         ])
-      : [[], []];
+      : [[], [], []];
 
     const restMap = new Map(siteRestRows.map((row) => [row.projectId, row]));
     const technicalMap = new Map<string, Date>();
@@ -514,6 +548,18 @@ export async function GET() {
       const pid = row.task.projectId;
       const prev = technicalMap.get(pid);
       if (!prev || prev < row.createdAt) technicalMap.set(pid, row.createdAt);
+    }
+
+    const eveningMap = new Map<string, Date>();
+    for (const row of technicalRows) {
+      const pid = row.task.projectId;
+      const prev = eveningMap.get(pid);
+      if (!prev || prev < row.createdAt) eveningMap.set(pid, row.createdAt);
+    }
+    for (const row of progressRows) {
+      const pid = row.task.projectId;
+      const prev = eveningMap.get(pid);
+      if (!prev || prev < row.createdAt) eveningMap.set(pid, row.createdAt);
     }
 
     const technicalDeadline = localDeadlineForDate(today, 19);
@@ -557,8 +603,10 @@ export async function GET() {
         };
       }
 
-      const submittedAt = technicalMap.get(project.id) ?? null;
-      const technicalStatus = buildReportStatusLabel(submittedAt, Boolean(submittedAt && submittedAt <= technicalDeadline), technicalDeadline, now);
+      const morningSubmittedAt = technicalMap.get(project.id) ?? null;
+      const eveningSubmittedAt = eveningMap.get(project.id) ?? null;
+      const morningStatus = buildReportStatusLabel(morningSubmittedAt, Boolean(morningSubmittedAt && morningSubmittedAt <= technicalDeadline), technicalDeadline, now);
+      const eveningStatus = buildReportStatusLabel(eveningSubmittedAt, Boolean(eveningSubmittedAt && eveningSubmittedAt <= technicalDeadline), technicalDeadline, now);
 
       return {
         projectId: project.id,
@@ -567,12 +615,12 @@ export async function GET() {
         isActive: true,
         isRestDay: false,
         restReason: null,
-        morningLabel: technicalStatus.label,
-        morningTone: technicalStatus.tone,
-        eveningLabel: technicalStatus.label,
-        eveningTone: technicalStatus.tone,
-        morningSubmitted: technicalStatus.submitted,
-        eveningSubmitted: technicalStatus.submitted,
+        morningLabel: morningStatus.label,
+        morningTone: morningStatus.tone,
+        eveningLabel: eveningStatus.label,
+        eveningTone: eveningStatus.tone,
+        morningSubmitted: morningStatus.submitted,
+        eveningSubmitted: eveningStatus.submitted,
       };
     });
 
