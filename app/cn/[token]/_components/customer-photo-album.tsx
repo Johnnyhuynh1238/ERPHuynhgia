@@ -13,9 +13,17 @@ type CustomerPhotoAlbumProps = {
   photos: CustomerPhotoAlbumPhoto[];
   gridClassName?: string;
   thumbnailClassName?: string;
+  triggerLabel?: string;
+  compactTrigger?: boolean;
 };
 
-export function CustomerPhotoAlbum({ photos, gridClassName = "grid grid-cols-3 gap-2", thumbnailClassName = "h-24" }: CustomerPhotoAlbumProps) {
+export function CustomerPhotoAlbum({
+  photos,
+  gridClassName = "grid grid-cols-3 gap-2",
+  thumbnailClassName = "h-24",
+  triggerLabel,
+  compactTrigger = false,
+}: CustomerPhotoAlbumProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -30,13 +38,23 @@ export function CustomerPhotoAlbum({ photos, gridClassName = "grid grid-cols-3 g
 
   return (
     <>
-      <div className={gridClassName}>
-        {photos.map((photo, index) => (
-          <button key={photo.id} type="button" onClick={() => setActiveIndex(index)} className="block min-w-0 overflow-hidden rounded-lg bg-[#2a2a2a]">
-            <img alt={photo.caption || "Ảnh công trình"} src={photo.thumbnailUrl || photo.url} className={`${thumbnailClassName} w-full object-cover`} />
-          </button>
-        ))}
-      </div>
+      {triggerLabel ? (
+        <button
+          type="button"
+          onClick={() => setActiveIndex(0)}
+          className={compactTrigger ? "mt-3 inline-block text-xs font-semibold text-[#ffb37b] underline" : "owner-button mt-3 w-full"}
+        >
+          {triggerLabel}
+        </button>
+      ) : (
+        <div className={gridClassName}>
+          {photos.map((photo, index) => (
+            <button key={photo.id} type="button" onClick={() => setActiveIndex(index)} className="block min-w-0 overflow-hidden rounded-lg bg-[#2a2a2a]">
+              <img alt={photo.caption || "Ảnh công trình"} src={photo.thumbnailUrl || photo.url} className={`${thumbnailClassName} w-full object-cover`} />
+            </button>
+          ))}
+        </div>
+      )}
 
       {activeIndex !== null ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/95 text-white">

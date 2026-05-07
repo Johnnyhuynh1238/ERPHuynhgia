@@ -106,6 +106,25 @@ export function normalizePaymentSchedule(row: PaymentRow): NormalizedPaymentSche
   };
 }
 
+function parseProgressPhotos(value: string) {
+  if (!value) return [] as Array<{ id?: string; url: string; thumbnailUrl?: string | null }>;
+
+  try {
+    const parsed = JSON.parse(value) as { photos?: Array<{ id?: string; photoUrl?: string; thumbnailUrl?: string }> };
+    if (Array.isArray(parsed.photos)) {
+      return parsed.photos
+        .map((photo) => ({
+          id: typeof photo.id === "string" ? photo.id : undefined,
+          url: typeof photo.photoUrl === "string" ? photo.photoUrl : "",
+          thumbnailUrl: typeof photo.thumbnailUrl === "string" ? photo.thumbnailUrl : null,
+        }))
+        .filter((photo) => Boolean(photo.url));
+    }
+  } catch {}
+
+  return [{ url: value }];
+}
+
 export async function requireCustomerPortalApiAccess(token: string): Promise<PortalApiAccessResult> {
   const access = await requirePortalPageAccess(token);
   if (!access.project) {
@@ -226,7 +245,13 @@ export async function validateCustomerCommentTarget(
     where: { id: targetId, task: { projectId } },
     select: { id: true },
   });
-  if (!activity) return { ok: false as const, message: "Nhật ký không hợp lệ" };
+  if (activity) return { ok: true as const, taskId: null as string | null, eveningReportId: null as string | null };
+
+  const progressHistory = await db.taskProgressHistory.findFirst({
+    where: { id: targetId, task: { projectId } },
+    select: { id: true },
+  });
+  if (!progressHistory) return { ok: false as const, message: "Nhật ký không hợp lệ" };
   return { ok: true as const, taskId: null as string | null, eveningReportId: null as string | null };
 }
 
@@ -243,7 +268,7 @@ export async function buildCustomerJournalEvents(
     ...(phaseFilter ? { phaseId: phaseFilter } : {}),
   };
 
-  const [reports, photos, qcLogs, acknowledgments, payments, commentCounts] = await Promise.all([
+  const [reports, progressUpdates, qcLogs, acknowledgments, payments, commentCounts] = await Promise.all([
     typeFilter && typeFilter !== "report"
       ? Promise.resolve([])
       : prisma.eveningReport.findMany({
@@ -260,19 +285,19 @@ export async function buildCustomerJournalEvents(
         }),
     typeFilter && typeFilter !== "photo"
       ? Promise.resolve([])
-      : prisma.taskPhoto.findMany({
+      : prisma.taskProgressHistory.findMany({
           where: { task: taskWhere },
           orderBy: { createdAt: "desc" },
           take: 120,
           select: {
             id: true,
-            photoUrl: true,
-            thumbnailUrl: true,
-            caption: true,
-            takenAt: true,
+            fromPercent: true,
+            toPercent: true,
+            note: true,
             createdAt: true,
-            task: { select: { id: true, code: true, name: true, phase: true, projectPhase: { select: { name: true } } } },
+            photoUrl: true,
             user: { select: { fullName: true } },
+            task: { select: { id: true, code: true, name: true, phase: true, projectPhase: { select: { name: true } } } },
           },
         }),
     typeFilter && typeFilter !== "qc"
@@ -355,22 +380,29 @@ export async function buildCustomerJournalEvents(
       targetId: report.id,
       commentCount: withCommentCount(CommentTargetType.journal_entry, report.id),
     })),
-    ...photos.map((photo) => ({
-      id: `photo:${photo.id}`,
-      type: "photo" as const,
-      date: photo.takenAt || photo.createdAt,
-      title: `${photo.task.code} - ${photo.task.name}`,
-      description: photo.caption || `${photo.user.fullName} cập nhật ảnh tiến độ`,
-      taskId: photo.task.id,
-      taskCode: photo.task.code,
-      taskName: photo.task.name,
-      phase: photo.task.phase,
-      phaseName: photo.task.projectPhase?.name || null,
-      photos: [{ id: photo.id, url: photo.photoUrl, thumbnailUrl: photo.thumbnailUrl }],
-      targetType: CommentTargetType.journal_entry,
-      targetId: photo.id,
-      commentCount: withCommentCount(CommentTargetType.journal_entry, photo.id),
-    })),
+    ...progressUpdates.flatMap((update) => {
+      const photos = parseProgressPhotos(update.photoUrl);
+      if (!photos.length) return [];
+
+      return [
+        {
+          id: `photo:${update.id}`,
+          type: "photo" as const,
+          date: update.createdAt,
+          title: `${update.task.code} - ${update.task.name}`,
+          description: update.note || `${update.user.fullName} cập nhật tiến độ ${update.fromPercent}% → ${update.toPercent}%`,
+          taskId: update.task.id,
+          taskCode: update.task.code,
+          taskName: update.task.name,
+          phase: update.task.phase,
+          phaseName: update.task.projectPhase?.name || null,
+          photos,
+          targetType: CommentTargetType.journal_entry,
+          targetId: update.id,
+          commentCount: withCommentCount(CommentTargetType.journal_entry, update.id),
+        },
+      ];
+    }),
     ...qcLogs.map((log) => ({
       id: `qc:${log.id}`,
       type: "qc" as const,

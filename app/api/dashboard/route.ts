@@ -258,7 +258,9 @@ export async function GET() {
 
     const technicalSet = new Set(technicalSubmittedRows.map((row) => `${row.task.projectId}_${row.createdBy}`));
     const progressSet = new Set(progressSubmittedRows.map((row) => `${row.task.projectId}_${row.userId}`));
-    const eveningSet = new Set([...technicalSet, ...progressSet]);
+    const eveningSet = new Set<string>();
+    technicalSet.forEach((value) => eveningSet.add(value));
+    progressSet.forEach((value) => eveningSet.add(value));
 
     const missingMorning = activeReportProjects
       .filter((project) => !technicalSet.has(`${project.id}_${project.mainEngineerId}`))

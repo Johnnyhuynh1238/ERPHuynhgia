@@ -138,18 +138,18 @@ export default async function CustomerJournalPage({
               <a href={`/api/payment-schedules/${event.targetId}/receipt?token=${params.token}`} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a>
             ) : event.photos?.length ? (
               <CustomerPhotoAlbum
-                photos={event.photos.slice(0, 6).map((photo, index) => {
-                  const taskPhotoUrl = event.type === "photo" && event.taskId && photo.id ? `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file?variant=photo` : null;
-                  const taskThumbnailUrl = event.type === "photo" && event.taskId && photo.id ? `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file?variant=thumb` : null;
+                photos={event.photos.map((photo, index) => {
                   const qcPhotoUrl = event.type === "qc" ? `/api/customer/${params.token}/journal/qc-logs/${event.targetId}/photos/${index}/file` : null;
                   return {
                     id: `${event.id}-photo-${index}`,
-                    url: taskPhotoUrl || qcPhotoUrl || photo.url,
-                    thumbnailUrl: taskThumbnailUrl || qcPhotoUrl || photo.thumbnailUrl,
+                    url: qcPhotoUrl || photo.url,
+                    thumbnailUrl: qcPhotoUrl || photo.thumbnailUrl,
                     caption: event.title,
                   };
                 })}
                 gridClassName="mt-3 grid grid-cols-3 gap-2"
+                triggerLabel={event.type === "photo" ? `Xem album ảnh (${event.photos.length} ảnh)` : undefined}
+                compactTrigger={event.type === "photo"}
               />
             ) : null}
 
