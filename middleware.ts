@@ -47,9 +47,10 @@ export async function middleware(req: NextRequest) {
 
   const isAuthRoute = pathname.startsWith("/api/auth");
   const isLoginRoute = pathname === "/login";
+  const isGuideRoute = pathname === "/huongdanapp" || pathname.startsWith("/huongdanapp/");
   const isForceChangeRoute = pathname === "/change-password" || pathname.startsWith("/api/change-password");
 
-  if (isAuthRoute) return NextResponse.next();
+  if (isAuthRoute || isGuideRoute) return NextResponse.next();
 
   const token = (await getToken({
     req,
