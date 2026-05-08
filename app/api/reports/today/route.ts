@@ -2,7 +2,13 @@ import { DailyAssignmentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { getReportDateVn, getSubmissionDeadline, sortFlatAssignments, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
+import {
+  generateAssignmentsAfterCheckin,
+  getReportDateVn,
+  getSubmissionDeadline,
+  sortFlatAssignments,
+  upsertPendingTptcAssignmentsForDay,
+} from "@/lib/reports-v3";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -22,44 +28,74 @@ export async function GET(request: Request) {
     reportDate,
   });
 
-  const rows = await prisma.taskDailyAssignment.findMany({
-    where: {
-      ksUserId: user.id,
-      reportDate,
-    },
-    include: {
-      task: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          progressPercent: true,
-          project: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
+  const readRows = () =>
+    prisma.taskDailyAssignment.findMany({
+      where: {
+        ksUserId: user.id,
+        reportDate,
+      },
+      include: {
+        task: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            progressPercent: true,
+            project: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
+          },
+        },
+        tptcAssignment: {
+          select: {
+            id: true,
+            dueAt: true,
+            priority: true,
+            status: true,
+            project: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
             },
           },
         },
       },
-      tptcAssignment: {
-        select: {
-          id: true,
-          dueAt: true,
-          priority: true,
-          status: true,
-          project: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-            },
+    });
+
+  let rows = await readRows();
+
+  if (!rows.length) {
+    const morningCheckin = await prisma.morningCheckin.findFirst({
+      where: {
+        userId: user.id,
+        reportDate,
+      },
+      select: {
+        tasks: {
+          select: {
+            taskId: true,
           },
         },
       },
-    },
-  });
+    });
+
+    const checkinTaskIds = Array.from(new Set((morningCheckin?.tasks || []).map((item) => item.taskId).filter(Boolean)));
+
+    if (checkinTaskIds.length) {
+      await generateAssignmentsAfterCheckin({
+        ksUserId: user.id,
+        reportDate,
+        taskIds: checkinTaskIds,
+      });
+      rows = await readRows();
+    }
+  }
 
   const assignments = rows.map((row) => {
     const base = {

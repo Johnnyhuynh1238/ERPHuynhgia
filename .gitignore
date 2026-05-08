@@ -39,3 +39,6 @@ next-env.d.ts
 /lib/generated/prisma
 .env.production
 backups/*.sql.gz
+
+.deploy.lock
+.serena/

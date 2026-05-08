@@ -77,9 +77,11 @@ export async function GET() {
     }
 
     const group = taskGroups.get(task.projectId)!;
-    const isOverdue = task.plannedEndDate < reportDate && task.status !== "in_progress";
-    const startToday = task.plannedStartDate.getTime() === reportDate.getTime();
-    const upcoming = task.plannedStartDate > reportDate && task.plannedStartDate <= in3Days;
+    const hasPlannedEnd = task.plannedEndDate instanceof Date;
+    const hasPlannedStart = task.plannedStartDate instanceof Date;
+    const isOverdue = Boolean(hasPlannedEnd && task.plannedEndDate < reportDate && task.status !== "in_progress");
+    const startToday = Boolean(hasPlannedStart && task.plannedStartDate.getTime() === reportDate.getTime());
+    const upcoming = Boolean(hasPlannedStart && task.plannedStartDate > reportDate && task.plannedStartDate <= in3Days);
 
     group.tasks.push({
       id: task.id,
