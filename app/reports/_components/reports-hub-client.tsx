@@ -678,7 +678,7 @@ export function ReportsHubClient() {
 
         {checkinTaskPickerOpen ? (
           <div className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-3">
-            <div className="modal-panel-in flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[#2f3555] bg-[#171c2f] shadow-2xl sm:rounded-2xl">
+            <div className="modal-panel-in flex max-h-[calc(100dvh-16px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[#2f3555] bg-[#171c2f] shadow-2xl sm:max-h-[92vh] sm:rounded-2xl">
               <div className="shrink-0 border-b border-[#2f3555] p-4">
                 {checkinPickerStep === "tasks" ? (
                   <button
@@ -697,7 +697,7 @@ export function ReportsHubClient() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div key={`${checkinPickerStep}-${checkinPickerProjectId || "projects"}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                 {checkinPickerStep === "projects" ? (
                   <div className="space-y-2">
                     {(checkin?.taskProjects || []).length > 0 ? (
