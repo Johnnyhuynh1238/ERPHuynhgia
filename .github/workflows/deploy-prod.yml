@@ -14,6 +14,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Prepare SSH
         env:
           PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
@@ -46,5 +51,10 @@ jobs:
           set -euo pipefail
 
           SSH_PORT="${PROD_SSH_PORT:-22}"
+          RELEASE_BUNDLE="$RUNNER_TEMP/erp-release-${GITHUB_SHA}.bundle"
+          REMOTE_BUNDLE="/tmp/erp-release-${GITHUB_SHA}.bundle"
 
-          ssh -p "$SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" "set -euo pipefail; cd '$PROD_APP_DIR'; git checkout master; git pull --ff-only origin master; bash scripts/deploy-prod.sh"
+          git bundle create "$RELEASE_BUNDLE" HEAD
+          scp -P "$SSH_PORT" "$RELEASE_BUNDLE" "$PROD_SSH_USER@$PROD_SSH_HOST:$REMOTE_BUNDLE"
+
+          ssh -p "$SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" "set -euo pipefail; cd '$PROD_APP_DIR'; ts=\$(date +%Y%m%d%H%M%S); mkdir -p .deploy-backups; git status --short > .deploy-backups/status-\$ts.txt || true; git diff > .deploy-backups/worktree-\$ts.patch || true; git diff --cached > .deploy-backups/staged-\$ts.patch || true; git rev-parse HEAD > .deploy-backups/head-\$ts.txt || true; git branch backup/deploy-\$ts HEAD || true; git fetch '$REMOTE_BUNDLE' HEAD; git update-ref refs/remotes/origin/master FETCH_HEAD; git checkout master; git reset --hard FETCH_HEAD; rm -f '$REMOTE_BUNDLE'; bash scripts/deploy-prod.sh"
