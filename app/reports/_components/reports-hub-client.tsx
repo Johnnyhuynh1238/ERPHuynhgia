@@ -160,6 +160,8 @@ export function ReportsHubClient() {
   const [pickedTptcIds, setPickedTptcIds] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [checkinTaskPickerOpen, setCheckinTaskPickerOpen] = useState(false);
+  const [checkinPickerProjectId, setCheckinPickerProjectId] = useState<string | null>(null);
   const [doneModalItem, setDoneModalItem] = useState<FlatAssignment | null>(null);
   const [donePhotoUrl, setDonePhotoUrl] = useState("");
   const [doneNote, setDoneNote] = useState("");
@@ -195,6 +197,22 @@ export function ReportsHubClient() {
     if (!selectedProjectId) return rows;
     return rows.filter((item) => item.projectId === selectedProjectId);
   }, [today, selectedProjectId]);
+
+  const checkinInProgressProjects = useMemo(
+    () =>
+      (checkin?.taskProjects || [])
+        .map((project) => ({
+          ...project,
+          tasks: project.tasks.filter((task) => task.group === "in_progress"),
+        }))
+        .filter((project) => project.tasks.length > 0),
+    [checkin],
+  );
+
+  const checkinPickerProject = useMemo(() => {
+    const projects = checkin?.taskProjects || [];
+    return projects.find((project) => project.projectId === checkinPickerProjectId) || projects[0] || null;
+  }, [checkin, checkinPickerProjectId]);
 
   const flatPriorityGroups = useMemo(() => {
     if (!today) {
@@ -282,6 +300,11 @@ export function ReportsHubClient() {
     if (!response.ok) {
       throw new Error(typeof json?.message === "string" ? json.message : "Thao tác thất bại");
     }
+  }
+
+  function openCheckinTaskPicker() {
+    setCheckinPickerProjectId((current) => current || checkin?.taskProjects[0]?.projectId || null);
+    setCheckinTaskPickerOpen(true);
   }
 
   async function submitCheckin() {
@@ -541,40 +564,108 @@ export function ReportsHubClient() {
           <div className="mt-2 text-sm text-[#d9def3]">Đã chọn: {totalPicked} việc hôm nay</div>
         </div>
 
-        {(checkin?.taskProjects || []).map((project) => {
-          const grouped = project.tasks.reduce<Record<string, CheckinTask[]>>((acc, task) => {
-            if (!acc[task.group]) acc[task.group] = [];
-            acc[task.group].push(task);
-            return acc;
-          }, {});
+        <section className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-[#f0f2ff]">Task đang làm</div>
+              <div className="mt-1 text-xs text-[#98a0c2]">Chỉ hiện sẵn các task đang làm. Task khác chọn trong popup thêm task.</div>
+            </div>
+            <button
+              type="button"
+              onClick={openCheckinTaskPicker}
+              className="shrink-0 rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-3 py-1.5 text-xs font-bold text-[#f97316]"
+            >
+              + Thêm task
+            </button>
+          </div>
 
-          return (
-            <section key={project.projectId} className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
-              <div className="text-sm font-semibold text-[#f0f2ff]">🏠 {project.projectName}</div>
-              <div className="mt-3 space-y-3">
-                {Object.entries(grouped).map(([group, tasks]) => (
-                  <div key={group}>
-                    <div className="mb-1 text-xs text-[#98a0c2]">{GROUP_LABEL[group as CheckinTask["group"]] || "Khác"}</div>
-                    <div className="space-y-1.5">
-                      {tasks.map((task) => (
-                        <label key={task.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#2f3555] px-2 py-2 text-sm text-[#d9def3]">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(pickedTaskIds[task.id])}
-                            onChange={(e) => setPickedTaskIds((prev) => ({ ...prev, [task.id]: e.target.checked }))}
-                          />
-                          <span>
-                            {task.code} · {task.name}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+          {checkinInProgressProjects.length > 0 ? (
+            <div className="mt-3 space-y-3">
+              {checkinInProgressProjects.map((project) => (
+                <div key={project.projectId} className="rounded-xl border border-[#2f3555] bg-[#11182d] p-3">
+                  <div className="text-xs font-semibold text-[#98a0c2]">{project.projectName}</div>
+                  <div className="mt-2 space-y-1.5">
+                    {project.tasks.map((task) => (
+                      <label key={task.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#2f3555] px-2 py-2 text-sm text-[#d9def3]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(pickedTaskIds[task.id])}
+                          onChange={(e) => setPickedTaskIds((prev) => ({ ...prev, [task.id]: e.target.checked }))}
+                        />
+                        <span>
+                          {task.code} · {task.name}
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-[#2f3555] p-3 text-xs text-[#98a0c2]">
+              Chưa có task nào đang làm. Bấm thêm task để chọn việc hôm nay.
+            </div>
+          )}
+        </section>
+
+        {checkinTaskPickerOpen ? (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-3">
+            <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-[#2f3555] bg-[#171c2f] shadow-xl">
+              <div className="border-b border-[#2f3555] p-4">
+                <div className="text-base font-bold text-[#f0f2ff]">Thêm task check-in</div>
+                <div className="mt-1 text-xs text-[#98a0c2]">Chọn dự án rồi tick task được phân quyền.</div>
               </div>
-            </section>
-          );
-        })}
+
+              <div className="space-y-3 overflow-y-auto p-4">
+                <label className="block text-xs font-semibold text-[#98a0c2]">
+                  Dự án
+                  <select
+                    value={checkinPickerProject?.projectId || ""}
+                    onChange={(event) => setCheckinPickerProjectId(event.target.value || null)}
+                    className="mt-1 w-full rounded-lg border border-[#2f3555] bg-[#11182d] px-3 py-2 text-sm text-[#d9def3]"
+                  >
+                    {(checkin?.taskProjects || []).map((project) => (
+                      <option key={project.projectId} value={project.projectId}>
+                        {project.projectName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {checkinPickerProject ? (
+                  <div className="space-y-2">
+                    {checkinPickerProject.tasks.map((task) => (
+                      <label key={task.id} className="flex cursor-pointer items-start gap-2 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-2.5 text-sm text-[#f0f2ff]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(pickedTaskIds[task.id])}
+                          onChange={(event) => setPickedTaskIds((prev) => ({ ...prev, [task.id]: event.target.checked }))}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block font-semibold">{task.code} · {task.name}</span>
+                          <span className="text-xs text-[#98a0c2]">{GROUP_LABEL[task.group]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[#2f3555] p-3 text-xs text-[#98a0c2]">Không có task được phân quyền.</div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-[#2f3555] p-4">
+                <button
+                  type="button"
+                  onClick={() => setCheckinTaskPickerOpen(false)}
+                  className="rounded-lg border border-[#2f3555] px-3 py-1.5 text-xs font-semibold text-[#d9def3]"
+                >
+                  Xong
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {(checkin?.tptcProjects || []).length > 0 ? (
           <section className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
