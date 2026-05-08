@@ -92,6 +92,35 @@ body {
   opacity: 0;
 }
 
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop-in {
+  animation: modalBackdropIn 0.2s ease-out forwards;
+}
+
+.modal-panel-in {
+  animation: modalPanelIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: center bottom;
+}
+
 .delay-1 {
   animation-delay: 0.05s;
 }

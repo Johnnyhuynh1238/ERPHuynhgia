@@ -162,6 +162,7 @@ export function ReportsHubClient() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [checkinTaskPickerOpen, setCheckinTaskPickerOpen] = useState(false);
   const [checkinPickerProjectId, setCheckinPickerProjectId] = useState<string | null>(null);
+  const [checkinPickerTaskIds, setCheckinPickerTaskIds] = useState<Record<string, boolean>>({});
   const [doneModalItem, setDoneModalItem] = useState<FlatAssignment | null>(null);
   const [donePhotoUrl, setDonePhotoUrl] = useState("");
   const [doneNote, setDoneNote] = useState("");
@@ -211,8 +212,10 @@ export function ReportsHubClient() {
 
   const checkinPickerProject = useMemo(() => {
     const projects = checkin?.taskProjects || [];
-    return projects.find((project) => project.projectId === checkinPickerProjectId) || projects[0] || null;
+    return projects.find((project) => project.projectId === checkinPickerProjectId) || null;
   }, [checkin, checkinPickerProjectId]);
+
+  const checkinPickerSelectedCount = useMemo(() => Object.values(checkinPickerTaskIds).filter(Boolean).length, [checkinPickerTaskIds]);
 
   const flatPriorityGroups = useMemo(() => {
     if (!today) {
@@ -303,8 +306,20 @@ export function ReportsHubClient() {
   }
 
   function openCheckinTaskPicker() {
-    setCheckinPickerProjectId((current) => current || checkin?.taskProjects[0]?.projectId || null);
+    setCheckinPickerProjectId(null);
+    setCheckinPickerTaskIds(pickedTaskIds);
     setCheckinTaskPickerOpen(true);
+  }
+
+  function closeCheckinTaskPicker() {
+    setCheckinTaskPickerOpen(false);
+    setCheckinPickerProjectId(null);
+    setCheckinPickerTaskIds({});
+  }
+
+  function addCheckinPickerTasks() {
+    setPickedTaskIds(checkinPickerTaskIds);
+    closeCheckinTaskPicker();
   }
 
   async function submitCheckin() {
@@ -609,8 +624,8 @@ export function ReportsHubClient() {
         </section>
 
         {checkinTaskPickerOpen ? (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-3">
-            <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-[#2f3555] bg-[#171c2f] shadow-xl">
+          <div className="modal-backdrop-in fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-3">
+            <div className="modal-panel-in max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-[#2f3555] bg-[#171c2f] shadow-xl">
               <div className="border-b border-[#2f3555] p-4">
                 <div className="text-base font-bold text-[#f0f2ff]">Thêm task check-in</div>
                 <div className="mt-1 text-xs text-[#98a0c2]">Chọn dự án rồi tick task được phân quyền.</div>
@@ -620,10 +635,11 @@ export function ReportsHubClient() {
                 <label className="block text-xs font-semibold text-[#98a0c2]">
                   Dự án
                   <select
-                    value={checkinPickerProject?.projectId || ""}
+                    value={checkinPickerProjectId || ""}
                     onChange={(event) => setCheckinPickerProjectId(event.target.value || null)}
                     className="mt-1 w-full rounded-lg border border-[#2f3555] bg-[#11182d] px-3 py-2 text-sm text-[#d9def3]"
                   >
+                    <option value="">Chọn dự án</option>
                     {(checkin?.taskProjects || []).map((project) => (
                       <option key={project.projectId} value={project.projectId}>
                         {project.projectName}
@@ -634,12 +650,13 @@ export function ReportsHubClient() {
 
                 {checkinPickerProject ? (
                   <div className="space-y-2">
+                    <div className="text-xs font-semibold text-[#98a0c2]">Chọn task</div>
                     {checkinPickerProject.tasks.map((task) => (
                       <label key={task.id} className="flex cursor-pointer items-start gap-2 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-2.5 text-sm text-[#f0f2ff]">
                         <input
                           type="checkbox"
-                          checked={Boolean(pickedTaskIds[task.id])}
-                          onChange={(event) => setPickedTaskIds((prev) => ({ ...prev, [task.id]: event.target.checked }))}
+                          checked={Boolean(checkinPickerTaskIds[task.id])}
+                          onChange={(event) => setCheckinPickerTaskIds((prev) => ({ ...prev, [task.id]: event.target.checked }))}
                           className="mt-0.5"
                         />
                         <span>
@@ -650,17 +667,25 @@ export function ReportsHubClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[#2f3555] p-3 text-xs text-[#98a0c2]">Không có task được phân quyền.</div>
+                  <div className="rounded-xl border border-dashed border-[#2f3555] p-3 text-xs text-[#98a0c2]">Chọn dự án để hiện danh sách task.</div>
                 )}
               </div>
 
               <div className="flex justify-end gap-2 border-t border-[#2f3555] p-4">
                 <button
                   type="button"
-                  onClick={() => setCheckinTaskPickerOpen(false)}
+                  onClick={closeCheckinTaskPicker}
                   className="rounded-lg border border-[#2f3555] px-3 py-1.5 text-xs font-semibold text-[#d9def3]"
                 >
-                  Xong
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={!checkinPickerProject}
+                  onClick={addCheckinPickerTasks}
+                  className="rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-3 py-1.5 text-xs font-bold text-[#f97316] disabled:opacity-50"
+                >
+                  Thêm ({checkinPickerSelectedCount})
                 </button>
               </div>
             </div>
