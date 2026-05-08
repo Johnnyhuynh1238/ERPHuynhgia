@@ -216,18 +216,11 @@ function ReportStatusCard({
             <span className={`rounded-full px-2 py-0.5 text-xs ${toneBadge(row.eveningTone)}`}>Chiều: {row.eveningLabel}</span>
           </div>
           {row.isActive && !row.isRestDay ? (
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/reports/${row.projectId}?tab=morning`}>
-                <Button variant="outline" size="sm">
-                  Báo cáo sáng
-                </Button>
-              </Link>
-              <Link href={`/reports/${row.projectId}?tab=evening`}>
-                <Button variant="outline" size="sm">
-                  Báo cáo chiều
-                </Button>
-              </Link>
-            </div>
+            <Link href="/reports" className="inline-flex">
+              <Button variant="outline" size="sm">
+                Vào nhiệm vụ hôm nay
+              </Button>
+            </Link>
           ) : null}
         </div>
       ))}
@@ -402,7 +395,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
                 {data.admin?.missingMorning?.length ? (
                   <div className="space-y-2 text-sm">
                     {data.admin.missingMorning.map((row) => (
-                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/${row.projectId}?tab=morning`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/projects/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
                         <div className="font-medium">{row.engineerName}</div>
                         <div className="text-xs text-[#8892b0]">
                           {row.projectCode} - {row.projectName}
@@ -424,7 +417,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
                 {data.admin?.missingEvening?.length ? (
                   <div className="space-y-2 text-sm">
                     {data.admin.missingEvening.map((row) => (
-                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/reports/${row.projectId}?tab=evening`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
+                      <Link key={`${row.projectId}_${row.engineerId}`} href={`/projects/${row.projectId}`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
                         <div className="font-medium">{row.engineerName}</div>
                         <div className="text-xs text-[#8892b0]">
                           {row.projectCode} - {row.projectName}

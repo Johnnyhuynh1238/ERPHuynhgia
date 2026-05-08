@@ -38,7 +38,7 @@ export function ReportingHomeClient({ projects }: { projects: ReportProject[] })
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <h2 className="text-lg font-bold text-[#f0f2ff]">Danh sách dự án báo cáo</h2>
-        <p className="mt-1 text-sm text-[#8892b0]">Chọn dự án để vào báo cáo sáng hoặc báo cáo chiều.</p>
+        <p className="mt-1 text-sm text-[#8892b0]">Flow báo cáo hiện dùng màn nhiệm vụ hôm nay.</p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -48,11 +48,8 @@ export function ReportingHomeClient({ projects }: { projects: ReportProject[] })
             <div className="font-semibold">{project.name}</div>
             <div className="mt-2 text-xs text-[#8892b0]">Go-live: {formatDate(project.goLiveDate)}</div>
             <div className="mt-3 flex gap-2">
-              <Link href={`/reports/${project.id}?tab=morning`}>
-                <Button variant="outline">Báo cáo sáng</Button>
-              </Link>
-              <Link href={`/reports/${project.id}?tab=evening`}>
-                <Button variant="outline">Báo cáo chiều</Button>
+              <Link href="/reports">
+                <Button variant="outline">Vào nhiệm vụ hôm nay</Button>
               </Link>
             </div>
           </div>
