@@ -148,10 +148,10 @@ async function seedTaskTemplates() {
 type QcSeedPreset = {
   code: string;
   category: TaskCategory;
-  preparationSteps: string;
-  executionSteps: string;
-  commonMistakes: string;
-  beforeQcSteps: string;
+  guidePreparation: string;
+  guideExecution: string;
+  guideMistakes: string;
+  guideBeforeQc: string;
   items: Array<{
     displayOrder: number;
     title: string;
@@ -164,10 +164,10 @@ const ADMIN_QC_TEMPLATE_SEEDS: QcSeedPreset[] = [
   {
     code: "T2.04",
     category: TaskCategory.internal_milestone,
-    preparationSteps: "- Mặt bằng móng sạch và đúng cao độ.\n- Đủ thép, kẽm buộc, con kê bê tông.\n- Có bản vẽ kết cấu mới nhất tại công trường.",
-    executionSteps: "- Gia công thép đúng chủng loại theo bản vẽ.\n- Buộc giao điểm chắc, không thiếu mối nối.\n- Đảm bảo lớp bảo vệ và chiều dài neo theo yêu cầu.",
-    commonMistakes: "- Sai đường kính thép chủ hoặc thép đai.\n- Thiếu lớp bảo vệ đáy, kê thép không đủ.\n- Mối nối chồng không đạt chiều dài.",
-    beforeQcSteps: "- Kiểm tra lại toàn bộ tim trục và cao độ.\n- Chụp ảnh các vị trí góc, mối nối, lớp bảo vệ.\n- Dọn sạch đáy móng trước khi mời QC.",
+    guidePreparation: "- Mặt bằng móng sạch và đúng cao độ.\n- Đủ thép, kẽm buộc, con kê bê tông.\n- Có bản vẽ kết cấu mới nhất tại công trường.",
+    guideExecution: "- Gia công thép đúng chủng loại theo bản vẽ.\n- Buộc giao điểm chắc, không thiếu mối nối.\n- Đảm bảo lớp bảo vệ và chiều dài neo theo yêu cầu.",
+    guideMistakes: "- Sai đường kính thép chủ hoặc thép đai.\n- Thiếu lớp bảo vệ đáy, kê thép không đủ.\n- Mối nối chồng không đạt chiều dài.",
+    guideBeforeQc: "- Kiểm tra lại toàn bộ tim trục và cao độ.\n- Chụp ảnh các vị trí góc, mối nối, lớp bảo vệ.\n- Dọn sạch đáy móng trước khi mời QC.",
     items: [
       { displayOrder: 1, title: "Đường kính thép đúng bản vẽ", requirePhoto: true },
       { displayOrder: 2, title: "Khoảng cách thép đai đúng thiết kế", requirePhoto: true },
@@ -179,10 +179,10 @@ const ADMIN_QC_TEMPLATE_SEEDS: QcSeedPreset[] = [
   {
     code: "T2.05",
     category: TaskCategory.major_milestone,
-    preparationSteps: "- Kiểm tra cốp pha, cốt thép đã nghiệm thu.\n- Chuẩn bị đầy đủ nhân lực đổ và đầm.\n- Xác nhận nguồn bê tông và thời gian cấp phối.",
-    executionSteps: "- Đổ bê tông liên tục theo lớp phù hợp.\n- Đầm đúng kỹ thuật, không bỏ sót chân cột/góc khuất.\n- Kiểm soát cao độ mặt hoàn thiện theo mốc chuẩn.",
-    commonMistakes: "- Đổ gián đoạn gây mạch ngừng không kiểm soát.\n- Đầm thiếu dẫn tới rỗ tổ ong.\n- Sai cao độ, khó xử lý ở bước sau.",
-    beforeQcSteps: "- Hoàn thiện bề mặt, vệ sinh khu vực đổ.\n- Chụp ảnh tổng thể và các vị trí trọng yếu.\n- Ghi nhận thời gian bắt đầu/kết thúc đổ.",
+    guidePreparation: "- Kiểm tra cốp pha, cốt thép đã nghiệm thu.\n- Chuẩn bị đầy đủ nhân lực đổ và đầm.\n- Xác nhận nguồn bê tông và thời gian cấp phối.",
+    guideExecution: "- Đổ bê tông liên tục theo lớp phù hợp.\n- Đầm đúng kỹ thuật, không bỏ sót chân cột/góc khuất.\n- Kiểm soát cao độ mặt hoàn thiện theo mốc chuẩn.",
+    guideMistakes: "- Đổ gián đoạn gây mạch ngừng không kiểm soát.\n- Đầm thiếu dẫn tới rỗ tổ ong.\n- Sai cao độ, khó xử lý ở bước sau.",
+    guideBeforeQc: "- Hoàn thiện bề mặt, vệ sinh khu vực đổ.\n- Chụp ảnh tổng thể và các vị trí trọng yếu.\n- Ghi nhận thời gian bắt đầu/kết thúc đổ.",
     items: [
       { displayOrder: 1, title: "Bê tông đúng mác theo chỉ định", requirePhoto: true },
       { displayOrder: 2, title: "Đầm bê tông đầy đủ, không rỗ tổ ong", requirePhoto: true },
@@ -194,10 +194,10 @@ const ADMIN_QC_TEMPLATE_SEEDS: QcSeedPreset[] = [
   {
     code: "T3.05",
     category: TaskCategory.internal_milestone,
-    preparationSteps: "- Đầy đủ bản vẽ cột và chi tiết nối thép.\n- Chuẩn bị thép đúng quy cách, con kê và đai định vị.\n- Kiểm tra vị trí chờ thép từ đợt trước.",
-    executionSteps: "- Lắp dựng lồng thép đúng tim trục.\n- Siết buộc đầy đủ đai tại các vùng gia cường.\n- Căn chỉnh thẳng đứng trước khi nghiệm thu.",
-    commonMistakes: "- Lắp sai chiều dài nối thép cột.\n- Thiếu đai ở vị trí liên kết dầm cột.\n- Lồng thép lệch tim, khó chỉnh về sau.",
-    beforeQcSteps: "- Soát tim trục từng cột với mốc chuẩn.\n- Chụp ảnh các mối nối và vùng gia cường.\n- Khóa cố định lồng thép tránh xô lệch.",
+    guidePreparation: "- Đầy đủ bản vẽ cột và chi tiết nối thép.\n- Chuẩn bị thép đúng quy cách, con kê và đai định vị.\n- Kiểm tra vị trí chờ thép từ đợt trước.",
+    guideExecution: "- Lắp dựng lồng thép đúng tim trục.\n- Siết buộc đầy đủ đai tại các vùng gia cường.\n- Căn chỉnh thẳng đứng trước khi nghiệm thu.",
+    guideMistakes: "- Lắp sai chiều dài nối thép cột.\n- Thiếu đai ở vị trí liên kết dầm cột.\n- Lồng thép lệch tim, khó chỉnh về sau.",
+    guideBeforeQc: "- Soát tim trục từng cột với mốc chuẩn.\n- Chụp ảnh các mối nối và vùng gia cường.\n- Khóa cố định lồng thép tránh xô lệch.",
     items: [
       { displayOrder: 1, title: "Lồng thép cột đúng chủng loại", requirePhoto: true },
       { displayOrder: 2, title: "Mối nối cột đạt chiều dài theo thiết kế", requirePhoto: true },
@@ -208,10 +208,10 @@ const ADMIN_QC_TEMPLATE_SEEDS: QcSeedPreset[] = [
   {
     code: "T3.07",
     category: TaskCategory.major_milestone,
-    preparationSteps: "- Đà kiềng đã lắp cốt thép và cốp pha hoàn chỉnh.\n- Kiểm tra liên kết với cột/chân tường.\n- Chuẩn bị phương án đổ liên tục.",
-    executionSteps: "- Đổ bê tông theo phân đoạn hợp lý.\n- Đầm kỹ tại góc giao và đầu dầm.\n- Cân chỉnh cao độ mặt đà kiềng.",
-    commonMistakes: "- Đầm không đều tại vị trí giao cắt.\n- Sai cao độ cục bộ gây khó xây tường.\n- Cốp pha hở gây mất vữa.",
-    beforeQcSteps: "- Kiểm tra bề mặt bê tông sau đổ.\n- Chụp ảnh toàn tuyến đà kiềng và điểm nối.\n- Ghi nhận vị trí cần bảo dưỡng đặc biệt.",
+    guidePreparation: "- Đà kiềng đã lắp cốt thép và cốp pha hoàn chỉnh.\n- Kiểm tra liên kết với cột/chân tường.\n- Chuẩn bị phương án đổ liên tục.",
+    guideExecution: "- Đổ bê tông theo phân đoạn hợp lý.\n- Đầm kỹ tại góc giao và đầu dầm.\n- Cân chỉnh cao độ mặt đà kiềng.",
+    guideMistakes: "- Đầm không đều tại vị trí giao cắt.\n- Sai cao độ cục bộ gây khó xây tường.\n- Cốp pha hở gây mất vữa.",
+    guideBeforeQc: "- Kiểm tra bề mặt bê tông sau đổ.\n- Chụp ảnh toàn tuyến đà kiềng và điểm nối.\n- Ghi nhận vị trí cần bảo dưỡng đặc biệt.",
     items: [
       { displayOrder: 1, title: "Cốp pha kín, không mất nước xi", requirePhoto: true },
       { displayOrder: 2, title: "Đầm bê tông đạt, không rỗ", requirePhoto: true },
@@ -222,10 +222,10 @@ const ADMIN_QC_TEMPLATE_SEEDS: QcSeedPreset[] = [
   {
     code: "T4.01",
     category: TaskCategory.internal_milestone,
-    preparationSteps: "- Vật tư gạch, cát, xi đảm bảo chất lượng.\n- Mốc xây và cao độ đã được định vị.\n- Khu vực xây sạch, đủ nước trộn.",
-    executionSteps: "- Xây theo dây chuẩn, mạch đều và no vữa.\n- Bố trí thép râu và giằng tường đúng vị trí.\n- Kiểm soát độ thẳng đứng và phẳng bề mặt.",
-    commonMistakes: "- Mạch đứng trùng gây yếu tường.\n- Thiếu no vữa hoặc gạch không ngâm đủ.\n- Tường nghiêng, lệch tim với trục.",
-    beforeQcSteps: "- Soát độ thẳng đứng theo từng đoạn.\n- Chụp ảnh các vị trí giao tường/cột.\n- Dọn sạch vữa thừa, bảo dưỡng ban đầu.",
+    guidePreparation: "- Vật tư gạch, cát, xi đảm bảo chất lượng.\n- Mốc xây và cao độ đã được định vị.\n- Khu vực xây sạch, đủ nước trộn.",
+    guideExecution: "- Xây theo dây chuẩn, mạch đều và no vữa.\n- Bố trí thép râu và giằng tường đúng vị trí.\n- Kiểm soát độ thẳng đứng và phẳng bề mặt.",
+    guideMistakes: "- Mạch đứng trùng gây yếu tường.\n- Thiếu no vữa hoặc gạch không ngâm đủ.\n- Tường nghiêng, lệch tim với trục.",
+    guideBeforeQc: "- Soát độ thẳng đứng theo từng đoạn.\n- Chụp ảnh các vị trí giao tường/cột.\n- Dọn sạch vữa thừa, bảo dưỡng ban đầu.",
     items: [
       { displayOrder: 1, title: "Gạch đúng chủng loại và quy cách", requirePhoto: true },
       { displayOrder: 2, title: "Mạch vữa đầy, đều, không rỗng", requirePhoto: true },
@@ -280,10 +280,10 @@ async function seedAdminTemplateQcLibrary(adminUserId: string) {
     await prisma.qcChecklistTemplate.create({
       data: {
         taskTemplateId: template.id,
-        preparationSteps: preset.preparationSteps,
-        executionSteps: preset.executionSteps,
-        commonMistakes: preset.commonMistakes,
-        beforeQcSteps: preset.beforeQcSteps,
+        guidePreparation: preset.guidePreparation,
+        guideExecution: preset.guideExecution,
+        guideMistakes: preset.guideMistakes,
+        guideBeforeQc: preset.guideBeforeQc,
         createdBy: adminUserId,
         qcItems: {
           create: preset.items.map((item) => ({
@@ -305,6 +305,116 @@ async function seedAdminTemplateQcLibrary(adminUserId: string) {
     categoriesUpdated,
     qcCreated,
     qcSkipped,
+  };
+}
+
+type AssignmentTemplateSeedPreset = {
+  code: string;
+  items: Array<{
+    displayOrder: number;
+    title: string;
+    description?: string | null;
+    guideContent?: string | null;
+    requirePhoto: boolean;
+  }>;
+};
+
+const ASSIGNMENT_TEMPLATE_SEEDS: AssignmentTemplateSeedPreset[] = [
+  {
+    code: "T2.04",
+    items: [
+      { displayOrder: 1, title: "Kiểm tra mặt bằng đào", requirePhoto: true, guideContent: "Đo lại kích thước hố móng theo bản vẽ KT-04 trước khi đan thép." },
+      { displayOrder: 2, title: "Lót đá 4×6 đầy đủ", requirePhoto: true, guideContent: "Lót đá dày 5-8cm và đầm chặt bằng đầm cóc." },
+      { displayOrder: 3, title: "Đếm thép theo bản vẽ", requirePhoto: false, guideContent: "Đối chiếu số lượng và đường kính thép theo bản vẽ kết cấu." },
+      { displayOrder: 4, title: "Đan thép chủ Φ16", requirePhoto: true, guideContent: "Bố trí thép chủ, thép đai đúng khoảng cách theo bản vẽ." },
+      { displayOrder: 5, title: "Buộc kẽm đầy đủ giao điểm", requirePhoto: false, guideContent: "Không bỏ sót mối buộc tại vị trí giao thép." },
+      { displayOrder: 6, title: "Đặt cữ kê đáy 5cm", requirePhoto: true, guideContent: "Đặt cữ kê đủ mật độ để đảm bảo lớp bảo vệ thép." },
+      { displayOrder: 7, title: "Vệ sinh sạch trước đổ BT", requirePhoto: true, guideContent: "Dọn sạch rác, bùn và vật cản trước khi đổ bê tông." },
+    ],
+  },
+  {
+    code: "T2.05",
+    items: [
+      { displayOrder: 1, title: "Kiểm tra cốp pha trước đổ", requirePhoto: true },
+      { displayOrder: 2, title: "Xác nhận mác bê tông", requirePhoto: true },
+      { displayOrder: 3, title: "Đầm bê tông theo lớp", requirePhoto: false },
+      { displayOrder: 4, title: "Kiểm tra cao độ hoàn thiện", requirePhoto: true },
+    ],
+  },
+  {
+    code: "T3.05",
+    items: [
+      { displayOrder: 1, title: "Soát tim cột theo trục", requirePhoto: true },
+      { displayOrder: 2, title: "Kiểm tra chiều dài nối thép", requirePhoto: true },
+      { displayOrder: 3, title: "Buộc đai cột đúng bước", requirePhoto: false },
+      { displayOrder: 4, title: "Khóa cố định lồng thép", requirePhoto: true },
+    ],
+  },
+  {
+    code: "T3.07",
+    items: [
+      { displayOrder: 1, title: "Kiểm tra liên kết đà kiềng", requirePhoto: true },
+      { displayOrder: 2, title: "Đổ bê tông liên tục", requirePhoto: false },
+      { displayOrder: 3, title: "Đầm kỹ vị trí giao cắt", requirePhoto: true },
+      { displayOrder: 4, title: "Soát cao độ đà kiềng", requirePhoto: true },
+    ],
+  },
+  {
+    code: "T4.01",
+    items: [
+      { displayOrder: 1, title: "Kiểm tra mốc xây", requirePhoto: true },
+      { displayOrder: 2, title: "Xây mạch vữa đều", requirePhoto: false },
+      { displayOrder: 3, title: "Soát độ thẳng đứng", requirePhoto: true },
+      { displayOrder: 4, title: "Vệ sinh mặt tường sau xây", requirePhoto: false },
+    ],
+  },
+];
+
+async function seedAssignmentTemplateItems() {
+  let templatesFound = 0;
+  let itemsCreated = 0;
+  let templatesSkipped = 0;
+
+  for (const preset of ASSIGNMENT_TEMPLATE_SEEDS) {
+    const template = await prisma.taskTemplate.findFirst({
+      where: {
+        code: preset.code,
+        templateCategory: "nha_pho_1t1l",
+      },
+      select: { id: true },
+    });
+
+    if (!template) continue;
+    templatesFound += 1;
+
+    const existingCount = await prisma.taskAssignmentTemplateItem.count({
+      where: { taskTemplateId: template.id },
+    });
+
+    if (existingCount > 0) {
+      templatesSkipped += 1;
+      continue;
+    }
+
+    await prisma.taskAssignmentTemplateItem.createMany({
+      data: preset.items.map((item) => ({
+        taskTemplateId: template.id,
+        displayOrder: item.displayOrder,
+        title: item.title,
+        description: item.description ?? null,
+        guideContent: item.guideContent ?? null,
+        requirePhoto: item.requirePhoto,
+      })),
+    });
+
+    itemsCreated += preset.items.length;
+  }
+
+  return {
+    targetTemplates: ASSIGNMENT_TEMPLATE_SEEDS.length,
+    templatesFound,
+    itemsCreated,
+    templatesSkipped,
   };
 }
 
@@ -512,6 +622,7 @@ async function main() {
   const users = await seedUsers();
   const templateResult = await seedTaskTemplates();
   const qcTemplateResult = await seedAdminTemplateQcLibrary(users.admin.id);
+  const assignmentTemplateResult = await seedAssignmentTemplateItems();
   const subcontractorResult = await seedSubcontractorMasterData();
   const demoResult = await seedDemoProject({
     adminId: users.admin.id,
@@ -535,6 +646,10 @@ async function main() {
   console.log(`[SEED] QC template categories updated: ${qcTemplateResult.categoriesUpdated}`);
   console.log(`[SEED] QC template created: ${qcTemplateResult.qcCreated}`);
   console.log(`[SEED] QC template skipped(existing): ${qcTemplateResult.qcSkipped}`);
+  console.log(`[SEED] Assignment template targets: ${assignmentTemplateResult.targetTemplates}`);
+  console.log(`[SEED] Assignment template matched: ${assignmentTemplateResult.templatesFound}`);
+  console.log(`[SEED] Assignment items created: ${assignmentTemplateResult.itemsCreated}`);
+  console.log(`[SEED] Assignment templates skipped(existing): ${assignmentTemplateResult.templatesSkipped}`);
   console.log(`[SEED] Demo project: ${demoResult.project.code}`);
   console.log(`[SEED] Demo project tasks: ${demoResult.taskCount}`);
   console.log(`[SEED] Demo project payment schedules: ${demoResult.paymentCount}`);

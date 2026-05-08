@@ -15,10 +15,10 @@ import {
 
 type QcMissionTemplate = {
   id: string;
-  preparationSteps: string | null;
-  executionSteps: string | null;
-  commonMistakes: string | null;
-  beforeQcSteps: string | null;
+  guidePreparation: string | null;
+  guideExecution: string | null;
+  guideMistakes: string | null;
+  guideBeforeQc: string | null;
 };
 
 type QcTemplateResponse = {
@@ -319,31 +319,31 @@ export function QcSection({
             <div className="text-sm text-[#8891aa]">Task này không có checklist QC mẫu.</div>
           ) : null}
 
-          {mission?.qcTemplate?.preparationSteps ? (
+          {mission?.qcTemplate?.guidePreparation ? (
             <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
               <div className="text-xs font-semibold text-amber-300">Chuẩn bị trước khi làm</div>
-              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.preparationSteps}</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.guidePreparation}</div>
             </div>
           ) : null}
 
-          {mission?.qcTemplate?.executionSteps ? (
+          {mission?.qcTemplate?.guideExecution ? (
             <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
               <div className="text-xs font-semibold text-amber-300">Các bước thực hiện</div>
-              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.executionSteps}</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.guideExecution}</div>
             </div>
           ) : null}
 
-          {mission?.qcTemplate?.commonMistakes ? (
+          {mission?.qcTemplate?.guideMistakes ? (
             <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
               <div className="text-xs font-semibold text-amber-300">Lỗi thường gặp</div>
-              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.commonMistakes}</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.guideMistakes}</div>
             </div>
           ) : null}
 
-          {mission?.qcTemplate?.beforeQcSteps ? (
+          {mission?.qcTemplate?.guideBeforeQc ? (
             <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3">
               <div className="text-xs font-semibold text-amber-300">Trước khi gọi QC</div>
-              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.beforeQcSteps}</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-[#c8d0e8]">{mission.qcTemplate.guideBeforeQc}</div>
             </div>
           ) : null}
 

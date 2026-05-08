@@ -17,10 +17,10 @@ type QcItem = {
 
 type QcTemplate = {
   id: string;
-  preparationSteps: string | null;
-  executionSteps: string | null;
-  commonMistakes: string | null;
-  beforeQcSteps: string | null;
+  guidePreparation: string | null;
+  guideExecution: string | null;
+  guideMistakes: string | null;
+  guideBeforeQc: string | null;
   qcItems: QcItem[];
 };
 

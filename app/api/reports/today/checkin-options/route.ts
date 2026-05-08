@@ -1,47 +1,119 @@
 import { NextResponse } from "next/server";
-import { ProjectRoleType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
-import { getTodayDateVn } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
+import { getReportDateVn } from "@/lib/reports-v3";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  if (!user?.id || user.role !== "engineer") {
+    return NextResponse.json({ message: "Chỉ KS được check-in sáng" }, { status: 403 });
+  }
 
-  const today = getTodayDateVn();
-  const in3Days = new Date(today);
+  const reportDate = getReportDateVn();
+  const in3Days = new Date(reportDate);
   in3Days.setUTCDate(in3Days.getUTCDate() + 3);
 
-  const assignments = await prisma.projectMemberAssignment.findMany({ where: { userId: user.id, role: ProjectRoleType.pm_engineer }, select: { projectId: true }, distinct: ["projectId"] });
-  const projectIds = assignments.map((a) => a.projectId);
-
-  const projects = await prisma.project.findMany({
-    where: { id: { in: projectIds } },
+  const tasks = await prisma.task.findMany({
+    where: {
+      assignedEngineerId: user.id,
+      isActive: true,
+      status: { notIn: ["done", "na"] },
+    },
+    orderBy: [{ plannedStartDate: "asc" }, { displayOrder: "asc" }, { code: "asc" }],
     select: {
       id: true,
       code: true,
       name: true,
-      tasks: {
-        where: {
-          status: { notIn: ["done", "na"] },
-          assignedEngineerId: user.id,
+      status: true,
+      plannedStartDate: true,
+      plannedEndDate: true,
+      progressPercent: true,
+      projectId: true,
+      project: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
         },
-        orderBy: { displayOrder: "asc" },
-        select: { id: true, code: true, name: true, status: true, plannedStartDate: true, plannedEndDate: true },
       },
     },
   });
 
-  const data = projects.map((p) => ({
-    projectId: p.id,
-    projectName: `${p.code} · ${p.name}`,
-    groups: {
-      overdue: p.tasks.filter((t) => t.plannedEndDate < today && t.status !== "done"),
-      in_progress: p.tasks.filter((t) => t.status === "in_progress"),
-      starting_today: p.tasks.filter((t) => t.status === "not_started" && t.plannedStartDate.getTime() === today.getTime()),
-      upcoming: p.tasks.filter((t) => t.status === "not_started" && t.plannedStartDate > today && t.plannedStartDate <= in3Days),
+  const tptcAssignments = await prisma.tptcAssignment.findMany({
+    where: {
+      assignedToUserId: user.id,
+      status: { in: ["pending", "rejected"] },
     },
-  }));
+    orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      projectId: true,
+      title: true,
+      priority: true,
+      dueAt: true,
+      status: true,
+      assignedByUserId: true,
+      createdAt: true,
+      project: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+      },
+      assigner: {
+        select: {
+          fullName: true,
+        },
+      },
+    },
+  });
 
-  return NextResponse.json({ projects: data });
+  const taskGroups = new Map<string, { projectId: string; projectName: string; tasks: any[] }>();
+  for (const task of tasks) {
+    const projectName = `${task.project.code} · ${task.project.name}`;
+    if (!taskGroups.has(task.projectId)) {
+      taskGroups.set(task.projectId, { projectId: task.projectId, projectName, tasks: [] });
+    }
+
+    const group = taskGroups.get(task.projectId)!;
+    const isOverdue = task.plannedEndDate < reportDate && task.status !== "in_progress";
+    const startToday = task.plannedStartDate.getTime() === reportDate.getTime();
+    const upcoming = task.plannedStartDate > reportDate && task.plannedStartDate <= in3Days;
+
+    group.tasks.push({
+      id: task.id,
+      code: task.code,
+      name: task.name,
+      status: task.status,
+      progressPercent: task.progressPercent,
+      group: task.status === "in_progress" ? "in_progress" : isOverdue ? "overdue" : startToday ? "starting_today" : upcoming ? "upcoming" : "other",
+      plannedStartDate: task.plannedStartDate,
+      plannedEndDate: task.plannedEndDate,
+    });
+  }
+
+  const tptcGroups = new Map<string, { projectId: string; projectName: string; assignments: any[] }>();
+  for (const item of tptcAssignments) {
+    const projectName = `${item.project.code} · ${item.project.name}`;
+    if (!tptcGroups.has(item.projectId)) {
+      tptcGroups.set(item.projectId, { projectId: item.projectId, projectName, assignments: [] });
+    }
+
+    tptcGroups.get(item.projectId)!.assignments.push({
+      id: item.id,
+      title: item.title,
+      priority: item.priority,
+      dueAt: item.dueAt,
+      status: item.status,
+      assignedAt: item.createdAt,
+      assignedBy: item.assigner.fullName,
+    });
+  }
+
+  return NextResponse.json({
+    reportDate,
+    taskProjects: Array.from(taskGroups.values()),
+    tptcProjects: Array.from(tptcGroups.values()),
+  });
 }

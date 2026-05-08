@@ -141,7 +141,7 @@ export default async function CustomerJournalPage({
           <div className="text-sm owner-muted">Chưa có sự kiện phù hợp bộ lọc.</div>
         ) : null}
 
-        {[...groupedByDay.entries()].map(([day, group], dayIndex) => (
+        {Array.from(groupedByDay.entries()).map(([day, group], dayIndex) => (
           <details key={day} className="owner-card" open={dayIndex === 0}>
             <summary className="cursor-pointer list-none">
               <div className="flex items-center justify-between gap-3">

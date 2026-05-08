@@ -11,10 +11,10 @@ const qcItemSchema = z.object({
 });
 
 const qcTemplateSchema = z.object({
-  preparationSteps: z.string().nullable().optional(),
-  executionSteps: z.string().nullable().optional(),
-  commonMistakes: z.string().nullable().optional(),
-  beforeQcSteps: z.string().nullable().optional(),
+  guidePreparation: z.string().nullable().optional(),
+  guideExecution: z.string().nullable().optional(),
+  guideMistakes: z.string().nullable().optional(),
+  guideBeforeQc: z.string().nullable().optional(),
   items: z.array(qcItemSchema).min(1).max(15),
 });
 
@@ -110,10 +110,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     data: {
       taskTemplateId: params.id,
       createdBy: user.id,
-      preparationSteps: cleanText(parsed.data.preparationSteps),
-      executionSteps: cleanText(parsed.data.executionSteps),
-      commonMistakes: cleanText(parsed.data.commonMistakes),
-      beforeQcSteps: cleanText(parsed.data.beforeQcSteps),
+      guidePreparation: cleanText(parsed.data.guidePreparation),
+      guideExecution: cleanText(parsed.data.guideExecution),
+      guideMistakes: cleanText(parsed.data.guideMistakes),
+      guideBeforeQc: cleanText(parsed.data.guideBeforeQc),
       qcItems: {
         create: parsed.data.items.map((item) => ({
           displayOrder: item.displayOrder,
@@ -165,10 +165,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return tx.qcChecklistTemplate.update({
       where: { id: template.qcTemplate!.id },
       data: {
-        preparationSteps: cleanText(parsed.data.preparationSteps),
-        executionSteps: cleanText(parsed.data.executionSteps),
-        commonMistakes: cleanText(parsed.data.commonMistakes),
-        beforeQcSteps: cleanText(parsed.data.beforeQcSteps),
+        guidePreparation: cleanText(parsed.data.guidePreparation),
+        guideExecution: cleanText(parsed.data.guideExecution),
+        guideMistakes: cleanText(parsed.data.guideMistakes),
+        guideBeforeQc: cleanText(parsed.data.guideBeforeQc),
         qcItems: {
           create: parsed.data.items.map((item) => ({
             displayOrder: item.displayOrder,

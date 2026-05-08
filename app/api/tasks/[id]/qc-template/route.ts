@@ -66,10 +66,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     qcTemplate: template
       ? {
           id: template.id,
-          preparationSteps: template.preparationSteps,
-          executionSteps: template.executionSteps,
-          commonMistakes: template.commonMistakes,
-          beforeQcSteps: template.beforeQcSteps,
+          guidePreparation: template.guidePreparation,
+          guideExecution: template.guideExecution,
+          guideMistakes: template.guideMistakes,
+          guideBeforeQc: template.guideBeforeQc,
         }
       : null,
     items: template?.qcItems || [],

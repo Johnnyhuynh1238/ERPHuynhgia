@@ -245,6 +245,34 @@ enum QcReviewAction {
   rejected
 }
 
+enum AssignmentPriority {
+  normal
+  important
+  urgent
+  critical
+}
+
+enum TptcAssignmentStatus {
+  pending
+  in_progress
+  done
+  approved
+  rejected
+  cancelled
+}
+
+enum DailyAssignmentType {
+  template_item
+  progress_update
+  tptc_assignment
+}
+
+enum DailyAssignmentStatus {
+  pending
+  done
+  not_applicable
+}
+
 model User {
   id                 String   @id @default(uuid()) @db.Uuid
   email              String   @unique
@@ -315,6 +343,10 @@ model User {
   subEvaluations               SubEvaluation[]
   createdProjectPhases         ProjectPhase[]
   createdQcChecklistTemplates  QcChecklistTemplate[]
+  assignedTptcAssignments      TptcAssignment[]          @relation("TptcAssignmentAssignee")
+  createdTptcAssignments       TptcAssignment[]          @relation("TptcAssignmentAssigner")
+  taskDailyAssignments         TaskDailyAssignment[]
+  dailyReportSubmissions       DailyReportSubmission[]
 
   @@map("users")
 }
@@ -366,6 +398,7 @@ model Project {
   customerSessions        CustomerSession[]
   customerLoginAttempts   CustomerLoginAttempt[]
   subContracts            SubContract[]
+  tptcAssignments         TptcAssignment[]
 
   @@index([status])
   @@map("projects")
@@ -423,8 +456,9 @@ model TaskTemplate {
   isActive            Boolean      @default(true) @map("is_active")
   createdAt           DateTime     @default(now()) @map("created_at")
 
-  tasks      Task[]
-  qcTemplate QcChecklistTemplate?
+  tasks           Task[]
+  qcTemplate      QcChecklistTemplate?
+  assignmentItems TaskAssignmentTemplateItem[]
 
   @@map("task_templates")
 }
@@ -432,17 +466,18 @@ model TaskTemplate {
 model QcChecklistTemplate {
   id               String   @id @default(uuid()) @db.Uuid
   taskTemplateId   String   @unique @map("task_template_id") @db.Uuid
-  preparationSteps String?  @map("preparation_steps") @db.Text
-  executionSteps   String?  @map("execution_steps") @db.Text
-  commonMistakes   String?  @map("common_mistakes") @db.Text
-  beforeQcSteps    String?  @map("before_qc_steps") @db.Text
+  guidePreparation String?  @map("guide_preparation") @db.Text
+  guideExecution   String?  @map("guide_execution") @db.Text
+  guideMistakes    String?  @map("guide_mistakes") @db.Text
+  guideBeforeQc    String?  @map("guide_before_qc") @db.Text
   createdBy        String   @map("created_by") @db.Uuid
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  taskTemplate TaskTemplate      @relation(fields: [taskTemplateId], references: [id], onDelete: Cascade)
-  qcItems      QcChecklistItem[]
-  creator      User              @relation(fields: [createdBy], references: [id])
+  taskTemplate    TaskTemplate                 @relation(fields: [taskTemplateId], references: [id], onDelete: Cascade)
+  assignmentItems TaskAssignmentTemplateItem[]
+  qcItems         QcChecklistItem[]
+  creator         User                         @relation(fields: [createdBy], references: [id])
 
   @@map("qc_checklist_templates")
 }
@@ -461,6 +496,98 @@ model QcChecklistItem {
   @@unique([templateId, displayOrder])
   @@index([templateId])
   @@map("qc_checklist_items")
+}
+
+model TaskAssignmentTemplateItem {
+  id             String  @id @default(uuid()) @db.Uuid
+  taskTemplateId String  @map("task_template_id") @db.Uuid
+  qcTemplateId   String? @map("qc_template_id") @db.Uuid
+  displayOrder   Int     @map("display_order")
+  title          String
+  description    String? @db.Text
+  guideContent   String? @map("guide_content") @db.Text
+  requirePhoto   Boolean @default(false) @map("require_photo")
+
+  taskTemplate TaskTemplate          @relation(fields: [taskTemplateId], references: [id], onDelete: Cascade)
+  qcTemplate   QcChecklistTemplate?  @relation(fields: [qcTemplateId], references: [id], onDelete: SetNull)
+  dailyItems   TaskDailyAssignment[]
+
+  @@index([taskTemplateId, displayOrder])
+  @@index([qcTemplateId])
+  @@map("task_assignment_template_items")
+}
+
+model TptcAssignment {
+  id               String               @id @default(uuid()) @db.Uuid
+  projectId        String               @map("project_id") @db.Uuid
+  assignedToUserId String               @map("assigned_to_user_id") @db.Uuid
+  assignedByUserId String               @map("assigned_by_user_id") @db.Uuid
+  title            String
+  description      String               @db.Text
+  priority         AssignmentPriority   @default(normal)
+  dueAt            DateTime             @map("due_at")
+  status           TptcAssignmentStatus @default(pending)
+  startedAt        DateTime?            @map("started_at")
+  completedAt      DateTime?            @map("completed_at")
+  approvedAt       DateTime?            @map("approved_at")
+  ksNote           String?              @map("ks_note") @db.Text
+  reviewNote       String?              @map("review_note") @db.Text
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  project    Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee   User                  @relation("TptcAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assigner   User                  @relation("TptcAssignmentAssigner", fields: [assignedByUserId], references: [id])
+  dailyItems TaskDailyAssignment[]
+
+  @@index([assignedToUserId, status, dueAt])
+  @@index([assignedByUserId])
+  @@index([projectId])
+  @@map("tptc_assignments")
+}
+
+model TaskDailyAssignment {
+  id               String                @id @default(uuid()) @db.Uuid
+  ksUserId         String                @map("ks_user_id") @db.Uuid
+  reportDate       DateTime              @map("report_date") @db.Date
+  taskId           String?               @map("task_id") @db.Uuid
+  tptcAssignmentId String?               @map("tptc_assignment_id") @db.Uuid
+  type             DailyAssignmentType
+  templateItemId   String?               @map("template_item_id") @db.Uuid
+  title            String
+  guideContent     String?               @map("guide_content") @db.Text
+  requirePhoto     Boolean               @default(false) @map("require_photo")
+  priority         AssignmentPriority    @default(normal)
+  status           DailyAssignmentStatus @default(pending)
+  photoUrl         String?               @map("photo_url")
+  note             String?               @db.Text
+  doneAt           DateTime?             @map("done_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+
+  ksUser         User                        @relation(fields: [ksUserId], references: [id])
+  task           Task?                       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tptcAssignment TptcAssignment?             @relation(fields: [tptcAssignmentId], references: [id])
+  templateItem   TaskAssignmentTemplateItem? @relation(fields: [templateItemId], references: [id])
+
+  @@index([ksUserId, reportDate])
+  @@index([taskId, reportDate])
+  @@map("task_daily_assignments")
+}
+
+model DailyReportSubmission {
+  id                 String   @id @default(uuid()) @db.Uuid
+  ksUserId           String   @map("ks_user_id") @db.Uuid
+  reportDate         DateTime @map("report_date") @db.Date
+  submittedAt        DateTime @map("submitted_at")
+  isLate             Boolean  @default(false) @map("is_late")
+  totalItems         Int      @map("total_items")
+  doneItems          Int      @map("done_items")
+  notApplicableItems Int      @map("not_applicable_items")
+
+  ksUser User @relation(fields: [ksUserId], references: [id])
+
+  @@unique([ksUserId, reportDate])
+  @@map("daily_report_submissions")
 }
 
 model Task {
@@ -542,6 +669,7 @@ model Task {
   customerKsRating        CustomerKsRating?
   subContractTasks        SubContractTask[]
   subPayments             SubPayment[]
+  taskDailyAssignments    TaskDailyAssignment[]
 
   @@unique([projectId, code])
   @@index([projectId, isActive, displayOrder, code])
@@ -737,16 +865,16 @@ model TaskProgressHistory {
 }
 
 model TaskQcResult {
-  id        String   @id @default(uuid()) @db.Uuid
-  taskId    String   @map("task_id") @db.Uuid
-  itemId    String   @map("item_id") @db.Uuid
+  id                   String   @id @default(uuid()) @db.Uuid
+  taskId               String   @map("task_id") @db.Uuid
+  itemId               String   @map("item_id") @db.Uuid
   isPassed             Boolean  @default(false) @map("is_passed")
   passedAtFirstAttempt Boolean? @map("passed_at_first_attempt")
   photoUrl             String?  @map("photo_url")
   note                 String?  @db.Text
-  checkedBy String   @map("checked_by") @db.Uuid
-  checkedAt DateTime @default(now()) @map("checked_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  checkedBy            String   @map("checked_by") @db.Uuid
+  checkedAt            DateTime @default(now()) @map("checked_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   task    Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
   item    QcChecklistItem @relation(fields: [itemId], references: [id])
@@ -1500,15 +1628,15 @@ model CustomerTaskRating {
 }
 
 model CustomerKsRating {
-  id                    String   @id @default(uuid()) @db.Uuid
-  taskId                String   @unique @map("task_id") @db.Uuid
-  ksUserId              String   @map("ks_user_id") @db.Uuid
-  projectId             String   @map("project_id") @db.Uuid
-  ratingExpertise       Int      @map("rating_expertise")
-  ratingAttitude        Int      @map("rating_attitude")
-  ratingCommunication   Int      @map("rating_communication")
-  note                  String?  @db.Text
-  ratedAt               DateTime @default(now()) @map("rated_at")
+  id                  String   @id @default(uuid()) @db.Uuid
+  taskId              String   @unique @map("task_id") @db.Uuid
+  ksUserId            String   @map("ks_user_id") @db.Uuid
+  projectId           String   @map("project_id") @db.Uuid
+  ratingExpertise     Int      @map("rating_expertise")
+  ratingAttitude      Int      @map("rating_attitude")
+  ratingCommunication Int      @map("rating_communication")
+  note                String?  @db.Text
+  ratedAt             DateTime @default(now()) @map("rated_at")
 
   task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   ksUser  User    @relation("KsRatedDirectly", fields: [ksUserId], references: [id])

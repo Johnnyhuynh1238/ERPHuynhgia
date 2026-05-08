@@ -71,6 +71,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
           },
         },
       },
+      assignmentItems: {
+        orderBy: { displayOrder: "asc" },
+      },
     },
   });
 
@@ -145,10 +148,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await tx.qcChecklistTemplate.create({
         data: {
           taskTemplateId: createdTemplate.id,
-          preparationSteps: source.qcTemplate.preparationSteps,
-          executionSteps: source.qcTemplate.executionSteps,
-          commonMistakes: source.qcTemplate.commonMistakes,
-          beforeQcSteps: source.qcTemplate.beforeQcSteps,
+          guidePreparation: source.qcTemplate.guidePreparation,
+          guideExecution: source.qcTemplate.guideExecution,
+          guideMistakes: source.qcTemplate.guideMistakes,
+          guideBeforeQc: source.qcTemplate.guideBeforeQc,
           createdBy: user.id,
           qcItems: {
             create: source.qcTemplate.qcItems.map((item) => ({
@@ -159,6 +162,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
             })),
           },
         },
+      });
+    }
+
+    if (source.assignmentItems.length) {
+      await tx.taskAssignmentTemplateItem.createMany({
+        data: source.assignmentItems.map((item) => ({
+          taskTemplateId: createdTemplate.id,
+          displayOrder: item.displayOrder,
+          title: item.title,
+          description: item.description,
+          guideContent: item.guideContent,
+          requirePhoto: item.requirePhoto,
+        })),
       });
     }
 

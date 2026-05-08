@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AssignmentItemsTab } from "./assignment-items-tab";
 
 type TemplateInfo = {
   id: string;
@@ -21,10 +22,10 @@ type QcItem = {
 
 type QcTemplate = {
   id: string;
-  preparationSteps: string | null;
-  executionSteps: string | null;
-  commonMistakes: string | null;
-  beforeQcSteps: string | null;
+  guidePreparation: string | null;
+  guideExecution: string | null;
+  guideMistakes: string | null;
+  guideBeforeQc: string | null;
   qcItems: QcItem[];
 };
 
@@ -36,10 +37,10 @@ type ItemDraft = {
 };
 
 const EMPTY_SECTIONS = {
-  preparationSteps: "",
-  executionSteps: "",
-  commonMistakes: "",
-  beforeQcSteps: "",
+  guidePreparation: "",
+  guideExecution: "",
+  guideMistakes: "",
+  guideBeforeQc: "",
 };
 
 export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
@@ -50,7 +51,7 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
 
   const [template, setTemplate] = useState<TemplateInfo | null>(null);
   const [qcTemplateId, setQcTemplateId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"tasks" | "checklist">("tasks");
+  const [activeTab, setActiveTab] = useState<"guides" | "assignments" | "checklist">("guides");
 
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   const [items, setItems] = useState<ItemDraft[]>([]);
@@ -94,10 +95,10 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
       setTemplate(info);
       setQcTemplateId(qcTemplate?.id || null);
       setSections({
-        preparationSteps: qcTemplate?.preparationSteps || "",
-        executionSteps: qcTemplate?.executionSteps || "",
-        commonMistakes: qcTemplate?.commonMistakes || "",
-        beforeQcSteps: qcTemplate?.beforeQcSteps || "",
+        guidePreparation: qcTemplate?.guidePreparation || "",
+        guideExecution: qcTemplate?.guideExecution || "",
+        guideMistakes: qcTemplate?.guideMistakes || "",
+        guideBeforeQc: qcTemplate?.guideBeforeQc || "",
       });
       setItems(
         (qcTemplate?.qcItems || []).map((item) => ({
@@ -109,7 +110,7 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
       );
     };
 
-    run();
+    void run();
     return () => {
       stop = true;
     };
@@ -186,10 +187,10 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
 
     setSaving(true);
     const payload = {
-      preparationSteps: sections.preparationSteps.trim() || null,
-      executionSteps: sections.executionSteps.trim() || null,
-      commonMistakes: sections.commonMistakes.trim() || null,
-      beforeQcSteps: sections.beforeQcSteps.trim() || null,
+      guidePreparation: sections.guidePreparation.trim() || null,
+      guideExecution: sections.guideExecution.trim() || null,
+      guideMistakes: sections.guideMistakes.trim() || null,
+      guideBeforeQc: sections.guideBeforeQc.trim() || null,
       items: items.map((item, idx) => ({
         displayOrder: idx + 1,
         title: item.title.trim(),
@@ -233,22 +234,31 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-[#f0f2ff]">
-          ← QC - {template?.code} {template?.name}
+          ← Cấu hình QC - {template?.code} {template?.name}
         </h1>
         <a href={`/admin/templates/${templateId}`} className="text-xs font-semibold text-[#f97316]">
           Về task
         </a>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => setActiveTab("tasks")}
+          onClick={() => setActiveTab("guides")}
           className={`rounded-lg px-3 py-2 text-sm font-medium ${
-            activeTab === "tasks" ? "bg-[#f97316] text-black" : "bg-[#2a2a2a] text-[#aaa]"
+            activeTab === "guides" ? "bg-[#f97316] text-black" : "bg-[#2a2a2a] text-[#aaa]"
           }`}
         >
-          📋 Nhiệm vụ
+          📖 Hướng dẫn
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("assignments")}
+          className={`rounded-lg px-3 py-2 text-sm font-medium ${
+            activeTab === "assignments" ? "bg-[#f97316] text-black" : "bg-[#2a2a2a] text-[#aaa]"
+          }`}
+        >
+          ✓ Nhiệm vụ
         </button>
         <button
           type="button"
@@ -257,11 +267,11 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
             activeTab === "checklist" ? "bg-[#f97316] text-black" : "bg-[#2a2a2a] text-[#aaa]"
           }`}
         >
-          ✅ Checklist ({itemCount})
+          ✅ Checklist QC ({itemCount})
         </button>
       </div>
 
-      {activeTab === "tasks" ? (
+      {activeTab === "guides" ? (
         <div className="space-y-3">
           <div className="rounded-lg border-l-4 border-[#f97316] bg-[#2a1a05] p-3 text-xs text-[#f7c58a]">
             Markdown đơn giản: dùng • cho bullet, **text** cho in đậm.
@@ -269,30 +279,34 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
 
           <MarkdownSection
             title="🟦 CHUẨN BỊ"
-            value={sections.preparationSteps}
-            onChange={(value) => setSections((prev) => ({ ...prev, preparationSteps: value }))}
+            value={sections.guidePreparation}
+            onChange={(value) => setSections((prev) => ({ ...prev, guidePreparation: value }))}
           />
           <MarkdownSection
             title="🟩 THI CÔNG"
-            value={sections.executionSteps}
-            onChange={(value) => setSections((prev) => ({ ...prev, executionSteps: value }))}
+            value={sections.guideExecution}
+            onChange={(value) => setSections((prev) => ({ ...prev, guideExecution: value }))}
           />
           <MarkdownSection
             title="🔴 SAI SÓT THƯỜNG GẶP"
-            value={sections.commonMistakes}
-            onChange={(value) => setSections((prev) => ({ ...prev, commonMistakes: value }))}
+            value={sections.guideMistakes}
+            onChange={(value) => setSections((prev) => ({ ...prev, guideMistakes: value }))}
           />
           <MarkdownSection
             title="🟧 TRƯỚC KHI CHECK QC"
-            value={sections.beforeQcSteps}
-            onChange={(value) => setSections((prev) => ({ ...prev, beforeQcSteps: value }))}
+            value={sections.guideBeforeQc}
+            onChange={(value) => setSections((prev) => ({ ...prev, guideBeforeQc: value }))}
           />
 
-          <Button className="w-full bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={saving} onClick={() => upsertQcTemplate("Đã lưu Nhiệm vụ")}>
-            {saving ? "Đang lưu..." : "💾 Lưu Nhiệm vụ"}
+          <Button className="w-full bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={saving} onClick={() => upsertQcTemplate("Đã lưu Hướng dẫn")}>
+            {saving ? "Đang lưu..." : "💾 Lưu Hướng dẫn"}
           </Button>
         </div>
-      ) : (
+      ) : null}
+
+      {activeTab === "assignments" ? <AssignmentItemsTab templateId={templateId} canEdit /> : null}
+
+      {activeTab === "checklist" ? (
         <div className="space-y-3">
           <div className="rounded-lg border-l-4 border-[#f97316] bg-[#2a1a05] p-3 text-xs text-[#f7c58a]">
             Danh sách tiêu chí QC: {itemCount} / 15
@@ -335,11 +349,11 @@ export function TemplateQcEditorClient({ templateId }: { templateId: string }) {
             + Thêm tiêu chí
           </Button>
 
-          <Button className="w-full bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={saving} onClick={() => upsertQcTemplate("Đã lưu Checklist")}>
-            {saving ? "Đang lưu..." : "💾 Lưu Checklist"}
+          <Button className="w-full bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={saving} onClick={() => upsertQcTemplate("Đã lưu Checklist QC")}>
+            {saving ? "Đang lưu..." : "💾 Lưu Checklist QC"}
           </Button>
         </div>
-      )}
+      ) : null}
 
       {itemModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

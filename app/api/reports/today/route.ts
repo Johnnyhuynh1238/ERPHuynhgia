@@ -1,46 +1,177 @@
+import { DailyAssignmentType } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { ProjectRoleType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
-import { getTodayDateVn } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
+import { getReportDateVn, getSubmissionDeadline, sortFlatAssignments, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
 
-const roleMap: Record<ProjectRoleType, { label: string; type: "technical" | "material" | "labor" | "equipment" }> = {
-  pm_construction_manager: { label: "TPTC", type: "technical" },
-  pm_engineer: { label: "Kỹ thuật", type: "technical" },
-  pm_material_manager: { label: "Vật tư", type: "material" },
-  pm_labor_manager: { label: "Nhân công", type: "labor" },
-  pm_accountant: { label: "Kế toán", type: "equipment" },
-};
-
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getCurrentUser();
-  if (!user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  if (!user?.id || user.role !== "engineer") {
+    return NextResponse.json({ message: "Chỉ KS được xem trang này" }, { status: 403 });
+  }
 
-  const assignments = await prisma.projectMemberAssignment.findMany({
-    where: { userId: user.id },
-    include: { project: { select: { id: true, code: true, name: true, tasks: { where: { isActive: true }, select: { id: true, code: true, name: true } } } } },
+  const url = new URL(request.url);
+  const modeParam = url.searchParams.get("mode");
+  const mode: "flat" | "task" | "project" = modeParam === "task" || modeParam === "project" ? modeParam : "flat";
+
+  const reportDate = getReportDateVn();
+  const now = new Date();
+
+  await upsertPendingTptcAssignmentsForDay({
+    ksUserId: user.id,
+    reportDate,
   });
 
-  const today = getTodayDateVn();
-  const projects = await Promise.all(assignments.reduce((acc: any[], cur) => {
-    const existing = acc.find((x) => x.project.id === cur.project.id);
-    if (!existing) acc.push({ project: cur.project, roles: [cur.role] }); else existing.roles.push(cur.role);
-    return acc;
-  }, []).map(async ({ project, roles }) => {
-    const groups = await Promise.all(roles.map(async (role: ProjectRoleType) => {
-      const type = roleMap[role].type;
-      const tasks = await Promise.all(project.tasks.map(async (task: { id: string; code: string; name: string }) => {
-        let reportedToday = false;
-        if (type === "technical") reportedToday = !!(await prisma.taskTechnicalReport.findUnique({ where: { taskId_reportDate: { taskId: task.id, reportDate: today } } }));
-        if (type === "material") reportedToday = !!(await prisma.taskMaterialReport.findUnique({ where: { taskId_reportDate: { taskId: task.id, reportDate: today } } }));
-        if (type === "labor") reportedToday = !!(await prisma.taskLaborReport.findUnique({ where: { taskId_reportDate: { taskId: task.id, reportDate: today } } }));
-        if (type === "equipment") reportedToday = !!(await prisma.taskEquipmentReport.findUnique({ where: { taskId_reportDate: { taskId: task.id, reportDate: today } } }));
-        return { taskId: task.id, taskCode: task.code, taskName: task.name, reportedToday };
-      }));
-      return { role, label: roleMap[role].label, tasks };
-    }));
-    return { projectId: project.id, projectName: `${project.code} · ${project.name}`, myRoles: roles, groups };
-  }));
+  const rows = await prisma.taskDailyAssignment.findMany({
+    where: {
+      ksUserId: user.id,
+      reportDate,
+    },
+    include: {
+      task: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          progressPercent: true,
+          project: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
+      tptcAssignment: {
+        select: {
+          id: true,
+          dueAt: true,
+          priority: true,
+          status: true,
+          project: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
 
-  return NextResponse.json({ projects });
+  const assignments = rows.map((row) => {
+    const base = {
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      status: row.status,
+      priority: row.priority,
+      requirePhoto: row.requirePhoto,
+      guideContent: row.guideContent,
+      photoUrl: row.photoUrl,
+      note: row.note,
+      doneAt: row.doneAt,
+      dueAt: row.tptcAssignment?.dueAt || null,
+      projectId: row.task?.project.id || row.tptcAssignment?.project.id || null,
+      projectName:
+        row.task?.project ? `${row.task.project.code} · ${row.task.project.name}` : row.tptcAssignment?.project ? `${row.tptcAssignment.project.code} · ${row.tptcAssignment.project.name}` : null,
+    };
+
+    if (row.type === DailyAssignmentType.template_item) {
+      return {
+        ...base,
+        taskId: row.task?.id || null,
+        taskCode: row.task?.code || null,
+        taskName: row.task?.name || null,
+      };
+    }
+
+    if (row.type === DailyAssignmentType.progress_update) {
+      return {
+        ...base,
+        taskId: row.task?.id || null,
+        taskCode: row.task?.code || null,
+        taskName: row.task?.name || null,
+        currentProgress: row.task?.progressPercent ?? 0,
+      };
+    }
+
+    return {
+      ...base,
+      tptcAssignmentId: row.tptcAssignment?.id || null,
+      tptcStatus: row.tptcAssignment?.status || null,
+    };
+  });
+
+  const sorted = sortFlatAssignments(assignments as any[]) as any[];
+
+  const stats = {
+    total: sorted.length,
+    done: sorted.filter((item) => item.status === "done").length,
+    notApplicable: sorted.filter((item) => item.status === "not_applicable").length,
+    pending: sorted.filter((item) => item.status === "pending").length,
+  };
+
+  const submission = await prisma.dailyReportSubmission.findUnique({
+    where: {
+      ksUserId_reportDate: {
+        ksUserId: user.id,
+        reportDate,
+      },
+    },
+    select: {
+      id: true,
+      submittedAt: true,
+      isLate: true,
+    },
+  });
+
+  const taskGroups = Object.values(
+    sorted
+      .filter((item) => item.taskId)
+      .reduce<Record<string, { taskId: string; taskCode: string | null; taskName: string | null; projectName: string | null; assignments: any[] }>>((acc, item) => {
+        const key = item.taskId as string;
+        if (!acc[key]) {
+          acc[key] = {
+            taskId: key,
+            taskCode: item.taskCode || null,
+            taskName: item.taskName || null,
+            projectName: item.projectName || null,
+            assignments: [],
+          };
+        }
+        acc[key].assignments.push(item);
+        return acc;
+      }, {}),
+  );
+
+  const projectGroups = Object.values(
+    sorted.reduce<Record<string, { projectId: string; projectName: string | null; assignments: any[] }>>((acc, item) => {
+      const key = item.projectId || "unknown";
+      if (!acc[key]) {
+        acc[key] = {
+          projectId: item.projectId || "unknown",
+          projectName: item.projectName || "Không rõ dự án",
+          assignments: [],
+        };
+      }
+      acc[key].assignments.push(item);
+      return acc;
+    }, {}),
+  );
+
+  return NextResponse.json({
+    date: reportDate,
+    submissionDeadline: getSubmissionDeadline(reportDate),
+    currentTime: now,
+    submitted: Boolean(submission),
+    submission,
+    mode,
+    stats,
+    assignments: mode === "flat" ? sorted : assignments,
+    taskGroups,
+    projectGroups,
+  });
 }
