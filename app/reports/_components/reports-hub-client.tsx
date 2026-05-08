@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 type AssignmentStatus = "pending" | "done" | "not_applicable";
 type AssignmentType = "template_item" | "progress_update" | "tptc_assignment";
@@ -304,6 +305,17 @@ export function ReportsHubClient() {
       loadCheckinOptions();
     }
   }, [needCheckin, loadCheckinOptions]);
+
+  useEffect(() => {
+    if (!checkinTaskPickerOpen || typeof document === "undefined") return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [checkinTaskPickerOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -676,106 +688,109 @@ export function ReportsHubClient() {
           ) : null}
         </section>
 
-        {checkinTaskPickerOpen ? (
-          <div className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-3">
-            <div className="modal-panel-in flex max-h-[calc(100dvh-16px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[#2f3555] bg-[#171c2f] shadow-2xl sm:max-h-[92vh] sm:rounded-2xl">
-              <div className="shrink-0 border-b border-[#2f3555] p-4">
-                {checkinPickerStep === "tasks" ? (
-                  <button
-                    type="button"
-                    onClick={backToCheckinPickerProjects}
-                    className="mb-3 inline-flex items-center rounded-lg border border-[#2f3555] px-2.5 py-1 text-xs font-semibold text-[#d9def3]"
-                  >
-                    ← Đổi dự án
-                  </button>
-                ) : null}
-                <div className="text-base font-bold text-[#f0f2ff]">
-                  {checkinPickerStep === "projects" ? "Chọn dự án" : checkinPickerProject?.projectName || "Chọn task"}
-                </div>
-                <div className="mt-1 text-xs text-[#98a0c2]">
-                  {checkinPickerStep === "projects" ? "Bấm vào dự án để xem task được phân quyền." : "Tick task cần thêm rồi bấm nút Thêm bên dưới."}
-                </div>
-              </div>
+        {checkinTaskPickerOpen && typeof document !== "undefined"
+          ? createPortal(
+              <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-black/65 p-3 sm:items-center">
+                <div className="modal-sheet-in flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[#2f3555] bg-[#171c2f] shadow-2xl sm:max-h-[92dvh] sm:rounded-2xl">
+                  <div className="shrink-0 border-b border-[#2f3555] p-4">
+                    {checkinPickerStep === "tasks" ? (
+                      <button
+                        type="button"
+                        onClick={backToCheckinPickerProjects}
+                        className="mb-3 inline-flex items-center rounded-lg border border-[#2f3555] px-2.5 py-1 text-xs font-semibold text-[#d9def3]"
+                      >
+                        ← Đổi dự án
+                      </button>
+                    ) : null}
+                    <div className="text-base font-bold text-[#f0f2ff]">
+                      {checkinPickerStep === "projects" ? "Chọn dự án" : checkinPickerProject?.projectName || "Chọn task"}
+                    </div>
+                    <div className="mt-1 text-xs text-[#98a0c2]">
+                      {checkinPickerStep === "projects" ? "Bấm vào dự án để xem task được phân quyền." : "Tick task cần thêm rồi bấm nút Thêm bên dưới."}
+                    </div>
+                  </div>
 
-              <div key={`${checkinPickerStep}-${checkinPickerProjectId || "projects"}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-                {checkinPickerStep === "projects" ? (
-                  <div className="space-y-2">
-                    {(checkin?.taskProjects || []).length > 0 ? (
-                      (checkin?.taskProjects || []).map((project) => {
-                        const selectedCount = project.tasks.filter((task) => checkinPickerTaskIds[task.id]).length;
-                        const inProgressCount = project.tasks.filter((task) => task.group === "in_progress").length;
+                  <div key={`${checkinPickerStep}-${checkinPickerProjectId || "projects"}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+                    {checkinPickerStep === "projects" ? (
+                      <div className="space-y-2">
+                        {(checkin?.taskProjects || []).length > 0 ? (
+                          (checkin?.taskProjects || []).map((project) => {
+                            const selectedCount = project.tasks.filter((task) => checkinPickerTaskIds[task.id]).length;
+                            const inProgressCount = project.tasks.filter((task) => task.group === "in_progress").length;
 
-                        return (
-                          <button
-                            key={project.projectId}
-                            type="button"
-                            onClick={() => selectCheckinPickerProject(project.projectId)}
-                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-3 text-left"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-[#f0f2ff]">{project.projectName}</span>
-                              <span className="mt-0.5 block text-xs text-[#98a0c2]">
-                                {project.tasks.length} task · {inProgressCount} đang làm
+                            return (
+                              <button
+                                key={project.projectId}
+                                type="button"
+                                onClick={() => selectCheckinPickerProject(project.projectId)}
+                                className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-3 text-left"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-semibold text-[#f0f2ff]">{project.projectName}</span>
+                                  <span className="mt-0.5 block text-xs text-[#98a0c2]">
+                                    {project.tasks.length} task · {inProgressCount} đang làm
+                                  </span>
+                                </span>
+                                <span className="shrink-0 rounded-full bg-[#1f2740] px-2 py-1 text-xs font-semibold text-[#f97316]">
+                                  {selectedCount > 0 ? `${selectedCount} đã chọn` : "Chọn"}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Không có dự án/task được phân quyền.</div>
+                        )}
+                      </div>
+                    ) : checkinPickerProject ? (
+                      <div className="space-y-2">
+                        {checkinPickerProject.tasks.length > 0 ? (
+                          checkinPickerProject.tasks.map((task) => (
+                            <label key={task.id} className="flex cursor-pointer items-start gap-2 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-2.5 text-sm text-[#f0f2ff]">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(checkinPickerTaskIds[task.id])}
+                                onChange={(event) => setCheckinPickerTaskIds((prev) => ({ ...prev, [task.id]: event.target.checked }))}
+                                className="mt-0.5"
+                              />
+                              <span className="min-w-0">
+                                <span className="block font-semibold">{task.code} · {task.name}</span>
+                                <span className="text-xs text-[#98a0c2]">{GROUP_LABEL[task.group]} · Tiến độ {task.progressPercent}%</span>
                               </span>
-                            </span>
-                            <span className="shrink-0 rounded-full bg-[#1f2740] px-2 py-1 text-xs font-semibold text-[#f97316]">
-                              {selectedCount > 0 ? `${selectedCount} đã chọn` : "Chọn"}
-                            </span>
-                          </button>
-                        );
-                      })
+                            </label>
+                          ))
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Dự án này chưa có task để chọn.</div>
+                        )}
+                      </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Không có dự án/task được phân quyền.</div>
+                      <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Vui lòng quay lại chọn dự án.</div>
                     )}
                   </div>
-                ) : checkinPickerProject ? (
-                  <div className="space-y-2">
-                    {checkinPickerProject.tasks.length > 0 ? (
-                      checkinPickerProject.tasks.map((task) => (
-                        <label key={task.id} className="flex cursor-pointer items-start gap-2 rounded-xl border border-[#2f3555] bg-[#0f1424] px-3 py-2.5 text-sm text-[#f0f2ff]">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(checkinPickerTaskIds[task.id])}
-                            onChange={(event) => setCheckinPickerTaskIds((prev) => ({ ...prev, [task.id]: event.target.checked }))}
-                            className="mt-0.5"
-                          />
-                          <span className="min-w-0">
-                            <span className="block font-semibold">{task.code} · {task.name}</span>
-                            <span className="text-xs text-[#98a0c2]">{GROUP_LABEL[task.group]} · Tiến độ {task.progressPercent}%</span>
-                          </span>
-                        </label>
-                      ))
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Dự án này chưa có task để chọn.</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[#2f3555] p-4 text-sm text-[#98a0c2]">Vui lòng quay lại chọn dự án.</div>
-                )}
-              </div>
 
-              <div className="flex shrink-0 justify-end gap-2 border-t border-[#2f3555] bg-[#171c2f] p-4">
-                <button
-                  type="button"
-                  onClick={closeCheckinTaskPicker}
-                  className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]"
-                >
-                  Hủy
-                </button>
-                {checkinPickerStep === "tasks" ? (
-                  <button
-                    type="button"
-                    disabled={!checkinPickerProject || checkinPickerSelectedCount === 0}
-                    onClick={addCheckinPickerTasks}
-                    className="rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs font-bold text-[#f97316] disabled:opacity-50"
-                  >
-                    Thêm ({checkinPickerSelectedCount})
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        ) : null}
+                  <div className="flex shrink-0 justify-end gap-2 border-t border-[#2f3555] bg-[#171c2f] p-4">
+                    <button
+                      type="button"
+                      onClick={closeCheckinTaskPicker}
+                      className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]"
+                    >
+                      Hủy
+                    </button>
+                    {checkinPickerStep === "tasks" ? (
+                      <button
+                        type="button"
+                        disabled={!checkinPickerProject || checkinPickerSelectedCount === 0}
+                        onClick={addCheckinPickerTasks}
+                        className="rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs font-bold text-[#f97316] disabled:opacity-50"
+                      >
+                        Thêm ({checkinPickerSelectedCount})
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
 
         {(checkin?.tptcProjects || []).length > 0 ? (
           <section className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
