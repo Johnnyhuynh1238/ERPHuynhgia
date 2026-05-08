@@ -54,8 +54,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   engineer: [
     { label: "Dashboard", href: "/" },
     { label: "Dự án của tôi", href: "/projects" },
-    { label: "Thầu phụ", href: "/subcontractors" },
-    { label: "Báo cáo", href: "/reports" },
+    { label: "Nhiệm Vụ", href: "/reports" },
     { label: "KPI/Lương", href: "/me/kpi" },
   ],
   foreman: [
@@ -265,7 +264,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       </main>
 
       <nav className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-[#252840] bg-[#13151f]/96 px-2 pb-2 pt-2 backdrop-blur-xl md:hidden">
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${primaryMenus.length + (moreMenus.length > 0 ? 1 : 0)}, minmax(0, 1fr))` }}>
           {primaryMenus.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = navIcon(item.href, item.label);
@@ -283,16 +282,18 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             );
           })}
 
-          <button
-            type="button"
-            onClick={() => setOpenMore(true)}
-            className={`flex flex-col items-center justify-center rounded-xl px-2 py-2 text-[10px] font-medium ${
-              openMore ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#8892b0]"
-            }`}
-          >
-            <MoreHorizontal className="mb-1 h-4 w-4" />
-            <span>Thêm</span>
-          </button>
+          {moreMenus.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setOpenMore(true)}
+              className={`flex flex-col items-center justify-center rounded-xl px-2 py-2 text-[10px] font-medium ${
+                openMore ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#8892b0]"
+              }`}
+            >
+              <MoreHorizontal className="mb-1 h-4 w-4" />
+              <span>Thêm</span>
+            </button>
+          ) : null}
         </div>
       </nav>
 
