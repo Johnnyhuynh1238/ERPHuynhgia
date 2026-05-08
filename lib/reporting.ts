@@ -278,20 +278,13 @@ export function getActivityDates(project: { goLiveDate: Date | null }, from: Dat
 }
 
 export async function getReportProjectIdsForEngineer(userId: string) {
-  const [main, members] = await Promise.all([
-    prisma.project.findMany({ where: { mainEngineerId: userId }, select: { id: true } }),
-    prisma.projectMember.findMany({
-      where: {
-        userId,
-        roleInProject: ProjectMemberRole.engineer,
-      },
-      select: { projectId: true },
-    }),
-  ]);
+  const assignments = await prisma.projectMemberAssignment.findMany({
+    where: { userId },
+    select: { projectId: true },
+  });
 
   const ids = new Set<string>();
-  main.forEach((p) => ids.add(p.id));
-  members.forEach((m) => ids.add(m.projectId));
+  assignments.forEach((assignment) => ids.add(assignment.projectId));
   return Array.from(ids);
 }
 
@@ -410,15 +403,9 @@ export function toProjectAccessWhere(user: UserCtx): Prisma.ProjectWhereInput {
   }
 
   return {
-    OR: [
-      { projectManagerId: user.id },
-      { mainEngineerId: user.id },
-      {
-        projectMembers: {
-          some: { userId: user.id },
-        },
-      },
-    ],
+    memberAssignments: {
+      some: { userId: user.id },
+    },
   };
 }
 

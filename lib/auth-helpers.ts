@@ -2,6 +2,7 @@ import { CommentTargetType, Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import {
   getCustomerSessionCookieName,
   isPortalExpired,
@@ -54,12 +55,7 @@ export async function getCustomerPortalSessionByToken(token: string) {
 export async function getStaffCommentUnreadCount(userId: string, role: string) {
   if (!["admin", "construction_manager", "engineer", "accountant"].includes(role)) return 0;
 
-  const projectWhere: Prisma.ProjectWhereInput =
-    role === "engineer"
-      ? {
-          OR: [{ mainEngineerId: userId }, { tasks: { some: { assignedEngineerId: userId } } }],
-        }
-      : {};
+  const projectWhere: Prisma.ProjectWhereInput = role === "engineer" ? buildProjectAccessWhere({ id: userId, role }) : {};
   const targetWhere: Prisma.CustomerCommentWhereInput =
     role === "accountant"
       ? { targetType: CommentTargetType.payment_schedule }

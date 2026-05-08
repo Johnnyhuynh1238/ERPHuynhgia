@@ -396,12 +396,15 @@ export async function GET() {
   }
 
   if (user.role === UserRole.engineer) {
+    const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
+
     const [taskCandidates, delayedTasks, next3Tasks, projectsCount, upcomingMilestones, reportProjects] = await Promise.all([
       prisma.task.findMany({
         where: {
           isActive: true,
           assignedEngineerId: user.id,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected, TaskStatus.na] },
+          project: projectAccess,
           OR: [
             { plannedEndDate: { lt: today } },
             {
@@ -423,6 +426,7 @@ export async function GET() {
           plannedEndDate: { lt: today },
           isActive: true,
           status: { notIn: [TaskStatus.done, TaskStatus.inspected] },
+          project: projectAccess,
         },
       }),
       prisma.task.findMany({
@@ -430,13 +434,12 @@ export async function GET() {
           isActive: true,
           assignedEngineerId: user.id,
           plannedStartDate: { gt: today, lte: in3Days },
+          project: projectAccess,
         },
         include: { project: { select: { id: true, code: true, name: true } } },
       }),
       prisma.project.count({
-        where: {
-          OR: [{ mainEngineerId: user.id }, { projectMembers: { some: { userId: user.id } } }],
-        },
+        where: projectAccess,
       }),
       prisma.task.findMany({
         where: {
@@ -444,6 +447,7 @@ export async function GET() {
           assignedEngineerId: user.id,
           isMilestone: true,
           plannedStartDate: { gte: today, lte: in7Days },
+          project: projectAccess,
         },
         include: { project: { select: { id: true, code: true, name: true } } },
         orderBy: { plannedStartDate: "asc" },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { generateAssignmentsAfterCheckin, getReportDateVn, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
 
 export async function POST(req: Request) {
@@ -21,13 +22,35 @@ export async function POST(req: Request) {
     }
 
     const reportDate = getReportDateVn();
+    const projectAccessWhere = buildProjectAccessWhere({ id: user.id, role: user.role });
+
+    let checkedInTaskIds: string[] = [];
 
     await prisma.$transaction(async (tx) => {
+      const validTasks = taskIds.length
+        ? await tx.task.findMany({
+            where: {
+              id: { in: taskIds },
+              assignedEngineerId: user.id,
+              isActive: true,
+              project: projectAccessWhere,
+            },
+            select: { id: true, projectId: true },
+          })
+        : [];
+      const validTaskIds = validTasks.map((task) => task.id);
+      checkedInTaskIds = validTaskIds;
+
+      if (taskIds.length && validTaskIds.length !== taskIds.length) {
+        throw new Error("Có task không thuộc phân quyền dự án của KS");
+      }
+
       await tx.task.updateMany({
         where: {
-          id: { in: taskIds },
+          id: { in: validTaskIds },
           assignedEngineerId: user.id,
           status: "not_started",
+          project: projectAccessWhere,
         },
         data: {
           status: "in_progress",
@@ -50,7 +73,7 @@ export async function POST(req: Request) {
           data: {
             submittedAt: new Date(),
             tasks: {
-              create: taskIds.map((taskId) => ({
+              create: validTaskIds.map((taskId) => ({
                 taskId,
                 taskGroup: "manual_checkin",
               })),
@@ -58,10 +81,7 @@ export async function POST(req: Request) {
           },
         });
       } else {
-        const firstTask = await tx.task.findFirst({
-          where: { id: { in: taskIds } },
-          select: { projectId: true },
-        });
+        const firstTask = validTasks[0];
 
         if (!firstTask) {
           throw new Error("Không tìm thấy task hợp lệ để check-in");
@@ -74,7 +94,7 @@ export async function POST(req: Request) {
             reportDate,
             submittedAt: new Date(),
             tasks: {
-              create: taskIds.map((taskId) => ({
+              create: validTaskIds.map((taskId) => ({
                 taskId,
                 taskGroup: "manual_checkin",
               })),
@@ -87,7 +107,7 @@ export async function POST(req: Request) {
     const generated = await generateAssignmentsAfterCheckin({
       ksUserId: user.id,
       reportDate,
-      taskIds,
+      taskIds: checkedInTaskIds,
     });
 
     const tptcGenerated = await upsertPendingTptcAssignmentsForDay({

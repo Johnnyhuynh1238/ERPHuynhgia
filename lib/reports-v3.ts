@@ -1,5 +1,6 @@
-import { AssignmentPriority, DailyAssignmentStatus, DailyAssignmentType } from "@prisma/client";
+import { AssignmentPriority, DailyAssignmentStatus, DailyAssignmentType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getTodayDateVn } from "@/lib/task-centric";
 
 export function getReportDateVn() {
@@ -251,6 +252,7 @@ export async function upsertPendingTptcAssignmentsForDay({
       assignedToUserId: ksUserId,
       status: "pending",
       dueAt: { lte: eod },
+      project: buildProjectAccessWhere({ id: ksUserId, role: UserRole.engineer }),
       ...(selectedIds && selectedIds.length ? { id: { in: selectedIds } } : {}),
     },
     select: {

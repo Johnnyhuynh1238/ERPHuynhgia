@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getReportDateVn } from "@/lib/reports-v3";
 
 export async function GET() {
@@ -10,6 +11,7 @@ export async function GET() {
   }
 
   const reportDate = getReportDateVn();
+  const projectAccessWhere = buildProjectAccessWhere({ id: user.id, role: user.role });
   const in3Days = new Date(reportDate);
   in3Days.setUTCDate(in3Days.getUTCDate() + 3);
 
@@ -18,6 +20,7 @@ export async function GET() {
       assignedEngineerId: user.id,
       isActive: true,
       status: { notIn: ["done", "na"] },
+      project: projectAccessWhere,
     },
     orderBy: [{ plannedStartDate: "asc" }, { displayOrder: "asc" }, { code: "asc" }],
     select: {
@@ -43,6 +46,7 @@ export async function GET() {
     where: {
       assignedToUserId: user.id,
       status: { in: ["pending", "rejected"] },
+      project: projectAccessWhere,
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
     select: {
