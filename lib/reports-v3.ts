@@ -197,7 +197,7 @@ export async function generateAssignmentsAfterCheckin({
         });
       }
     } else {
-      const fallbackItems = buildFallbackAssignmentItemsFromLegacyGuides(task.template);
+      const fallbackItems = buildFallbackAssignmentItemsFromLegacyGuides(task.template || undefined);
       for (const item of fallbackItems) {
         batch.push({
           ksUserId,
