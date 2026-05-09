@@ -60,45 +60,6 @@ export function sortFlatAssignments<T extends { status: DailyAssignmentStatus; p
   });
 }
 
-function parseGuideLines(content?: string | null) {
-  if (!content) return [] as string[];
-  return content
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^[-•\s]+/, "").trim())
-    .filter(Boolean);
-}
-
-function buildFallbackAssignmentItemsFromLegacyGuides(template?: {
-  qcTemplate?: {
-    guidePreparation?: string | null;
-    guideExecution?: string | null;
-    guideMistakes?: string | null;
-    guideBeforeQc?: string | null;
-  } | null;
-}) {
-  if (!template?.qcTemplate) return [] as Array<{ title: string; guideContent: string | null; requirePhoto: boolean }>;
-
-  const sections: Array<{ heading: string; content?: string | null }> = [
-    { heading: "Chuẩn bị", content: template.qcTemplate.guidePreparation },
-    { heading: "Thi công", content: template.qcTemplate.guideExecution },
-    { heading: "Sai sót thường gặp", content: template.qcTemplate.guideMistakes },
-    { heading: "Trước khi mời QC", content: template.qcTemplate.guideBeforeQc },
-  ];
-
-  const rows: Array<{ title: string; guideContent: string | null; requirePhoto: boolean }> = [];
-  for (const section of sections) {
-    for (const line of parseGuideLines(section.content)) {
-      rows.push({
-        title: line,
-        guideContent: `${section.heading}\n${line}`,
-        requirePhoto: true,
-      });
-    }
-  }
-
-  return rows;
-}
-
 export async function generateAssignmentsAfterCheckin({
   ksUserId,
   reportDate,
@@ -119,7 +80,6 @@ export async function generateAssignmentsAfterCheckin({
     select: {
       id: true,
       code: true,
-      templateId: true,
       template: {
         select: {
           assignmentItems: {
@@ -129,14 +89,6 @@ export async function generateAssignmentsAfterCheckin({
               title: true,
               guideContent: true,
               requirePhoto: true,
-            },
-          },
-          qcTemplate: {
-            select: {
-              guidePreparation: true,
-              guideExecution: true,
-              guideMistakes: true,
-              guideBeforeQc: true,
             },
           },
         },
@@ -181,36 +133,20 @@ export async function generateAssignmentsAfterCheckin({
   for (const task of tasks) {
     const templateItems = task.template?.assignmentItems || [];
 
-    if (templateItems.length > 0) {
-      for (const item of templateItems) {
-        const key = `${task.id}:${item.id}`;
-        if (existingTemplateKey.has(key)) continue;
-        batch.push({
-          ksUserId,
-          reportDate,
-          taskId: task.id,
-          type: DailyAssignmentType.template_item,
-          templateItemId: item.id,
-          title: item.title,
-          guideContent: item.guideContent,
-          requirePhoto: item.requirePhoto,
-          priority: AssignmentPriority.normal,
-        });
-      }
-    } else {
-      const fallbackItems = buildFallbackAssignmentItemsFromLegacyGuides(task.template || undefined);
-      for (const item of fallbackItems) {
-        batch.push({
-          ksUserId,
-          reportDate,
-          taskId: task.id,
-          type: DailyAssignmentType.template_item,
-          title: item.title,
-          guideContent: item.guideContent,
-          requirePhoto: item.requirePhoto,
-          priority: AssignmentPriority.normal,
-        });
-      }
+    for (const item of templateItems) {
+      const key = `${task.id}:${item.id}`;
+      if (existingTemplateKey.has(key)) continue;
+      batch.push({
+        ksUserId,
+        reportDate,
+        taskId: task.id,
+        type: DailyAssignmentType.template_item,
+        templateItemId: item.id,
+        title: item.title,
+        guideContent: item.guideContent,
+        requirePhoto: item.requirePhoto,
+        priority: AssignmentPriority.normal,
+      });
     }
 
     if (!existingProgressTaskIds.has(task.id)) {
