@@ -309,7 +309,8 @@ export function ReportsHubClient() {
   }, [needCheckin, loadCheckinOptions]);
 
   useEffect(() => {
-    if ((!checkinTaskPickerOpen && !progressModalItem) || typeof document === "undefined") return;
+    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || progressModalItem || guideItem || submitConfirmOpen);
+    if (!hasOpenModal || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -317,7 +318,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [checkinTaskPickerOpen, progressModalItem]);
+  }, [checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -1064,64 +1065,70 @@ export function ReportsHubClient() {
         </div>
       )}
 
-      {doneModalItem ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
-          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#171c2f] p-4">
-            <div className="text-sm font-semibold text-[#f0f2ff]">✅ Đánh dấu hoàn thành</div>
-            <div className="mt-1 text-xs text-[#98a0c2]">{doneModalItem.title}</div>
-            <div className="mt-3 space-y-2">
-              <input
-                value={donePhotoUrl}
-                onChange={(e) => setDonePhotoUrl(e.target.value)}
-                placeholder={doneModalItem.requirePhoto ? "Link ảnh minh chứng (bắt buộc)" : "Link ảnh minh chứng (tuỳ chọn)"}
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-              <textarea
-                value={doneNote}
-                onChange={(e) => setDoneNote(e.target.value)}
-                placeholder="Ghi chú (tuỳ chọn)"
-                rows={3}
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setDoneModalItem(null)} className="rounded border border-[#2f3555] px-3 py-1.5 text-xs text-[#d9def3]">
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={busyId === doneModalItem.id}
-                onClick={confirmDone}
-                className="rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-200"
-              >
-                {busyId === doneModalItem.id ? "Đang xử lý..." : "Xác nhận"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {doneModalItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 shadow-2xl">
+                <div className="text-base font-bold text-[#f0f2ff]">✅ Đánh dấu hoàn thành</div>
+                <div className="mt-1 text-sm text-[#98a0c2]">{doneModalItem.title}</div>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={donePhotoUrl}
+                    onChange={(e) => setDonePhotoUrl(e.target.value)}
+                    placeholder={doneModalItem.requirePhoto ? "Link ảnh minh chứng (bắt buộc)" : "Link ảnh minh chứng (tuỳ chọn)"}
+                    className="w-full rounded-xl border border-[#2f3555] bg-[#11182d] px-3 py-2.5 text-sm text-[#d9def3]"
+                  />
+                  <textarea
+                    value={doneNote}
+                    onChange={(e) => setDoneNote(e.target.value)}
+                    placeholder="Ghi chú (tuỳ chọn)"
+                    rows={3}
+                    className="w-full rounded-xl border border-[#2f3555] bg-[#11182d] px-3 py-2.5 text-sm text-[#d9def3]"
+                  />
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setDoneModalItem(null)} className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]">
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === doneModalItem.id}
+                    onClick={confirmDone}
+                    className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-200 disabled:opacity-50"
+                  >
+                    {busyId === doneModalItem.id ? "Đang xử lý..." : "Xác nhận"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {notApplicableItem ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
-          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#171c2f] p-4">
-            <div className="text-sm font-semibold text-[#f0f2ff]">⊘ Đánh dấu không áp dụng</div>
-            <div className="mt-2 text-sm text-[#d9def3]">Xác nhận đánh dấu &quot;{notApplicableItem.title}&quot; là không áp dụng?</div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setNotApplicableItem(null)} className="rounded border border-[#2f3555] px-3 py-1.5 text-xs text-[#d9def3]">
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={busyId === notApplicableItem.id}
-                onClick={confirmNotApplicable}
-                className="rounded border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200"
-              >
-                {busyId === notApplicableItem.id ? "Đang xử lý..." : "Xác nhận"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {notApplicableItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 shadow-2xl">
+                <div className="text-base font-bold text-[#f0f2ff]">⊘ Đánh dấu không áp dụng</div>
+                <div className="mt-2 text-sm leading-6 text-[#d9def3]">Xác nhận đánh dấu &quot;{notApplicableItem.title}&quot; là không áp dụng?</div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setNotApplicableItem(null)} className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]">
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === notApplicableItem.id}
+                    onClick={confirmNotApplicable}
+                    className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-200 disabled:opacity-50"
+                  >
+                    {busyId === notApplicableItem.id ? "Đang xử lý..." : "Xác nhận"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {progressModalItem && typeof document !== "undefined"
         ? createPortal(
@@ -1221,44 +1228,50 @@ export function ReportsHubClient() {
           )
         : null}
 
-      {guideItem ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
-          <div className="w-full max-w-2xl rounded-xl border border-[#2f3555] bg-[#171c2f] p-4">
-            <div className="text-sm font-semibold text-[#f0f2ff]">📖 {guideItem.title}</div>
-            <div className="mt-3 max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm text-[#d9def3]">{guideItem.guideContent}</div>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => setGuideItem(null)} className="rounded border border-[#2f3555] px-3 py-1.5 text-xs text-[#d9def3]">
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {guideItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in flex max-h-[92dvh] w-full max-w-2xl flex-col rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 shadow-2xl">
+                <div className="shrink-0 text-base font-bold text-[#f0f2ff]">📖 {guideItem.title}</div>
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[#d9def3]">{guideItem.guideContent}</div>
+                <div className="mt-4 flex shrink-0 justify-end">
+                  <button type="button" onClick={() => setGuideItem(null)} className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]">
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {submitConfirmOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
-          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#171c2f] p-4">
-            <div className="text-sm font-semibold text-[#f0f2ff]">📤 Gửi báo cáo cuối ngày</div>
-            <div className="mt-2 text-sm text-[#d9def3]">Xác nhận gửi báo cáo hôm nay?</div>
-            <div className="mt-2 text-xs text-[#98a0c2]">
-              ✅ {today.stats.done} · ⊘ {today.stats.notApplicable} · ☐ {today.stats.pending}
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setSubmitConfirmOpen(false)} className="rounded border border-[#2f3555] px-3 py-1.5 text-xs text-[#d9def3]">
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={busyId === "submit"}
-                onClick={submitDayReport}
-                className="rounded border border-[#f97316]/30 bg-[#f97316]/10 px-3 py-1.5 text-xs font-semibold text-[#f97316]"
-              >
-                {busyId === "submit" ? "Đang gửi..." : "Xác nhận gửi"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {submitConfirmOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 shadow-2xl">
+                <div className="text-base font-bold text-[#f0f2ff]">📤 Gửi báo cáo cuối ngày</div>
+                <div className="mt-2 text-sm leading-6 text-[#d9def3]">Xác nhận gửi báo cáo hôm nay?</div>
+                <div className="mt-2 text-xs text-[#98a0c2]">
+                  ✅ {today.stats.done} · ⊘ {today.stats.notApplicable} · ☐ {today.stats.pending}
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setSubmitConfirmOpen(false)} className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]">
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === "submit"}
+                    onClick={submitDayReport}
+                    className="rounded-lg border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs font-bold text-[#f97316] disabled:opacity-50"
+                  >
+                    {busyId === "submit" ? "Đang gửi..." : "Xác nhận gửi"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
