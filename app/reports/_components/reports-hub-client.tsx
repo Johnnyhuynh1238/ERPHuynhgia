@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type TaskPhotoItem, TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
 
@@ -177,7 +177,8 @@ export function ReportsHubClient() {
   const [progressNote, setProgressNote] = useState("");
   const [guideItem, setGuideItem] = useState<FlatAssignment | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
-  const { items: progressUploadItems, upload: uploadProgressPhotos, clear: clearProgressUploads } = useTaskPhotoUploader(progressModalItem?.taskId || "");
+  const removedProgressUploadIdsRef = useRef(new Set<string>());
+  const { items: progressUploadItems, upload: uploadProgressPhotos, clear: clearProgressUploads, remove: removeProgressUploadItem } = useTaskPhotoUploader(progressModalItem?.taskId || "");
 
   const totalPicked = useMemo(() => {
     const taskCount = Object.values(pickedTaskIds).filter(Boolean).length;
@@ -443,6 +444,7 @@ export function ReportsHubClient() {
 
   function openProgressModal(item: FlatAssignment) {
     clearProgressUploads();
+    removedProgressUploadIdsRef.current = new Set();
     setProgressModalItem(item);
     setProgressPercent(item.currentProgress || 0);
     setProgressPhotos(item.photoUrl ? [{ photoUrl: item.photoUrl, thumbnailUrl: item.photoUrl }] : []);
@@ -454,10 +456,14 @@ export function ReportsHubClient() {
     if (!progressModalItem?.taskId || !files?.length) return;
 
     const result = await uploadProgressPhotos(Array.from(files));
-    if (result.uploaded.length) {
+    const photosToAttach = result.uploadedItems
+      .filter((item) => !removedProgressUploadIdsRef.current.has(item.itemId))
+      .map((item) => item.photo);
+
+    if (photosToAttach.length) {
       setProgressPhotos((current) => {
         const byUrl = new Map(current.map((photo) => [photo.photoUrl, photo]));
-        for (const photo of result.uploaded) {
+        for (const photo of photosToAttach) {
           byUrl.set(photo.photoUrl, photo);
         }
         return Array.from(byUrl.values());
@@ -504,6 +510,7 @@ export function ReportsHubClient() {
       });
       setProgressModalItem(null);
       setProgressPhotos([]);
+      removedProgressUploadIdsRef.current = new Set();
       clearProgressUploads();
       await loadToday(mode);
     } catch (e) {
@@ -1204,21 +1211,20 @@ export function ReportsHubClient() {
                       }}
                       className="mt-3 w-full rounded-lg border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black"
                     />
-                    {progressUploadItems.length > 0 ? <TaskPhotoUploadStatus items={progressUploadItems} onClear={clearProgressUploads} /> : null}
-                    {progressPhotos.length > 0 ? (
-                      <div className="mt-3 space-y-2">
-                        <div className="text-xs font-semibold text-[#8892b0]">Ảnh sẽ gắn vào cập nhật ({progressPhotos.length})</div>
-                        {progressPhotos.map((photo, index) => (
-                          <div key={photo.photoUrl} className="flex items-center justify-between gap-2 rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#f0f2ff]">
-                            <a href={photo.photoUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate underline">
-                              Ảnh {index + 1}
-                            </a>
-                            <button type="button" onClick={() => removeProgressPhoto(photo.photoUrl)} className="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] font-bold text-red-200">
-                              Gỡ
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                    {progressUploadItems.length > 0 ? (
+                      <TaskPhotoUploadStatus
+                        items={progressUploadItems}
+                        onClear={() => {
+                          clearProgressUploads();
+                          setProgressPhotos([]);
+                          removedProgressUploadIdsRef.current = new Set();
+                        }}
+                        onRemove={(item) => {
+                          removedProgressUploadIdsRef.current.add(item.id);
+                          removeProgressUploadItem(item.id);
+                          if (item.photo?.photoUrl) removeProgressPhoto(item.photo.photoUrl);
+                        }}
+                      />
                     ) : null}
                   </div>
 
@@ -1243,6 +1249,7 @@ export function ReportsHubClient() {
                     onClick={() => {
                       setProgressModalItem(null);
                       setProgressPhotos([]);
+                      removedProgressUploadIdsRef.current = new Set();
                       clearProgressUploads();
                     }}
                     className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]"
