@@ -4,9 +4,16 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireEngineerForTodayAssignment } from "../../_helpers";
 
+const photoUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "Ảnh tiến độ không hợp lệ");
+
 const bodySchema = z.object({
   newPercent: z.number().int().min(0).max(100),
-  photoUrl: z.string().trim().url("Ảnh tiến độ không hợp lệ"),
+  photoUrl: photoUrlSchema.optional(),
+  photoUrls: z.array(photoUrlSchema).optional(),
   note: z.string().trim().optional().nullable(),
   reason: z.string().trim().optional().nullable(),
 });
@@ -34,8 +41,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  if (auth.assignment.requirePhoto && !parsed.data.photoUrl) {
-    return NextResponse.json({ message: "Nhiệm vụ này bắt buộc upload ảnh" }, { status: 400 });
+  const photoUrls = Array.from(new Set([...(parsed.data.photoUrls || []), parsed.data.photoUrl].filter((value): value is string => Boolean(value))));
+  const primaryPhotoUrl = photoUrls[0];
+
+  if (!primaryPhotoUrl) {
+    return NextResponse.json({ message: "Cập nhật tiến độ bắt buộc có ảnh minh chứng" }, { status: 400 });
   }
 
   const reason = String(parsed.data.reason || "").trim();
@@ -62,7 +72,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         userId: auth.user.id,
         fromPercent: auth.assignment.task!.progressPercent,
         toPercent: parsed.data.newPercent,
-        photoUrl: parsed.data.photoUrl,
+        photoUrl: primaryPhotoUrl,
         reason: reason || null,
         note: note || null,
       },
@@ -76,7 +86,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         fromValue: String(auth.assignment.task!.progressPercent),
         toValue: String(parsed.data.newPercent),
         metadata: {
-          photoUrl: parsed.data.photoUrl,
+          photoUrl: primaryPhotoUrl,
+          photoUrls,
           reason: reason || null,
           note: note || null,
         },
@@ -99,7 +110,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       where: { id: auth.assignment.id },
       data: {
         status: "done",
-        photoUrl: parsed.data.photoUrl,
+        photoUrl: primaryPhotoUrl,
         note: note || null,
         doneAt: now,
       },
@@ -112,6 +123,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       from: auth.assignment.task.progressPercent,
       to: parsed.data.newPercent,
       updatedAt: now,
+      photoUrls,
     },
   });
 }

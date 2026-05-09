@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
+import { type TaskPhotoItem, TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
 
 type AssignmentStatus = "pending" | "done" | "not_applicable";
 type AssignmentType = "template_item" | "progress_update" | "tptc_assignment";
@@ -172,7 +172,7 @@ export function ReportsHubClient() {
   const [notApplicableItem, setNotApplicableItem] = useState<FlatAssignment | null>(null);
   const [progressModalItem, setProgressModalItem] = useState<FlatAssignment | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
-  const [progressPhotoUrl, setProgressPhotoUrl] = useState("");
+  const [progressPhotos, setProgressPhotos] = useState<TaskPhotoItem[]>([]);
   const [progressReason, setProgressReason] = useState("");
   const [progressNote, setProgressNote] = useState("");
   const [guideItem, setGuideItem] = useState<FlatAssignment | null>(null);
@@ -445,7 +445,7 @@ export function ReportsHubClient() {
     clearProgressUploads();
     setProgressModalItem(item);
     setProgressPercent(item.currentProgress || 0);
-    setProgressPhotoUrl(item.photoUrl || "");
+    setProgressPhotos(item.photoUrl ? [{ photoUrl: item.photoUrl, thumbnailUrl: item.photoUrl }] : []);
     setProgressReason("");
     setProgressNote(item.note || "");
   }
@@ -453,14 +453,23 @@ export function ReportsHubClient() {
   async function uploadProgressPhotoFiles(files: FileList | null) {
     if (!progressModalItem?.taskId || !files?.length) return;
 
-    const result = await uploadProgressPhotos(Array.from(files).slice(0, 1));
-    const uploadedPhoto = result.uploaded[0];
-    if (uploadedPhoto?.photoUrl) {
-      setProgressPhotoUrl(uploadedPhoto.photoUrl);
+    const result = await uploadProgressPhotos(Array.from(files));
+    if (result.uploaded.length) {
+      setProgressPhotos((current) => {
+        const byUrl = new Map(current.map((photo) => [photo.photoUrl, photo]));
+        for (const photo of result.uploaded) {
+          byUrl.set(photo.photoUrl, photo);
+        }
+        return Array.from(byUrl.values());
+      });
     }
     if (result.failed[0]?.message) {
       setError(result.failed[0].message);
     }
+  }
+
+  function removeProgressPhoto(photoUrl: string) {
+    setProgressPhotos((current) => current.filter((photo) => photo.photoUrl !== photoUrl));
   }
 
   async function confirmProgressUpdate() {
@@ -472,7 +481,9 @@ export function ReportsHubClient() {
       return;
     }
 
-    if (!progressPhotoUrl.trim()) {
+    const progressPhotoUrls = progressPhotos.map((photo) => photo.photoUrl).filter(Boolean);
+
+    if (!progressPhotoUrls.length) {
       setError("Cập nhật tiến độ bắt buộc có ảnh minh chứng");
       return;
     }
@@ -486,11 +497,13 @@ export function ReportsHubClient() {
     try {
       await postAction(`/api/reports/assignments/${progressModalItem.id}/update-progress`, {
         newPercent: progressPercent,
-        photoUrl: progressPhotoUrl.trim(),
+        photoUrl: progressPhotoUrls[0],
+        photoUrls: progressPhotoUrls,
         reason: progressReason.trim() || undefined,
         note: progressNote.trim() || undefined,
       });
       setProgressModalItem(null);
+      setProgressPhotos([]);
       clearProgressUploads();
       await loadToday(mode);
     } catch (e) {
@@ -539,6 +552,7 @@ export function ReportsHubClient() {
     const isDone = item.status === "done";
     const isNa = item.status === "not_applicable";
     const isPending = item.status === "pending";
+    const displayTitle = item.type === "progress_update" && item.taskName ? `Cập nhật tiến độ · ${item.taskName}` : item.title;
 
     return (
       <div
@@ -560,7 +574,7 @@ export function ReportsHubClient() {
             {isDone ? "✓" : isNa ? "⊘" : ""}
           </button>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold leading-5 text-[#f0f2ff]">{item.title}</div>
+            <div className="text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
             <div className="mt-1 text-xs leading-5 text-[#8892b0]">
               {item.taskCode ? `${item.taskCode} · ` : ""}
               {item.projectName || "Không rõ dự án"}
@@ -1142,7 +1156,11 @@ export function ReportsHubClient() {
               <div className="modal-sheet-in flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl sm:max-h-[92dvh] sm:rounded-2xl">
                 <div className="shrink-0 border-b border-[#252840] p-4">
                   <div className="text-lg font-bold text-[#f0f2ff]">📈 Cập nhật tiến độ</div>
-                  <div className="mt-1 text-sm text-[#8892b0]">{progressModalItem.title}</div>
+                  <div className="mt-1 text-sm text-[#8892b0]">
+                    {progressModalItem.taskName
+                      ? `${progressModalItem.taskCode ? `${progressModalItem.taskCode} · ` : ""}${progressModalItem.taskName}`
+                      : progressModalItem.title}
+                  </div>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
@@ -1178,6 +1196,7 @@ export function ReportsHubClient() {
                     <div className="mt-1 text-xs text-[#8892b0]">Chọn ảnh từ điện thoại, hệ thống sẽ upload vào task rồi gắn vào cập nhật tiến độ.</div>
                     <input
                       type="file"
+                      multiple
                       accept="image/jpeg,image/png,image/webp"
                       onChange={async (event) => {
                         await uploadProgressPhotoFiles(event.currentTarget.files);
@@ -1186,10 +1205,20 @@ export function ReportsHubClient() {
                       className="mt-3 w-full rounded-lg border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black"
                     />
                     {progressUploadItems.length > 0 ? <TaskPhotoUploadStatus items={progressUploadItems} onClear={clearProgressUploads} /> : null}
-                    {progressPhotoUrl ? (
-                      <a href={progressPhotoUrl} target="_blank" rel="noreferrer" className="mt-3 block rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 underline">
-                        Đã có ảnh minh chứng, bấm để xem ảnh
-                      </a>
+                    {progressPhotos.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs font-semibold text-[#8892b0]">Ảnh sẽ gắn vào cập nhật ({progressPhotos.length})</div>
+                        {progressPhotos.map((photo, index) => (
+                          <div key={photo.photoUrl} className="flex items-center justify-between gap-2 rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#f0f2ff]">
+                            <a href={photo.photoUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate underline">
+                              Ảnh {index + 1}
+                            </a>
+                            <button type="button" onClick={() => removeProgressPhoto(photo.photoUrl)} className="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] font-bold text-red-200">
+                              Gỡ
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
 
@@ -1213,6 +1242,7 @@ export function ReportsHubClient() {
                     type="button"
                     onClick={() => {
                       setProgressModalItem(null);
+                      setProgressPhotos([]);
                       clearProgressUploads();
                     }}
                     className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]"

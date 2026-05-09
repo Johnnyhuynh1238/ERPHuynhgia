@@ -80,6 +80,7 @@ export async function generateAssignmentsAfterCheckin({
     select: {
       id: true,
       code: true,
+      name: true,
       template: {
         select: {
           assignmentItems: {
@@ -155,7 +156,7 @@ export async function generateAssignmentsAfterCheckin({
         reportDate,
         taskId: task.id,
         type: DailyAssignmentType.progress_update,
-        title: `Update tiến độ ${task.code}`,
+        title: `Cập nhật tiến độ · ${task.code} · ${task.name}`,
         requirePhoto: true,
         priority: AssignmentPriority.important,
       });
