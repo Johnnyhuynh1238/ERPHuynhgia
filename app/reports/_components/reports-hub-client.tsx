@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
 
 type AssignmentStatus = "pending" | "done" | "not_applicable";
 type AssignmentType = "template_item" | "progress_update" | "tptc_assignment";
@@ -176,6 +177,7 @@ export function ReportsHubClient() {
   const [progressNote, setProgressNote] = useState("");
   const [guideItem, setGuideItem] = useState<FlatAssignment | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const { items: progressUploadItems, upload: uploadProgressPhotos, clear: clearProgressUploads } = useTaskPhotoUploader(progressModalItem?.taskId || "");
 
   const totalPicked = useMemo(() => {
     const taskCount = Object.values(pickedTaskIds).filter(Boolean).length;
@@ -307,7 +309,7 @@ export function ReportsHubClient() {
   }, [needCheckin, loadCheckinOptions]);
 
   useEffect(() => {
-    if (!checkinTaskPickerOpen || typeof document === "undefined") return;
+    if ((!checkinTaskPickerOpen && !progressModalItem) || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -315,7 +317,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [checkinTaskPickerOpen]);
+  }, [checkinTaskPickerOpen, progressModalItem]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -439,11 +441,25 @@ export function ReportsHubClient() {
   }
 
   function openProgressModal(item: FlatAssignment) {
+    clearProgressUploads();
     setProgressModalItem(item);
     setProgressPercent(item.currentProgress || 0);
     setProgressPhotoUrl(item.photoUrl || "");
     setProgressReason("");
     setProgressNote(item.note || "");
+  }
+
+  async function uploadProgressPhotoFiles(files: FileList | null) {
+    if (!progressModalItem?.taskId || !files?.length) return;
+
+    const result = await uploadProgressPhotos(Array.from(files).slice(0, 1));
+    const uploadedPhoto = result.uploaded[0];
+    if (uploadedPhoto?.photoUrl) {
+      setProgressPhotoUrl(uploadedPhoto.photoUrl);
+    }
+    if (result.failed[0]?.message) {
+      setError(result.failed[0].message);
+    }
   }
 
   async function confirmProgressUpdate() {
@@ -474,6 +490,7 @@ export function ReportsHubClient() {
         note: progressNote.trim() || undefined,
       });
       setProgressModalItem(null);
+      clearProgressUploads();
       await loadToday(mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể cập nhật tiến độ");
@@ -512,29 +529,29 @@ export function ReportsHubClient() {
     return (
       <div
         key={item.id}
-        className={`rounded-xl border-l-4 border-[#555] bg-[#2a2a2a] p-3 ${
+        className={`rounded-2xl border border-[#2f3555] border-l-4 border-l-[#555] bg-[#171c2f] p-4 shadow-sm ${
           isDone ? "border-l-emerald-500 opacity-80" : isNa ? "border-l-[#777] opacity-70" : ""
         } ${item.type === "tptc_assignment" ? "border-l-orange-400" : ""} ${item.type === "progress_update" ? "border-l-blue-500 bg-[#0a1a2a]" : ""}`}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-3">
           <div
-            className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded border text-[11px] ${
+            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-sm font-bold ${
               isDone ? "border-emerald-500 bg-emerald-500 text-white" : isNa ? "border-[#666] bg-[#666] text-white" : "border-[#555]"
             }`}
           >
             {isDone ? "✓" : isNa ? "⊘" : ""}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-[#f0f2ff]">{item.title}</div>
-            <div className="mt-1 text-[11px] text-[#98a0c2]">
+            <div className="text-base font-semibold leading-6 text-[#f0f2ff]">{item.title}</div>
+            <div className="mt-1.5 text-xs leading-5 text-[#98a0c2]">
               {item.taskCode ? `${item.taskCode} · ` : ""}
               {item.projectName || "Không rõ dự án"}
               {item.dueAt ? ` · Hạn ${formatDateTime(item.dueAt)}` : ""}
               {!isPending && item.doneAt ? ` · ${formatClock(item.doneAt)}` : ""}
             </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {item.requirePhoto ? <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-300">📷 Yêu cầu ảnh</span> : null}
-              {item.type === "tptc_assignment" ? <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-300">⚡ TPTC giao</span> : null}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {item.requirePhoto ? <span className="rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-300">📷 Yêu cầu ảnh</span> : null}
+              {item.type === "tptc_assignment" ? <span className="rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-300">⚡ TPTC giao</span> : null}
             </div>
           </div>
         </div>
@@ -544,19 +561,19 @@ export function ReportsHubClient() {
             type="button"
             disabled={busyId === item.id}
             onClick={() => openProgressModal(item)}
-            className="mt-2 w-full rounded-md bg-gradient-to-r from-blue-500 to-blue-700 px-2 py-2 text-xs font-semibold text-white"
+            className="mt-3 w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 px-3 py-2.5 text-sm font-semibold text-white"
           >
             {busyId === item.id ? "Đang cập nhật..." : "📊 Cập nhật ngay →"}
           </button>
         ) : null}
 
         {item.type !== "progress_update" && isPending ? (
-          <div className="mt-2 flex gap-1.5">
+          <div className="mt-3 flex gap-2">
             <button
               type="button"
               disabled={busyId === item.id}
               onClick={() => openDoneModal(item)}
-              className="flex-1 rounded border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-300"
+              className="flex-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm font-semibold text-emerald-300"
             >
               {compact ? "✅" : "✅ Hoàn thành"}
             </button>
@@ -564,7 +581,7 @@ export function ReportsHubClient() {
               type="button"
               disabled={busyId === item.id}
               onClick={() => openNotApplicableModal(item)}
-              className="flex-1 rounded border border-[#666] px-2 py-1 text-xs font-semibold text-[#b6b9c9]"
+              className="flex-1 rounded-lg border border-[#666] px-3 py-2 text-sm font-semibold text-[#b6b9c9]"
             >
               {compact ? "⊘" : "⊘ N/A"}
             </button>
@@ -572,7 +589,7 @@ export function ReportsHubClient() {
               <button
                 type="button"
                 onClick={() => openGuide(item)}
-                className="flex-1 rounded border border-orange-400 px-2 py-1 text-xs font-semibold text-orange-300"
+                className="flex-1 rounded-lg border border-orange-400 px-3 py-2 text-sm font-semibold text-orange-300"
               >
                 {compact ? "📖" : "📖 Hướng dẫn"}
               </button>
@@ -585,7 +602,7 @@ export function ReportsHubClient() {
             type="button"
             disabled={busyId === item.id}
             onClick={() => resetItem(item)}
-            className="mt-2 rounded border border-[#2f3555] px-2 py-1 text-[11px] text-[#c2c9e4]"
+            className="mt-3 rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#c2c9e4]"
           >
             Bỏ đánh dấu
           </button>
@@ -835,48 +852,48 @@ export function ReportsHubClient() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border-l-4 border-l-[#ff8a3d] border-[#2f3555] bg-[#1a1a1a] p-4">
-        <div className="text-lg font-bold text-[#f0f2ff]">📋 Nhiệm vụ hôm nay</div>
-        <div className="mt-1 text-xs text-[#98a0c2]">{new Date(today.date).toLocaleDateString("vi-VN")}</div>
-        <div className="mt-2 inline-block rounded-md bg-[#2a1a05] px-2.5 py-1 text-xs font-semibold text-[#ff8a3d]">
+    <div className="space-y-5">
+      <div className="rounded-3xl border border-[#2f3555] border-l-4 border-l-[#ff8a3d] bg-[#171c2f] p-5 shadow-sm">
+        <div className="text-2xl font-black tracking-tight text-[#f0f2ff]">📋 Nhiệm vụ hôm nay</div>
+        <div className="mt-1.5 text-sm text-[#98a0c2]">{new Date(today.date).toLocaleDateString("vi-VN")}</div>
+        <div className="mt-3 inline-block rounded-lg bg-[#2a1a05] px-3 py-1.5 text-sm font-semibold text-[#ff8a3d]">
           ⏰ {remainLabel(today.submissionDeadline, today.currentTime)}
         </div>
         {today.submitted ? (
-          <div className="mt-2 text-xs text-emerald-300">
+          <div className="mt-3 text-sm font-semibold text-emerald-300">
             Đã gửi lúc {formatClock(today.submission?.submittedAt || null)}
             {today.submission?.isLate ? " · Trễ" : " · Đúng giờ"}
           </div>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
-        <div className="rounded-xl bg-[#1a1a1a] px-2 py-2 text-center">
-          <div className="text-lg font-bold text-[#8f95ad]">{today.stats.total}</div>
-          <div className="text-[10px] text-[#8f95ad]">Tổng</div>
+      <div className="grid grid-cols-4 gap-3">
+        <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] px-3 py-3 text-center shadow-sm">
+          <div className="text-2xl font-black text-[#d9def3]">{today.stats.total}</div>
+          <div className="mt-0.5 text-xs font-semibold text-[#8f95ad]">Tổng</div>
         </div>
-        <div className="rounded-xl bg-[#1a1a1a] px-2 py-2 text-center">
-          <div className="text-lg font-bold text-emerald-300">{today.stats.done}</div>
-          <div className="text-[10px] text-[#8f95ad]">✅ Xong</div>
+        <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] px-3 py-3 text-center shadow-sm">
+          <div className="text-2xl font-black text-emerald-300">{today.stats.done}</div>
+          <div className="mt-0.5 text-xs font-semibold text-[#8f95ad]">✅ Xong</div>
         </div>
-        <div className="rounded-xl bg-[#1a1a1a] px-2 py-2 text-center">
-          <div className="text-lg font-bold text-[#8f95ad]">{today.stats.notApplicable}</div>
-          <div className="text-[10px] text-[#8f95ad]">⊘ N/A</div>
+        <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] px-3 py-3 text-center shadow-sm">
+          <div className="text-2xl font-black text-[#d9def3]">{today.stats.notApplicable}</div>
+          <div className="mt-0.5 text-xs font-semibold text-[#8f95ad]">⊘ N/A</div>
         </div>
-        <div className="rounded-xl bg-[#1a1a1a] px-2 py-2 text-center">
-          <div className="text-lg font-bold text-[#ff8a3d]">{today.stats.pending}</div>
-          <div className="text-[10px] text-[#8f95ad]">☐ Còn</div>
+        <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] px-3 py-3 text-center shadow-sm">
+          <div className="text-2xl font-black text-[#ff8a3d]">{today.stats.pending}</div>
+          <div className="mt-0.5 text-xs font-semibold text-[#8f95ad]">☐ Còn</div>
         </div>
       </div>
 
-      <div className="flex gap-2 rounded-xl bg-[#1a1a1a] p-1">
+      <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[#2f3555] bg-[#171c2f] p-1.5 shadow-sm">
         <button
           type="button"
           onClick={() => {
             setSelectedProjectId(null);
             loadToday("flat");
           }}
-          className={`rounded-lg px-3 py-1.5 text-sm ${mode === "flat" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
+          className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${mode === "flat" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
         >
           ☰ Phẳng
         </button>
@@ -886,7 +903,7 @@ export function ReportsHubClient() {
             setSelectedProjectId(null);
             loadToday("task");
           }}
-          className={`rounded-lg px-3 py-1.5 text-sm ${mode === "task" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
+          className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${mode === "task" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
         >
           📋 Task
         </button>
@@ -896,7 +913,7 @@ export function ReportsHubClient() {
             setSelectedProjectId(null);
             loadToday("project");
           }}
-          className={`rounded-lg px-3 py-1.5 text-sm ${mode === "project" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
+          className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${mode === "project" ? "bg-[#f97316] text-white" : "border border-[#2f3555] text-[#d9def3]"}`}
         >
           🏠 Dự án
         </button>
@@ -945,30 +962,30 @@ export function ReportsHubClient() {
           {taskModeGroups.map((group) => {
             const doneCount = group.assignments.filter((item) => item.status !== "pending").length;
             return (
-              <div key={group.taskId} className="rounded-xl border-l-4 border-l-[#ff8a3d] border-[#2f3555] bg-[#171c2f] p-3">
-                <div className="border-b border-[#2a2a2a] pb-2">
-                  <div className="text-sm font-bold text-[#ff8a3d]">
+              <div key={group.taskId} className="rounded-2xl border border-[#2f3555] border-l-4 border-l-[#ff8a3d] bg-[#171c2f] p-4 shadow-sm">
+                <div className="border-b border-[#2a2a2a] pb-3">
+                  <div className="text-base font-bold leading-6 text-[#ff8a3d]">
                     {group.taskCode ? `${group.taskCode} ` : ""}
                     {group.taskName || "Task"}
                   </div>
-                  <div className="mt-1 text-[11px] text-[#98a0c2]">
+                  <div className="mt-1.5 text-xs leading-5 text-[#98a0c2]">
                     {group.projectName || "Không rõ dự án"} · {doneCount}/{group.assignments.length} nhiệm vụ xong
                   </div>
                 </div>
-                <div className="mt-2 space-y-2">{group.assignments.map((item) => renderAssignmentItem(item, true))}</div>
+                <div className="mt-3 space-y-3">{group.assignments.map((item) => renderAssignmentItem(item, true))}</div>
               </div>
             );
           })}
 
           {taskModeTptcItems.length > 0 ? (
-            <div className="rounded-xl border-l-4 border-l-orange-400 border-[#2f3555] bg-[#171c2f] p-3">
-              <div className="border-b border-[#2a2a2a] pb-2">
-                <div className="text-sm font-bold text-orange-300">⚡ Việc TPTC giao</div>
-                <div className="mt-1 text-[11px] text-[#98a0c2]">
+            <div className="rounded-2xl border border-[#2f3555] border-l-4 border-l-orange-400 bg-[#171c2f] p-4 shadow-sm">
+              <div className="border-b border-[#2a2a2a] pb-3">
+                <div className="text-base font-bold text-orange-300">⚡ Việc TPTC giao</div>
+                <div className="mt-1.5 text-xs leading-5 text-[#98a0c2]">
                   {taskModeTptcItems.filter((item) => item.status !== "pending").length}/{taskModeTptcItems.length} xong
                 </div>
               </div>
-              <div className="mt-2 space-y-2">{taskModeTptcItems.map((item) => renderAssignmentItem(item))}</div>
+              <div className="mt-3 space-y-3">{taskModeTptcItems.map((item) => renderAssignmentItem(item))}</div>
             </div>
           ) : null}
         </div>
@@ -979,16 +996,16 @@ export function ReportsHubClient() {
           {today.projectGroups.map((group) => {
             const doneCount = group.assignments.filter((item) => item.status !== "pending").length;
             return (
-              <div key={group.projectId} className="rounded-xl border border-[#2f3555] bg-[#171c2f] p-3">
-                <div className="text-sm font-semibold text-[#f0f2ff]">🏠 {group.projectName || "Không rõ dự án"}</div>
-                <div className="mt-1 text-xs text-[#98a0c2]">{doneCount}/{group.assignments.length} đã tick</div>
+              <div key={group.projectId} className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 shadow-sm">
+                <div className="text-base font-bold leading-6 text-[#f0f2ff]">🏠 {group.projectName || "Không rõ dự án"}</div>
+                <div className="mt-1.5 text-sm text-[#98a0c2]">{doneCount}/{group.assignments.length} đã tick</div>
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedProjectId(group.projectId === "unknown" ? null : group.projectId);
                     loadToday("task");
                   }}
-                  className="mt-2 rounded border border-[#2f3555] bg-[#11182d] px-2 py-1 text-xs text-[#d9def3]"
+                  className="mt-3 rounded-lg border border-[#2f3555] bg-[#11182d] px-3 py-2 text-sm font-semibold text-[#d9def3]"
                 >
                   Chi tiết →
                 </button>
@@ -1000,30 +1017,30 @@ export function ReportsHubClient() {
 
       {!today.submitted ? (
         <div
-          className={`rounded-xl border-2 border-dashed p-4 text-center ${
-            today.stats.pending > 0 ? "border-[#444] bg-[#1a1a1a]" : "border-emerald-500 bg-gradient-to-br from-[#0a2a0a] to-[#1a1a1a]"
+          className={`rounded-2xl border-2 border-dashed p-5 text-center shadow-sm ${
+            today.stats.pending > 0 ? "border-[#444] bg-[#171c2f]" : "border-emerald-500 bg-gradient-to-br from-[#0a2a0a] to-[#171c2f]"
           }`}
         >
-          <div className={`mb-2 text-sm ${today.stats.pending > 0 ? "text-[#8f95ad]" : "font-semibold text-emerald-300"}`}>
+          <div className={`mb-3 text-base ${today.stats.pending > 0 ? "text-[#8f95ad]" : "font-semibold text-emerald-300"}`}>
             {today.stats.pending > 0 ? `⚠ Còn ${today.stats.pending} nhiệm vụ chưa tick` : "✅ Đã tick đủ tất cả nhiệm vụ"}
           </div>
           <button
             type="button"
             disabled={today.stats.pending > 0 || busyId === "submit"}
             onClick={openSubmitConfirm}
-            className="w-full rounded-lg bg-[#ff8a3d] px-3 py-2 text-sm font-bold text-black disabled:cursor-not-allowed disabled:bg-[#333] disabled:text-[#666]"
+            className="w-full rounded-xl bg-[#ff8a3d] px-4 py-3 text-base font-bold text-black disabled:cursor-not-allowed disabled:bg-[#333] disabled:text-[#666]"
           >
             {busyId === "submit" ? "Đang gửi..." : "📤 Gửi báo cáo cuối ngày"}
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border-2 border-emerald-500 bg-[#0a2a0a]/40 p-4">
-          <div className="text-sm font-bold text-emerald-300">🎉 ĐÃ GỬI BÁO CÁO HÔM NAY</div>
-          <div className="mt-2 text-sm text-[#d9def3]">
+        <div className="rounded-2xl border-2 border-emerald-500 bg-[#0a2a0a]/40 p-5 shadow-sm">
+          <div className="text-base font-bold text-emerald-300">🎉 ĐÃ GỬI BÁO CÁO HÔM NAY</div>
+          <div className="mt-2 text-sm leading-6 text-[#d9def3]">
             <span className="font-semibold text-emerald-300">Thời gian:</span> {formatClock(today.submission?.submittedAt || null)}
             {today.submission?.isLate ? " (trễ)" : " (đúng giờ ✓)"}
           </div>
-          <div className="mt-2 text-sm text-[#d9def3]">
+          <div className="mt-2 text-sm leading-6 text-[#d9def3]">
             ✅ {today.stats.done} nhiệm vụ hoàn thành
             <br />⊘ {today.stats.notApplicable} nhiệm vụ không áp dụng
           </div>
@@ -1089,57 +1106,103 @@ export function ReportsHubClient() {
         </div>
       ) : null}
 
-      {progressModalItem ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
-          <div className="w-full max-w-md rounded-xl border border-[#2f3555] bg-[#171c2f] p-4">
-            <div className="text-sm font-semibold text-[#f0f2ff]">📈 Cập nhật tiến độ</div>
-            <div className="mt-1 text-xs text-[#98a0c2]">{progressModalItem.title}</div>
-            <div className="mt-3 space-y-2">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={progressPercent}
-                onChange={(e) => setProgressPercent(Number(e.target.value))}
-                placeholder="% tiến độ mới"
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-              <input
-                value={progressPhotoUrl}
-                onChange={(e) => setProgressPhotoUrl(e.target.value)}
-                placeholder="Link ảnh minh chứng (bắt buộc)"
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-              <input
-                value={progressReason}
-                onChange={(e) => setProgressReason(e.target.value)}
-                placeholder="Lý do (bắt buộc khi giảm tiến độ)"
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-              <textarea
-                value={progressNote}
-                onChange={(e) => setProgressNote(e.target.value)}
-                placeholder="Ghi chú (tuỳ chọn)"
-                rows={3}
-                className="w-full rounded-md border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setProgressModalItem(null)} className="rounded border border-[#2f3555] px-3 py-1.5 text-xs text-[#d9def3]">
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={busyId === progressModalItem.id}
-                onClick={confirmProgressUpdate}
-                className="rounded border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-200"
-              >
-                {busyId === progressModalItem.id ? "Đang cập nhật..." : "Xác nhận"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {progressModalItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-black/65 p-3 sm:items-center">
+              <div className="modal-sheet-in flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[#2f3555] bg-[#171c2f] shadow-2xl sm:max-h-[92dvh] sm:rounded-2xl">
+                <div className="shrink-0 border-b border-[#2f3555] p-4">
+                  <div className="text-lg font-bold text-[#f0f2ff]">📈 Cập nhật tiến độ</div>
+                  <div className="mt-1 text-sm text-[#98a0c2]">{progressModalItem.title}</div>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+                  <div className="rounded-2xl border border-[#2f3555] bg-[#11182d] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[#d9def3]">Tiến độ mới</div>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={progressPercent}
+                        onChange={(e) => setProgressPercent(Number(e.target.value))}
+                        className="w-20 rounded-lg border border-[#2f3555] bg-[#171c2f] px-2 py-1.5 text-center text-sm font-bold text-[#f0f2ff]"
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={progressPercent}
+                      onChange={(e) => setProgressPercent(Number(e.target.value))}
+                      className="mt-4 w-full accent-[#f97316]"
+                    />
+                    <div className="mt-2 flex justify-between text-[11px] text-[#98a0c2]">
+                      <span>0%</span>
+                      <span className="font-semibold text-[#f97316]">{progressPercent}%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#2f3555] bg-[#11182d] p-4">
+                    <div className="text-sm font-semibold text-[#d9def3]">Ảnh minh chứng</div>
+                    <div className="mt-1 text-xs text-[#98a0c2]">Chọn ảnh từ điện thoại, hệ thống sẽ upload vào task rồi gắn vào cập nhật tiến độ.</div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={async (event) => {
+                        await uploadProgressPhotoFiles(event.currentTarget.files);
+                        event.currentTarget.value = "";
+                      }}
+                      className="mt-3 w-full rounded-lg border border-[#2f3555] bg-[#171c2f] px-3 py-2 text-sm text-[#d9def3] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black"
+                    />
+                    {progressUploadItems.length > 0 ? <TaskPhotoUploadStatus items={progressUploadItems} onClear={clearProgressUploads} /> : null}
+                    {progressPhotoUrl ? (
+                      <a href={progressPhotoUrl} target="_blank" rel="noreferrer" className="mt-3 block rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 underline">
+                        Đã có ảnh minh chứng, bấm để xem ảnh
+                      </a>
+                    ) : null}
+                  </div>
+
+                  <input
+                    value={progressReason}
+                    onChange={(e) => setProgressReason(e.target.value)}
+                    placeholder="Lý do (bắt buộc khi giảm tiến độ)"
+                    className="w-full rounded-xl border border-[#2f3555] bg-[#11182d] px-3 py-2.5 text-sm text-[#d9def3]"
+                  />
+                  <textarea
+                    value={progressNote}
+                    onChange={(e) => setProgressNote(e.target.value)}
+                    placeholder="Ghi chú (tuỳ chọn)"
+                    rows={3}
+                    className="w-full rounded-xl border border-[#2f3555] bg-[#11182d] px-3 py-2.5 text-sm text-[#d9def3]"
+                  />
+                </div>
+
+                <div className="flex shrink-0 justify-end gap-2 border-t border-[#2f3555] bg-[#171c2f] p-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProgressModalItem(null);
+                      clearProgressUploads();
+                    }}
+                    className="rounded-lg border border-[#2f3555] px-3 py-2 text-xs font-semibold text-[#d9def3]"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === progressModalItem.id}
+                    onClick={confirmProgressUpdate}
+                    className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-xs font-bold text-blue-200 disabled:opacity-50"
+                  >
+                    {busyId === progressModalItem.id ? "Đang cập nhật..." : "Cập nhật"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {guideItem ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3">
