@@ -521,7 +521,20 @@ export function ReportsHubClient() {
     setGuideItem(item);
   }
 
-  function renderAssignmentItem(item: FlatAssignment, compact = false) {
+  function handleAssignmentStatusClick(item: FlatAssignment) {
+    if (item.status === "pending") {
+      if (item.type === "progress_update") {
+        openProgressModal(item);
+      } else {
+        openDoneModal(item);
+      }
+      return;
+    }
+
+    void resetItem(item);
+  }
+
+  function renderAssignmentItem(item: FlatAssignment) {
     const isDone = item.status === "done";
     const isNa = item.status === "not_applicable";
     const isPending = item.status === "pending";
@@ -534,13 +547,17 @@ export function ReportsHubClient() {
         } ${item.type === "tptc_assignment" ? "border-l-orange-400" : ""} ${item.type === "progress_update" ? "border-l-blue-500 bg-[#0a1a2a]" : ""}`}
       >
         <div className="flex items-start gap-3">
-          <div
-            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-sm font-bold ${
+          <button
+            type="button"
+            disabled={busyId === item.id}
+            onClick={() => handleAssignmentStatusClick(item)}
+            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-sm font-bold disabled:opacity-60 ${
               isDone ? "border-emerald-500 bg-emerald-500 text-white" : isNa ? "border-[#666] bg-[#666] text-white" : "border-[#555]"
             }`}
+            aria-label={isPending ? (item.type === "progress_update" ? "Cập nhật tiến độ" : "Đánh dấu hoàn thành") : "Bỏ đánh dấu"}
           >
             {isDone ? "✓" : isNa ? "⊘" : ""}
-          </div>
+          </button>
           <div className="min-w-0 flex-1">
             <div className="text-base font-semibold leading-6 text-[#f0f2ff]">{item.title}</div>
             <div className="mt-1.5 text-xs leading-5 text-[#98a0c2]">
@@ -575,7 +592,7 @@ export function ReportsHubClient() {
               onClick={() => openDoneModal(item)}
               className="flex-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm font-semibold text-emerald-300"
             >
-              {compact ? "✅" : "✅ Hoàn thành"}
+              ✅ Hoàn thành
             </button>
             <button
               type="button"
@@ -583,7 +600,7 @@ export function ReportsHubClient() {
               onClick={() => openNotApplicableModal(item)}
               className="flex-1 rounded-lg border border-[#666] px-3 py-2 text-sm font-semibold text-[#b6b9c9]"
             >
-              {compact ? "⊘" : "⊘ N/A"}
+              ⊘ N/A
             </button>
             {item.guideContent ? (
               <button
@@ -591,7 +608,7 @@ export function ReportsHubClient() {
                 onClick={() => openGuide(item)}
                 className="flex-1 rounded-lg border border-orange-400 px-3 py-2 text-sm font-semibold text-orange-300"
               >
-                {compact ? "📖" : "📖 Hướng dẫn"}
+                📖 Hướng dẫn
               </button>
             ) : null}
           </div>
@@ -972,7 +989,7 @@ export function ReportsHubClient() {
                     {group.projectName || "Không rõ dự án"} · {doneCount}/{group.assignments.length} nhiệm vụ xong
                   </div>
                 </div>
-                <div className="mt-3 space-y-3">{group.assignments.map((item) => renderAssignmentItem(item, true))}</div>
+                <div className="mt-3 space-y-3">{group.assignments.map((item) => renderAssignmentItem(item))}</div>
               </div>
             );
           })}
