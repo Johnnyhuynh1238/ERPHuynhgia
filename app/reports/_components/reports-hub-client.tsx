@@ -170,6 +170,7 @@ export function ReportsHubClient() {
   const [donePhotoUrl, setDonePhotoUrl] = useState("");
   const [doneNote, setDoneNote] = useState("");
   const [notApplicableItem, setNotApplicableItem] = useState<FlatAssignment | null>(null);
+  const [actionItem, setActionItem] = useState<FlatAssignment | null>(null);
   const [progressModalItem, setProgressModalItem] = useState<FlatAssignment | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressPhotos, setProgressPhotos] = useState<TaskPhotoItem[]>([]);
@@ -310,7 +311,7 @@ export function ReportsHubClient() {
   }, [needCheckin, loadCheckinOptions]);
 
   useEffect(() => {
-    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || progressModalItem || guideItem || submitConfirmOpen);
+    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || progressModalItem || guideItem || submitConfirmOpen);
     if (!hasOpenModal || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
@@ -319,7 +320,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
+  }, [actionItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -542,115 +543,37 @@ export function ReportsHubClient() {
     setGuideItem(item);
   }
 
-  function handleAssignmentStatusClick(item: FlatAssignment) {
-    if (item.status === "pending") {
-      if (item.type === "progress_update") {
-        openProgressModal(item);
-      } else {
-        openDoneModal(item);
-      }
-      return;
-    }
-
-    void resetItem(item);
-  }
-
   function renderAssignmentItem(item: FlatAssignment) {
     const isDone = item.status === "done";
     const isNa = item.status === "not_applicable";
-    const isPending = item.status === "pending";
     const displayTitle = item.type === "progress_update" && item.taskName ? `Cập nhật tiến độ · ${item.taskName}` : item.title;
+    const metaLine = `${item.taskCode ? `${item.taskCode} · ` : ""}${item.projectName || "Không rõ dự án"}`;
+
+    function handleCardClick() {
+      if (item.status !== "pending") {
+        void resetItem(item);
+        return;
+      }
+      if (item.type === "progress_update") {
+        openProgressModal(item);
+        return;
+      }
+      setActionItem(item);
+    }
 
     return (
-      <div
+      <button
         key={item.id}
-        className={`rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 ${
+        type="button"
+        disabled={busyId === item.id}
+        onClick={handleCardClick}
+        className={`block w-full rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-left transition hover:bg-[#1f2436] active:scale-[0.97] disabled:opacity-60 ${
           isDone ? "opacity-80" : isNa ? "opacity-70" : ""
         } ${item.type === "progress_update" ? "bg-[#13151f]" : ""}`}
       >
-        <div className="flex items-start gap-2">
-          <button
-            type="button"
-            disabled={busyId === item.id}
-            onClick={() => handleAssignmentStatusClick(item)}
-            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] border text-xs font-bold disabled:opacity-60 ${
-              isDone ? "border-emerald-500 bg-emerald-500 text-white" : isNa ? "border-[#666] bg-[#666] text-white" : "border-[#2d3249] bg-[#13151f]"
-            }`}
-            aria-label={isPending ? (item.type === "progress_update" ? "Cập nhật tiến độ" : "Đánh dấu hoàn thành") : "Bỏ đánh dấu"}
-          >
-            {isDone ? "✓" : isNa ? "⊘" : ""}
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
-            <div className="mt-1 text-xs leading-5 text-[#8892b0]">
-              {item.taskCode ? `${item.taskCode} · ` : ""}
-              {item.projectName || "Không rõ dự án"}
-              {item.dueAt ? ` · Hạn ${formatDateTime(item.dueAt)}` : ""}
-              {!isPending && item.doneAt ? ` · ${formatClock(item.doneAt)}` : ""}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {item.requirePhoto ? <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-300">📷 Yêu cầu ảnh</span> : null}
-              {item.type === "tptc_assignment" ? <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-300">⚡ TPTC giao</span> : null}
-            </div>
-          </div>
-        </div>
-
-        {item.type === "progress_update" && isPending ? (
-          <button
-            type="button"
-            disabled={busyId === item.id}
-            onClick={() => openProgressModal(item)}
-            className="mt-3 flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-blue-300 transition hover:bg-[#1f2436] active:scale-[0.97]"
-          >
-            <span>{busyId === item.id ? "Đang cập nhật..." : "📊 Cập nhật tiến độ"}</span>
-            <span>›</span>
-          </button>
-        ) : null}
-
-        {item.type !== "progress_update" && isPending ? (
-          <div className="mt-3 flex flex-col gap-1.5">
-            <button
-              type="button"
-              disabled={busyId === item.id}
-              onClick={() => openDoneModal(item)}
-              className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-emerald-300 transition hover:bg-[#1f2436] active:scale-[0.97]"
-            >
-              <span>✅ Hoàn thành</span>
-              <span>›</span>
-            </button>
-            <button
-              type="button"
-              disabled={busyId === item.id}
-              onClick={() => openNotApplicableModal(item)}
-              className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
-            >
-              <span>⊘ N/A</span>
-              <span>›</span>
-            </button>
-            {item.guideContent ? (
-              <button
-                type="button"
-                onClick={() => openGuide(item)}
-                className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-orange-300 transition hover:bg-[#1f2436] active:scale-[0.97]"
-              >
-                <span>📖 Hướng dẫn</span>
-                <span>›</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!isPending ? (
-          <button
-            type="button"
-            disabled={busyId === item.id}
-            onClick={() => resetItem(item)}
-            className="mt-3 rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
-          >
-            Bỏ đánh dấu
-          </button>
-        ) : null}
-      </div>
+        <div className="text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
+        <div className="mt-1 text-xs leading-5 text-[#8892b0]">{metaLine}</div>
+      </button>
     );
   }
 
@@ -1091,6 +1014,68 @@ export function ReportsHubClient() {
           </div>
         </div>
       )}
+
+      {actionItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 shadow-2xl">
+                <div className="text-base font-bold text-[#f0f2ff]">{actionItem.title}</div>
+                <div className="mt-1 text-xs text-[#8892b0]">
+                  {actionItem.taskCode ? `${actionItem.taskCode} · ` : ""}
+                  {actionItem.projectName || "Không rõ dự án"}
+                </div>
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    disabled={busyId === actionItem.id}
+                    onClick={() => {
+                      const item = actionItem;
+                      setActionItem(null);
+                      openDoneModal(item);
+                    }}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-emerald-300 transition hover:bg-[#1f2436] active:scale-[0.97] disabled:opacity-50"
+                  >
+                    <span>Hoàn thành</span>
+                    <span>›</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === actionItem.id}
+                    onClick={() => {
+                      const item = actionItem;
+                      setActionItem(null);
+                      openNotApplicableModal(item);
+                    }}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97] disabled:opacity-50"
+                  >
+                    <span>N/A</span>
+                    <span>›</span>
+                  </button>
+                  {actionItem.guideContent ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const item = actionItem;
+                        setActionItem(null);
+                        setGuideItem(item);
+                      }}
+                      className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-orange-300 transition hover:bg-[#1f2436] active:scale-[0.97]"
+                    >
+                      <span>Hướng dẫn</span>
+                      <span>›</span>
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={() => setActionItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {doneModalItem && typeof document !== "undefined"
         ? createPortal(
