@@ -114,6 +114,13 @@ export async function POST(request: Request, { params }: { params: { draftId: st
     appliedIds.push(proposal.id);
   }
 
+  console.info("[project-ai] apply proposals", {
+    draftId: params.draftId,
+    requestedIds: parsed.data.proposalIds.length,
+    appliedIds: appliedIds.length,
+    skippedIds: skippedIds.length,
+  });
+
   if (appliedIds.length === 0) {
     return NextResponse.json({ message: "Không có đề xuất nào được apply vì field đã có dữ liệu hoặc chỉ là cảnh báo", skippedIds }, { status: 400 });
   }

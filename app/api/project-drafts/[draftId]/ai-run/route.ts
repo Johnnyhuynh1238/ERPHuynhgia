@@ -397,6 +397,16 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     const formData = (draft.formData && typeof draft.formData === "object" && !Array.isArray(draft.formData) ? draft.formData : {}) as DraftFormData;
     const projectData = normalizeProject(draft.project);
     const fileBlocks = await buildFileBlocks(draft.files);
+    console.info("[project-ai] run request", {
+      draftId: draft.id,
+      mode: draft.mode,
+      model,
+      hasBaseURL: Boolean(baseURL),
+      fileCount: draft.files.length,
+      fileKinds: draft.files.map((file) => file.fileKind),
+      mimeTypes: draft.files.map((file) => file.mimeType),
+      fileBlockCount: fileBlocks.length,
+    });
     const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
     const message = await client.messages.create({
@@ -424,6 +434,16 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
 
     const parsed = analysisSchema.parse(toolUse.input);
     const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: parsed.proposals, conflicts: parsed.conflicts });
+    console.info("[project-ai] run result", {
+      draftId: draft.id,
+      runId: run.id,
+      parsedProposalCount: parsed.proposals.length,
+      parsedConflictCount: parsed.conflicts.length,
+      enforcedProposalCount: enforced.proposals.length,
+      enforcedConflictCount: enforced.conflicts.length,
+      proposals: enforced.proposals.map((proposal) => ({ fieldPath: proposal.fieldPath, action: proposal.action, confidence: proposal.confidence ?? null })),
+      conflicts: enforced.conflicts.map((conflict) => ({ fieldPath: conflict.fieldPath, conflictType: conflict.conflictType })),
+    });
 
     await prisma.$transaction(async (tx) => {
       await tx.projectAiProposal.deleteMany({ where: { runId: run.id } });
@@ -481,6 +501,7 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     return NextResponse.json({ run: latestRun, message: "AI đã phân tích hồ sơ" });
   } catch (error) {
     const message = await markRunFailed(run.id, error);
+    console.error("[project-ai] run failed", { draftId: draft.id, runId: run.id, message });
     return NextResponse.json({ message: "AI phân tích thất bại", error: message }, { status: 500 });
   }
 }
