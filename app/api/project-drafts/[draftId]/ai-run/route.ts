@@ -1,0 +1,485 @@
+import Anthropic from "@anthropic-ai/sdk";
+import type { ContentBlockParam, Tool } from "@anthropic-ai/sdk/resources/messages/messages";
+import { Prisma, ProjectAiAuditAction, ProjectAiConflictType, ProjectAiProposalAction, ProjectAiProposalSection, ProjectAiRunStatus, ProjectChangeDraftMode } from "@prisma/client";
+import * as mammoth from "mammoth";
+import readExcelFile from "read-excel-file/node";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { requireRole } from "@/lib/auth-helpers";
+import { getObjectFromMinio } from "@/lib/minio";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+
+const TOOL_NAME = "submit_project_intake_analysis";
+const PROMPT_VERSION = "project-intake-v1";
+const MAX_TEXT_CHARS_PER_FILE = 30_000;
+
+const proposalSchema = z.object({
+  section: z.nativeEnum(ProjectAiProposalSection),
+  fieldPath: z.string().min(1),
+  suggestedValue: z.unknown(),
+  action: z.nativeEnum(ProjectAiProposalAction),
+  confidence: z.number().min(0).max(1).optional().nullable(),
+  reason: z.string().optional().nullable(),
+});
+
+const conflictSchema = z.object({
+  fieldPath: z.string().min(1),
+  currentValue: z.unknown().optional().nullable(),
+  suggestedValue: z.unknown().optional().nullable(),
+  conflictType: z.nativeEnum(ProjectAiConflictType),
+  reason: z.string().optional().nullable(),
+});
+
+const analysisSchema = z.object({
+  summary: z.record(z.string(), z.unknown()).optional().default({}),
+  proposals: z.array(proposalSchema).optional().default([]),
+  conflicts: z.array(conflictSchema).optional().default([]),
+});
+
+const toolInputSchema: Tool.InputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "object", additionalProperties: true },
+    proposals: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          section: { type: "string", enum: Object.values(ProjectAiProposalSection) },
+          fieldPath: { type: "string" },
+          suggestedValue: {},
+          action: { type: "string", enum: Object.values(ProjectAiProposalAction) },
+          confidence: { type: ["number", "null"], minimum: 0, maximum: 1 },
+          reason: { type: ["string", "null"] },
+        },
+        required: ["section", "fieldPath", "suggestedValue", "action"],
+      },
+    },
+    conflicts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          fieldPath: { type: "string" },
+          currentValue: {},
+          suggestedValue: {},
+          conflictType: { type: "string", enum: Object.values(ProjectAiConflictType) },
+          reason: { type: ["string", "null"] },
+        },
+        required: ["fieldPath", "conflictType"],
+      },
+    },
+  },
+  required: ["summary", "proposals", "conflicts"],
+};
+
+type Proposal = z.infer<typeof proposalSchema>;
+type Conflict = z.infer<typeof conflictSchema>;
+
+type DraftFormData = Record<string, unknown>;
+
+type DraftProject = {
+  customerName: string;
+  customerPhone: string;
+  customerIdNumber: string | null;
+  address: string;
+  name: string;
+  areaM2: Prisma.Decimal;
+  unitPrice: Prisma.Decimal;
+  contractValue: Prisma.Decimal | null;
+  startDate: Date;
+  expectedEndDate: Date;
+  plannedDeadline: Date | null;
+  actualEndDate: Date | null;
+  status: string;
+  notes: string | null;
+  projectManagerId: string;
+  mainEngineerId: string;
+} | null;
+
+function authError(error: unknown) {
+  const msg = error instanceof Error ? error.message : "UNKNOWN";
+  if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  if (msg === "403_FORBIDDEN") return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  return NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
+}
+
+function minioKey(url: string) {
+  return url.startsWith("minio://") ? url.slice("minio://".length) : null;
+}
+
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+}
+
+function truncateText(text: string) {
+  return text.length > MAX_TEXT_CHARS_PER_FILE ? `${text.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung file do quá dài]` : text;
+}
+
+function formatDate(value: Date | null) {
+  return value ? value.toISOString().slice(0, 10) : null;
+}
+
+function normalizeProject(project: DraftProject): DraftFormData {
+  if (!project) return {};
+  return {
+    customerName: project.customerName,
+    customerPhone: project.customerPhone,
+    customerIdNumber: project.customerIdNumber,
+    address: project.address,
+    name: project.name,
+    areaM2: Number(project.areaM2),
+    unitPrice: Number(project.unitPrice),
+    contractValue: project.contractValue ? Number(project.contractValue) : null,
+    startDate: formatDate(project.startDate),
+    expectedEndDate: formatDate(project.expectedEndDate),
+    plannedDeadline: formatDate(project.plannedDeadline),
+    actualEndDate: formatDate(project.actualEndDate),
+    status: project.status,
+    notes: project.notes,
+    projectManagerId: project.projectManagerId,
+    mainEngineerId: project.mainEngineerId,
+  };
+}
+
+function pathValue(source: unknown, path: string) {
+  if (!source || typeof source !== "object") return undefined;
+  const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  let cursor: unknown = source;
+  for (const part of parts) {
+    if (cursor === null || cursor === undefined || typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[part];
+  }
+  return cursor;
+}
+
+function isMeaningful(value: unknown) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function fieldValue(formData: DraftFormData, projectData: DraftFormData, fieldPath: string) {
+  const formValue = pathValue(formData, fieldPath);
+  if (isMeaningful(formValue)) return formValue;
+  return pathValue(projectData, fieldPath);
+}
+
+function enforceNoOverwrite({
+  mode,
+  formData,
+  projectData,
+  proposals,
+  conflicts,
+}: {
+  mode: ProjectChangeDraftMode;
+  formData: DraftFormData;
+  projectData: DraftFormData;
+  proposals: Proposal[];
+  conflicts: Conflict[];
+}) {
+  const safeProposals: Proposal[] = [];
+  const nextConflicts: Conflict[] = [...conflicts];
+
+  for (const proposal of proposals) {
+    const currentValue = fieldValue(formData, projectData, proposal.fieldPath);
+    const hasCurrentValue = isMeaningful(currentValue);
+    const isSupplement = proposal.action === ProjectAiProposalAction.supplement;
+    const isWarning = proposal.action === ProjectAiProposalAction.warning_only;
+    const blocked = hasCurrentValue && !isSupplement && (mode === ProjectChangeDraftMode.update_project || proposal.action === ProjectAiProposalAction.fill_empty);
+
+    if (blocked) {
+      nextConflicts.push({
+        fieldPath: proposal.fieldPath,
+        currentValue,
+        suggestedValue: proposal.suggestedValue,
+        conflictType: ProjectAiConflictType.existing_value,
+        reason: proposal.reason || "AI không được ghi đè field đã có dữ liệu.",
+      });
+      continue;
+    }
+
+    safeProposals.push(isWarning ? { ...proposal, action: ProjectAiProposalAction.warning_only } : proposal);
+  }
+
+  return { proposals: safeProposals, conflicts: nextConflicts };
+}
+
+async function extractSpreadsheetText(buffer: Buffer) {
+  const sheets = (await readExcelFile(buffer)) as Array<{ sheet: string; data: unknown[][] }>;
+  return sheets
+    .map((sheet) => {
+      const rows = sheet.data.slice(0, 120).map((row) => row.map((cell) => (cell instanceof Date ? cell.toISOString().slice(0, 10) : cell ?? "")).join(" | "));
+      return `# Sheet: ${sheet.sheet}\n${rows.join("\n")}`;
+    })
+    .join("\n\n");
+}
+
+async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string; fileUrl: string; mimeType: string }>) {
+  const blocks: ContentBlockParam[] = [];
+  const unsupported: string[] = [];
+
+  for (const file of files) {
+    const key = minioKey(file.fileUrl);
+    if (!key) {
+      unsupported.push(`${file.fileName}: đường dẫn không phải MinIO`);
+      continue;
+    }
+
+    const object = await getObjectFromMinio(key);
+    const name = file.fileName.toLowerCase();
+    const header = `Loại hồ sơ: ${file.fileKind}\nTên file: ${file.fileName}`;
+
+    if (file.mimeType === "application/pdf" || name.endsWith(".pdf")) {
+      blocks.push({
+        type: "document",
+        title: file.fileName,
+        context: header,
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: object.buffer.toString("base64"),
+        },
+      });
+      continue;
+    }
+
+    if (name.endsWith(".docx")) {
+      const result = await mammoth.extractRawText({ buffer: object.buffer });
+      blocks.push({
+        type: "document",
+        title: file.fileName,
+        context: header,
+        source: {
+          type: "text",
+          media_type: "text/plain",
+          data: truncateText(result.value || ""),
+        },
+      });
+      continue;
+    }
+
+    if (name.endsWith(".xlsx")) {
+      const text = await extractSpreadsheetText(object.buffer);
+      blocks.push({
+        type: "document",
+        title: file.fileName,
+        context: header,
+        source: {
+          type: "text",
+          media_type: "text/plain",
+          data: truncateText(text),
+        },
+      });
+      continue;
+    }
+
+    unsupported.push(`${file.fileName}: định dạng legacy chưa parse tự động trong AI (.doc/.xls)`);
+  }
+
+  if (unsupported.length > 0) {
+    blocks.push({
+      type: "text",
+      text: `Các file sau chưa đọc được nội dung tự động, hãy tạo warning nếu chúng quan trọng:\n${unsupported.join("\n")}`,
+    });
+  }
+
+  return blocks;
+}
+
+function analysisPrompt({ mode, formData, projectData }: { mode: ProjectChangeDraftMode; formData: DraftFormData; projectData: DraftFormData }) {
+  return `Bạn là trợ lý nhập liệu dự án ERP thi công Huỳnh Gia. Phân tích hồ sơ HĐ/dự toán/bản vẽ/phụ lục được đính kèm và trả kết quả bằng tool ${TOOL_NAME}.
+
+Luật bắt buộc:
+- Không ghi trực tiếp DB chính, chỉ tạo đề xuất/cảnh báo.
+- Field path phải dùng tên form: customerName, customerPhone, customerIdNumber, address, name, areaM2, unitPrice, startDate, expectedEndDate, plannedDeadline, paymentSchedules, drawings, documents.
+- Date trả về dạng yyyy-mm-dd. Tiền/diện tích trả number, không kèm ký tự đ.
+- action=fill_empty chỉ dùng khi field đang trống.
+- action=supplement dùng cho dòng bổ sung như lịch thanh toán phụ lục, bản vẽ mới, tài liệu mới.
+- action=warning_only dùng khi chỉ cảnh báo, không được apply.
+- Với update_project: nếu ERP/form đã có dữ liệu meaningful thì KHÔNG đề xuất ghi đè; nếu hồ sơ khác dữ liệu hiện tại thì tạo conflict existing_value hoặc mismatch.
+- Không đoán UUID user. Nếu thấy tên GĐ/KS trong hồ sơ nhưng không có ID, chỉ cảnh báo hoặc ghi reason.
+- Chỉ đưa proposal có confidence >= 0.55. Nếu mơ hồ thì đưa conflict ambiguous.
+
+Mode: ${mode}
+FormData hiện tại:
+${JSON.stringify(formData, null, 2)}
+
+Dữ liệu ERP hiện tại nếu update:
+${JSON.stringify(projectData, null, 2)}
+`;
+}
+
+async function markRunFailed(runId: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  await prisma.projectAiRun.update({
+    where: { id: runId },
+    data: { status: ProjectAiRunStatus.failed, error: message.slice(0, 4000), finishedAt: new Date() },
+  });
+  return message;
+}
+
+export async function POST(_request: Request, { params }: { params: { draftId: string } }) {
+  let current;
+  try {
+    current = await requireRole(["admin"]);
+  } catch (error) {
+    return authError(error);
+  }
+
+  const draft = await prisma.projectChangeDraft.findUnique({
+    where: { id: params.draftId },
+    include: {
+      project: {
+        select: {
+          customerName: true,
+          customerPhone: true,
+          customerIdNumber: true,
+          address: true,
+          name: true,
+          areaM2: true,
+          unitPrice: true,
+          contractValue: true,
+          startDate: true,
+          expectedEndDate: true,
+          plannedDeadline: true,
+          actualEndDate: true,
+          status: true,
+          notes: true,
+          projectManagerId: true,
+          mainEngineerId: true,
+        },
+      },
+      files: { orderBy: { uploadedAt: "asc" } },
+    },
+  });
+
+  if (!draft) return NextResponse.json({ message: "Không tìm thấy bản nháp" }, { status: 404 });
+  if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-7";
+  const run = await prisma.$transaction(async (tx) => {
+    const created = await tx.projectAiRun.create({
+      data: {
+        draftId: draft.id,
+        status: ProjectAiRunStatus.running,
+        model,
+        promptVersion: PROMPT_VERSION,
+        startedAt: new Date(),
+      },
+    });
+    await tx.projectAiAudit.create({
+      data: {
+        draftId: draft.id,
+        actorId: current.id,
+        action: ProjectAiAuditAction.run_ai,
+        payload: { runId: created.id, model, promptVersion: PROMPT_VERSION, fileCount: draft.files.length },
+      },
+    });
+    return created;
+  });
+
+  if (!apiKey) {
+    await markRunFailed(run.id, "ANTHROPIC_API_KEY is missing");
+    return NextResponse.json({ message: "Chưa cấu hình ANTHROPIC_API_KEY" }, { status: 500 });
+  }
+
+  try {
+    const formData = (draft.formData && typeof draft.formData === "object" && !Array.isArray(draft.formData) ? draft.formData : {}) as DraftFormData;
+    const projectData = normalizeProject(draft.project);
+    const fileBlocks = await buildFileBlocks(draft.files);
+    const client = new Anthropic({ apiKey });
+
+    const message = await client.messages.create({
+      model,
+      max_tokens: 4096,
+      system: "Bạn trích xuất dữ liệu hồ sơ xây dựng Việt Nam. Luôn trả lời bằng tool được yêu cầu, không viết prose ngoài tool.",
+      tools: [
+        {
+          name: TOOL_NAME,
+          description: "Structured project intake proposals and conflicts for ERP draft review.",
+          input_schema: toolInputSchema,
+        },
+      ],
+      tool_choice: { type: "tool", name: TOOL_NAME },
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: analysisPrompt({ mode: draft.mode, formData, projectData }) }, ...fileBlocks],
+        },
+      ],
+    });
+
+    const toolUse = message.content.find((block) => block.type === "tool_use" && block.name === TOOL_NAME);
+    if (!toolUse || toolUse.type !== "tool_use") throw new Error("Claude không trả về tool output hợp lệ");
+
+    const parsed = analysisSchema.parse(toolUse.input);
+    const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: parsed.proposals, conflicts: parsed.conflicts });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.projectAiProposal.deleteMany({ where: { runId: run.id } });
+      await tx.projectAiConflict.deleteMany({ where: { runId: run.id } });
+
+      if (enforced.proposals.length > 0) {
+        await tx.projectAiProposal.createMany({
+          data: enforced.proposals.map((proposal) => ({
+            runId: run.id,
+            section: proposal.section,
+            fieldPath: proposal.fieldPath,
+            suggestedValue: toJson(proposal.suggestedValue),
+            action: proposal.action,
+            confidence: proposal.confidence ?? null,
+            reason: proposal.reason || null,
+          })),
+        });
+      }
+
+      if (enforced.conflicts.length > 0) {
+        await tx.projectAiConflict.createMany({
+          data: enforced.conflicts.map((conflict) => ({
+            runId: run.id,
+            fieldPath: conflict.fieldPath,
+            currentValue: conflict.currentValue === undefined ? Prisma.JsonNull : toJson(conflict.currentValue),
+            suggestedValue: conflict.suggestedValue === undefined ? Prisma.JsonNull : toJson(conflict.suggestedValue),
+            conflictType: conflict.conflictType,
+          })),
+        });
+      }
+
+      await tx.projectAiRun.update({
+        where: { id: run.id },
+        data: {
+          status: ProjectAiRunStatus.done,
+          rawResult: toJson({ ...parsed, enforced }),
+          finishedAt: new Date(),
+        },
+      });
+
+      await tx.projectChangeDraft.update({
+        where: { id: draft.id },
+        data: { aiSummary: toJson(parsed.summary), updatedBy: current.id },
+      });
+    });
+
+    const latestRun = await prisma.projectAiRun.findUnique({
+      where: { id: run.id },
+      include: {
+        proposals: { orderBy: { createdAt: "asc" } },
+        conflicts: { orderBy: { createdAt: "asc" } },
+      },
+    });
+
+    return NextResponse.json({ run: latestRun, message: "AI đã phân tích hồ sơ" });
+  } catch (error) {
+    const message = await markRunFailed(run.id, error);
+    return NextResponse.json({ message: "AI phân tích thất bại", error: message }, { status: 500 });
+  }
+}

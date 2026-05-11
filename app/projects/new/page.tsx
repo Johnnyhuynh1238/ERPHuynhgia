@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { RouteToast } from "@/app/_components/route-toast";
 import { ProjectsNewForm } from "./_components/projects-new-form";
 
-export default async function ProjectsNewPage() {
+export default async function ProjectsNewPage({ searchParams }: { searchParams?: { draftId?: string } }) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -30,7 +30,12 @@ export default async function ProjectsNewPage() {
 
         <h1 className="text-2xl font-semibold text-[#1F4E79]">Tạo dự án mới</h1>
 
-        <ProjectsNewForm currentUserId={user.id} currentUserRole={user.role} currentUserName={user.name ?? ""} />
+        <ProjectsNewForm
+          currentUserId={user.id}
+          currentUserRole={user.role}
+          currentUserName={user.name ?? ""}
+          initialDraftId={searchParams?.draftId}
+        />
       </div>
     </ProtectedLayout>
   );

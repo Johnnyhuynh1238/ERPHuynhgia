@@ -591,8 +591,8 @@ export function ProjectInfoClient({
               <Button variant="outline" onClick={() => setShowCloneModal(true)}>
                 Sao chép dự án
               </Button>
-              <Button variant="outline" onClick={() => setShowProjectEdit(true)}>
-                Sửa thông tin
+              <Button variant="outline" onClick={() => router.push(`/projects/${data.id}/edit`)}>
+                Cập Nhật Dự Án
               </Button>
             </div>
           ) : null}

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { PaymentStatus, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, ProjectRoleType, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
@@ -25,6 +25,7 @@ const projectSchema = z.object({
   unitPrice: z.number().min(1_000_000),
   startDate: z.string(),
   expectedEndDate: z.string(),
+  plannedDeadline: z.string().nullable().optional(),
   actualEndDate: z.string().nullable().optional(),
   status: z.nativeEnum(ProjectStatus),
   notes: z.string().nullable().optional(),
@@ -167,21 +168,61 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: "GĐ Thi Công hoặc KS chính không hợp lệ" }, { status: 400 });
     }
 
-    const updated = await prisma.project.update({
-      where: { id: params.id },
-      data: {
-        projectManagerId: payload.data.projectManagerId,
-        mainEngineerId: payload.data.mainEngineerId,
-      },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.project.update({
+        where: { id: params.id },
+        data: {
+          projectManagerId: payload.data.projectManagerId,
+          mainEngineerId: payload.data.mainEngineerId,
+        },
+      });
 
-    await prisma.task.updateMany({
-      where: {
-        projectId: params.id,
-      },
-      data: {
-        assignedEngineerId: payload.data.mainEngineerId,
-      },
+      await tx.task.updateMany({
+        where: {
+          projectId: params.id,
+        },
+        data: {
+          assignedEngineerId: payload.data.mainEngineerId,
+        },
+      });
+
+      await tx.projectMemberAssignment.deleteMany({
+        where: {
+          projectId: params.id,
+          role: ProjectRoleType.pm_construction_manager,
+          isPrimary: true,
+          userId: { not: payload.data.projectManagerId },
+        },
+      });
+      await tx.projectMemberAssignment.deleteMany({
+        where: {
+          projectId: params.id,
+          role: ProjectRoleType.pm_engineer,
+          isPrimary: true,
+          userId: { not: payload.data.mainEngineerId },
+        },
+      });
+      await tx.projectMemberAssignment.createMany({
+        data: [
+          {
+            projectId: params.id,
+            userId: payload.data.projectManagerId,
+            role: ProjectRoleType.pm_construction_manager,
+            isPrimary: true,
+            assignedBy: user.id,
+          },
+          {
+            projectId: params.id,
+            userId: payload.data.mainEngineerId,
+            role: ProjectRoleType.pm_engineer,
+            isPrimary: true,
+            assignedBy: user.id,
+          },
+        ],
+        skipDuplicates: true,
+      });
+
+      return result;
     });
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật phân công" });
@@ -272,6 +313,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         contractValue,
         startDate,
         expectedEndDate,
+        ...(payload.data.plannedDeadline !== undefined ? { plannedDeadline: normalizeNullableDate(payload.data.plannedDeadline) } : {}),
         actualEndDate: payload.data.actualEndDate ? normalizeDate(payload.data.actualEndDate) : null,
         status: payload.data.status,
         notes: payload.data.notes ?? null,

@@ -144,6 +144,78 @@ enum CustomerExportJobStatus {
   failed
 }
 
+enum ProjectChangeDraftMode {
+  create_project
+  update_project
+}
+
+enum ProjectChangeDraftStatus {
+  draft
+  ready
+  applied
+  archived
+}
+
+enum ProjectDraftFileKind {
+  contract
+  estimate
+  drawing
+  appendix
+  other
+}
+
+enum ProjectAiRunStatus {
+  pending
+  running
+  done
+  failed
+}
+
+enum ProjectAiProposalSection {
+  owner
+  project
+  assignment
+  payment
+  drawing
+  document
+}
+
+enum ProjectAiProposalAction {
+  fill_empty
+  supplement
+  warning_only
+}
+
+enum ProjectAiConflictType {
+  mismatch
+  ambiguous
+  format
+  validation
+  existing_value
+}
+
+enum ProjectAiConflictResolution {
+  manual_pending
+  accepted
+  rejected
+  ignored
+}
+
+enum ProjectAiAuditAction {
+  create_draft
+  save_draft
+  upload_file
+  delete_file
+  run_ai
+  apply_proposal
+  reject_proposal
+  manual_edit
+  submit_create
+  submit_update
+  create_project
+  update_project
+}
+
 enum PhaseStatus {
   not_started
   in_progress
@@ -334,6 +406,10 @@ model User {
   customerCommentReplies       CustomerCommentReply[]
   projectDrawingsUploaded      ProjectDrawing[]          @relation("ProjectDrawingUploader")
   paymentSchedulesCreated      PaymentSchedule[]         @relation("PaymentScheduleCreator")
+  projectChangeDraftsCreated   ProjectChangeDraft[]      @relation("ProjectChangeDraftCreator")
+  projectChangeDraftsUpdated   ProjectChangeDraft[]      @relation("ProjectChangeDraftUpdater")
+  projectDraftFilesUploaded    ProjectDraftFile[]        @relation("ProjectDraftFileUploader")
+  projectAiAudits              ProjectAiAudit[]          @relation("ProjectAiAuditActor")
   subcontractorsCreated        Subcontractor[]           @relation("SubcontractorCreator")
   subContractsCreated          SubContract[]             @relation("SubContractCreator")
   subContractFiles             SubContractFile[]
@@ -384,6 +460,7 @@ model Project {
   paymentSchedules        PaymentSchedule[]
   drawings                ProjectDrawing[]
   customerExportJobs      CustomerExportJob[]
+  changeDrafts            ProjectChangeDraft[]
   projectMembers          ProjectMember[]
   memberAssignments       ProjectMemberAssignment[]
   siteRestDays            SiteRestDay[]
@@ -975,6 +1052,123 @@ model CustomerExportJob {
   @@index([status, createdAt])
   @@index([expiresAt])
   @@map("customer_export_jobs")
+}
+
+model ProjectChangeDraft {
+  id        String                   @id @default(uuid()) @db.Uuid
+  mode      ProjectChangeDraftMode
+  status    ProjectChangeDraftStatus @default(draft)
+  projectId String?                  @map("project_id") @db.Uuid
+  formData  Json                     @map("form_data")
+  aiSummary Json?                    @map("ai_summary")
+  createdBy String                   @map("created_by") @db.Uuid
+  updatedBy String?                  @map("updated_by") @db.Uuid
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+
+  project Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User               @relation("ProjectChangeDraftCreator", fields: [createdBy], references: [id])
+  updater User?              @relation("ProjectChangeDraftUpdater", fields: [updatedBy], references: [id])
+  files   ProjectDraftFile[]
+  aiRuns  ProjectAiRun[]
+  audits  ProjectAiAudit[]
+
+  @@index([projectId, status, updatedAt])
+  @@index([createdBy, status, updatedAt])
+  @@map("project_change_drafts")
+}
+
+model ProjectDraftFile {
+  id         String               @id @default(uuid()) @db.Uuid
+  draftId    String               @map("draft_id") @db.Uuid
+  fileKind   ProjectDraftFileKind @map("file_kind")
+  fileUrl    String               @map("file_url") @db.Text
+  fileName   String               @map("file_name")
+  fileSize   Int                  @map("file_size")
+  mimeType   String               @map("mime_type")
+  uploadedBy String               @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime             @default(now()) @map("uploaded_at")
+
+  draft    ProjectChangeDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  uploader User               @relation("ProjectDraftFileUploader", fields: [uploadedBy], references: [id])
+
+  @@index([draftId, uploadedAt])
+  @@index([fileKind])
+  @@map("project_draft_files")
+}
+
+model ProjectAiRun {
+  id            String             @id @default(uuid()) @db.Uuid
+  draftId       String             @map("draft_id") @db.Uuid
+  status        ProjectAiRunStatus @default(pending)
+  model         String
+  promptVersion String             @map("prompt_version")
+  rawResult     Json?              @map("raw_result")
+  error         String?            @db.Text
+  startedAt     DateTime?          @map("started_at")
+  finishedAt    DateTime?          @map("finished_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  draft     ProjectChangeDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  proposals ProjectAiProposal[]
+  conflicts ProjectAiConflict[]
+
+  @@index([draftId, createdAt])
+  @@index([status, createdAt])
+  @@map("project_ai_runs")
+}
+
+model ProjectAiProposal {
+  id             String                   @id @default(uuid()) @db.Uuid
+  runId          String                   @map("run_id") @db.Uuid
+  section        ProjectAiProposalSection
+  fieldPath      String                   @map("field_path")
+  suggestedValue Json                     @map("suggested_value")
+  action         ProjectAiProposalAction
+  confidence     Decimal?                 @db.Decimal(5, 4)
+  reason         String?                  @db.Text
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  run ProjectAiRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, section])
+  @@index([action])
+  @@map("project_ai_proposals")
+}
+
+model ProjectAiConflict {
+  id             String                      @id @default(uuid()) @db.Uuid
+  runId          String                      @map("run_id") @db.Uuid
+  fieldPath      String                      @map("field_path")
+  currentValue   Json?                       @map("current_value")
+  suggestedValue Json?                       @map("suggested_value")
+  conflictType   ProjectAiConflictType       @map("conflict_type")
+  resolution     ProjectAiConflictResolution @default(manual_pending)
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  resolvedAt     DateTime?                   @map("resolved_at")
+
+  run ProjectAiRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, resolution])
+  @@index([conflictType])
+  @@map("project_ai_conflicts")
+}
+
+model ProjectAiAudit {
+  id        String               @id @default(uuid()) @db.Uuid
+  draftId   String               @map("draft_id") @db.Uuid
+  actorId   String               @map("actor_id") @db.Uuid
+  action    ProjectAiAuditAction
+  payload   Json?
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  draft ProjectChangeDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  actor User               @relation("ProjectAiAuditActor", fields: [actorId], references: [id])
+
+  @@index([draftId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@map("project_ai_audits")
 }
 
 model ProjectMember {
