@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, ProjectStatus, ProjectMemberRole, TaskStatus, UserRole } from "@prisma/client";
+import { Prisma, ProjectStatus, ProjectMemberRole, ProjectRoleType, TaskStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +14,13 @@ const STATUS_PRIORITY: Record<ProjectStatus, number> = {
 };
 
 const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
+
+const MEMBER_ROLE_TO_PROJECT_ROLE: Record<ProjectMemberRole, ProjectRoleType> = {
+  [ProjectMemberRole.engineer]: ProjectRoleType.pm_engineer,
+  [ProjectMemberRole.foreman]: ProjectRoleType.pm_labor_manager,
+  [ProjectMemberRole.accountant]: ProjectRoleType.pm_accountant,
+  [ProjectMemberRole.construction_manager]: ProjectRoleType.pm_construction_manager,
+};
 
 const createProjectSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
@@ -233,7 +240,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let actorUser;
+  let actorUser: Awaited<ReturnType<typeof requireRole>>;
   try {
     actorUser = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
@@ -497,6 +504,32 @@ export async function POST(request: Request) {
           })),
         });
       }
+
+      const assignmentRows = new Map<
+        string,
+        { projectId: string; userId: string; role: ProjectRoleType; isPrimary: boolean; assignedBy: string }
+      >();
+
+      function queueAssignment(userId: string, role: ProjectRoleType, isPrimary: boolean) {
+        assignmentRows.set(`${userId}:${role}`, {
+          projectId: project.id,
+          userId,
+          role,
+          isPrimary,
+          assignedBy: actorUser.id,
+        });
+      }
+
+      queueAssignment(projectManagerId, ProjectRoleType.pm_construction_manager, true);
+      queueAssignment(parsed.data.mainEngineerId, ProjectRoleType.pm_engineer, true);
+      dedup.forEach((roleInProject, userId) => {
+        queueAssignment(userId, MEMBER_ROLE_TO_PROJECT_ROLE[roleInProject], false);
+      });
+
+      await tx.projectMemberAssignment.createMany({
+        data: Array.from(assignmentRows.values()),
+        skipDuplicates: true,
+      });
 
       return project;
     });
