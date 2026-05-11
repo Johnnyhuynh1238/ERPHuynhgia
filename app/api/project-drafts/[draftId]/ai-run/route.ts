@@ -365,7 +365,8 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-7";
+  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  const baseURL = process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_BASE_URL;
   const run = await prisma.$transaction(async (tx) => {
     const created = await tx.projectAiRun.create({
       data: {
@@ -396,7 +397,7 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     const formData = (draft.formData && typeof draft.formData === "object" && !Array.isArray(draft.formData) ? draft.formData : {}) as DraftFormData;
     const projectData = normalizeProject(draft.project);
     const fileBlocks = await buildFileBlocks(draft.files);
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
     const message = await client.messages.create({
       model,
