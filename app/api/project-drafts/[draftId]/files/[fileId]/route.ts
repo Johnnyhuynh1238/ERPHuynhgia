@@ -20,7 +20,7 @@ function minioKey(url: string) {
 export async function DELETE(_request: Request, { params }: { params: { draftId: string; fileId: string } }) {
   let current;
   try {
-    current = await requireRole(["admin"]);
+    current = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return authError(error);
   }

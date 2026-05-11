@@ -62,7 +62,7 @@ function appendPath(target: DraftFormData, path: string, value: unknown) {
 export async function POST(request: Request, { params }: { params: { draftId: string } }) {
   let current;
   try {
-    current = await requireRole(["admin"]);
+    current = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return authError(error);
   }

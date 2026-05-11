@@ -18,7 +18,7 @@ function minioKey(url: string) {
 
 export async function GET(_request: Request, { params }: { params: { draftId: string; fileId: string } }) {
   try {
-    await requireRole(["admin"]);
+    await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return authError(error);
   }

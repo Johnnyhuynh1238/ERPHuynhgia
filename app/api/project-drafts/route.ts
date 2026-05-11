@@ -20,7 +20,7 @@ function authError(error: unknown) {
 export async function POST(request: Request) {
   let current;
   try {
-    current = await requireRole(["admin"]);
+    current = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return authError(error);
   }
