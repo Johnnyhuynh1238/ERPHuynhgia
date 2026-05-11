@@ -498,9 +498,33 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       return;
     }
 
-    setAiProposals(data.run?.proposals || []);
-    setAiConflicts(data.run?.conflicts || []);
+    const proposals = data.run?.proposals || [];
+    const conflicts = data.run?.conflicts || [];
+    setAiProposals(proposals);
+    setAiConflicts(conflicts);
     setSelectedProposalIds([]);
+
+    const autoApplyIds = proposals.filter((proposal) => proposal.action !== "warning_only").map((proposal) => proposal.id);
+    if (autoApplyIds.length > 0) {
+      const applyRes = await fetch(`/api/project-drafts/${nextDraftId}/apply-proposals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposalIds: autoApplyIds }),
+      });
+      const applyData = (await applyRes.json().catch(() => ({}))) as { draft?: { formData?: unknown }; message?: string };
+
+      if (!applyRes.ok) {
+        toast.error("AI phân tích xong nhưng apply tự động thất bại", { description: applyData.message || "Vui lòng bấm Apply thủ công" });
+        await refreshDraft(nextDraftId);
+        return;
+      }
+
+      form.reset(mergeDraftFormData(form.getValues(), applyData.draft?.formData));
+      toast.success(`AI đã điền tự động ${autoApplyIds.length} đề xuất`);
+      await refreshDraft(nextDraftId);
+      return;
+    }
+
     toast.success(data.message || "AI đã phân tích hồ sơ");
     await refreshDraft(nextDraftId);
   }
