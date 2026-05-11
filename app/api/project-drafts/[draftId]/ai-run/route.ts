@@ -364,7 +364,7 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   if (!draft) return NextResponse.json({ message: "Không tìm thấy bản nháp" }, { status: 404 });
   if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
   const baseURL = process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_BASE_URL;
   const run = await prisma.$transaction(async (tx) => {
