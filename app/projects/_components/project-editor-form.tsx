@@ -489,6 +489,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     const res = await fetch(`/api/project-drafts/${nextDraftId}/ai-run`, { method: "POST" });
     const data = (await res.json().catch(() => ({}))) as {
       run?: { proposals?: AiProposal[]; conflicts?: AiConflict[] };
+      draft?: { formData?: unknown };
+      autoApplied?: { appliedFields?: Array<{ fieldPath: string; action: string }>; skippedFields?: Array<{ fieldPath: string; action: string; reason: string }> };
       message?: string;
       error?: string;
     };
@@ -504,6 +506,14 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     setAiProposals(proposals);
     setAiConflicts(conflicts);
     setSelectedProposalIds([]);
+
+    const serverAppliedCount = data.autoApplied?.appliedFields?.length || 0;
+    if (serverAppliedCount > 0) {
+      form.reset(mergeDraftFormData(form.getValues(), data.draft?.formData));
+      toast.success(`AI đã điền tự động ${serverAppliedCount} đề xuất`);
+      await refreshDraft(nextDraftId);
+      return;
+    }
 
     const autoApplyIds = proposals.filter((proposal) => proposal.action !== "warning_only").map((proposal) => proposal.id);
     if (autoApplyIds.length > 0) {

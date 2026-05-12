@@ -209,15 +209,35 @@ function normalizeProject(project: DraftProject): DraftFormData {
   };
 }
 
+function pathParts(path: string) {
+  return path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+}
+
 function pathValue(source: unknown, path: string) {
   if (!source || typeof source !== "object") return undefined;
-  const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
   let cursor: unknown = source;
-  for (const part of parts) {
+  for (const part of pathParts(path)) {
     if (cursor === null || cursor === undefined || typeof cursor !== "object") return undefined;
     cursor = (cursor as Record<string, unknown>)[part];
   }
   return cursor;
+}
+
+function setPath(target: DraftFormData, path: string, value: unknown) {
+  const parts = pathParts(path);
+  let cursor: Record<string, unknown> = target;
+  parts.slice(0, -1).forEach((part) => {
+    if (!cursor[part] || typeof cursor[part] !== "object" || Array.isArray(cursor[part])) cursor[part] = {};
+    cursor = cursor[part] as Record<string, unknown>;
+  });
+  cursor[parts[parts.length - 1]] = value;
+}
+
+function appendPath(target: DraftFormData, path: string, value: unknown) {
+  const current = pathValue(target, path);
+  const currentArray = Array.isArray(current) ? current : [];
+  const nextItems = Array.isArray(value) ? value : [value];
+  setPath(target, path, [...currentArray, ...nextItems]);
 }
 
 function isMeaningful(value: unknown) {
@@ -232,6 +252,35 @@ function fieldValue(formData: DraftFormData, projectData: DraftFormData, fieldPa
   const formValue = pathValue(formData, fieldPath);
   if (isMeaningful(formValue)) return formValue;
   return pathValue(projectData, fieldPath);
+}
+
+function autoApplyProposals(formData: DraftFormData, proposals: Proposal[]) {
+  const nextFormData = JSON.parse(JSON.stringify(formData)) as DraftFormData;
+  const appliedFields: Array<{ fieldPath: string; action: ProjectAiProposalAction }> = [];
+  const skippedFields: Array<{ fieldPath: string; action: ProjectAiProposalAction; reason: string }> = [];
+
+  for (const proposal of proposals) {
+    if (proposal.action === ProjectAiProposalAction.warning_only) {
+      skippedFields.push({ fieldPath: proposal.fieldPath, action: proposal.action, reason: "warning_only" });
+      continue;
+    }
+
+    if (proposal.action === ProjectAiProposalAction.supplement) {
+      appendPath(nextFormData, proposal.fieldPath, proposal.suggestedValue);
+      appliedFields.push({ fieldPath: proposal.fieldPath, action: proposal.action });
+      continue;
+    }
+
+    if (isMeaningful(pathValue(nextFormData, proposal.fieldPath))) {
+      skippedFields.push({ fieldPath: proposal.fieldPath, action: proposal.action, reason: "existing_value" });
+      continue;
+    }
+
+    setPath(nextFormData, proposal.fieldPath, proposal.suggestedValue);
+    appliedFields.push({ fieldPath: proposal.fieldPath, action: proposal.action });
+  }
+
+  return { formData: nextFormData, appliedFields, skippedFields };
 }
 
 function enforceNoOverwrite({
@@ -507,6 +556,7 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
 
     const parsed = analysisSchema.parse(toolUse.input);
     const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: parsed.proposals, conflicts: parsed.conflicts });
+    const autoApplied = autoApplyProposals(formData, enforced.proposals);
     console.info("[project-ai] run result", {
       draftId: draft.id,
       runId: run.id,
@@ -514,6 +564,10 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
       parsedConflictCount: parsed.conflicts.length,
       enforcedProposalCount: enforced.proposals.length,
       enforcedConflictCount: enforced.conflicts.length,
+      autoAppliedCount: autoApplied.appliedFields.length,
+      autoSkippedCount: autoApplied.skippedFields.length,
+      autoAppliedFields: autoApplied.appliedFields,
+      autoSkippedFields: autoApplied.skippedFields,
       summaryKeys: Object.keys(parsed.summary),
       proposals: enforced.proposals.map((proposal) => ({
         fieldPath: proposal.fieldPath,
@@ -562,15 +616,26 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
         where: { id: run.id },
         data: {
           status: ProjectAiRunStatus.done,
-          rawResult: toJson({ ...parsed, enforced }),
+          rawResult: toJson({ ...parsed, enforced, autoApplied }),
           finishedAt: new Date(),
         },
       });
 
       await tx.projectChangeDraft.update({
         where: { id: draft.id },
-        data: { aiSummary: toJson(parsed.summary), updatedBy: current.id },
+        data: { formData: toJson(autoApplied.formData), aiSummary: toJson(parsed.summary), updatedBy: current.id },
       });
+
+      if (autoApplied.appliedFields.length > 0 || autoApplied.skippedFields.length > 0) {
+        await tx.projectAiAudit.create({
+          data: {
+            draftId: draft.id,
+            actorId: current.id,
+            action: ProjectAiAuditAction.apply_proposal,
+            payload: toJson(autoApplied),
+          },
+        });
+      }
     });
 
     const latestRun = await prisma.projectAiRun.findUnique({
@@ -590,7 +655,12 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
         }
       : latestRun;
 
-    return NextResponse.json({ run: runWithConflictReasons, message: "AI đã phân tích hồ sơ" });
+    return NextResponse.json({
+      run: runWithConflictReasons,
+      draft: { id: draft.id, formData: autoApplied.formData },
+      autoApplied,
+      message: autoApplied.appliedFields.length > 0 ? "AI đã phân tích và điền form" : "AI đã phân tích hồ sơ",
+    });
   } catch (error) {
     const message = await markRunFailed(run.id, error);
     console.error("[project-ai] run failed", { draftId: draft.id, runId: run.id, message });
