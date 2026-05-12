@@ -18,6 +18,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+RUN apk add --no-cache ghostscript tesseract-ocr tesseract-ocr-data-eng tesseract-ocr-data-vie
+
 # Chỉ copy những thứ cần thiết để chạy production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
