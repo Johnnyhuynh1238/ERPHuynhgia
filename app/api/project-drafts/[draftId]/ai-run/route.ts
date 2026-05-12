@@ -1,3 +1,8 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ContentBlockParam, Tool } from "@anthropic-ai/sdk/resources/messages/messages";
 import { Prisma, ProjectAiAuditAction, ProjectAiConflictType, ProjectAiProposalAction, ProjectAiProposalSection, ProjectAiRunStatus, ProjectChangeDraftMode } from "@prisma/client";
@@ -14,6 +19,10 @@ export const runtime = "nodejs";
 const TOOL_NAME = "submit_project_intake_analysis";
 const PROMPT_VERSION = "project-intake-v1";
 const MAX_TEXT_CHARS_PER_FILE = 30_000;
+const MAX_OCR_CHARS_PER_FILE = 20_000;
+const MAX_OCR_PAGES_PER_FILE = 3;
+
+const execFileAsync = promisify(execFile);
 
 const proposalSchema = z.object({
   section: z.nativeEnum(ProjectAiProposalSection),
@@ -119,6 +128,59 @@ function toJson(value: unknown): Prisma.InputJsonValue {
 
 function truncateText(text: string) {
   return text.length > MAX_TEXT_CHARS_PER_FILE ? `${text.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung file do quá dài]` : text;
+}
+
+function truncateOcrText(text: string) {
+  return text.length > MAX_OCR_CHARS_PER_FILE ? `${text.slice(0, MAX_OCR_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung OCR do quá dài]` : text;
+}
+
+async function extractPdfOcrText(buffer: Buffer, fileName: string) {
+  let dir: string | null = null;
+  try {
+    dir = await mkdtemp(join(tmpdir(), "project-ai-pdf-"));
+    const inputPath = join(dir, "input.pdf");
+    const outputPattern = join(dir, "page-%03d.png");
+    await writeFile(inputPath, buffer);
+
+    await execFileAsync(
+      "gs",
+      [
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        "-sDEVICE=pnggray",
+        "-r160",
+        "-dFirstPage=1",
+        `-dLastPage=${MAX_OCR_PAGES_PER_FILE}`,
+        `-sOutputFile=${outputPattern}`,
+        inputPath,
+      ],
+      { timeout: 120_000, maxBuffer: 1024 * 1024 },
+    );
+
+    const imageFiles = (await readdir(dir)).filter((entry) => entry.startsWith("page-") && entry.endsWith(".png")).sort();
+    const chunks: string[] = [];
+    for (const imageFile of imageFiles) {
+      const { stdout } = await execFileAsync("tesseract", [join(dir, imageFile), "stdout", "-l", "vie+eng", "--psm", "6"], {
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      const text = String(stdout);
+      if (text.trim()) chunks.push(text.trim());
+      if (chunks.join("\n\n").length >= MAX_OCR_CHARS_PER_FILE) break;
+    }
+
+    const text = truncateOcrText(chunks.join("\n\n"));
+    console.info("[project-ai] pdf ocr fallback", { fileName, renderedPages: imageFiles.length, extractedChars: text.length });
+    return text;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[project-ai] pdf ocr fallback failed", { fileName, message });
+    return "";
+  } finally {
+    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 function formatDate(value: Date | null) {
@@ -248,6 +310,14 @@ async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string
           data: object.buffer.toString("base64"),
         },
       });
+
+      const ocrText = await extractPdfOcrText(object.buffer, file.fileName);
+      if (ocrText.trim()) {
+        blocks.push({
+          type: "text",
+          text: `${header}\nNội dung OCR fallback từ PDF scan/ảnh, ưu tiên dùng để trích xuất field nếu document PDF không đọc được:\n${ocrText}`,
+        });
+      }
       continue;
     }
 
@@ -301,12 +371,15 @@ Luật bắt buộc:
 - Không ghi trực tiếp DB chính, chỉ tạo đề xuất/cảnh báo.
 - Field path phải dùng tên form: customerName, customerPhone, customerIdNumber, address, name, areaM2, unitPrice, startDate, expectedEndDate, plannedDeadline, paymentSchedules, drawings, documents.
 - Date trả về dạng yyyy-mm-dd. Tiền/diện tích trả number, không kèm ký tự đ.
+- Với hợp đồng xây dựng Việt Nam: Bên A/chủ đầu tư thường map vào customerName/customerPhone/customerIdNumber/address; tên công trình/gói thầu map vào name; địa điểm công trình map vào address nếu chưa có địa chỉ chủ nhà rõ hơn.
+- Nếu có block "Nội dung OCR fallback" thì dùng nó như nguồn text chính khi document PDF có vẻ không đọc được.
+- create_project: form thường đang trống, nếu đọc được field nào đủ tin cậy thì phải tạo proposal fill_empty cho field đó; không chỉ tạo conflict documents ambiguous chung chung.
 - action=fill_empty chỉ dùng khi field đang trống.
 - action=supplement dùng cho dòng bổ sung như lịch thanh toán phụ lục, bản vẽ mới, tài liệu mới.
 - action=warning_only dùng khi chỉ cảnh báo, không được apply.
 - Với update_project: nếu ERP/form đã có dữ liệu meaningful thì KHÔNG đề xuất ghi đè; nếu hồ sơ khác dữ liệu hiện tại thì tạo conflict existing_value hoặc mismatch.
 - Không đoán UUID user. Nếu thấy tên GĐ/KS trong hồ sơ nhưng không có ID, chỉ cảnh báo hoặc ghi reason.
-- Chỉ đưa proposal có confidence >= 0.55. Nếu mơ hồ thì đưa conflict ambiguous.
+- Chỉ đưa proposal có confidence >= 0.55. Nếu thật sự không đọc được dữ liệu từ file thì tạo conflict ambiguous với reason nói rõ là OCR/PDF không trích xuất được hay nội dung thiếu field nào.
 
 Mode: ${mode}
 FormData hiện tại:
@@ -441,8 +514,18 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
       parsedConflictCount: parsed.conflicts.length,
       enforcedProposalCount: enforced.proposals.length,
       enforcedConflictCount: enforced.conflicts.length,
-      proposals: enforced.proposals.map((proposal) => ({ fieldPath: proposal.fieldPath, action: proposal.action, confidence: proposal.confidence ?? null })),
-      conflicts: enforced.conflicts.map((conflict) => ({ fieldPath: conflict.fieldPath, conflictType: conflict.conflictType })),
+      summaryKeys: Object.keys(parsed.summary),
+      proposals: enforced.proposals.map((proposal) => ({
+        fieldPath: proposal.fieldPath,
+        action: proposal.action,
+        confidence: proposal.confidence ?? null,
+        reason: proposal.reason || null,
+      })),
+      conflicts: enforced.conflicts.map((conflict) => ({
+        fieldPath: conflict.fieldPath,
+        conflictType: conflict.conflictType,
+        reason: conflict.reason || null,
+      })),
     });
 
     await prisma.$transaction(async (tx) => {
@@ -497,8 +580,17 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
         conflicts: { orderBy: { createdAt: "asc" } },
       },
     });
+    const runWithConflictReasons = latestRun
+      ? {
+          ...latestRun,
+          conflicts: latestRun.conflicts.map((conflict, index) => ({
+            ...conflict,
+            reason: enforced.conflicts[index]?.reason || null,
+          })),
+        }
+      : latestRun;
 
-    return NextResponse.json({ run: latestRun, message: "AI đã phân tích hồ sơ" });
+    return NextResponse.json({ run: runWithConflictReasons, message: "AI đã phân tích hồ sơ" });
   } catch (error) {
     const message = await markRunFailed(run.id, error);
     console.error("[project-ai] run failed", { draftId: draft.id, runId: run.id, message });

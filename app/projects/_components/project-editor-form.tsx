@@ -84,6 +84,7 @@ type AiConflict = {
   currentValue: unknown;
   suggestedValue: unknown;
   conflictType: string;
+  reason?: string | null;
 };
 
 type DraftAudit = {
@@ -525,7 +526,15 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       return;
     }
 
-    toast.success(data.message || "AI đã phân tích hồ sơ");
+    const diagnostic = [
+      ...conflicts.slice(0, 2).map((conflict) => conflict.reason || `${conflict.fieldPath}: ${conflict.conflictType}`),
+      ...proposals.filter((proposal) => proposal.action === "warning_only").slice(0, 2).map((proposal) => proposal.reason || `${proposal.fieldPath}: warning`),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    toast(proposals.length === 0 ? "AI chưa tìm được dữ liệu để điền form" : "AI chỉ tạo cảnh báo, chưa có đề xuất điền form", {
+      description: diagnostic || "PDF có thể là bản scan/ảnh hoặc thiếu dữ liệu khớp với field của form.",
+    });
     await refreshDraft(nextDraftId);
   }
 
@@ -786,6 +795,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
                   <div className="font-medium">{conflict.fieldPath} · {conflict.conflictType}</div>
                   <div>Hiện tại: {formatAiValue(conflict.currentValue)}</div>
                   <div>Hồ sơ: {formatAiValue(conflict.suggestedValue)}</div>
+                  {conflict.reason ? <div>Lý do: {conflict.reason}</div> : null}
                 </div>
               ))}
             </div>

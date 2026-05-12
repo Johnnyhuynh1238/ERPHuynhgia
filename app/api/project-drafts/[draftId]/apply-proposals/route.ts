@@ -91,27 +91,33 @@ export async function POST(request: Request, { params }: { params: { draftId: st
     : {}) as DraftFormData;
   const appliedIds: string[] = [];
   const skippedIds: string[] = [];
+  const appliedFields: Array<{ id: string; fieldPath: string; action: ProjectAiProposalAction }> = [];
+  const skippedFields: Array<{ id: string; fieldPath: string; action: ProjectAiProposalAction; reason: string }> = [];
 
   for (const proposal of proposals) {
     if (proposal.action === ProjectAiProposalAction.warning_only) {
       skippedIds.push(proposal.id);
+      skippedFields.push({ id: proposal.id, fieldPath: proposal.fieldPath, action: proposal.action, reason: "warning_only" });
       continue;
     }
 
     if (proposal.action === ProjectAiProposalAction.supplement) {
       appendPath(formData, proposal.fieldPath, proposal.suggestedValue);
       appliedIds.push(proposal.id);
+      appliedFields.push({ id: proposal.id, fieldPath: proposal.fieldPath, action: proposal.action });
       continue;
     }
 
     const currentValue = getPath(formData, proposal.fieldPath);
     if (isMeaningful(currentValue)) {
       skippedIds.push(proposal.id);
+      skippedFields.push({ id: proposal.id, fieldPath: proposal.fieldPath, action: proposal.action, reason: "existing_value" });
       continue;
     }
 
     setPath(formData, proposal.fieldPath, proposal.suggestedValue);
     appliedIds.push(proposal.id);
+    appliedFields.push({ id: proposal.id, fieldPath: proposal.fieldPath, action: proposal.action });
   }
 
   console.info("[project-ai] apply proposals", {
@@ -119,6 +125,8 @@ export async function POST(request: Request, { params }: { params: { draftId: st
     requestedIds: parsed.data.proposalIds.length,
     appliedIds: appliedIds.length,
     skippedIds: skippedIds.length,
+    appliedFields,
+    skippedFields,
   });
 
   if (appliedIds.length === 0) {
