@@ -20,7 +20,8 @@ const TOOL_NAME = "submit_project_intake_analysis";
 const PROMPT_VERSION = "project-intake-v1";
 const MAX_TEXT_CHARS_PER_FILE = 30_000;
 const MAX_OCR_CHARS_PER_FILE = 20_000;
-const MAX_OCR_PAGES_PER_FILE = 3;
+const MAX_PDF_TEXT_PAGES_PER_FILE = 8;
+const MAX_OCR_PAGES_PER_FILE = 2;
 
 const execFileAsync = promisify(execFile);
 
@@ -134,6 +135,36 @@ function truncateOcrText(text: string) {
   return text.length > MAX_OCR_CHARS_PER_FILE ? `${text.slice(0, MAX_OCR_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung OCR do quá dài]` : text;
 }
 
+async function extractPdfPlainText(buffer: Buffer, fileName: string) {
+  let dir: string | null = null;
+  try {
+    dir = await mkdtemp(join(tmpdir(), "project-ai-pdf-text-"));
+    const inputPath = join(dir, "input.pdf");
+    await writeFile(inputPath, buffer);
+    const { stdout } = await execFileAsync("pdftotext", ["-layout", "-f", "1", "-l", String(MAX_PDF_TEXT_PAGES_PER_FILE), inputPath, "-"], {
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    const text = truncateText(String(stdout).trim());
+    console.info("[project-ai] pdf text fallback", { fileName, extractedChars: text.length });
+    return text;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[project-ai] pdf text fallback failed", { fileName, message });
+    return "";
+  } finally {
+    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+function commandOutputText(error: unknown) {
+  const output = error as { stdout?: unknown; stderr?: unknown; message?: string };
+  return {
+    stdout: output.stdout ? String(output.stdout) : "",
+    stderr: output.stderr ? String(output.stderr) : output.message || String(error),
+  };
+}
+
 async function extractPdfOcrText(buffer: Buffer, fileName: string) {
   let dir: string | null = null;
   try {
@@ -150,24 +181,30 @@ async function extractPdfOcrText(buffer: Buffer, fileName: string) {
         "-dBATCH",
         "-dNOPAUSE",
         "-sDEVICE=pnggray",
-        "-r160",
+        "-r120",
         "-dFirstPage=1",
         `-dLastPage=${MAX_OCR_PAGES_PER_FILE}`,
         `-sOutputFile=${outputPattern}`,
         inputPath,
       ],
-      { timeout: 120_000, maxBuffer: 1024 * 1024 },
+      { timeout: 90_000, maxBuffer: 1024 * 1024 },
     );
 
     const imageFiles = (await readdir(dir)).filter((entry) => entry.startsWith("page-") && entry.endsWith(".png")).sort();
     const chunks: string[] = [];
     for (const imageFile of imageFiles) {
-      const { stdout } = await execFileAsync("tesseract", [join(dir, imageFile), "stdout", "-l", "vie+eng", "--psm", "6"], {
-        timeout: 120_000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      const text = String(stdout);
-      if (text.trim()) chunks.push(text.trim());
+      try {
+        const { stdout } = await execFileAsync("tesseract", [join(dir, imageFile), "stdout", "-l", "vie+eng", "--psm", "11"], {
+          timeout: 90_000,
+          maxBuffer: 10 * 1024 * 1024,
+        });
+        const text = String(stdout).trim();
+        if (text) chunks.push(text);
+      } catch (error) {
+        const output = commandOutputText(error);
+        if (output.stdout.trim()) chunks.push(output.stdout.trim());
+        console.warn("[project-ai] pdf ocr page failed", { fileName, imageFile, message: output.stderr.slice(0, 500) });
+      }
       if (chunks.join("\n\n").length >= MAX_OCR_CHARS_PER_FILE) break;
     }
 
@@ -360,11 +397,13 @@ async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string
         },
       });
 
-      const ocrText = await extractPdfOcrText(object.buffer, file.fileName);
-      if (ocrText.trim()) {
+      const plainText = await extractPdfPlainText(object.buffer, file.fileName);
+      const ocrText = plainText.length >= 500 ? "" : await extractPdfOcrText(object.buffer, file.fileName);
+      const extractedText = [plainText, ocrText].filter((text) => text.trim()).join("\n\n");
+      if (extractedText.trim()) {
         blocks.push({
           type: "text",
-          text: `${header}\nNội dung OCR fallback từ PDF scan/ảnh, ưu tiên dùng để trích xuất field nếu document PDF không đọc được:\n${ocrText}`,
+          text: `${header}\nNội dung text fallback từ PDF, ưu tiên dùng để trích xuất field nếu document PDF không đọc được:\n${extractedText}`,
         });
       }
       continue;
