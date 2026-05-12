@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
-import { Be_Vietnam_Pro } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import '@/src/styles/hg-design-system.css'
-
-const beVietnamPro = Be_Vietnam_Pro({
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
-});
 
 export const metadata: Metadata = {
   title: "ERP Huỳnh Gia",
@@ -30,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={beVietnamPro.variable}>
+    <html lang="vi">
       <body className="font-sans bg-black text-zinc-100">
         <div className="hg-page-enter">{children}</div>
         <Toaster richColors position="top-right" closeButton />
