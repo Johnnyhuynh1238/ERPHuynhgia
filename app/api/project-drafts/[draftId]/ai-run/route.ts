@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const TOOL_NAME = "submit_project_intake_analysis";
-const PROMPT_VERSION = "project-intake-v1";
+const PROMPT_VERSION = "project-intake-v2";
 const MAX_TEXT_CHARS_PER_FILE = 30_000;
 const MAX_OCR_CHARS_PER_FILE = 20_000;
 const MAX_PDF_TEXT_PAGES_PER_FILE = 8;
@@ -459,6 +459,7 @@ Luật bắt buộc:
 - Không ghi trực tiếp DB chính, chỉ tạo đề xuất/cảnh báo.
 - Field path phải dùng tên form: customerName, customerPhone, customerIdNumber, address, name, areaM2, unitPrice, startDate, expectedEndDate, plannedDeadline, paymentSchedules, drawings, documents.
 - Date trả về dạng yyyy-mm-dd. Tiền/diện tích trả number, không kèm ký tự đ.
+- Nếu hợp đồng có bảng thanh toán dạng "ĐỢT / NỘI DUNG CÔNG VIỆC / % / SỐ TIỀN / GHI CHÚ", hãy tạo 1 proposal fieldPath=paymentSchedules, action=fill_empty cho create_project khi form chưa có đợt thanh toán. suggestedValue phải là mảng object: { type: "contract", installmentNo: number, description: string, percent: number, amount: number, dueDate?: "yyyy-mm-dd", paymentNote?: string }. Nếu bảng không có ngày hạn, bỏ dueDate để ERP tự phân bổ theo ngày khởi công - bàn giao dự kiến. Ví dụ hợp đồng mẫu có 8 đợt: tạm ứng khởi công, hoàn thành móng, hoàn thành sàn tầng 2, hoàn thành xây tô, hoàn thành lợp mái, hoàn thiện cơ bản, bàn giao tạm thời, bàn giao chính thức.
 - Với hợp đồng xây dựng Việt Nam: Bên A/chủ đầu tư thường map vào customerName/customerPhone/customerIdNumber/address; tên công trình/gói thầu map vào name; địa điểm công trình map vào address nếu chưa có địa chỉ chủ nhà rõ hơn.
 - Nếu có block "Nội dung OCR fallback" thì dùng nó như nguồn text chính khi document PDF có vẻ không đọc được.
 - create_project: form thường đang trống, nếu đọc được field nào đủ tin cậy thì phải tạo proposal fill_empty cho field đó; không chỉ tạo conflict documents ambiguous chung chung.

@@ -10,6 +10,16 @@ import { Button } from "@/components/ui/button";
 
 const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 
+const paymentScheduleFormSchema = z.object({
+  type: z.enum(["contract", "addendum"]).optional(),
+  installmentNo: z.number().int().min(1, "Đợt phải >= 1"),
+  description: z.string().trim().min(1, "Nội dung thanh toán là bắt buộc"),
+  percent: z.number().min(0).max(100).optional(),
+  amount: z.number().positive().optional(),
+  dueDate: z.string().optional().nullable(),
+  paymentNote: z.string().optional().nullable(),
+});
+
 const formSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
@@ -33,7 +43,7 @@ const formSchema = z.object({
       roleInProject: z.enum(["engineer", "foreman", "accountant", "construction_manager"]),
     }),
   ),
-  paymentSchedules: z.array(z.unknown()).optional(),
+  paymentSchedules: z.array(paymentScheduleFormSchema).optional(),
   drawings: z.array(z.unknown()).optional(),
 });
 
@@ -276,6 +286,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     name: "members",
   });
 
+  const paymentSchedulesFieldArray = useFieldArray({
+    control: form.control,
+    name: "paymentSchedules",
+  });
+
   useEffect(() => {
     async function loadOptions() {
       const res = await fetch("/api/admin/users/options", { cache: "no-store" });
@@ -425,6 +440,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         || path.endsWith(`.${normalizedField}`)
         || normalizedField.endsWith(`.${path}`)
         || path.startsWith(`${normalizedField}.`)
+        || normalizedField.startsWith(`${path}.`)
       ) {
         entries.push(...markers);
       }
@@ -469,6 +485,18 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         ))}
       </span>
     );
+  }
+
+  function addPaymentSchedule() {
+    paymentSchedulesFieldArray.append({
+      type: "contract",
+      installmentNo: paymentSchedulesFieldArray.fields.length + 1,
+      description: "",
+      percent: undefined,
+      amount: undefined,
+      dueDate: "",
+      paymentNote: "",
+    });
   }
 
   function validateFinancial(values: ProjectEditorFormValues) {
@@ -737,6 +765,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           projectManagerId: currentUserId,
           mainEngineerId: values.mainEngineerId,
           members: values.members,
+          paymentSchedules: values.paymentSchedules || [],
         }
       : {
           customerName: values.customerName,
@@ -753,6 +782,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           projectManagerId: values.projectManagerId,
           mainEngineerId: values.mainEngineerId,
           members: values.members,
+          paymentSchedules: values.paymentSchedules || [],
         };
 
     const res = await fetch("/api/projects", {
@@ -768,7 +798,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     }
 
     toast.success(data.message || `Đã tạo dự án ${data.code || ""}`);
-    if (draftId && (supplementalPaymentCount > 0 || supplementalDrawingCount > 0)) {
+    if (draftId && supplementalDrawingCount > 0) {
       await applySupplementData(data.id);
     }
     router.push(`/projects/${data.id}`);
@@ -908,12 +938,12 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         ) : null}
 
-        {supplementalPaymentCount > 0 || supplementalDrawingCount > 0 ? (
+        {(!isCreate && supplementalPaymentCount > 0) || supplementalDrawingCount > 0 ? (
           <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="font-semibold">Dữ liệu bổ sung đã duyệt</h3>
-                <p className="text-xs">{supplementalPaymentCount} lịch thanh toán · {supplementalDrawingCount} bản vẽ</p>
+                <p className="text-xs">{!isCreate ? `${supplementalPaymentCount} lịch thanh toán · ` : ""}{supplementalDrawingCount} bản vẽ</p>
               </div>
               {!isCreate ? (
                 <Button type="button" variant="outline" onClick={() => applySupplementData(projectId)} disabled={applyingSupplements || !draftId}>
@@ -1066,8 +1096,67 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         </div>
       </div>
 
+      {isCreate ? (
+        <div className="rounded-xl border bg-white p-5 text-slate-900">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Section C - Các đợt thanh toán{renderFieldMarker("paymentSchedules")}</h2>
+              <p className="mt-1 text-sm text-slate-600">Theo mẫu HĐ: Đợt, nội dung công việc, %, số tiền, ghi chú. Nếu AI đọc được hợp đồng, AI sẽ tự điền đủ các đợt vào đây.</p>
+            </div>
+            <Button type="button" variant="outline" onClick={addPaymentSchedule}>+ Thêm đợt</Button>
+          </div>
+
+          {paymentSchedulesFieldArray.fields.length === 0 ? (
+            <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa có đợt thanh toán. Có thể bấm + để nhập thủ công, hoặc upload hợp đồng rồi chạy AI.</div>
+          ) : (
+            <div className="space-y-3">
+              {paymentSchedulesFieldArray.fields.map((field, idx) => {
+                const rowErrors = form.formState.errors.paymentSchedules?.[idx];
+                return (
+                  <div key={field.id} className="rounded-lg border bg-slate-50 p-3">
+                    <div className="grid gap-3 md:grid-cols-[90px_1fr_100px_150px_150px_auto]">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Đợt{renderFieldMarker(`paymentSchedules.${idx}.installmentNo`)}</label>
+                        <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.installmentNo`)} {...form.register(`paymentSchedules.${idx}.installmentNo` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                        {rowErrors?.installmentNo ? <p className="mt-1 text-xs text-red-600">{rowErrors.installmentNo.message}</p> : null}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Nội dung công việc{renderFieldMarker(`paymentSchedules.${idx}.description`)}</label>
+                        <input className={getFieldInputClassName(`paymentSchedules.${idx}.description`)} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
+                        {rowErrors?.description ? <p className="mt-1 text-xs text-red-600">{rowErrors.description.message}</p> : null}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">%{renderFieldMarker(`paymentSchedules.${idx}.percent`)}</label>
+                        <input type="number" min={0} max={100} step="0.01" className={getFieldInputClassName(`paymentSchedules.${idx}.percent`)} {...form.register(`paymentSchedules.${idx}.percent` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                        {rowErrors?.percent ? <p className="mt-1 text-xs text-red-600">{rowErrors.percent.message}</p> : null}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Số tiền{renderFieldMarker(`paymentSchedules.${idx}.amount`)}</label>
+                        <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.amount`)} {...form.register(`paymentSchedules.${idx}.amount` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                        {rowErrors?.amount ? <p className="mt-1 text-xs text-red-600">{rowErrors.amount.message}</p> : null}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Ngày hạn{renderFieldMarker(`paymentSchedules.${idx}.dueDate`)}</label>
+                        <input type="date" className={getFieldInputClassName(`paymentSchedules.${idx}.dueDate`)} {...form.register(`paymentSchedules.${idx}.dueDate` as const)} />
+                      </div>
+                      <div className="flex items-end">
+                        <Button type="button" variant="outline" onClick={() => paymentSchedulesFieldArray.remove(idx)}>Xóa</Button>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs font-medium">Ghi chú{renderFieldMarker(`paymentSchedules.${idx}.paymentNote`)}</label>
+                      <input className={getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+
       <div className="rounded-xl border bg-white p-5 text-slate-900">
-        <h2 className="mb-4 text-lg font-semibold">Section C - Phân công</h2>
+        <h2 className="mb-4 text-lg font-semibold">Section D - Phân công</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">GĐ Thi Công *{renderFieldMarker("projectManagerId")}</label>

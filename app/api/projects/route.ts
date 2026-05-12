@@ -15,6 +15,31 @@ const STATUS_PRIORITY: Record<ProjectStatus, number> = {
 
 const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 
+const optionalPositiveNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined || Number.isNaN(value) ? undefined : Number(value)),
+  z.number().positive().optional(),
+);
+
+const optionalPercentNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined || Number.isNaN(value) ? undefined : Number(value)),
+  z.number().min(0).max(100).optional(),
+);
+
+const optionalDateString = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+);
+
+const paymentScheduleInputSchema = z.object({
+  type: z.enum(["contract", "addendum"]).optional().default("contract"),
+  installmentNo: z.coerce.number().int().min(1),
+  description: z.string().trim().min(1),
+  percent: optionalPercentNumber,
+  amount: optionalPositiveNumber,
+  dueDate: optionalDateString,
+  paymentNote: z.string().trim().optional().nullable(),
+});
+
 const MEMBER_ROLE_TO_PROJECT_ROLE: Record<ProjectMemberRole, ProjectRoleType> = {
   [ProjectMemberRole.engineer]: ProjectRoleType.pm_engineer,
   [ProjectMemberRole.foreman]: ProjectRoleType.pm_labor_manager,
@@ -44,6 +69,7 @@ const createProjectSchema = z.object({
       }),
     )
     .default([]),
+  paymentSchedules: z.array(paymentScheduleInputSchema).default([]),
 });
 
 function mapAuthError(message: string) {
@@ -60,6 +86,12 @@ function addDays(baseDate: Date, offsetDays: number) {
   const d = new Date(baseDate);
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d;
+}
+
+function dayDiff(from: Date, to: Date) {
+  const start = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+  const end = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+  return Math.max(0, Math.round((end - start) / 86400000));
 }
 
 function normalizeDateStart(raw: string) {
@@ -463,25 +495,56 @@ export async function POST(request: Request) {
       });
 
       const paymentBaseValue = contractValue ?? 0;
-      const paymentAmounts = paymentTemplate.map((item) => Math.round(paymentBaseValue * item.percent));
-      const partialSum = paymentAmounts.slice(0, 5).reduce((sum, v) => sum + v, 0);
-      paymentAmounts[5] = paymentBaseValue - partialSum;
+      const paymentScheduleInputs = parsed.data.paymentSchedules;
+      const paymentRows = paymentScheduleInputs.length > 0
+        ? paymentScheduleInputs.map((item, index) => {
+            const installmentNo = item.installmentNo || index + 1;
+            const amount = item.amount ?? (paymentBaseValue > 0 && item.percent !== undefined ? Math.round(paymentBaseValue * (item.percent / 100)) : 0);
+            if (amount <= 0) throw new Error(`Đợt thanh toán ${installmentNo} thiếu số tiền hoặc % hợp lệ`);
+            const dueDate = item.dueDate ? normalizeDate(item.dueDate) : addDays(startDate, Math.round((dayDiff(startDate, expectedEndDate) * index) / Math.max(paymentScheduleInputs.length - 1, 1)));
+            const percent = item.percent !== undefined ? item.percent : paymentBaseValue > 0 ? Math.round((amount / paymentBaseValue) * 10000) / 100 : 0;
 
-      await tx.paymentSchedule.createMany({
-        data: paymentTemplate.map((item, index) => ({
-          projectId: project.id,
-          phaseNumber: item.phaseNumber,
-          milestoneDescription: item.milestoneDescription,
-          percent: item.percent,
-          amount: paymentAmounts[index],
-          expectedDate: addDays(startDate, item.dayOffset),
-          dayOffset: item.dayOffset,
-          status: "not_collected",
-          actualPaidDate: null,
-          actualPaidAmount: null,
-          notes: null,
-        })),
-      });
+            return {
+              projectId: project.id,
+              phaseNumber: installmentNo,
+              milestoneDescription: item.description,
+              percent,
+              amount,
+              expectedDate: dueDate,
+              dayOffset: dayDiff(startDate, dueDate),
+              status: "not_collected" as const,
+              actualPaidDate: null,
+              actualPaidAmount: null,
+              notes: item.paymentNote || null,
+              type: item.type,
+              installmentNo,
+              description: item.description,
+              dueDate,
+              paymentNote: item.paymentNote || null,
+              createdBy: actorUser.id,
+            };
+          })
+        : (() => {
+            const paymentAmounts = paymentTemplate.map((item) => Math.round(paymentBaseValue * item.percent));
+            const partialSum = paymentAmounts.slice(0, 5).reduce((sum, v) => sum + v, 0);
+            paymentAmounts[5] = paymentBaseValue - partialSum;
+
+            return paymentTemplate.map((item, index) => ({
+              projectId: project.id,
+              phaseNumber: item.phaseNumber,
+              milestoneDescription: item.milestoneDescription,
+              percent: item.percent,
+              amount: paymentAmounts[index],
+              expectedDate: addDays(startDate, item.dayOffset),
+              dayOffset: item.dayOffset,
+              status: "not_collected" as const,
+              actualPaidDate: null,
+              actualPaidAmount: null,
+              notes: null,
+            }));
+          })();
+
+      await tx.paymentSchedule.createMany({ data: paymentRows });
 
       const memberRows = parsed.data.members.filter(
         (member) => member.userId !== projectManagerId && member.userId !== parsed.data.mainEngineerId,
@@ -535,13 +598,16 @@ export async function POST(request: Request) {
     });
 
     const elapsed = Date.now() - startedAt;
-    const createdTaskCount = await prisma.task.count({ where: { projectId: createdProject.id } });
-    console.log(`Created project ${createdProject.code} with ${createdTaskCount} tasks, 6 payments in ${elapsed}ms`);
+    const [createdTaskCount, createdPaymentCount] = await Promise.all([
+      prisma.task.count({ where: { projectId: createdProject.id } }),
+      prisma.paymentSchedule.count({ where: { projectId: createdProject.id } }),
+    ]);
+    console.log(`Created project ${createdProject.code} with ${createdTaskCount} tasks, ${createdPaymentCount} payments in ${elapsed}ms`);
 
     return NextResponse.json({
       id: createdProject.id,
       code: createdProject.code,
-      message: `Đã tạo dự án ${createdProject.code}. Tự động sinh ${createdTaskCount} task + 6 đợt thanh toán.`,
+      message: `Đã tạo dự án ${createdProject.code}. Tự động sinh ${createdTaskCount} task + ${createdPaymentCount} đợt thanh toán.`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Không thể tạo dự án";
