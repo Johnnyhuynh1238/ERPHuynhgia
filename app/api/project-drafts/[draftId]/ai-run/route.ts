@@ -285,6 +285,75 @@ function isMeaningful(value: unknown) {
   return true;
 }
 
+function numberValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const parsed = Number(value.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function stringValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function normalizePaymentSchedules(value: unknown) {
+  if (!Array.isArray(value)) return null;
+
+  const rows = value
+    .map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const row = item as Record<string, unknown>;
+      const installmentNo = numberValue(row.installmentNo ?? row.stage ?? row.phaseNumber ?? row.no ?? row.dot) ?? index + 1;
+      const description = stringValue(row.description, row.title, row.milestoneDescription, row.content, row.name);
+      const rawPercent = numberValue(row.percent ?? row.percentage ?? row.rate);
+      const percent = rawPercent === null ? undefined : rawPercent > 0 && rawPercent <= 1 ? Math.round(rawPercent * 10000) / 100 : rawPercent;
+      const amount = numberValue(row.amount ?? row.money ?? row.value ?? row.soTien);
+      const dueDate = stringValue(row.dueDate, row.expectedDate, row.date);
+      const paymentNote = stringValue(row.paymentNote, row.note, row.ghiChu);
+
+      if (!description || (!amount && percent === undefined)) return null;
+
+      return {
+        type: row.type === "addendum" ? "addendum" : "contract",
+        installmentNo,
+        description,
+        ...(percent !== undefined ? { percent } : {}),
+        ...(amount ? { amount } : {}),
+        ...(dueDate ? { dueDate } : {}),
+        ...(paymentNote ? { paymentNote } : {}),
+      };
+    })
+    .filter((row): row is { type: "contract" | "addendum"; installmentNo: number; description: string; percent?: number; amount?: number; dueDate?: string; paymentNote?: string } => row !== null);
+
+  return rows.length > 0 ? rows : null;
+}
+
+function normalizeProposal(proposal: Proposal, mode: ProjectChangeDraftMode, formData: DraftFormData): Proposal {
+  const fieldPath = proposal.fieldPath.replace(/^formData\./, "").replace(/^payload\./, "");
+  if (fieldPath !== "paymentSchedules") return { ...proposal, fieldPath };
+
+  const paymentSchedules = normalizePaymentSchedules(proposal.suggestedValue);
+  if (!paymentSchedules) return { ...proposal, fieldPath };
+
+  const currentPayments = pathValue(formData, "paymentSchedules");
+  const shouldFillEmpty = mode === ProjectChangeDraftMode.create_project && !isMeaningful(currentPayments);
+
+  return {
+    ...proposal,
+    section: ProjectAiProposalSection.payment,
+    fieldPath,
+    suggestedValue: paymentSchedules,
+    action: shouldFillEmpty ? ProjectAiProposalAction.fill_empty : proposal.action,
+  };
+}
+
+function normalizeProposals(proposals: Proposal[], mode: ProjectChangeDraftMode, formData: DraftFormData) {
+  return proposals.map((proposal) => normalizeProposal(proposal, mode, formData));
+}
+
 function fieldValue(formData: DraftFormData, projectData: DraftFormData, fieldPath: string) {
   const formValue = pathValue(formData, fieldPath);
   if (isMeaningful(formValue)) return formValue;
@@ -595,7 +664,8 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     if (!toolUse || toolUse.type !== "tool_use") throw new Error("Claude không trả về tool output hợp lệ");
 
     const parsed = analysisSchema.parse(toolUse.input);
-    const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: parsed.proposals, conflicts: parsed.conflicts });
+    const normalizedProposals = normalizeProposals(parsed.proposals, draft.mode, formData);
+    const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: normalizedProposals, conflicts: parsed.conflicts });
     const autoApplied = autoApplyProposals(formData, enforced.proposals);
     console.info("[project-ai] run result", {
       draftId: draft.id,
