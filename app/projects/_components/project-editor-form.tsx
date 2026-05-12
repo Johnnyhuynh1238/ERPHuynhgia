@@ -454,12 +454,17 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return (
       <span className="ml-2 inline-flex items-center gap-1 align-middle">
         {markers.map((marker, index) => (
-          <span
-            key={`${fieldName}-${marker.kind}-${index}`}
-            title={marker.title}
-            className={marker.kind === "warning" ? "inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-[11px] leading-none text-amber-700" : "inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-emerald-300 bg-emerald-100 text-[11px] leading-none text-emerald-700"}
-          >
-            {marker.kind === "warning" ? "!" : "AI"}
+          <span key={`${fieldName}-${marker.kind}-${index}`} className="group relative inline-flex">
+            <span
+              tabIndex={0}
+              aria-label={marker.title}
+              className={marker.kind === "warning" ? "inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-[11px] leading-none text-amber-700" : "inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-emerald-300 bg-emerald-100 text-[11px] leading-none text-emerald-700"}
+            >
+              {marker.kind === "warning" ? "!" : "AI"}
+            </span>
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 whitespace-pre-line rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-xs font-normal leading-relaxed text-white shadow-lg group-hover:block group-focus-within:block">
+              {marker.title}
+            </span>
           </span>
         ))}
       </span>
