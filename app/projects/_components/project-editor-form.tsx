@@ -908,53 +908,6 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         ) : null}
 
-        {aiConflicts.length > 0 ? (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <h3 className="mb-2 text-sm font-semibold text-amber-800">Cảnh báo AI</h3>
-            <div className="space-y-2 text-xs text-amber-900">
-              {aiConflicts.map((conflict) => (
-                <div key={conflict.id} className="rounded border border-amber-200 bg-white p-2">
-                  <div className="font-medium">{conflict.fieldPath} · {conflict.conflictType}</div>
-                  <div>Hiện tại: {formatAiValue(conflict.currentValue)}</div>
-                  <div>Hồ sơ: {formatAiValue(conflict.suggestedValue)}</div>
-                  {conflict.reason ? <div>Lý do: {conflict.reason}</div> : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {aiProposals.length > 0 ? (
-          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-emerald-800">Đề xuất AI</h3>
-              <Button type="button" variant="outline" onClick={applySelectedProposals} disabled={applyingProposals || selectedProposalIds.length === 0}>
-                {applyingProposals ? "Đang apply..." : `Apply ${selectedProposalIds.length} đề xuất`}
-              </Button>
-            </div>
-            <div className="space-y-2 text-xs text-emerald-950">
-              {aiProposals.map((proposal) => {
-                const selectable = proposal.action !== "warning_only";
-                return (
-                  <label key={proposal.id} className="flex gap-2 rounded border border-emerald-200 bg-white p-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedProposalIds.includes(proposal.id)}
-                      disabled={!selectable}
-                      onChange={() => toggleProposal(proposal.id)}
-                    />
-                    <span className="space-y-1">
-                      <span className="block font-medium">{proposal.fieldPath} · {proposal.action}</span>
-                      <span className="block">Giá trị: {formatAiValue(proposal.suggestedValue)}</span>
-                      {proposal.reason ? <span className="block text-emerald-700">{proposal.reason}</span> : null}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
         {supplementalPaymentCount > 0 || supplementalDrawingCount > 0 ? (
           <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
             <div className="flex flex-wrap items-center justify-between gap-2">
