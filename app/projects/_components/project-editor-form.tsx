@@ -419,7 +419,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     const normalizedField = normalizeAiFieldPath(fieldName);
     const entries: AiFieldMarker[] = [];
 
-    for (const [path, markers] of aiFieldMarkers.entries()) {
+    aiFieldMarkers.forEach((markers, path) => {
       if (
         path === normalizedField
         || path.endsWith(`.${normalizedField}`)
@@ -428,7 +428,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       ) {
         entries.push(...markers);
       }
-    }
+    });
 
     const dedup = new Set<string>();
     return entries.filter((entry) => {
