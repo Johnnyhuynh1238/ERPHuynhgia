@@ -174,6 +174,19 @@ function formatAiValue(value: unknown) {
   return JSON.stringify(value);
 }
 
+function normalizeAiFieldPath(fieldPath: string) {
+  return fieldPath
+    .replace(/^formData\./, "")
+    .replace(/^payload\./, "")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .trim();
+}
+
+type AiFieldMarker = {
+  kind: "proposal" | "warning";
+  title: string;
+};
+
 function mergeDraftFormData(current: ProjectEditorFormValues, formData: unknown): ProjectEditorFormValues {
   if (!formData || typeof formData !== "object" || Array.isArray(formData)) return current;
   const data = formData as Partial<ProjectEditorFormValues>;
@@ -358,6 +371,100 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }, [calculatedEndDate, plannedDeadlineValue]);
 
   const isSubmitDisabled = submitting || hasDuplicateMembers || loadingOptions || loadingTemplateSummary;
+
+  const aiFieldMarkers = useMemo(() => {
+    const markerMap = new Map<string, AiFieldMarker[]>();
+
+    const appendMarker = (rawPath: string, marker: AiFieldMarker) => {
+      const path = normalizeAiFieldPath(rawPath);
+      if (!path) return;
+      const list = markerMap.get(path) || [];
+      list.push(marker);
+      markerMap.set(path, list);
+    };
+
+    aiProposals.forEach((proposal) => {
+      appendMarker(proposal.fieldPath, {
+        kind: proposal.action === "warning_only" ? "warning" : "proposal",
+        title: [
+          `AI ${proposal.action === "warning_only" ? "cảnh báo" : "đề xuất"}`,
+          `Field: ${proposal.fieldPath}`,
+          `Giá trị: ${formatAiValue(proposal.suggestedValue)}`,
+          proposal.reason ? `Mô tả: ${proposal.reason}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+    });
+
+    aiConflicts.forEach((conflict) => {
+      appendMarker(conflict.fieldPath, {
+        kind: "warning",
+        title: [
+          "AI cảnh báo xung đột",
+          `Field: ${conflict.fieldPath}`,
+          `Hiện tại: ${formatAiValue(conflict.currentValue)}`,
+          `Hồ sơ: ${formatAiValue(conflict.suggestedValue)}`,
+          conflict.reason ? `Mô tả: ${conflict.reason}` : `Loại xung đột: ${conflict.conflictType}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+    });
+
+    return markerMap;
+  }, [aiConflicts, aiProposals]);
+
+  const getFieldMarkers = useCallback((fieldName: string) => {
+    const normalizedField = normalizeAiFieldPath(fieldName);
+    const entries: AiFieldMarker[] = [];
+
+    for (const [path, markers] of aiFieldMarkers.entries()) {
+      if (
+        path === normalizedField
+        || path.endsWith(`.${normalizedField}`)
+        || normalizedField.endsWith(`.${path}`)
+        || path.startsWith(`${normalizedField}.`)
+      ) {
+        entries.push(...markers);
+      }
+    }
+
+    const dedup = new Set<string>();
+    return entries.filter((entry) => {
+      const key = `${entry.kind}::${entry.title}`;
+      if (dedup.has(key)) return false;
+      dedup.add(key);
+      return true;
+    });
+  }, [aiFieldMarkers]);
+
+  const hasFieldWarning = useCallback((fieldName: string) => getFieldMarkers(fieldName).some((marker) => marker.kind === "warning"), [getFieldMarkers]);
+
+  const getFieldInputClassName = useCallback((fieldName: string) => {
+    if (hasFieldWarning(fieldName)) return "w-full rounded-md border border-amber-400 px-3 py-2 text-sm";
+    if (getFieldMarkers(fieldName).length > 0) return "w-full rounded-md border border-emerald-400 px-3 py-2 text-sm";
+    return "w-full rounded-md border px-3 py-2 text-sm";
+  }, [getFieldMarkers, hasFieldWarning]);
+
+  function renderFieldMarker(fieldName: string) {
+    const markers = getFieldMarkers(fieldName);
+    if (markers.length === 0) return null;
+
+    return (
+      <span className="ml-2 inline-flex items-center gap-1 align-middle">
+        {markers.map((marker, index) => (
+          <span
+            key={`${fieldName}-${marker.kind}-${index}`}
+            title={marker.title}
+            className={marker.kind === "warning" ? "inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-[11px] leading-none text-amber-700" : "inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-emerald-300 bg-emerald-100 text-[11px] leading-none text-emerald-700"}
+          >
+            {marker.kind === "warning" ? "!" : "AI"}
+          </span>
+        ))}
+      </span>
+    );
+  }
 
   function validateFinancial(values: ProjectEditorFormValues) {
     if (isConstructionManager && isCreate) return true;
@@ -880,23 +987,23 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         <h2 className="mb-4 text-lg font-semibold">Section A - Thông tin chủ nhà</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Tên chủ nhà *</label>
-            <input className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("customerName")} />
+            <label className="mb-1 block text-sm font-medium">Tên chủ nhà *{renderFieldMarker("customerName")}</label>
+            <input className={getFieldInputClassName("customerName")} {...form.register("customerName")} />
             {form.formState.errors.customerName ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.customerName.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">SĐT chủ nhà *</label>
-            <input className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("customerPhone")} />
+            <label className="mb-1 block text-sm font-medium">SĐT chủ nhà *{renderFieldMarker("customerPhone")}</label>
+            <input className={getFieldInputClassName("customerPhone")} {...form.register("customerPhone")} />
             {form.formState.errors.customerPhone ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.customerPhone.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">CMND/CCCD (tuỳ chọn)</label>
-            <input className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("customerIdNumber")} />
+            <label className="mb-1 block text-sm font-medium">CMND/CCCD (tuỳ chọn){renderFieldMarker("customerIdNumber")}</label>
+            <input className={getFieldInputClassName("customerIdNumber")} {...form.register("customerIdNumber")} />
           </div>
         </div>
         <div className="mt-4">
-          <label className="mb-1 block text-sm font-medium">Địa chỉ công trình *</label>
-          <textarea rows={2} className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("address")} />
+          <label className="mb-1 block text-sm font-medium">Địa chỉ công trình *{renderFieldMarker("address")}</label>
+          <textarea rows={2} className={getFieldInputClassName("address")} {...form.register("address")} />
           {form.formState.errors.address ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.address.message}</p> : null}
         </div>
       </div>
@@ -905,13 +1012,13 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         <h2 className="mb-4 text-lg font-semibold">Section B - Thông tin dự án</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Tên dự án *</label>
-            <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Nhà anh/chị [Tên] - [Quận]" {...form.register("name")} />
+            <label className="mb-1 block text-sm font-medium">Tên dự án *{renderFieldMarker("name")}</label>
+            <input className={getFieldInputClassName("name")} placeholder="Nhà anh/chị [Tên] - [Quận]" {...form.register("name")} />
             {form.formState.errors.name ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.name.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Template *</label>
-            <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("templateCategory")} disabled={!isCreate}>
+            <label className="mb-1 block text-sm font-medium">Template *{renderFieldMarker("templateCategory")}</label>
+            <select className={getFieldInputClassName("templateCategory")} {...form.register("templateCategory")} disabled={!isCreate}>
               <option value="nha_pho_1t1l">Nhà phố 1T1L</option>
             </select>
           </div>
@@ -919,13 +1026,13 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           {!isConstructionManager || !isCreate ? (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *</label>
-                <input type="number" min={1} className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("areaM2", { valueAsNumber: true })} />
+                <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *{renderFieldMarker("areaM2")}</label>
+                <input type="number" min={1} className={getFieldInputClassName("areaM2")} {...form.register("areaM2", { valueAsNumber: true })} />
                 {form.formState.errors.areaM2 ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p> : null}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *</label>
-                <input type="number" min={1_000_000} className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("unitPrice", { valueAsNumber: true })} />
+                <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *{renderFieldMarker("unitPrice")}</label>
+                <input type="number" min={1_000_000} className={getFieldInputClassName("unitPrice")} {...form.register("unitPrice", { valueAsNumber: true })} />
                 {form.formState.errors.unitPrice ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p> : null}
               </div>
               <div>
@@ -936,29 +1043,29 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           ) : null}
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Ngày khởi công *</label>
-            <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("startDate")} />
+            <label className="mb-1 block text-sm font-medium">Ngày khởi công *{renderFieldMarker("startDate")}</label>
+            <input type="date" className={getFieldInputClassName("startDate")} {...form.register("startDate")} />
             {form.formState.errors.startDate ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.startDate.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Ngày bàn giao dự kiến *</label>
-            <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("expectedEndDate")} />
+            <label className="mb-1 block text-sm font-medium">Ngày bàn giao dự kiến *{renderFieldMarker("expectedEndDate")}</label>
+            <input type="date" className={getFieldInputClassName("expectedEndDate")} {...form.register("expectedEndDate")} />
             {form.formState.errors.expectedEndDate ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.expectedEndDate.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Deadline phase timeline (tuỳ chọn)</label>
-            <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("plannedDeadline")} />
+            <label className="mb-1 block text-sm font-medium">Deadline phase timeline (tuỳ chọn){renderFieldMarker("plannedDeadline")}</label>
+            <input type="date" className={getFieldInputClassName("plannedDeadline")} {...form.register("plannedDeadline")} />
           </div>
 
           {!isCreate ? (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium">Bàn giao thực tế</label>
-                <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("actualEndDate")} />
+                <label className="mb-1 block text-sm font-medium">Bàn giao thực tế{renderFieldMarker("actualEndDate")}</label>
+                <input type="date" className={getFieldInputClassName("actualEndDate")} {...form.register("actualEndDate")} />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Trạng thái</label>
-                <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("status")}>
+                <label className="mb-1 block text-sm font-medium">Trạng thái{renderFieldMarker("status")}</label>
+                <select className={getFieldInputClassName("status")} {...form.register("status")}>
                   <option value="planning">planning</option>
                   <option value="in_progress">in_progress</option>
                   <option value="completed">completed</option>
@@ -966,8 +1073,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
                 </select>
               </div>
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium">Ghi chú</label>
-                <textarea rows={2} className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("notes")} />
+                <label className="mb-1 block text-sm font-medium">Ghi chú{renderFieldMarker("notes")}</label>
+                <textarea rows={2} className={getFieldInputClassName("notes")} {...form.register("notes")} />
               </div>
             </>
           ) : null}
@@ -1005,11 +1112,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         <h2 className="mb-4 text-lg font-semibold">Section C - Phân công</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">GĐ Thi Công *</label>
+            <label className="mb-1 block text-sm font-medium">GĐ Thi Công *{renderFieldMarker("projectManagerId")}</label>
             {isConstructionManager ? (
               <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{currentUserName}</div>
             ) : (
-              <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("projectManagerId")}>
+              <select className={getFieldInputClassName("projectManagerId")} {...form.register("projectManagerId")}>
                 <option value="">Chọn GĐ Thi Công</option>
                 {admins.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
               </select>
@@ -1017,8 +1124,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             {form.formState.errors.projectManagerId ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.projectManagerId.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">KS chính *</label>
-            <select className="w-full rounded-md border px-3 py-2 text-sm" {...form.register("mainEngineerId")}>
+            <label className="mb-1 block text-sm font-medium">KS chính *{renderFieldMarker("mainEngineerId")}</label>
+            <select className={getFieldInputClassName("mainEngineerId")} {...form.register("mainEngineerId")}>
               <option value="">Chọn KS chính</option>
               {engineers.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
             </select>
@@ -1029,7 +1136,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         {isCreate ? (
           <div className="mt-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-medium">Thành viên dự án (multi select)</h3>
+              <h3 className="font-medium">Thành viên dự án (multi select){renderFieldMarker("members")}</h3>
               <Button type="button" variant="outline" onClick={() => membersFieldArray.append({ userId: "", roleInProject: "engineer" })}>+ Thêm thành viên</Button>
             </div>
             {membersFieldArray.fields.length === 0 ? (
@@ -1037,11 +1144,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             ) : (
               membersFieldArray.fields.map((field, idx) => (
                 <div key={field.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_220px_auto]">
-                  <select className="rounded-md border px-3 py-2 text-sm" {...form.register(`members.${idx}.userId`)}>
+                  <select className={hasFieldWarning(`members.${idx}.userId`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.userId`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.userId`)}>
                     <option value="">Chọn user</option>
                     {members.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
                   </select>
-                  <select className="rounded-md border px-3 py-2 text-sm" {...form.register(`members.${idx}.roleInProject`)}>
+                  <select className={hasFieldWarning(`members.${idx}.roleInProject`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.roleInProject`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.roleInProject`)}>
                     <option value="engineer">engineer</option>
                     <option value="foreman">foreman</option>
                     <option value="accountant">accountant</option>
