@@ -152,7 +152,7 @@ export function TaskDetailClient({
   const initialLegacySub = parseLegacySub(subTabParam);
   const initialMain = parseMainTab(tabParam) === "technical" && tabParam === "reports" ? detectMainFromReportType(initialLegacySub) : parseMainTab(tabParam);
 
-  const [task] = useState<TaskDetail>(initialTask);
+  const [task, setTask] = useState<TaskDetail>(initialTask);
   const [logs] = useState<TaskLog[]>(initialLogs);
   const [activeTab, setActiveTab] = useState<MainTab>(initialMain);
   const [technicalSubTab, setTechnicalSubTab] = useState<TechnicalSubTab>(tabParam === "history" ? "history" : "qc");
@@ -252,6 +252,23 @@ export function TaskDetailClient({
     const res = await fetch(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, payload: body }) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(json.message || "Cập nhật thất bại");
+
+    if (section === "assignment") {
+      const payload = body as {
+        assignedEngineerId?: string | null;
+        assignedForemanId?: string | null;
+        team?: string | null;
+        inspectorName?: string;
+      };
+      setTask((prev) => ({
+        ...prev,
+        assignedEngineer: payload.assignedEngineerId ? engineers.find((u) => u.id === payload.assignedEngineerId) || prev.assignedEngineer : null,
+        assignedForeman: payload.assignedForemanId ? foremen.find((u) => u.id === payload.assignedForemanId) || prev.assignedForeman : null,
+        team: payload.team ?? prev.team,
+        inspectorName: payload.inspectorName || prev.inspectorName,
+      }));
+    }
+
     toast.success(json.message || "Đã cập nhật");
   }
 
