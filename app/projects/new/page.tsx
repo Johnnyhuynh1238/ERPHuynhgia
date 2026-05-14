@@ -12,7 +12,7 @@ export default async function ProjectsNewPage({ searchParams }: { searchParams?:
     redirect("/login");
   }
 
-  if (user.role !== "admin" && user.role !== "construction_manager") {
+  if (user.role !== "admin") {
     redirect("/?denied=1");
   }
 

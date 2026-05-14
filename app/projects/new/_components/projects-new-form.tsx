@@ -9,7 +9,7 @@ export function ProjectsNewForm({
   initialDraftId,
 }: {
   currentUserId: string;
-  currentUserRole: "admin" | "construction_manager";
+  currentUserRole: "admin";
   currentUserName: string;
   initialDraftId?: string;
 }) {

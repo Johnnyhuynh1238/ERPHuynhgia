@@ -24,16 +24,21 @@ const formSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
   customerIdNumber: z.string().trim().optional().nullable(),
+  customerPermanentAddress: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
   areaM2: z.number().min(1, "Diện tích phải > 0").optional(),
   unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
+  contractSignDate: z.string().optional().nullable(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   plannedDeadline: z.string().optional().nullable(),
-  templateCategory: z.literal("nha_pho_1t1l"),
+  templateCategory: z.enum(["nha_pho_1t1l", "blank"]),
   projectManagerId: z.string().uuid("Vui lòng chọn GĐ Thi Công").optional(),
   mainEngineerId: z.string().uuid("Vui lòng chọn KS chính"),
+  warrantyTotalMonths: z.number().int().min(0).optional(),
+  warrantyStructureYears: z.number().int().min(0).optional(),
+  warrantyLeakYears: z.number().int().min(0).optional(),
   status: z.enum(["planning", "in_progress", "completed", "paused"]),
   actualEndDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -110,7 +115,7 @@ type ProjectEditorFormProps = {
   projectId?: string;
   initialDraftId?: string;
   currentUserId: string;
-  currentUserRole: "admin" | "construction_manager";
+  currentUserRole: "admin";
   currentUserName: string;
   initialValues?: Partial<ProjectEditorFormValues>;
 };
@@ -216,19 +221,24 @@ function buildDefaultValues(currentUserId: string, initialValues?: Partial<Proje
     customerName: initialValues?.customerName || "",
     customerPhone: initialValues?.customerPhone || "",
     customerIdNumber: initialValues?.customerIdNumber || "",
+    customerPermanentAddress: initialValues?.customerPermanentAddress || "",
     address: initialValues?.address || "",
     name: initialValues?.name || "",
     areaM2: initialValues?.areaM2 === undefined || initialValues.areaM2 === null ? undefined : Number(initialValues.areaM2),
     unitPrice: initialValues?.unitPrice === undefined || initialValues.unitPrice === null ? undefined : Number(initialValues.unitPrice),
+    contractSignDate: dateInput(initialValues?.contractSignDate) || "",
     startDate: dateInput(initialValues?.startDate) || todayIso(),
     expectedEndDate: dateInput(initialValues?.expectedEndDate) || todayPlusDaysIso(120),
     plannedDeadline: dateInput(initialValues?.plannedDeadline) || "",
-    templateCategory: "nha_pho_1t1l",
-    projectManagerId: initialValues?.projectManagerId || currentUserId,
+    templateCategory: initialValues?.templateCategory || "nha_pho_1t1l",
+    projectManagerId: initialValues?.projectManagerId || "",
     mainEngineerId: initialValues?.mainEngineerId || "",
     status: initialValues?.status || "planning",
     actualEndDate: dateInput(initialValues?.actualEndDate),
     notes: initialValues?.notes || "",
+    warrantyTotalMonths: initialValues?.warrantyTotalMonths ?? 12,
+    warrantyStructureYears: initialValues?.warrantyStructureYears ?? 5,
+    warrantyLeakYears: initialValues?.warrantyLeakYears ?? 2,
     members: initialValues?.members || [],
     paymentSchedules: initialValues?.paymentSchedules || [],
     drawings: initialValues?.drawings || [],
@@ -273,7 +283,6 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const isCreate = mode === "create";
-  const isConstructionManager = currentUserRole === "construction_manager";
 
   const form = useForm<ProjectEditorFormValues>({
     resolver: zodResolver(formSchema),
@@ -312,15 +321,13 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       setEngineers(data.engineers || []);
       setMembers(data.members || []);
 
-      if (isConstructionManager) {
-        form.setValue("projectManagerId", currentUserId);
-      } else if (!form.getValues("projectManagerId") && data.admins?.[0]) {
+      if (!form.getValues("projectManagerId") && data.admins?.[0]) {
         form.setValue("projectManagerId", data.admins[0].id);
       }
     }
 
     loadOptions();
-  }, [currentUserId, form, isConstructionManager]);
+  }, [currentUserId, form]);
 
   const areaM2 = form.watch("areaM2");
   const unitPrice = form.watch("unitPrice");
@@ -337,6 +344,12 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     let mounted = true;
 
     async function loadTemplateSummary() {
+      if (templateCategoryValue === "blank") {
+        setTemplatePhases([]);
+        setTemplateTotalDuration(0);
+        setLoadingTemplateSummary(false);
+        return;
+      }
       setLoadingTemplateSummary(true);
       const params = new URLSearchParams({ templateCategory: templateCategoryValue });
       const res = await fetch(`/api/projects/template-phase-summary?${params.toString()}`, { cache: "no-store" });
@@ -500,7 +513,6 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }
 
   function validateFinancial(values: ProjectEditorFormValues) {
-    if (isConstructionManager && isCreate) return true;
     if (!Number.isFinite(values.areaM2) || Number(values.areaM2) < 1) {
       toast.error("Diện tích quy đổi là bắt buộc");
       return false;
@@ -748,42 +760,28 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }
 
   async function submitCreate(values: ProjectEditorFormValues) {
-    const payload = isConstructionManager
-      ? {
-          customerName: values.customerName,
-          customerPhone: values.customerPhone,
-          customerIdNumber: values.customerIdNumber || null,
-          address: values.address,
-          name: values.name,
-          areaM2: undefined,
-          unitPrice: undefined,
-          contractValue: null,
-          startDate: values.startDate,
-          expectedEndDate: values.expectedEndDate,
-          plannedDeadline: values.plannedDeadline || null,
-          templateCategory: values.templateCategory,
-          projectManagerId: currentUserId,
-          mainEngineerId: values.mainEngineerId,
-          members: values.members,
-          paymentSchedules: values.paymentSchedules || [],
-        }
-      : {
-          customerName: values.customerName,
-          customerPhone: values.customerPhone,
-          customerIdNumber: values.customerIdNumber || null,
-          address: values.address,
-          name: values.name,
-          areaM2: values.areaM2,
-          unitPrice: values.unitPrice,
-          startDate: values.startDate,
-          expectedEndDate: values.expectedEndDate,
-          plannedDeadline: values.plannedDeadline || null,
-          templateCategory: values.templateCategory,
-          projectManagerId: values.projectManagerId,
-          mainEngineerId: values.mainEngineerId,
-          members: values.members,
-          paymentSchedules: values.paymentSchedules || [],
-        };
+    const payload = {
+      customerName: values.customerName,
+      customerPhone: values.customerPhone,
+      customerIdNumber: values.customerIdNumber || null,
+      customerPermanentAddress: values.customerPermanentAddress || null,
+      address: values.address,
+      name: values.name,
+      areaM2: values.areaM2,
+      unitPrice: values.unitPrice,
+      contractSignDate: values.contractSignDate || null,
+      startDate: values.startDate,
+      expectedEndDate: values.expectedEndDate,
+      plannedDeadline: values.plannedDeadline || null,
+      templateCategory: values.templateCategory,
+      projectManagerId: values.projectManagerId,
+      mainEngineerId: values.mainEngineerId,
+      warrantyTotalMonths: values.warrantyTotalMonths,
+      warrantyStructureYears: values.warrantyStructureYears,
+      warrantyLeakYears: values.warrantyLeakYears,
+      members: values.members,
+      paymentSchedules: values.paymentSchedules || [],
+    };
 
     const res = await fetch("/api/projects", {
       method: "POST",
@@ -990,6 +988,10 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         </div>
         <div className="mt-4">
+          <label className="mb-1 block text-sm font-medium">Địa chỉ thường trú (tuỳ chọn){renderFieldMarker("customerPermanentAddress")}</label>
+          <textarea rows={2} className={getFieldInputClassName("customerPermanentAddress")} {...form.register("customerPermanentAddress")} />
+        </div>
+        <div className="mt-4">
           <label className="mb-1 block text-sm font-medium">Địa chỉ công trình *{renderFieldMarker("address")}</label>
           <textarea rows={2} className={getFieldInputClassName("address")} {...form.register("address")} />
           {form.formState.errors.address ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.address.message}</p> : null}
@@ -1005,30 +1007,31 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             {form.formState.errors.name ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.name.message}</p> : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Template *{renderFieldMarker("templateCategory")}</label>
+            <label className="mb-1 block text-sm font-medium">Loại công trình *{renderFieldMarker("templateCategory")}</label>
             <select className={getFieldInputClassName("templateCategory")} {...form.register("templateCategory")} disabled={!isCreate}>
               <option value="nha_pho_1t1l">Nhà phố 1T1L</option>
+              <option value="blank">Tạo trống (tự thêm phase/task sau)</option>
             </select>
           </div>
 
-          {!isConstructionManager || !isCreate ? (
-            <>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *{renderFieldMarker("areaM2")}</label>
-                <input type="number" min={1} className={getFieldInputClassName("areaM2")} {...form.register("areaM2", { valueAsNumber: true })} />
-                {form.formState.errors.areaM2 ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p> : null}
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *{renderFieldMarker("unitPrice")}</label>
-                <input type="number" min={1_000_000} className={getFieldInputClassName("unitPrice")} {...form.register("unitPrice", { valueAsNumber: true })} />
-                {form.formState.errors.unitPrice ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p> : null}
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Giá trị HĐ (readonly)</label>
-                <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{formatMoney(contractValue)}</div>
-              </div>
-            </>
-          ) : null}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *{renderFieldMarker("areaM2")}</label>
+            <input type="number" min={1} className={getFieldInputClassName("areaM2")} {...form.register("areaM2", { valueAsNumber: true })} />
+            {form.formState.errors.areaM2 ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *{renderFieldMarker("unitPrice")}</label>
+            <input type="number" min={1_000_000} className={getFieldInputClassName("unitPrice")} {...form.register("unitPrice", { valueAsNumber: true })} />
+            {form.formState.errors.unitPrice ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Giá trị HĐ (readonly)</label>
+            <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{formatMoney(contractValue)}</div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Ngày ký HĐ (tuỳ chọn){renderFieldMarker("contractSignDate")}</label>
+            <input type="date" className={getFieldInputClassName("contractSignDate")} {...form.register("contractSignDate")} />
+          </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium">Ngày khởi công *{renderFieldMarker("startDate")}</label>
@@ -1068,32 +1071,38 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           ) : null}
         </div>
 
-        <div className="mt-5 rounded-lg border bg-slate-50 p-4">
-          <h3 className="mb-3 text-sm font-semibold">Phase từ template</h3>
-          {loadingTemplateSummary ? (
-            <div className="text-sm text-slate-500">Đang tải phase template...</div>
-          ) : templatePhases.length === 0 ? (
-            <div className="text-sm text-slate-500">Không có dữ liệu phase template.</div>
-          ) : (
-            <div className="space-y-2">
-              {templatePhases.map((phase) => (
-                <div key={phase.code} className="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
-                  <span>{phase.code} {phase.name}</span>
-                  <span className="font-medium">{phase.duration} ngày</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-3 space-y-1 text-sm">
-            <div className="text-slate-700">Tổng: <span className="font-semibold">{templateTotalDuration} ngày</span></div>
-            <div className="text-slate-700">KT dự kiến: <span className="font-semibold">{formatDateVi(calculatedEndDate)}</span></div>
+        {templateCategoryValue === "blank" ? (
+          <div className="mt-5 rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-slate-600">
+            Chế độ tạo trống: dự án sẽ không có phase/task. Anh sẽ thêm thủ công sau khi tạo dự án.
           </div>
-          {exceedDays > 0 ? (
-            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              Vượt deadline {exceedDays} ngày. Hãy giảm duration phase hoặc dời deadline.
+        ) : (
+          <div className="mt-5 rounded-lg border bg-slate-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold">Phase từ template</h3>
+            {loadingTemplateSummary ? (
+              <div className="text-sm text-slate-500">Đang tải phase template...</div>
+            ) : templatePhases.length === 0 ? (
+              <div className="text-sm text-slate-500">Không có dữ liệu phase template.</div>
+            ) : (
+              <div className="space-y-2">
+                {templatePhases.map((phase) => (
+                  <div key={phase.code} className="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
+                    <span>{phase.code} {phase.name}</span>
+                    <span className="font-medium">{phase.duration} ngày</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 space-y-1 text-sm">
+              <div className="text-slate-700">Tổng: <span className="font-semibold">{templateTotalDuration} ngày</span></div>
+              <div className="text-slate-700">KT dự kiến: <span className="font-semibold">{formatDateVi(calculatedEndDate)}</span></div>
             </div>
-          ) : null}
-        </div>
+            {exceedDays > 0 ? (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                Vượt deadline {exceedDays} ngày. Hãy giảm duration phase hoặc dời deadline.
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {isCreate ? (
@@ -1160,14 +1169,10 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">GĐ Thi Công *{renderFieldMarker("projectManagerId")}</label>
-            {isConstructionManager ? (
-              <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{currentUserName}</div>
-            ) : (
-              <select className={getFieldInputClassName("projectManagerId")} {...form.register("projectManagerId")}>
-                <option value="">Chọn GĐ Thi Công</option>
-                {admins.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
-              </select>
-            )}
+            <select className={getFieldInputClassName("projectManagerId")} {...form.register("projectManagerId")}>
+              <option value="">Chọn GĐ Thi Công</option>
+              {admins.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
+            </select>
             {form.formState.errors.projectManagerId ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.projectManagerId.message}</p> : null}
           </div>
           <div>
@@ -1211,6 +1216,26 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           <div className="mt-5 rounded-md border border-dashed p-3 text-sm text-slate-500">Thành viên phụ cập nhật ở tab Thành viên; màn này chỉ cập nhật GĐ Thi Công và KS chính.</div>
         )}
       </div>
+
+      {isCreate ? (
+        <div className="rounded-xl border bg-white p-5 text-slate-900">
+          <h2 className="mb-4 text-lg font-semibold">Section E - Điều khoản HĐ</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Bảo hành tổng (tháng){renderFieldMarker("warrantyTotalMonths")}</label>
+              <input type="number" min={0} className={getFieldInputClassName("warrantyTotalMonths")} {...form.register("warrantyTotalMonths", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Bảo hành kết cấu (năm){renderFieldMarker("warrantyStructureYears")}</label>
+              <input type="number" min={0} className={getFieldInputClassName("warrantyStructureYears")} {...form.register("warrantyStructureYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Bảo hành chống thấm (năm){renderFieldMarker("warrantyLeakYears")}</label>
+              <input type="number" min={0} className={getFieldInputClassName("warrantyLeakYears")} {...form.register("warrantyLeakYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Đang lưu nháp..." : "Lưu nháp"}</Button>

@@ -51,16 +51,21 @@ const createProjectSchema = z.object({
   customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
   customerPhone: z.string().trim().regex(phoneVNRegex, "SĐT chủ nhà không hợp lệ"),
   customerIdNumber: z.string().trim().optional().nullable(),
+  customerPermanentAddress: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.number().min(1, "Diện tích phải > 0").optional(),
-  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
+  areaM2: z.number().min(1, "Diện tích phải > 0"),
+  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
+  contractSignDate: optionalDateString,
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   plannedDeadline: z.string().optional().nullable(),
-  templateCategory: z.literal("nha_pho_1t1l"),
-  projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ").optional(),
+  templateCategory: z.enum(["nha_pho_1t1l", "blank"]).default("nha_pho_1t1l"),
+  projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ"),
   mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
+  warrantyTotalMonths: z.coerce.number().int().min(0).optional(),
+  warrantyStructureYears: z.coerce.number().int().min(0).optional(),
+  warrantyLeakYears: z.coerce.number().int().min(0).optional(),
   members: z
     .array(
       z.object({
@@ -274,7 +279,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let actorUser: Awaited<ReturnType<typeof requireRole>>;
   try {
-    actorUser = await requireRole(["admin", "construction_manager"]);
+    actorUser = await requireRole(["admin"]);
   } catch (error) {
     const mapped = mapAuthError(error instanceof Error ? error.message : "UNKNOWN");
     return mapped || NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
@@ -297,22 +302,11 @@ export async function POST(request: Request) {
   const expectedEndDate = normalizeDate(parsed.data.expectedEndDate);
   const plannedDeadline = parsed.data.plannedDeadline ? normalizeDate(parsed.data.plannedDeadline) : null;
 
-  const isConstructionManager = actorUser.role === UserRole.construction_manager;
-  const areaM2 = isConstructionManager ? 1 : Number(parsed.data.areaM2);
-  const unitPrice = isConstructionManager ? 1_000_000 : Number(parsed.data.unitPrice);
-
-  if (!isConstructionManager && (!parsed.data.areaM2 || !parsed.data.unitPrice)) {
-    return NextResponse.json({ message: "Thiếu dữ liệu tài chính dự án" }, { status: 400 });
-  }
-
-  const contractValue = isConstructionManager ? null : Math.round(areaM2 * unitPrice);
-  const contractValueForCreate =
-    contractValue !== null && contractValue !== undefined ? new Prisma.Decimal(contractValue) : null;
-  const projectManagerId = isConstructionManager ? actorUser.id : parsed.data.projectManagerId;
-
-  if (!projectManagerId) {
-    return NextResponse.json({ message: "Thiếu GĐ Thi Công" }, { status: 400 });
-  }
+  const areaM2 = Number(parsed.data.areaM2);
+  const unitPrice = Number(parsed.data.unitPrice);
+  const contractValue = Math.round(areaM2 * unitPrice);
+  const contractValueForCreate = new Prisma.Decimal(contractValue);
+  const projectManagerId = parsed.data.projectManagerId;
 
   const year = startDate.getFullYear();
   const codePrefix = `DA-${year}-`;
@@ -356,6 +350,23 @@ export async function POST(request: Request) {
 
       const nextCode = `${codePrefix}${String(countThisYear + 1).padStart(3, "0")}`;
 
+      const contractMetaPayload: Record<string, unknown> = {};
+      if (parsed.data.customerPermanentAddress) {
+        contractMetaPayload.customerPermanentAddress = parsed.data.customerPermanentAddress;
+      }
+      if (parsed.data.contractSignDate) {
+        contractMetaPayload.contractSignDate = parsed.data.contractSignDate;
+      }
+      if (parsed.data.warrantyTotalMonths !== undefined) {
+        contractMetaPayload.warrantyTotalMonths = parsed.data.warrantyTotalMonths;
+      }
+      if (parsed.data.warrantyStructureYears !== undefined) {
+        contractMetaPayload.warrantyStructureYears = parsed.data.warrantyStructureYears;
+      }
+      if (parsed.data.warrantyLeakYears !== undefined) {
+        contractMetaPayload.warrantyLeakYears = parsed.data.warrantyLeakYears;
+      }
+
       const project = await tx.project.create({
         data: {
           code: nextCode,
@@ -376,17 +387,23 @@ export async function POST(request: Request) {
           mainEngineerId: parsed.data.mainEngineerId,
           status: ProjectStatus.planning,
           notes: null,
+          contractMeta:
+            Object.keys(contractMetaPayload).length > 0
+              ? (contractMetaPayload as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
         },
       });
 
-      const taskTemplates = await tx.taskTemplate.findMany({
-        where: {
-          templateCategory: parsed.data.templateCategory,
-        },
-        orderBy: [{ displayOrder: "asc" }, { code: "asc" }],
-      });
+      const taskTemplates = parsed.data.templateCategory === "blank"
+        ? []
+        : await tx.taskTemplate.findMany({
+            where: {
+              templateCategory: parsed.data.templateCategory,
+            },
+            orderBy: [{ displayOrder: "asc" }, { code: "asc" }],
+          });
 
-      if (taskTemplates.length === 0) {
+      if (parsed.data.templateCategory !== "blank" && taskTemplates.length === 0) {
         throw new Error("Chưa có template để tạo dự án");
       }
 
@@ -422,28 +439,30 @@ export async function POST(request: Request) {
       const phaseTemplates = Array.from(phaseTemplateMap.values()).sort((a, b) => a.displayOrder - b.displayOrder);
       let phaseStartDateCursor = startDate;
 
-      await tx.projectPhase.createMany({
-        data: phaseTemplates.map((phaseTemplate) => {
-          const plannedStartDate = phaseStartDateCursor;
-          const plannedEndDate = addDays(plannedStartDate, phaseTemplate.duration - 1);
-          phaseStartDateCursor = addDays(plannedEndDate, 1);
+      if (phaseTemplates.length > 0) {
+        await tx.projectPhase.createMany({
+          data: phaseTemplates.map((phaseTemplate) => {
+            const plannedStartDate = phaseStartDateCursor;
+            const plannedEndDate = addDays(plannedStartDate, phaseTemplate.duration - 1);
+            phaseStartDateCursor = addDays(plannedEndDate, 1);
 
-          return {
-            projectId: project.id,
-            code: phaseTemplate.code,
-            name: phaseTemplate.name,
-            description: null,
-            displayOrder: phaseTemplate.displayOrder,
-            duration: phaseTemplate.duration,
-            plannedStartDate,
-            plannedEndDate,
-            actualStartDate: null,
-            actualEndDate: null,
-            status: "not_started",
-            createdBy: actorUser.id,
-          };
-        }),
-      });
+            return {
+              projectId: project.id,
+              code: phaseTemplate.code,
+              name: phaseTemplate.name,
+              description: null,
+              displayOrder: phaseTemplate.displayOrder,
+              duration: phaseTemplate.duration,
+              plannedStartDate,
+              plannedEndDate,
+              actualStartDate: null,
+              actualEndDate: null,
+              status: "not_started",
+              createdBy: actorUser.id,
+            };
+          }),
+        });
+      }
 
       const projectPhases = await tx.projectPhase.findMany({
         where: { projectId: project.id },
@@ -452,8 +471,9 @@ export async function POST(request: Request) {
 
       const phaseIdByCode = new Map(projectPhases.map((phase) => [phase.code, phase.id]));
 
-      await tx.task.createMany({
-        data: taskTemplates.map((template) => {
+      if (taskTemplates.length > 0) {
+        await tx.task.createMany({
+          data: taskTemplates.map((template) => {
           const phaseMeta = getPhaseMeta(template.phase);
           const phaseCode = template.phaseCode || phaseMeta.code;
 
@@ -491,8 +511,9 @@ export async function POST(request: Request) {
             displayOrder: template.displayOrder,
             notes: null,
           };
-        }),
-      });
+          }),
+        });
+      }
 
       const paymentBaseValue = contractValue ?? 0;
       const paymentScheduleInputs = parsed.data.paymentSchedules;
