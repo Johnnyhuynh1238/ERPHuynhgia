@@ -35,7 +35,7 @@ const assignmentSchema = z.object({
   assignedEngineerId: z.string().uuid().nullable().optional(),
   assignedForemanId: z.string().uuid().nullable().optional(),
   team: z.string().optional(),
-  inspectorName: z.string().min(1).optional(),
+  inspectorName: z.string().optional(),
 });
 
 const qcSchema = z.object({
