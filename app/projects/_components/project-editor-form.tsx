@@ -83,6 +83,18 @@ type DraftFile = {
   viewUrl: string;
 };
 
+type ProjectDocCategory = "contract" | "estimate" | "drawing" | "legal" | "other";
+
+type ProjectDoc = {
+  id: string;
+  title: string;
+  category: ProjectDocCategory;
+  fileName: string;
+  fileSize: number;
+  uploadedAt: string;
+  viewUrl: string;
+};
+
 type AiProposal = {
   id: string;
   section: string;
@@ -125,6 +137,14 @@ const fileKindOptions: Array<{ value: DraftFile["fileKind"]; label: string }> = 
   { value: "estimate", label: "Dự toán" },
   { value: "drawing", label: "Bản vẽ" },
   { value: "appendix", label: "Phụ lục" },
+  { value: "other", label: "Khác" },
+];
+
+const projectDocCategoryOptions: Array<{ value: ProjectDocCategory; label: string }> = [
+  { value: "contract", label: "Hợp đồng" },
+  { value: "estimate", label: "Dự toán" },
+  { value: "drawing", label: "Bản vẽ" },
+  { value: "legal", label: "Pháp lý" },
   { value: "other", label: "Khác" },
 ];
 
@@ -308,9 +328,13 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   const [draftAudits, setDraftAudits] = useState<DraftAudit[]>([]);
   const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
   const [fileKind, setFileKind] = useState<DraftFile["fileKind"]>("contract");
+  const [docCategory, setDocCategory] = useState<ProjectDocCategory>("contract");
+  const [docTitle, setDocTitle] = useState<string>("");
+  const [projectDocs, setProjectDocs] = useState<ProjectDoc[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const isCreate = mode === "create";
+  const useProjectDocuments = !isCreate && !!projectId;
 
   const form = useForm<ProjectEditorFormValues>({
     resolver: zodResolver(formSchema),
@@ -574,6 +598,23 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return true;
   }
 
+  const refreshProjectDocs = useCallback(async () => {
+    if (!projectId) return;
+    const res = await fetch(`/api/projects/${projectId}/documents`, { cache: "no-store" });
+    const data = (await res.json().catch(() => ({}))) as { documents?: ProjectDoc[]; message?: string };
+    if (!res.ok) {
+      toast.error("Không tải được hồ sơ dự án", { description: data.message || "Vui lòng thử lại" });
+      return;
+    }
+    setProjectDocs(data.documents || []);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (useProjectDocuments) {
+      refreshProjectDocs();
+    }
+  }, [useProjectDocuments, refreshProjectDocs]);
+
   const refreshDraft = useCallback(async (nextDraftId: string) => {
     const res = await fetch(`/api/project-drafts/${nextDraftId}`, { cache: "no-store" });
     const data = (await res.json().catch(() => ({}))) as {
@@ -643,6 +684,30 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     }
 
     setUploadingFile(true);
+
+    if (useProjectDocuments && projectId) {
+      const body = new FormData();
+      body.append("category", docCategory);
+      body.append("title", docTitle.trim() || selectedFile.name);
+      body.append("file", selectedFile);
+
+      const res = await fetch(`/api/projects/${projectId}/documents`, { method: "POST", body });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      setUploadingFile(false);
+
+      if (!res.ok) {
+        toast.error("Upload hồ sơ thất bại", { description: data.message || "Vui lòng thử lại" });
+        return;
+      }
+
+      toast.success(data.message || "Đã upload hồ sơ vào dự án");
+      setSelectedFile(null);
+      setDocTitle("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await refreshProjectDocs();
+      return;
+    }
+
     const nextDraftId = draftId || (await saveDraft());
     if (!nextDraftId) {
       setUploadingFile(false);
@@ -669,6 +734,18 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }
 
   async function deleteDraftFile(fileId: string) {
+    if (useProjectDocuments && projectId) {
+      const res = await fetch(`/api/projects/${projectId}/documents/${fileId}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) {
+        toast.error("Xóa hồ sơ thất bại", { description: data.message || "Vui lòng thử lại" });
+        return;
+      }
+      toast.success(data.message || "Đã xóa hồ sơ");
+      await refreshProjectDocs();
+      return;
+    }
+
     if (!draftId) return;
     const res = await fetch(`/api/project-drafts/${draftId}/files/${fileId}`, { method: "DELETE" });
     const data = (await res.json().catch(() => ({}))) as { message?: string };
@@ -991,19 +1068,58 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]">
-          <select className="rounded-md border px-3 py-2 text-sm" value={fileKind} onChange={(e) => setFileKind(e.target.value as DraftFile["fileKind"])}>
-            {fileKindOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <input ref={fileInputRef} type="file" className="rounded-md border bg-white px-3 py-2 text-sm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
-          <Button type="button" variant="outline" onClick={uploadDraftFile} disabled={uploadingFile}>
-            {uploadingFile ? "Đang upload..." : "Upload hồ sơ"}
-          </Button>
-        </div>
+        {useProjectDocuments ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_1fr_auto]">
+            <select className="rounded-md border px-3 py-2 text-sm" value={docCategory} onChange={(e) => setDocCategory(e.target.value as ProjectDocCategory)}>
+              {projectDocCategoryOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Tên hồ sơ (tuỳ chọn)"
+              className="rounded-md border bg-white px-3 py-2 text-sm"
+              value={docTitle}
+              onChange={(e) => setDocTitle(e.target.value)}
+            />
+            <input ref={fileInputRef} type="file" className="rounded-md border bg-white px-3 py-2 text-sm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+            <Button type="button" variant="outline" onClick={uploadDraftFile} disabled={uploadingFile}>
+              {uploadingFile ? "Đang upload..." : "Upload hồ sơ"}
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]">
+            <select className="rounded-md border px-3 py-2 text-sm" value={fileKind} onChange={(e) => setFileKind(e.target.value as DraftFile["fileKind"])}>
+              {fileKindOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input ref={fileInputRef} type="file" className="rounded-md border bg-white px-3 py-2 text-sm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+            <Button type="button" variant="outline" onClick={uploadDraftFile} disabled={uploadingFile}>
+              {uploadingFile ? "Đang upload..." : "Upload hồ sơ"}
+            </Button>
+          </div>
+        )}
 
-        {draftFiles.length > 0 ? (
+        {useProjectDocuments ? (
+          projectDocs.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {projectDocs.map((doc) => (
+                <div key={doc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-sm">
+                  <div>
+                    <a href={doc.viewUrl} target="_blank" rel="noreferrer" className="font-medium text-[#1F4E79] underline">{doc.title || doc.fileName}</a>
+                    <span className="ml-2 text-xs text-slate-500">
+                      {fileSizeLabel(doc.fileSize)} · {projectDocCategoryOptions.find((opt) => opt.value === doc.category)?.label}
+                    </span>
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => deleteDraftFile(doc.id)}>Xóa</Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 text-xs text-slate-500">Chưa có hồ sơ nào. Hồ sơ upload ở đây sẽ lưu trực tiếp vào dự án và có thể phân quyền xem tại tab Hồ sơ.</div>
+          )
+        ) : draftFiles.length > 0 ? (
           <div className="mt-4 space-y-2">
             {draftFiles.map((file) => (
               <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-sm">

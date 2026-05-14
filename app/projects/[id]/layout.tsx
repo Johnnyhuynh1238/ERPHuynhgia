@@ -77,6 +77,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
     ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),
     ...(canViewPayments ? [{ label: "Lịch thanh toán", href: `/projects/${params.id}/payments` }] : []),
     ...(canViewMembers ? [{ label: "Thành viên", href: `/projects/${params.id}/members` }] : []),
+    { label: "Hồ sơ", href: `/projects/${params.id}/documents` },
   ];
 
   return (

@@ -1,28 +1,16 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
 import OpenAI from "openai";
-import { Prisma, ProjectAiAuditAction, ProjectAiConflictType, ProjectAiProposalAction, ProjectAiProposalSection, ProjectAiRunStatus, ProjectChangeDraftMode } from "@prisma/client";
-import * as mammoth from "mammoth";
-import readExcelFile from "read-excel-file/node";
+import { Prisma, ProjectAiAuditAction, ProjectAiConflictType, ProjectAiProposalAction, ProjectAiProposalSection, ProjectAiRunStatus, ProjectChangeDraftMode, ProjectDocumentCategory } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
-import { getObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { buildFileContext, type AiFileInput } from "@/lib/project-ai-analyzer";
+import { computeDocumentSignature } from "@/lib/project-document-permissions";
 
 export const runtime = "nodejs";
 
 const TOOL_NAME = "submit_project_intake_analysis";
 const PROMPT_VERSION = "project-intake-v2";
-const MAX_TEXT_CHARS_PER_FILE = 30_000;
-const MAX_OCR_CHARS_PER_FILE = 20_000;
-const MAX_PDF_TEXT_PAGES_PER_FILE = 8;
-const MAX_OCR_PAGES_PER_FILE = 2;
-
-const execFileAsync = promisify(execFile);
 
 const proposalSchema = z.object({
   section: z.nativeEnum(ProjectAiProposalSection),
@@ -175,105 +163,8 @@ function authError(error: unknown) {
   return NextResponse.json({ message: "Lỗi xác thực" }, { status: 500 });
 }
 
-function minioKey(url: string) {
-  return url.startsWith("minio://") ? url.slice("minio://".length) : null;
-}
-
 function toJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
-}
-
-function truncateText(text: string) {
-  return text.length > MAX_TEXT_CHARS_PER_FILE ? `${text.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung file do quá dài]` : text;
-}
-
-function truncateOcrText(text: string) {
-  return text.length > MAX_OCR_CHARS_PER_FILE ? `${text.slice(0, MAX_OCR_CHARS_PER_FILE)}\n\n[Đã cắt bớt nội dung OCR do quá dài]` : text;
-}
-
-async function extractPdfPlainText(buffer: Buffer, fileName: string) {
-  let dir: string | null = null;
-  try {
-    dir = await mkdtemp(join(tmpdir(), "project-ai-pdf-text-"));
-    const inputPath = join(dir, "input.pdf");
-    await writeFile(inputPath, buffer);
-    const { stdout } = await execFileAsync("pdftotext", ["-layout", "-f", "1", "-l", String(MAX_PDF_TEXT_PAGES_PER_FILE), inputPath, "-"], {
-      timeout: 60_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    const text = truncateText(String(stdout).trim());
-    console.info("[project-ai] pdf text fallback", { fileName, extractedChars: text.length });
-    return text;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn("[project-ai] pdf text fallback failed", { fileName, message });
-    return "";
-  } finally {
-    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
-  }
-}
-
-function commandOutputText(error: unknown) {
-  const output = error as { stdout?: unknown; stderr?: unknown; message?: string };
-  return {
-    stdout: output.stdout ? String(output.stdout) : "",
-    stderr: output.stderr ? String(output.stderr) : output.message || String(error),
-  };
-}
-
-async function extractPdfOcrText(buffer: Buffer, fileName: string) {
-  let dir: string | null = null;
-  try {
-    dir = await mkdtemp(join(tmpdir(), "project-ai-pdf-"));
-    const inputPath = join(dir, "input.pdf");
-    const outputPattern = join(dir, "page-%03d.png");
-    await writeFile(inputPath, buffer);
-
-    await execFileAsync(
-      "gs",
-      [
-        "-q",
-        "-dSAFER",
-        "-dBATCH",
-        "-dNOPAUSE",
-        "-sDEVICE=pnggray",
-        "-r120",
-        "-dFirstPage=1",
-        `-dLastPage=${MAX_OCR_PAGES_PER_FILE}`,
-        `-sOutputFile=${outputPattern}`,
-        inputPath,
-      ],
-      { timeout: 90_000, maxBuffer: 1024 * 1024 },
-    );
-
-    const imageFiles = (await readdir(dir)).filter((entry) => entry.startsWith("page-") && entry.endsWith(".png")).sort();
-    const chunks: string[] = [];
-    for (const imageFile of imageFiles) {
-      try {
-        const { stdout } = await execFileAsync("tesseract", [join(dir, imageFile), "stdout", "-l", "vie+eng", "--psm", "11"], {
-          timeout: 90_000,
-          maxBuffer: 10 * 1024 * 1024,
-        });
-        const text = String(stdout).trim();
-        if (text) chunks.push(text);
-      } catch (error) {
-        const output = commandOutputText(error);
-        if (output.stdout.trim()) chunks.push(output.stdout.trim());
-        console.warn("[project-ai] pdf ocr page failed", { fileName, imageFile, message: output.stderr.slice(0, 500) });
-      }
-      if (chunks.join("\n\n").length >= MAX_OCR_CHARS_PER_FILE) break;
-    }
-
-    const text = truncateOcrText(chunks.join("\n\n"));
-    console.info("[project-ai] pdf ocr fallback", { fileName, renderedPages: imageFiles.length, extractedChars: text.length });
-    return text;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn("[project-ai] pdf ocr fallback failed", { fileName, message });
-    return "";
-  } finally {
-    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
-  }
 }
 
 function formatDate(value: Date | null) {
@@ -483,65 +374,6 @@ function enforceNoOverwrite({
   return { proposals: safeProposals, conflicts: nextConflicts };
 }
 
-async function extractSpreadsheetText(buffer: Buffer) {
-  const sheets = (await readExcelFile(buffer)) as Array<{ sheet: string; data: unknown[][] }>;
-  return sheets
-    .map((sheet) => {
-      const rows = sheet.data.slice(0, 120).map((row) => row.map((cell) => (cell instanceof Date ? cell.toISOString().slice(0, 10) : cell ?? "")).join(" | "));
-      return `# Sheet: ${sheet.sheet}\n${rows.join("\n")}`;
-    })
-    .join("\n\n");
-}
-
-async function buildFileContext(files: Array<{ fileName: string; fileKind: string; fileUrl: string; mimeType: string }>) {
-  const sections: string[] = [];
-  const unsupported: string[] = [];
-
-  for (const file of files) {
-    const key = minioKey(file.fileUrl);
-    if (!key) {
-      unsupported.push(`${file.fileName}: đường dẫn không phải MinIO`);
-      continue;
-    }
-
-    const object = await getObjectFromMinio(key);
-    const name = file.fileName.toLowerCase();
-    const header = `Loại hồ sơ: ${file.fileKind}\nTên file: ${file.fileName}`;
-
-    if (file.mimeType === "application/pdf" || name.endsWith(".pdf")) {
-      const plainText = await extractPdfPlainText(object.buffer, file.fileName);
-      const ocrText = plainText.length >= 500 ? "" : await extractPdfOcrText(object.buffer, file.fileName);
-      const extractedText = [plainText, ocrText].filter((text) => text.trim()).join("\n\n");
-      if (extractedText.trim()) {
-        sections.push(`${header}\nNội dung trích xuất từ PDF:\n${extractedText}`);
-      } else {
-        unsupported.push(`${file.fileName}: PDF không trích xuất được text (pdftotext + OCR đều fail)`);
-      }
-      continue;
-    }
-
-    if (name.endsWith(".docx")) {
-      const result = await mammoth.extractRawText({ buffer: object.buffer });
-      sections.push(`${header}\nNội dung file:\n${truncateText(result.value || "")}`);
-      continue;
-    }
-
-    if (name.endsWith(".xlsx")) {
-      const text = await extractSpreadsheetText(object.buffer);
-      sections.push(`${header}\nNội dung file:\n${truncateText(text)}`);
-      continue;
-    }
-
-    unsupported.push(`${file.fileName}: định dạng legacy chưa parse tự động trong AI (.doc/.xls)`);
-  }
-
-  if (unsupported.length > 0) {
-    sections.push(`Các file sau chưa đọc được nội dung tự động, hãy tạo warning nếu chúng quan trọng:\n${unsupported.join("\n")}`);
-  }
-
-  return sections.join("\n\n---\n\n");
-}
-
 function analysisPrompt({ mode, formData, projectData }: { mode: ProjectChangeDraftMode; formData: DraftFormData; projectData: DraftFormData }) {
   return `Bạn là trợ lý nhập liệu dự án ERP thi công Huỳnh Gia. Phân tích hồ sơ HĐ/dự toán/bản vẽ/phụ lục được đính kèm và trả kết quả bằng tool ${TOOL_NAME}.
 
@@ -581,13 +413,16 @@ async function markRunFailed(runId: string, error: unknown) {
   return message;
 }
 
-export async function POST(_request: Request, { params }: { params: { draftId: string } }) {
+export async function POST(request: Request, { params }: { params: { draftId: string } }) {
   let current;
   try {
     current = await requireRole(["admin", "construction_manager"]);
   } catch (error) {
     return authError(error);
   }
+
+  const url = new URL(request.url);
+  const forceRefresh = url.searchParams.get("force") === "1";
 
   const draft = await prisma.projectChangeDraft.findUnique({
     where: { id: params.draftId },
@@ -615,11 +450,53 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   });
 
   if (!draft) return NextResponse.json({ message: "Không tìm thấy bản nháp" }, { status: 404 });
-  if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
+
+  const useProjectDocuments = draft.mode === ProjectChangeDraftMode.update_project && !!draft.projectId;
+
+  const projectDocuments = useProjectDocuments
+    ? await prisma.projectDocument.findMany({
+        where: {
+          projectId: draft.projectId!,
+          category: { in: [ProjectDocumentCategory.contract, ProjectDocumentCategory.estimate] },
+        },
+        select: { id: true, fileName: true, fileUrl: true, mimeType: true, category: true, contentHash: true },
+        orderBy: { uploadedAt: "asc" },
+      })
+    : [];
+
+  const totalFiles = useProjectDocuments ? projectDocuments.length : draft.files.length;
+  if (totalFiles === 0) {
+    return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
+  }
+
+  const aiFiles: AiFileInput[] = useProjectDocuments
+    ? projectDocuments.map((doc) => ({
+        fileName: doc.fileName,
+        fileKind: doc.category,
+        fileUrl: doc.fileUrl,
+        mimeType: doc.mimeType,
+      }))
+    : draft.files.map((file) => ({
+        fileName: file.fileName,
+        fileKind: file.fileKind,
+        fileUrl: file.fileUrl,
+        mimeType: file.mimeType,
+      }));
+
+  const documentSignature = useProjectDocuments
+    ? computeDocumentSignature(projectDocuments.map((d) => ({ id: d.id, contentHash: d.contentHash })))
+    : null;
 
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const baseURL = process.env.OPENAI_BASE_URL;
+
+  const cachedAnalysis = useProjectDocuments && documentSignature && !forceRefresh
+    ? await prisma.projectAiAnalysisCache.findUnique({
+        where: { projectId_documentSignature: { projectId: draft.projectId!, documentSignature } },
+      })
+    : null;
+
   const run = await prisma.$transaction(async (tx) => {
     const created = await tx.projectAiRun.create({
       data: {
@@ -635,13 +512,21 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
         draftId: draft.id,
         actorId: current.id,
         action: ProjectAiAuditAction.run_ai,
-        payload: { runId: created.id, model, promptVersion: PROMPT_VERSION, fileCount: draft.files.length },
+        payload: {
+          runId: created.id,
+          model,
+          promptVersion: PROMPT_VERSION,
+          fileCount: totalFiles,
+          source: useProjectDocuments ? "project_documents" : "draft_files",
+          cacheHit: !!cachedAnalysis,
+          forceRefresh,
+        },
       },
     });
     return created;
   });
 
-  if (!apiKey) {
+  if (!apiKey && !cachedAnalysis) {
     await markRunFailed(run.id, "OPENAI_API_KEY missing");
     return NextResponse.json({ message: "Chưa cấu hình OPENAI_API_KEY" }, { status: 500 });
   }
@@ -649,52 +534,97 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   try {
     const formData = (draft.formData && typeof draft.formData === "object" && !Array.isArray(draft.formData) ? draft.formData : {}) as DraftFormData;
     const projectData = normalizeProject(draft.project);
-    const fileContext = await buildFileContext(draft.files);
-    console.info("[project-ai] run request", {
-      draftId: draft.id,
-      mode: draft.mode,
-      model,
-      hasBaseURL: Boolean(baseURL),
-      fileCount: draft.files.length,
-      fileKinds: draft.files.map((file) => file.fileKind),
-      mimeTypes: draft.files.map((file) => file.mimeType),
-      fileContextChars: fileContext.length,
-    });
-    const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
-    const userContent = `${analysisPrompt({ mode: draft.mode, formData, projectData })}
+    let parsed: z.infer<typeof analysisSchema>;
+    let cacheUsed = false;
+
+    if (cachedAnalysis) {
+      const cachedRaw = (cachedAnalysis.rawResult ?? {}) as { summary?: Record<string, unknown> };
+      parsed = analysisSchema.parse({
+        summary: cachedRaw.summary ?? {},
+        proposals: Array.isArray(cachedAnalysis.proposals) ? cachedAnalysis.proposals : [],
+        conflicts: Array.isArray(cachedAnalysis.conflicts) ? cachedAnalysis.conflicts : [],
+      });
+      cacheUsed = true;
+      console.info("[project-ai] cache hit", {
+        draftId: draft.id,
+        projectId: draft.projectId,
+        documentSignature,
+        proposalCount: parsed.proposals.length,
+        conflictCount: parsed.conflicts.length,
+      });
+    } else {
+      const fileContext = await buildFileContext(aiFiles);
+      console.info("[project-ai] run request", {
+        draftId: draft.id,
+        mode: draft.mode,
+        model,
+        hasBaseURL: Boolean(baseURL),
+        fileCount: aiFiles.length,
+        fileKinds: aiFiles.map((file) => file.fileKind),
+        mimeTypes: aiFiles.map((file) => file.mimeType),
+        fileContextChars: fileContext.length,
+        source: useProjectDocuments ? "project_documents" : "draft_files",
+        documentSignature,
+      });
+      const client = new OpenAI({ apiKey: apiKey!, ...(baseURL ? { baseURL } : {}) });
+
+      const userContent = `${analysisPrompt({ mode: draft.mode, formData, projectData })}
 
 Hồ sơ đính kèm:
 ${fileContext || "(không có nội dung trích xuất được)"}`;
 
-    const completion = await client.chat.completions.create({
-      model,
-      max_tokens: 4096,
-      messages: [
-        { role: "system", content: "Bạn trích xuất dữ liệu hồ sơ xây dựng Việt Nam. Luôn trả lời bằng tool được yêu cầu, không viết prose ngoài tool." },
-        { role: "user", content: userContent },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: TOOL_NAME,
-            description: "Structured project intake proposals and conflicts for ERP draft review.",
-            parameters: toolInputSchema,
+      const completion = await client.chat.completions.create({
+        model,
+        max_tokens: 4096,
+        messages: [
+          { role: "system", content: "Bạn trích xuất dữ liệu hồ sơ xây dựng Việt Nam. Luôn trả lời bằng tool được yêu cầu, không viết prose ngoài tool." },
+          { role: "user", content: userContent },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: TOOL_NAME,
+              description: "Structured project intake proposals and conflicts for ERP draft review.",
+              parameters: toolInputSchema,
+            },
           },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: TOOL_NAME } },
-    });
+        ],
+        tool_choice: { type: "function", function: { name: TOOL_NAME } },
+      });
 
-    const toolCall = completion.choices[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.type !== "function" || toolCall.function.name !== TOOL_NAME) {
-      throw new Error("OpenAI không trả về tool output hợp lệ");
+      const toolCall = completion.choices[0]?.message?.tool_calls?.[0];
+      if (!toolCall || toolCall.type !== "function" || toolCall.function.name !== TOOL_NAME) {
+        throw new Error("OpenAI không trả về tool output hợp lệ");
+      }
+
+      const toolArgs = JSON.parse(toolCall.function.arguments);
+      const coercedArgs = coerceAnalysisPayload(toolArgs);
+      parsed = analysisSchema.parse(coercedArgs);
+
+      if (useProjectDocuments && documentSignature) {
+        await prisma.projectAiAnalysisCache.upsert({
+          where: { projectId_documentSignature: { projectId: draft.projectId!, documentSignature } },
+          create: {
+            projectId: draft.projectId!,
+            documentSignature,
+            rawResult: toJson(parsed),
+            proposals: toJson(parsed.proposals),
+            conflicts: toJson(parsed.conflicts),
+            model,
+            promptVersion: PROMPT_VERSION,
+          },
+          update: {
+            rawResult: toJson(parsed),
+            proposals: toJson(parsed.proposals),
+            conflicts: toJson(parsed.conflicts),
+            model,
+            promptVersion: PROMPT_VERSION,
+          },
+        });
+      }
     }
-
-    const toolArgs = JSON.parse(toolCall.function.arguments);
-    const coercedArgs = coerceAnalysisPayload(toolArgs);
-    const parsed = analysisSchema.parse(coercedArgs);
     const normalizedProposals = normalizeProposals(parsed.proposals, draft.mode, formData);
     const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: normalizedProposals, conflicts: parsed.conflicts });
     const autoApplied = autoApplyProposals(formData, enforced.proposals);
@@ -800,7 +730,12 @@ ${fileContext || "(không có nội dung trích xuất được)"}`;
       run: runWithConflictReasons,
       draft: { id: draft.id, formData: autoApplied.formData },
       autoApplied,
-      message: autoApplied.appliedFields.length > 0 ? "AI đã phân tích và điền form" : "AI đã phân tích hồ sơ",
+      cacheUsed,
+      message: cacheUsed
+        ? "AI dùng lại kết quả phân tích đã lưu trước đó (không gọi LLM)"
+        : autoApplied.appliedFields.length > 0
+          ? "AI đã phân tích và điền form"
+          : "AI đã phân tích hồ sơ",
     });
   } catch (error) {
     const message = await markRunFailed(run.id, error);
