@@ -1014,6 +1014,16 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           },
         }),
       }),
+      fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section: "members",
+          payload: {
+            rows: (values.members || []).map((m) => ({ userId: m.userId, roleInProject: m.roleInProject })),
+          },
+        }),
+      }),
     ];
 
     for (const req of requests) {

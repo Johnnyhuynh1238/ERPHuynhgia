@@ -57,6 +57,10 @@ export default async function ProjectEditPage({
         },
         orderBy: [{ type: "asc" }, { installmentNo: "asc" }],
       },
+      projectMembers: {
+        select: { userId: true, roleInProject: true },
+        orderBy: { addedAt: "asc" },
+      },
     },
   });
 
@@ -127,7 +131,9 @@ export default async function ProjectEditPage({
             dueDate: toDateInput(row.dueDate),
             paymentNote: row.paymentNote || "",
           })),
-          members: [],
+          members: project.projectMembers
+            .filter((m) => m.userId !== project.projectManagerId && m.userId !== project.mainEngineerId)
+            .map((m) => ({ userId: m.userId, roleInProject: m.roleInProject })),
         }}
       />
     </div>

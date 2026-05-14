@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { PaymentStatus, Prisma, ProjectRoleType, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, Prisma, ProjectMemberRole, ProjectRoleType, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 const updateSchema = z.object({
-  section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal", "contract_meta", "payment_schedules"]),
+  section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal", "contract_meta", "payment_schedules", "members"]),
   payload: z.record(z.string(), z.any()),
 });
 
@@ -56,6 +56,15 @@ const projectSchema = z.object({
 const assignmentSchema = z.object({
   projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ"),
   mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
+});
+
+const membersSyncSchema = z.object({
+  rows: z.array(
+    z.object({
+      userId: z.string().uuid("User không hợp lệ"),
+      roleInProject: z.nativeEnum(ProjectMemberRole),
+    }),
+  ),
 });
 
 const reportingSchema = z.object({
@@ -371,6 +380,64 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật phân công" });
+  }
+
+  if (parsed.data.section === "members") {
+    if (!isAdmin) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+
+    const payload = membersSyncSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu thành viên không hợp lệ" }, { status: 400 });
+    }
+
+    const uniqueIds = new Set(payload.data.rows.map((r) => r.userId));
+    if (uniqueIds.size !== payload.data.rows.length) {
+      return NextResponse.json({ message: "Có user bị chọn trùng trong danh sách thành viên" }, { status: 400 });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: params.id },
+      select: { id: true, projectManagerId: true, mainEngineerId: true },
+    });
+    if (!project) return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+
+    const rows = payload.data.rows.filter(
+      (r) => r.userId !== project.projectManagerId && r.userId !== project.mainEngineerId,
+    );
+
+    if (rows.length > 0) {
+      const validUsers = await prisma.user.findMany({
+        where: { id: { in: rows.map((r) => r.userId) }, isActive: true },
+        select: { id: true },
+      });
+      if (validUsers.length !== rows.length) {
+        return NextResponse.json({ message: "Có user thành viên không hợp lệ" }, { status: 400 });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.projectMember.deleteMany({
+        where: {
+          projectId: params.id,
+          userId: { notIn: [project.projectManagerId, project.mainEngineerId] },
+        },
+      });
+      if (rows.length > 0) {
+        await tx.projectMember.createMany({
+          data: rows.map((r) => ({
+            projectId: params.id,
+            userId: r.userId,
+            roleInProject: r.roleInProject,
+            addedBy: user.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    return NextResponse.json({ message: "Đã cập nhật thành viên" });
   }
 
   if (parsed.data.section === "reporting") {
