@@ -1029,6 +1029,14 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       await applySupplementData(projectId);
     }
 
+    if (draftId) {
+      await fetch(`/api/project-drafts/${draftId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "applied" }),
+      }).catch(() => {});
+    }
+
     toast.success("Đã cập nhật dự án");
     router.push(`/projects/${projectId}`);
     router.refresh();

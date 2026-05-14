@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 const patchDraftSchema = z.object({
   formData: z.record(z.string(), z.unknown()).optional(),
-  status: z.enum([ProjectChangeDraftStatus.draft, ProjectChangeDraftStatus.ready, ProjectChangeDraftStatus.archived]).optional(),
+  status: z.enum([ProjectChangeDraftStatus.draft, ProjectChangeDraftStatus.ready, ProjectChangeDraftStatus.applied, ProjectChangeDraftStatus.archived]).optional(),
   aiSummary: z.unknown().optional().nullable(),
 });
 
