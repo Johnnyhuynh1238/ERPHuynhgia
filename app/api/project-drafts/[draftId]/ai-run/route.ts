@@ -98,8 +98,6 @@ type DraftProject = {
   customerIdNumber: string | null;
   address: string;
   name: string;
-  areaM2: Prisma.Decimal;
-  unitPrice: Prisma.Decimal;
   contractValue: Prisma.Decimal | null;
   startDate: Date;
   expectedEndDate: Date;
@@ -231,8 +229,6 @@ function normalizeProject(project: DraftProject): DraftFormData {
     customerIdNumber: project.customerIdNumber,
     address: project.address,
     name: project.name,
-    areaM2: Number(project.areaM2),
-    unitPrice: Number(project.unitPrice),
     contractValue: project.contractValue ? Number(project.contractValue) : null,
     startDate: formatDate(project.startDate),
     expectedEndDate: formatDate(project.expectedEndDate),
@@ -492,8 +488,9 @@ function analysisPrompt({ mode, formData, projectData }: { mode: ProjectChangeDr
 
 Luật bắt buộc:
 - Không ghi trực tiếp DB chính, chỉ tạo đề xuất/cảnh báo.
-- Field path phải dùng tên form: customerName, customerPhone, customerIdNumber, address, name, areaM2, unitPrice, startDate, expectedEndDate, plannedDeadline, paymentSchedules, drawings, documents.
-- Date trả về dạng yyyy-mm-dd. Tiền/diện tích trả number, không kèm ký tự đ.
+- Field path phải dùng tên form: customerName, customerPhone, customerIdNumber, address, name, contractValue, startDate, expectedEndDate, plannedDeadline, paymentSchedules, drawings, documents.
+- contractValue là TỔNG giá trị hợp đồng (VND, number). Đọc trực tiếp từ con số ghi trong hợp đồng (vd "1.500.000.000 đồng"). KHÔNG nhân diện tích × đơn giá.
+- Date trả về dạng yyyy-mm-dd. Tiền trả number, không kèm ký tự đ.
 - Nếu hợp đồng có bảng thanh toán dạng "ĐỢT / NỘI DUNG CÔNG VIỆC / % / SỐ TIỀN / GHI CHÚ", hãy tạo 1 proposal fieldPath=paymentSchedules, action=fill_empty cho create_project khi form chưa có đợt thanh toán. suggestedValue phải là mảng object: { type: "contract", installmentNo: number, description: string, percent: number, amount: number, dueDate?: "yyyy-mm-dd", paymentNote?: string }. Nếu bảng không có ngày hạn, bỏ dueDate để ERP tự phân bổ theo ngày khởi công - bàn giao dự kiến. Ví dụ hợp đồng mẫu có 8 đợt: tạm ứng khởi công, hoàn thành móng, hoàn thành sàn tầng 2, hoàn thành xây tô, hoàn thành lợp mái, hoàn thiện cơ bản, bàn giao tạm thời, bàn giao chính thức.
 - Với hợp đồng xây dựng Việt Nam: Bên A/chủ đầu tư thường map vào customerName/customerPhone/customerIdNumber/address; tên công trình/gói thầu map vào name; địa điểm công trình map vào address nếu chưa có địa chỉ chủ nhà rõ hơn.
 - Nếu có block "Nội dung OCR fallback" thì dùng nó như nguồn text chính khi document PDF có vẻ không đọc được.
@@ -541,8 +538,6 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
           customerIdNumber: true,
           address: true,
           name: true,
-          areaM2: true,
-          unitPrice: true,
           contractValue: true,
           startDate: true,
           expectedEndDate: true,

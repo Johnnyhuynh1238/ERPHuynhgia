@@ -54,8 +54,7 @@ const createProjectSchema = z.object({
   customerPermanentAddress: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.number().min(1, "Diện tích phải > 0"),
-  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000"),
+  contractValue: z.number().min(1, "Giá trị HĐ phải > 0"),
   contractSignDate: optionalDateString,
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
@@ -302,9 +301,9 @@ export async function POST(request: Request) {
   const expectedEndDate = normalizeDate(parsed.data.expectedEndDate);
   const plannedDeadline = parsed.data.plannedDeadline ? normalizeDate(parsed.data.plannedDeadline) : null;
 
-  const areaM2 = Number(parsed.data.areaM2);
-  const unitPrice = Number(parsed.data.unitPrice);
-  const contractValue = Math.round(areaM2 * unitPrice);
+  const areaM2 = 0;
+  const unitPrice = 0;
+  const contractValue = Math.round(Number(parsed.data.contractValue));
   const contractValueForCreate = new Prisma.Decimal(contractValue);
   const projectManagerId = parsed.data.projectManagerId;
 

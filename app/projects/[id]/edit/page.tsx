@@ -34,6 +34,7 @@ export default async function ProjectEditPage({
       address: true,
       areaM2: true,
       unitPrice: true,
+      contractValue: true,
       startDate: true,
       expectedEndDate: true,
       plannedDeadline: true,
@@ -42,6 +43,20 @@ export default async function ProjectEditPage({
       notes: true,
       projectManagerId: true,
       mainEngineerId: true,
+      contractMeta: true,
+      paymentSchedules: {
+        select: {
+          id: true,
+          type: true,
+          installmentNo: true,
+          description: true,
+          percent: true,
+          amount: true,
+          dueDate: true,
+          paymentNote: true,
+        },
+        orderBy: [{ type: "asc" }, { installmentNo: "asc" }],
+      },
     },
   });
 
@@ -50,6 +65,16 @@ export default async function ProjectEditPage({
     if (!exists) notFound();
     redirect("/projects?denied=1");
   }
+
+  const meta = (project.contractMeta && typeof project.contractMeta === "object" && !Array.isArray(project.contractMeta)
+    ? (project.contractMeta as Record<string, unknown>)
+    : {}) as {
+    customerPermanentAddress?: string | null;
+    contractSignDate?: string | null;
+    warrantyTotalMonths?: number | null;
+    warrantyStructureYears?: number | null;
+    warrantyLeakYears?: number | null;
+  };
 
   return (
     <div className="space-y-4">
@@ -74,18 +99,32 @@ export default async function ProjectEditPage({
           customerName: project.customerName,
           customerPhone: project.customerPhone,
           customerIdNumber: project.customerIdNumber || "",
+          customerPermanentAddress: meta.customerPermanentAddress || "",
           address: project.address,
           name: project.name,
-          areaM2: Number(project.areaM2),
-          unitPrice: Number(project.unitPrice),
+          contractValue: project.contractValue ? Number(project.contractValue) : Number(project.areaM2) * Number(project.unitPrice),
           startDate: toDateInput(project.startDate),
           expectedEndDate: toDateInput(project.expectedEndDate),
           plannedDeadline: toDateInput(project.plannedDeadline),
           actualEndDate: toDateInput(project.actualEndDate),
+          contractSignDate: meta.contractSignDate || "",
+          warrantyTotalMonths: meta.warrantyTotalMonths ?? 12,
+          warrantyStructureYears: meta.warrantyStructureYears ?? 5,
+          warrantyLeakYears: meta.warrantyLeakYears ?? 2,
           status: project.status,
           notes: project.notes || "",
           projectManagerId: project.projectManagerId,
           mainEngineerId: project.mainEngineerId,
+          paymentSchedules: project.paymentSchedules.map((row, idx) => ({
+            id: row.id,
+            type: (row.type === "addendum" ? "addendum" : "contract") as "contract" | "addendum",
+            installmentNo: row.installmentNo ?? idx + 1,
+            description: row.description ?? "",
+            percent: row.percent ? Number(row.percent) : undefined,
+            amount: row.amount ? Number(row.amount) : undefined,
+            dueDate: toDateInput(row.dueDate),
+            paymentNote: row.paymentNote || "",
+          })),
           members: [],
         }}
       />

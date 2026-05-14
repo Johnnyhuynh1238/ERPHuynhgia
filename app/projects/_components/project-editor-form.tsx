@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const phoneVNRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 
 const paymentScheduleFormSchema = z.object({
+  id: z.string().uuid().optional(),
   type: z.enum(["contract", "addendum"]).optional(),
   installmentNo: z.number().int().min(1, "Đợt phải >= 1"),
   description: z.string().trim().min(1, "Nội dung thanh toán là bắt buộc"),
@@ -27,8 +28,7 @@ const formSchema = z.object({
   customerPermanentAddress: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5, "Địa chỉ tối thiểu 5 ký tự"),
   name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
-  areaM2: z.number().min(1, "Diện tích phải > 0").optional(),
-  unitPrice: z.number().min(1_000_000, "Đơn giá tối thiểu 1.000.000").optional(),
+  contractValue: z.number().min(1, "Giá trị HĐ phải > 0"),
   contractSignDate: z.string().optional().nullable(),
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
@@ -208,8 +208,7 @@ function mergeDraftFormData(current: ProjectEditorFormValues, formData: unknown)
   return {
     ...current,
     ...data,
-    areaM2: data.areaM2 === null || data.areaM2 === undefined ? undefined : Number(data.areaM2),
-    unitPrice: data.unitPrice === null || data.unitPrice === undefined ? undefined : Number(data.unitPrice),
+    contractValue: data.contractValue === null || data.contractValue === undefined ? current.contractValue : Number(data.contractValue),
     members: Array.isArray(data.members) ? data.members : current.members,
     paymentSchedules: Array.isArray(data.paymentSchedules) ? data.paymentSchedules : current.paymentSchedules,
     drawings: Array.isArray(data.drawings) ? data.drawings : current.drawings,
@@ -224,8 +223,7 @@ function buildDefaultValues(currentUserId: string, initialValues?: Partial<Proje
     customerPermanentAddress: initialValues?.customerPermanentAddress || "",
     address: initialValues?.address || "",
     name: initialValues?.name || "",
-    areaM2: initialValues?.areaM2 === undefined || initialValues.areaM2 === null ? undefined : Number(initialValues.areaM2),
-    unitPrice: initialValues?.unitPrice === undefined || initialValues.unitPrice === null ? undefined : Number(initialValues.unitPrice),
+    contractValue: initialValues?.contractValue === undefined || initialValues.contractValue === null ? 0 : Number(initialValues.contractValue),
     contractSignDate: dateInput(initialValues?.contractSignDate) || "",
     startDate: dateInput(initialValues?.startDate) || todayIso(),
     expectedEndDate: dateInput(initialValues?.expectedEndDate) || todayPlusDaysIso(120),
@@ -248,8 +246,7 @@ function buildDefaultValues(currentUserId: string, initialValues?: Partial<Proje
 function draftFormData(values: ProjectEditorFormValues) {
   return {
     ...values,
-    areaM2: Number.isFinite(values.areaM2) ? values.areaM2 : null,
-    unitPrice: Number.isFinite(values.unitPrice) ? values.unitPrice : null,
+    contractValue: Number.isFinite(values.contractValue) ? values.contractValue : null,
     plannedDeadline: values.plannedDeadline || null,
     actualEndDate: values.actualEndDate || null,
     notes: values.notes || null,
@@ -329,8 +326,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     loadOptions();
   }, [currentUserId, form]);
 
-  const areaM2 = form.watch("areaM2");
-  const unitPrice = form.watch("unitPrice");
+  const contractValueWatch = form.watch("contractValue");
   const selectedMembers = form.watch("members");
   const startDateValue = form.watch("startDate");
   const plannedDeadlineValue = form.watch("plannedDeadline");
@@ -377,7 +373,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     };
   }, [templateCategoryValue]);
 
-  const contractValue = useMemo(() => Number(areaM2 || 0) * Number(unitPrice || 0), [areaM2, unitPrice]);
+  const contractValue = useMemo(() => Number(contractValueWatch || 0), [contractValueWatch]);
 
   const hasDuplicateMembers = useMemo(() => {
     const ids = selectedMembers.map((m) => m.userId).filter(Boolean);
@@ -513,12 +509,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }
 
   function validateFinancial(values: ProjectEditorFormValues) {
-    if (!Number.isFinite(values.areaM2) || Number(values.areaM2) < 1) {
-      toast.error("Diện tích quy đổi là bắt buộc");
-      return false;
-    }
-    if (!Number.isFinite(values.unitPrice) || Number(values.unitPrice) < 1_000_000) {
-      toast.error("Đơn giá là bắt buộc");
+    if (!Number.isFinite(values.contractValue) || Number(values.contractValue) < 1) {
+      toast.error("Giá trị HĐ là bắt buộc");
       return false;
     }
     return true;
@@ -767,8 +759,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       customerPermanentAddress: values.customerPermanentAddress || null,
       address: values.address,
       name: values.name,
-      areaM2: values.areaM2,
-      unitPrice: values.unitPrice,
+      contractValue: Number(values.contractValue),
       contractSignDate: values.contractSignDate || null,
       startDate: values.startDate,
       expectedEndDate: values.expectedEndDate,
@@ -823,6 +814,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             customerName: values.customerName,
             customerPhone: values.customerPhone,
             customerIdNumber: values.customerIdNumber || null,
+            customerPermanentAddress: values.customerPermanentAddress || null,
             address: values.address,
           },
         }),
@@ -834,8 +826,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           section: "project",
           payload: {
             name: values.name,
-            areaM2: Number(values.areaM2),
-            unitPrice: Number(values.unitPrice),
+            contractValue: Number(values.contractValue),
             startDate: values.startDate,
             expectedEndDate: values.expectedEndDate,
             plannedDeadline: values.plannedDeadline || null,
@@ -849,10 +840,42 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          section: "contract_meta",
+          payload: {
+            contractSignDate: values.contractSignDate || null,
+            warrantyTotalMonths: values.warrantyTotalMonths,
+            warrantyStructureYears: values.warrantyStructureYears,
+            warrantyLeakYears: values.warrantyLeakYears,
+          },
+        }),
+      }),
+      fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           section: "assignment",
           payload: {
             projectManagerId: values.projectManagerId,
             mainEngineerId: values.mainEngineerId,
+          },
+        }),
+      }),
+      fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section: "payment_schedules",
+          payload: {
+            rows: (values.paymentSchedules || []).map((row) => ({
+              id: row.id,
+              type: row.type || "contract",
+              installmentNo: row.installmentNo,
+              description: row.description,
+              percent: row.percent,
+              amount: row.amount,
+              dueDate: row.dueDate || null,
+              paymentNote: row.paymentNote || null,
+            })),
           },
         }),
       }),
@@ -953,20 +976,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         ) : null}
 
-        {draftAudits.length > 0 ? (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-            <h3 className="text-sm font-semibold text-slate-800">Lịch sử xử lý</h3>
-            <div className="mt-2 space-y-2 text-xs text-slate-700">
-              {draftAudits.slice(0, 8).map((audit) => (
-                <div key={audit.id} className="rounded border bg-slate-50 px-2 py-1">
-                  <div className="font-medium">{audit.action} · {formatDateTimeVi(audit.createdAt)}</div>
-                  <div>Người thao tác: {audit.actor?.fullName || "Admin"}</div>
-                  <div>Kết quả: {formatAiValue(audit.payload)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        {/* "Lịch sử xử lý" (draftAudits) ẩn theo yêu cầu — dữ liệu vẫn được ghi vào DB cho audit. */}
       </div>
 
       <div className="rounded-xl border bg-white p-5 text-slate-900">
@@ -1014,19 +1024,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">Diện tích quy đổi m2 *{renderFieldMarker("areaM2")}</label>
-            <input type="number" min={1} className={getFieldInputClassName("areaM2")} {...form.register("areaM2", { valueAsNumber: true })} />
-            {form.formState.errors.areaM2 ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.areaM2.message}</p> : null}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Đơn giá đồng/m2 *{renderFieldMarker("unitPrice")}</label>
-            <input type="number" min={1_000_000} className={getFieldInputClassName("unitPrice")} {...form.register("unitPrice", { valueAsNumber: true })} />
-            {form.formState.errors.unitPrice ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.unitPrice.message}</p> : null}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Giá trị HĐ (readonly)</label>
-            <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm font-medium">{formatMoney(contractValue)}</div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Giá trị HĐ (VND) *{renderFieldMarker("contractValue")}</label>
+            <input type="number" min={1} step={1} className={getFieldInputClassName("contractValue")} {...form.register("contractValue", { valueAsNumber: true })} />
+            <p className="mt-1 text-xs text-slate-500">Nhập trực tiếp từ hợp đồng. Đã hiển thị: {formatMoney(contractValue)}</p>
+            {form.formState.errors.contractValue ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.contractValue.message}</p> : null}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Ngày ký HĐ (tuỳ chọn){renderFieldMarker("contractSignDate")}</label>
@@ -1100,19 +1102,18 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         ) : null}
       </div>
 
-      {isCreate ? (
-        <div className="rounded-xl border bg-white p-5 text-slate-900">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Section C - Các đợt thanh toán{renderFieldMarker("paymentSchedules")}</h2>
-              <p className="mt-1 text-sm text-slate-600">Theo mẫu HĐ: Đợt, nội dung công việc, %, số tiền, ghi chú. Nếu AI đọc được hợp đồng, AI sẽ tự điền đủ các đợt vào đây.</p>
-            </div>
-            <Button type="button" variant="outline" onClick={addPaymentSchedule}>+ Thêm đợt</Button>
+      <div className="rounded-xl border bg-white p-5 text-slate-900">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Section C - Các đợt thanh toán{renderFieldMarker("paymentSchedules")}</h2>
+            <p className="mt-1 text-sm text-slate-600">Theo mẫu HĐ: Đợt, nội dung công việc, %, số tiền, ghi chú. {isCreate ? "Nếu AI đọc được hợp đồng, AI sẽ tự điền đủ các đợt vào đây." : "Trạng thái thanh toán và ngày thanh toán thực tế giữ nguyên khi cập nhật."}</p>
           </div>
+          <Button type="button" variant="outline" onClick={addPaymentSchedule}>+ Thêm đợt</Button>
+        </div>
 
-          {paymentSchedulesFieldArray.fields.length === 0 ? (
-            <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa có đợt thanh toán. Có thể bấm + để nhập thủ công, hoặc upload hợp đồng rồi chạy AI.</div>
-          ) : (
+        {paymentSchedulesFieldArray.fields.length === 0 ? (
+          <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa có đợt thanh toán. Có thể bấm + để nhập thủ công, hoặc upload hợp đồng rồi chạy AI.</div>
+        ) : (
             <div className="space-y-3">
               {paymentSchedulesFieldArray.fields.map((field, idx) => {
                 const rowErrors = form.formState.errors.paymentSchedules?.[idx];
@@ -1156,8 +1157,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
               })}
             </div>
           )}
-        </div>
-      ) : null}
+      </div>
 
       <div className="rounded-xl border bg-white p-5 text-slate-900">
         <h2 className="mb-4 text-lg font-semibold">Section D - Phân công</h2>
@@ -1212,25 +1212,23 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         )}
       </div>
 
-      {isCreate ? (
-        <div className="rounded-xl border bg-white p-5 text-slate-900">
-          <h2 className="mb-4 text-lg font-semibold">Section E - Điều khoản HĐ</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Bảo hành tổng (tháng){renderFieldMarker("warrantyTotalMonths")}</label>
-              <input type="number" min={0} className={getFieldInputClassName("warrantyTotalMonths")} {...form.register("warrantyTotalMonths", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Bảo hành kết cấu (năm){renderFieldMarker("warrantyStructureYears")}</label>
-              <input type="number" min={0} className={getFieldInputClassName("warrantyStructureYears")} {...form.register("warrantyStructureYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Bảo hành chống thấm (năm){renderFieldMarker("warrantyLeakYears")}</label>
-              <input type="number" min={0} className={getFieldInputClassName("warrantyLeakYears")} {...form.register("warrantyLeakYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
-            </div>
+      <div className="rounded-xl border bg-white p-5 text-slate-900">
+        <h2 className="mb-4 text-lg font-semibold">Section E - Điều khoản HĐ</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium">Bảo hành tổng (tháng){renderFieldMarker("warrantyTotalMonths")}</label>
+            <input type="number" min={0} className={getFieldInputClassName("warrantyTotalMonths")} {...form.register("warrantyTotalMonths", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Bảo hành kết cấu (năm){renderFieldMarker("warrantyStructureYears")}</label>
+            <input type="number" min={0} className={getFieldInputClassName("warrantyStructureYears")} {...form.register("warrantyStructureYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Bảo hành chống thấm (năm){renderFieldMarker("warrantyLeakYears")}</label>
+            <input type="number" min={0} className={getFieldInputClassName("warrantyLeakYears")} {...form.register("warrantyLeakYears", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} />
           </div>
         </div>
-      ) : null}
+      </div>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Đang lưu nháp..." : "Lưu nháp"}</Button>

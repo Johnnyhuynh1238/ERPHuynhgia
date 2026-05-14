@@ -1,28 +1,50 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { PaymentStatus, ProjectRoleType, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, Prisma, ProjectRoleType, ProjectStatus, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 const updateSchema = z.object({
-  section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal"]),
+  section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal", "contract_meta", "payment_schedules"]),
   payload: z.record(z.string(), z.any()),
+});
+
+const paymentRowSchema = z.object({
+  id: z.string().uuid().optional(),
+  type: z.enum(["contract", "addendum"]).optional().default("contract"),
+  installmentNo: z.number().int().min(1),
+  description: z.string().trim().min(1, "Mô tả là bắt buộc"),
+  percent: z.number().min(0).max(100).optional().nullable(),
+  amount: z.number().positive().optional().nullable(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  paymentNote: z.string().optional().nullable(),
+});
+
+const paymentSchedulesSchema = z.object({
+  rows: z.array(paymentRowSchema),
 });
 
 const ownerSchema = z.object({
   customerName: z.string().trim().min(2),
   customerPhone: z.string().trim().min(10),
   customerIdNumber: z.string().trim().optional().nullable(),
+  customerPermanentAddress: z.string().trim().optional().nullable(),
   address: z.string().trim().min(5),
+});
+
+const contractMetaSchema = z.object({
+  contractSignDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  warrantyTotalMonths: z.number().int().min(0).optional(),
+  warrantyStructureYears: z.number().int().min(0).optional(),
+  warrantyLeakYears: z.number().int().min(0).optional(),
 });
 
 const projectSchema = z.object({
   name: z.string().trim().min(3),
-  areaM2: z.number().min(1),
-  unitPrice: z.number().min(1_000_000),
+  contractValue: z.number().min(1),
   startDate: z.string(),
   expectedEndDate: z.string(),
   plannedDeadline: z.string().nullable().optional(),
@@ -100,7 +122,6 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       ? project
       : {
           ...project,
-          unitPrice: null,
           contractValue: null,
         },
   });
@@ -133,6 +154,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu chủ nhà không hợp lệ" }, { status: 400 });
     }
 
+    const existingMeta = (project.contractMeta && typeof project.contractMeta === "object" && !Array.isArray(project.contractMeta) ? project.contractMeta : {}) as Record<string, unknown>;
+    const nextMeta = { ...existingMeta };
+    const permanentAddress = payload.data.customerPermanentAddress?.trim() || null;
+    if (permanentAddress) {
+      nextMeta.customerPermanentAddress = permanentAddress;
+    } else {
+      delete nextMeta.customerPermanentAddress;
+    }
+
     const updated = await prisma.project.update({
       where: { id: params.id },
       data: {
@@ -140,10 +170,125 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         customerPhone: payload.data.customerPhone,
         customerIdNumber: payload.data.customerIdNumber || null,
         address: payload.data.address,
+        contractMeta: Object.keys(nextMeta).length > 0 ? (nextMeta as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật thông tin chủ nhà" });
+  }
+
+  if (parsed.data.section === "contract_meta") {
+    if (!isAdmin) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+
+    const payload = contractMetaSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu điều khoản HĐ không hợp lệ" }, { status: 400 });
+    }
+
+    const existingMeta = (project.contractMeta && typeof project.contractMeta === "object" && !Array.isArray(project.contractMeta) ? project.contractMeta : {}) as Record<string, unknown>;
+    const nextMeta = { ...existingMeta };
+    if (payload.data.contractSignDate) {
+      nextMeta.contractSignDate = payload.data.contractSignDate;
+    } else {
+      delete nextMeta.contractSignDate;
+    }
+    if (payload.data.warrantyTotalMonths !== undefined) nextMeta.warrantyTotalMonths = payload.data.warrantyTotalMonths;
+    if (payload.data.warrantyStructureYears !== undefined) nextMeta.warrantyStructureYears = payload.data.warrantyStructureYears;
+    if (payload.data.warrantyLeakYears !== undefined) nextMeta.warrantyLeakYears = payload.data.warrantyLeakYears;
+
+    const updated = await prisma.project.update({
+      where: { id: params.id },
+      data: {
+        contractMeta: Object.keys(nextMeta).length > 0 ? (nextMeta as Prisma.InputJsonValue) : Prisma.JsonNull,
+      },
+    });
+
+    return NextResponse.json({ project: updated, message: "Đã cập nhật điều khoản HĐ" });
+  }
+
+  if (parsed.data.section === "payment_schedules") {
+    if (!isAdmin) {
+      return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+    }
+
+    const payload = paymentSchedulesSchema.safeParse(parsed.data.payload);
+    if (!payload.success) {
+      return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu lịch thanh toán không hợp lệ" }, { status: 400 });
+    }
+
+    const projectStartDate = new Date(project.startDate);
+    const contractValue = project.contractValue ? Number(project.contractValue) : 0;
+
+    const diffDays = (from: Date, to: Date) => {
+      const a = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+      const b = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+      return Math.max(0, Math.floor((b - a) / (24 * 60 * 60 * 1000)));
+    };
+
+    const existingRows = await prisma.paymentSchedule.findMany({
+      where: { projectId: params.id },
+      select: { id: true, paidAt: true, actualPaidDate: true },
+    });
+    const existingById = new Map(existingRows.map((row) => [row.id, row]));
+    const submittedIds = new Set<string>();
+
+    await prisma.$transaction(async (tx) => {
+      for (const row of payload.data.rows) {
+        const amount = row.amount && row.amount > 0 ? row.amount : 0;
+        const percent = row.percent !== null && row.percent !== undefined ? row.percent : contractValue > 0 ? (amount / contractValue) * 100 : 0;
+        const dueDate = row.dueDate ? normalizeDate(row.dueDate) : null;
+        const expectedDate = dueDate ?? addDays(projectStartDate, 0);
+        const dayOffset = dueDate ? diffDays(projectStartDate, dueDate) : 0;
+
+        if (row.id && existingById.has(row.id)) {
+          submittedIds.add(row.id);
+          await tx.paymentSchedule.update({
+            where: { id: row.id },
+            data: {
+              type: row.type,
+              installmentNo: row.installmentNo,
+              description: row.description,
+              milestoneDescription: row.description,
+              percent,
+              amount,
+              ...(dueDate ? { dueDate, expectedDate, dayOffset } : {}),
+              paymentNote: row.paymentNote || null,
+              phaseNumber: row.installmentNo,
+            },
+          });
+        } else {
+          await tx.paymentSchedule.create({
+            data: {
+              projectId: params.id,
+              type: row.type,
+              installmentNo: row.installmentNo,
+              phaseNumber: row.installmentNo,
+              description: row.description,
+              milestoneDescription: row.description,
+              percent,
+              amount,
+              dueDate: dueDate ?? projectStartDate,
+              expectedDate,
+              dayOffset,
+              paymentNote: row.paymentNote || null,
+              status: PaymentStatus.pending,
+              createdBy: user.id,
+            },
+          });
+        }
+      }
+
+      const toDelete = existingRows.filter((row) => !submittedIds.has(row.id) && !row.paidAt && !row.actualPaidDate);
+      if (toDelete.length > 0) {
+        await tx.paymentSchedule.deleteMany({
+          where: { id: { in: toDelete.map((row) => row.id) } },
+        });
+      }
+    });
+
+    return NextResponse.json({ message: "Đã cập nhật lịch thanh toán" });
   }
 
   if (parsed.data.section === "assignment") {
@@ -300,7 +445,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   previousStartDate.setHours(0, 0, 0, 0);
   const isStartDateChanged = previousStartDate.getTime() !== startDate.getTime();
 
-  const contractValue = Math.round(payload.data.areaM2 * payload.data.unitPrice);
+  const contractValue = Math.round(payload.data.contractValue);
   const expectedEndDate = normalizeDate(payload.data.expectedEndDate);
 
   const result = await prisma.$transaction(async (tx) => {
@@ -308,8 +453,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       where: { id: params.id },
       data: {
         name: payload.data.name,
-        areaM2: payload.data.areaM2,
-        unitPrice: payload.data.unitPrice,
         contractValue,
         startDate,
         expectedEndDate,
@@ -354,36 +497,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
-    const paymentTemplate = [0.15, 0.2, 0.2, 0.2, 0.15, 0.1];
-    const amounts = paymentTemplate.map((p) => Math.round(contractValue * p));
-    const partial = amounts.slice(0, 5).reduce((s, x) => s + x, 0);
-    amounts[5] = contractValue - partial;
-
-    const paymentRows = await tx.paymentSchedule.findMany({
-      where: { projectId: params.id },
-      orderBy: { phaseNumber: "asc" },
-      select: { id: true, phaseNumber: true },
-    });
-
-    for (const row of paymentRows) {
-      const idx = row.phaseNumber - 1;
-      if (idx >= 0 && idx < amounts.length) {
-        await tx.paymentSchedule.update({
-          where: { id: row.id },
-          data: {
-            amount: amounts[idx],
-          },
-        });
-      }
-    }
-
     return updated;
   });
 
   return NextResponse.json({
     project: result,
     message: isStartDateChanged
-      ? "Đã cập nhật dự án. Ngày dự kiến của 69 công tác và 6 đợt thanh toán đã được cập nhật theo ngày khởi công mới."
+      ? "Đã cập nhật dự án. Ngày dự kiến của công tác và các đợt thanh toán đã được dịch theo ngày khởi công mới."
       : "Đã cập nhật dự án",
   });
 }

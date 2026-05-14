@@ -15,8 +15,6 @@ type ProjectData = {
   customerPortalToken?: string | null;
   customerPortalEnabled?: boolean;
   address: string;
-  areaM2: number;
-  unitPrice: number | null;
   contractValue: number | null;
   startDate: string;
   expectedEndDate: string;
@@ -131,8 +129,7 @@ export function ProjectInfoClient({
 
   const [projectForm, setProjectForm] = useState({
     name: project.name,
-    areaM2: String(project.areaM2),
-    unitPrice: String(project.unitPrice ?? ""),
+    contractValue: String(project.contractValue ?? ""),
     startDate: project.startDate.slice(0, 10),
     expectedEndDate: project.expectedEndDate.slice(0, 10),
     actualEndDate: project.actualEndDate ? project.actualEndDate.slice(0, 10) : "",
@@ -189,8 +186,7 @@ export function ProjectInfoClient({
       setData(projectJson.project);
       setProjectForm({
         name: projectJson.project.name,
-        areaM2: String(projectJson.project.areaM2),
-        unitPrice: String(projectJson.project.unitPrice ?? ""),
+        contractValue: String(projectJson.project.contractValue ?? ""),
         startDate: projectJson.project.startDate.slice(0, 10),
         expectedEndDate: projectJson.project.expectedEndDate.slice(0, 10),
         actualEndDate: projectJson.project.actualEndDate ? projectJson.project.actualEndDate.slice(0, 10) : "",
@@ -237,8 +233,7 @@ export function ProjectInfoClient({
 
     const payload = {
       name: projectForm.name,
-      areaM2: Number(projectForm.areaM2),
-      unitPrice: Number(projectForm.unitPrice),
+      contractValue: Number(projectForm.contractValue),
       startDate: projectForm.startDate,
       expectedEndDate: projectForm.expectedEndDate,
       actualEndDate: projectForm.actualEndDate || null,
@@ -599,8 +594,6 @@ export function ProjectInfoClient({
         </div>
         <div className="grid gap-2 text-sm md:grid-cols-2">
           <div>Tên dự án: {data.name}</div>
-          <div>Diện tích: {data.areaM2} m²</div>
-          {canViewFinancial ? <div>Đơn giá: {formatMoney(data.unitPrice ?? 0)}</div> : null}
           {canViewFinancial ? <div>Giá trị HĐ: {formatMoney(data.contractValue ?? 0)}</div> : null}
           <div>Khởi công: {formatDate(data.startDate)}</div>
           <div>Bàn giao dự kiến: {formatDate(data.expectedEndDate)}</div>
@@ -880,15 +873,10 @@ export function ProjectInfoClient({
               />
               <input
                 type="number"
-                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                value={projectForm.areaM2}
-                onChange={(e) => setProjectForm((p) => ({ ...p, areaM2: e.target.value }))}
-              />
-              <input
-                type="number"
-                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
-                value={projectForm.unitPrice}
-                onChange={(e) => setProjectForm((p) => ({ ...p, unitPrice: e.target.value }))}
+                placeholder="Giá trị HĐ (VND)"
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm md:col-span-2"
+                value={projectForm.contractValue}
+                onChange={(e) => setProjectForm((p) => ({ ...p, contractValue: e.target.value }))}
               />
               <input
                 type="date"

@@ -85,7 +85,6 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
             ? project
             : {
                 ...project,
-                unitPrice: null,
                 contractValue: null,
               },
         ),
