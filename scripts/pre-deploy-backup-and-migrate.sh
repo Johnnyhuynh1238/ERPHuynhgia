@@ -37,7 +37,3 @@ if [ -z "$BACKUP_FILE" ] || [ ! -s "$BACKUP_FILE" ]; then
 fi
 
 echo "[Deploy] Backup ready: $BACKUP_FILE"
-echo "[Deploy] Running Prisma migrate deploy..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T app npx prisma migrate deploy
-
-echo "[Deploy] Migration completed successfully."

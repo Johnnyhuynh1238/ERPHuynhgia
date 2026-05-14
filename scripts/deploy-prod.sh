@@ -40,6 +40,10 @@ if ! docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" ps
   exit 1
 fi
 
+echo "[Deploy] Running Prisma migrate deploy in new container..."
+docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" exec -T app npx prisma migrate deploy
+echo "[Deploy] Migration completed."
+
 echo "[Deploy] Health check on http://127.0.0.1:3001 ..."
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:3001" >/dev/null; then
