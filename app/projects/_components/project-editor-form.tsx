@@ -1043,13 +1043,12 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             <input type="date" className={getFieldInputClassName("expectedEndDate")} {...form.register("expectedEndDate")} />
             {form.formState.errors.expectedEndDate ? <p className="mt-1 text-xs text-red-600">{form.formState.errors.expectedEndDate.message}</p> : null}
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Deadline phase timeline (tuỳ chọn){renderFieldMarker("plannedDeadline")}</label>
-            <input type="date" className={getFieldInputClassName("plannedDeadline")} {...form.register("plannedDeadline")} />
-          </div>
-
           {!isCreate ? (
             <>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Deadline phase timeline (tuỳ chọn){renderFieldMarker("plannedDeadline")}</label>
+                <input type="date" className={getFieldInputClassName("plannedDeadline")} {...form.register("plannedDeadline")} />
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">Bàn giao thực tế{renderFieldMarker("actualEndDate")}</label>
                 <input type="date" className={getFieldInputClassName("actualEndDate")} {...form.register("actualEndDate")} />
@@ -1071,11 +1070,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           ) : null}
         </div>
 
-        {templateCategoryValue === "blank" ? (
-          <div className="mt-5 rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-slate-600">
-            Chế độ tạo trống: dự án sẽ không có phase/task. Anh sẽ thêm thủ công sau khi tạo dự án.
-          </div>
-        ) : (
+        {!isCreate && templateCategoryValue !== "blank" ? (
           <div className="mt-5 rounded-lg border bg-slate-50 p-4">
             <h3 className="mb-3 text-sm font-semibold">Phase từ template</h3>
             {loadingTemplateSummary ? (
@@ -1102,7 +1097,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
               </div>
             ) : null}
           </div>
-        )}
+        ) : null}
       </div>
 
       {isCreate ? (
