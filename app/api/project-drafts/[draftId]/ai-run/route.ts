@@ -3,8 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
-import type { ContentBlockParam, Tool } from "@anthropic-ai/sdk/resources/messages/messages";
+import OpenAI from "openai";
 import { Prisma, ProjectAiAuditAction, ProjectAiConflictType, ProjectAiProposalAction, ProjectAiProposalSection, ProjectAiRunStatus, ProjectChangeDraftMode } from "@prisma/client";
 import * as mammoth from "mammoth";
 import readExcelFile from "read-excel-file/node";
@@ -48,7 +47,7 @@ const analysisSchema = z.object({
   conflicts: z.array(conflictSchema).optional().default([]),
 });
 
-const toolInputSchema: Tool.InputSchema = {
+const toolInputSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -439,8 +438,8 @@ async function extractSpreadsheetText(buffer: Buffer) {
     .join("\n\n");
 }
 
-async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string; fileUrl: string; mimeType: string }>) {
-  const blocks: ContentBlockParam[] = [];
+async function buildFileContext(files: Array<{ fileName: string; fileKind: string; fileUrl: string; mimeType: string }>) {
+  const sections: string[] = [];
   const unsupported: string[] = [];
 
   for (const file of files) {
@@ -455,56 +454,26 @@ async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string
     const header = `Loại hồ sơ: ${file.fileKind}\nTên file: ${file.fileName}`;
 
     if (file.mimeType === "application/pdf" || name.endsWith(".pdf")) {
-      blocks.push({
-        type: "document",
-        title: file.fileName,
-        context: header,
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data: object.buffer.toString("base64"),
-        },
-      });
-
       const plainText = await extractPdfPlainText(object.buffer, file.fileName);
       const ocrText = plainText.length >= 500 ? "" : await extractPdfOcrText(object.buffer, file.fileName);
       const extractedText = [plainText, ocrText].filter((text) => text.trim()).join("\n\n");
       if (extractedText.trim()) {
-        blocks.push({
-          type: "text",
-          text: `${header}\nNội dung text fallback từ PDF, ưu tiên dùng để trích xuất field nếu document PDF không đọc được:\n${extractedText}`,
-        });
+        sections.push(`${header}\nNội dung trích xuất từ PDF:\n${extractedText}`);
+      } else {
+        unsupported.push(`${file.fileName}: PDF không trích xuất được text (pdftotext + OCR đều fail)`);
       }
       continue;
     }
 
     if (name.endsWith(".docx")) {
       const result = await mammoth.extractRawText({ buffer: object.buffer });
-      blocks.push({
-        type: "document",
-        title: file.fileName,
-        context: header,
-        source: {
-          type: "text",
-          media_type: "text/plain",
-          data: truncateText(result.value || ""),
-        },
-      });
+      sections.push(`${header}\nNội dung file:\n${truncateText(result.value || "")}`);
       continue;
     }
 
     if (name.endsWith(".xlsx")) {
       const text = await extractSpreadsheetText(object.buffer);
-      blocks.push({
-        type: "document",
-        title: file.fileName,
-        context: header,
-        source: {
-          type: "text",
-          media_type: "text/plain",
-          data: truncateText(text),
-        },
-      });
+      sections.push(`${header}\nNội dung file:\n${truncateText(text)}`);
       continue;
     }
 
@@ -512,13 +481,10 @@ async function buildFileBlocks(files: Array<{ fileName: string; fileKind: string
   }
 
   if (unsupported.length > 0) {
-    blocks.push({
-      type: "text",
-      text: `Các file sau chưa đọc được nội dung tự động, hãy tạo warning nếu chúng quan trọng:\n${unsupported.join("\n")}`,
-    });
+    sections.push(`Các file sau chưa đọc được nội dung tự động, hãy tạo warning nếu chúng quan trọng:\n${unsupported.join("\n")}`);
   }
 
-  return blocks;
+  return sections.join("\n\n---\n\n");
 }
 
 function analysisPrompt({ mode, formData, projectData }: { mode: ProjectChangeDraftMode; formData: DraftFormData; projectData: DraftFormData }) {
@@ -595,11 +561,9 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   if (!draft) return NextResponse.json({ message: "Không tìm thấy bản nháp" }, { status: 404 });
   if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
 
-  const oauthToken = process.env.ANTHROPIC_AUTH_TOKEN;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const credential = oauthToken || apiKey;
-  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-  const baseURL = process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_BASE_URL;
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const baseURL = process.env.OPENAI_BASE_URL;
   const run = await prisma.$transaction(async (tx) => {
     const created = await tx.projectAiRun.create({
       data: {
@@ -621,15 +585,15 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     return created;
   });
 
-  if (!credential) {
-    await markRunFailed(run.id, "ANTHROPIC credential missing");
-    return NextResponse.json({ message: "Chưa cấu hình ANTHROPIC_AUTH_TOKEN hoặc ANTHROPIC_API_KEY" }, { status: 500 });
+  if (!apiKey) {
+    await markRunFailed(run.id, "OPENAI_API_KEY missing");
+    return NextResponse.json({ message: "Chưa cấu hình OPENAI_API_KEY" }, { status: 500 });
   }
 
   try {
     const formData = (draft.formData && typeof draft.formData === "object" && !Array.isArray(draft.formData) ? draft.formData : {}) as DraftFormData;
     const projectData = normalizeProject(draft.project);
-    const fileBlocks = await buildFileBlocks(draft.files);
+    const fileContext = await buildFileContext(draft.files);
     console.info("[project-ai] run request", {
       draftId: draft.id,
       mode: draft.mode,
@@ -638,40 +602,42 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
       fileCount: draft.files.length,
       fileKinds: draft.files.map((file) => file.fileKind),
       mimeTypes: draft.files.map((file) => file.mimeType),
-      fileBlockCount: fileBlocks.length,
+      fileContextChars: fileContext.length,
     });
-    const client = oauthToken
-      ? new Anthropic({
-          authToken: oauthToken,
-          defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
-          ...(baseURL ? { baseURL } : {}),
-        })
-      : new Anthropic({ apiKey: apiKey!, ...(baseURL ? { baseURL } : {}) });
+    const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
-    const message = await client.messages.create({
+    const userContent = `${analysisPrompt({ mode: draft.mode, formData, projectData })}
+
+Hồ sơ đính kèm:
+${fileContext || "(không có nội dung trích xuất được)"}`;
+
+    const completion = await client.chat.completions.create({
       model,
       max_tokens: 4096,
-      system: "Bạn trích xuất dữ liệu hồ sơ xây dựng Việt Nam. Luôn trả lời bằng tool được yêu cầu, không viết prose ngoài tool.",
+      messages: [
+        { role: "system", content: "Bạn trích xuất dữ liệu hồ sơ xây dựng Việt Nam. Luôn trả lời bằng tool được yêu cầu, không viết prose ngoài tool." },
+        { role: "user", content: userContent },
+      ],
       tools: [
         {
-          name: TOOL_NAME,
-          description: "Structured project intake proposals and conflicts for ERP draft review.",
-          input_schema: toolInputSchema,
+          type: "function",
+          function: {
+            name: TOOL_NAME,
+            description: "Structured project intake proposals and conflicts for ERP draft review.",
+            parameters: toolInputSchema,
+          },
         },
       ],
-      tool_choice: { type: "tool", name: TOOL_NAME },
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: analysisPrompt({ mode: draft.mode, formData, projectData }) }, ...fileBlocks],
-        },
-      ],
+      tool_choice: { type: "function", function: { name: TOOL_NAME } },
     });
 
-    const toolUse = message.content.find((block) => block.type === "tool_use" && block.name === TOOL_NAME);
-    if (!toolUse || toolUse.type !== "tool_use") throw new Error("Claude không trả về tool output hợp lệ");
+    const toolCall = completion.choices[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.type !== "function" || toolCall.function.name !== TOOL_NAME) {
+      throw new Error("OpenAI không trả về tool output hợp lệ");
+    }
 
-    const parsed = analysisSchema.parse(toolUse.input);
+    const toolArgs = JSON.parse(toolCall.function.arguments);
+    const parsed = analysisSchema.parse(toolArgs);
     const normalizedProposals = normalizeProposals(parsed.proposals, draft.mode, formData);
     const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: normalizedProposals, conflicts: parsed.conflicts });
     const autoApplied = autoApplyProposals(formData, enforced.proposals);
