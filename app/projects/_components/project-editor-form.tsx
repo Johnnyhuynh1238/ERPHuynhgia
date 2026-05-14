@@ -200,6 +200,7 @@ function normalizeAiFieldPath(fieldPath: string) {
 type AiFieldMarker = {
   kind: "proposal" | "warning";
   title: string;
+  applyableConflict?: { id: string; fieldPath: string; suggestedValue: unknown };
 };
 
 function mergeDraftFormData(current: ProjectEditorFormValues, formData: unknown): ProjectEditorFormValues {
@@ -433,6 +434,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         ]
           .filter(Boolean)
           .join("\n"),
+        applyableConflict: {
+          id: conflict.id,
+          fieldPath: conflict.fieldPath,
+          suggestedValue: conflict.suggestedValue,
+        },
       });
     });
 
@@ -472,6 +478,18 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return "w-full rounded-md border px-3 py-2 text-sm";
   }, [getFieldMarkers, hasFieldWarning]);
 
+  const applyAiConflict = useCallback((conflict: { id: string; fieldPath: string; suggestedValue: unknown }) => {
+    const path = normalizeAiFieldPath(conflict.fieldPath);
+    if (!path) return;
+    form.setValue(path as Parameters<typeof form.setValue>[0], conflict.suggestedValue as never, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setAiConflicts((prev) => prev.filter((c) => c.id !== conflict.id));
+    toast.success("Đã áp dụng giá trị từ AI vào form");
+  }, [form]);
+
   function renderFieldMarker(fieldName: string) {
     const markers = getFieldMarkers(fieldName);
     if (markers.length === 0) return null;
@@ -479,7 +497,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return (
       <span className="ml-2 inline-flex items-center gap-1 align-middle">
         {markers.map((marker, index) => (
-          <span key={`${fieldName}-${marker.kind}-${index}`} className="group relative inline-flex">
+          <span key={`${fieldName}-${marker.kind}-${index}`} className="group relative inline-flex items-center gap-1">
             <span
               tabIndex={0}
               aria-label={marker.title}
@@ -487,6 +505,16 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             >
               {marker.kind === "warning" ? "!" : "AI"}
             </span>
+            {marker.applyableConflict ? (
+              <button
+                type="button"
+                onClick={() => applyAiConflict(marker.applyableConflict!)}
+                title={`Ghi đè bằng giá trị AI: ${formatAiValue(marker.applyableConflict.suggestedValue)}`}
+                className="inline-flex h-5 items-center rounded-md border border-emerald-400 bg-emerald-50 px-1.5 text-[10px] font-medium leading-none text-emerald-700 hover:bg-emerald-100"
+              >
+                Áp dụng AI
+              </button>
+            ) : null}
             <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 whitespace-pre-line rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-xs font-normal leading-relaxed text-white shadow-lg group-hover:block group-focus-within:block">
               {marker.title}
             </span>

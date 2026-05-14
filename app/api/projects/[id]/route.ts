@@ -15,11 +15,11 @@ const updateSchema = z.object({
 const paymentRowSchema = z.object({
   id: z.string().uuid().optional(),
   type: z.enum(["contract", "addendum"]).optional().default("contract"),
-  installmentNo: z.number().int().min(1),
-  description: z.string().trim().min(1, "Mô tả là bắt buộc"),
-  percent: z.number().min(0).max(100).optional().nullable(),
-  amount: z.number().positive().optional().nullable(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  installmentNo: z.number().int().min(1, "Đợt phải >= 1"),
+  description: z.string().trim().min(1, "Nội dung thanh toán là bắt buộc"),
+  percent: z.number().min(0, "% phải >= 0").max(100, "% phải <= 100").optional().nullable(),
+  amount: z.number().positive("Số tiền phải > 0").optional().nullable(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày hạn phải dạng yyyy-mm-dd").optional().nullable(),
   paymentNote: z.string().optional().nullable(),
 });
 
@@ -28,38 +28,38 @@ const paymentSchedulesSchema = z.object({
 });
 
 const ownerSchema = z.object({
-  customerName: z.string().trim().min(2),
-  customerPhone: z.string().trim().min(10),
+  customerName: z.string().trim().min(2, "Tên chủ nhà tối thiểu 2 ký tự"),
+  customerPhone: z.string().trim().min(10, "SĐT chủ nhà tối thiểu 10 ký tự"),
   customerIdNumber: z.string().trim().optional().nullable(),
   customerPermanentAddress: z.string().trim().optional().nullable(),
-  address: z.string().trim().min(5),
+  address: z.string().trim().min(5, "Địa chỉ công trình tối thiểu 5 ký tự"),
 });
 
 const contractMetaSchema = z.object({
-  contractSignDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  warrantyTotalMonths: z.number().int().min(0).optional(),
-  warrantyStructureYears: z.number().int().min(0).optional(),
-  warrantyLeakYears: z.number().int().min(0).optional(),
+  contractSignDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày ký HĐ phải dạng yyyy-mm-dd").optional().nullable(),
+  warrantyTotalMonths: z.number().int().min(0, "Số tháng bảo hành phải >= 0").optional(),
+  warrantyStructureYears: z.number().int().min(0, "Bảo hành kết cấu phải >= 0 năm").optional(),
+  warrantyLeakYears: z.number().int().min(0, "Bảo hành chống thấm phải >= 0 năm").optional(),
 });
 
 const projectSchema = z.object({
-  name: z.string().trim().min(3),
-  contractValue: z.number().min(1),
-  startDate: z.string(),
-  expectedEndDate: z.string(),
+  name: z.string().trim().min(3, "Tên dự án tối thiểu 3 ký tự"),
+  contractValue: z.number().min(1, "Giá trị HĐ phải > 0"),
+  startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
+  expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   plannedDeadline: z.string().nullable().optional(),
   actualEndDate: z.string().nullable().optional(),
-  status: z.nativeEnum(ProjectStatus),
+  status: z.nativeEnum(ProjectStatus, { error: () => "Trạng thái không hợp lệ" }),
   notes: z.string().nullable().optional(),
 });
 
 const assignmentSchema = z.object({
-  projectManagerId: z.string().uuid(),
-  mainEngineerId: z.string().uuid(),
+  projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ"),
+  mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
 });
 
 const reportingSchema = z.object({
-  goLiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  goLiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày go-live phải dạng yyyy-mm-dd").nullable(),
 });
 
 const customerPortalSchema = z.object({
