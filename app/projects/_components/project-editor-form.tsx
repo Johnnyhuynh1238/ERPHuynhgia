@@ -1415,6 +1415,14 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       </div>
 
       <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push(isCreate || !projectId ? "/projects" : `/projects/${projectId}`)}
+          disabled={submitting}
+        >
+          Huỷ
+        </Button>
         <Button type="button" variant="outline" onClick={saveDraft} disabled={savingDraft}>{savingDraft ? "Đang lưu nháp..." : "Lưu nháp"}</Button>
         <Button type="submit" disabled={isSubmitDisabled} className="bg-orange-500 hover:bg-orange-600">
           {submitting ? (isCreate ? "Đang tạo dự án..." : "Đang cập nhật dự án...") : isCreate ? "Tạo dự án" : "Cập Nhật Dự Án"}

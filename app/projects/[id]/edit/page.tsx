@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ProjectChangeDraftMode, ProjectChangeDraftStatus } from "@prisma/client";
 import { ProjectEditorForm } from "@/app/projects/_components/project-editor-form";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -67,20 +66,7 @@ export default async function ProjectEditPage({
     redirect("/projects?denied=1");
   }
 
-  let resolvedDraftId = searchParams?.draftId;
-  if (!resolvedDraftId) {
-    const latestOpenDraft = await prisma.projectChangeDraft.findFirst({
-      where: {
-        projectId: params.id,
-        createdBy: user.id,
-        mode: ProjectChangeDraftMode.update_project,
-        status: { in: [ProjectChangeDraftStatus.draft, ProjectChangeDraftStatus.ready] },
-      },
-      orderBy: { updatedAt: "desc" },
-      select: { id: true },
-    });
-    if (latestOpenDraft) resolvedDraftId = latestOpenDraft.id;
-  }
+  const resolvedDraftId = searchParams?.draftId;
 
   const meta = (project.contractMeta && typeof project.contractMeta === "object" && !Array.isArray(project.contractMeta)
     ? (project.contractMeta as Record<string, unknown>)
