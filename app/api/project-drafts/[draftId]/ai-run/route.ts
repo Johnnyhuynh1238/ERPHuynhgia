@@ -90,6 +90,53 @@ const toolInputSchema = {
 type Proposal = z.infer<typeof proposalSchema>;
 type Conflict = z.infer<typeof conflictSchema>;
 
+const VALID_PROPOSAL_ACTIONS = new Set<string>(Object.values(ProjectAiProposalAction));
+const VALID_PROPOSAL_SECTIONS = new Set<string>(Object.values(ProjectAiProposalSection));
+const VALID_CONFLICT_TYPES = new Set<string>(Object.values(ProjectAiConflictType));
+
+function coerceAnalysisPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const root = raw as Record<string, unknown>;
+  const proposals = Array.isArray(root.proposals) ? root.proposals : [];
+  const conflicts = Array.isArray(root.conflicts) ? root.conflicts : [];
+  const coerced: { actions: string[]; sections: string[]; conflicts: string[] } = { actions: [], sections: [], conflicts: [] };
+
+  const fixedProposals = proposals.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+    const obj = { ...(entry as Record<string, unknown>) };
+    const action = typeof obj.action === "string" ? obj.action : "";
+    if (!VALID_PROPOSAL_ACTIONS.has(action)) {
+      coerced.actions.push(action || "<rỗng>");
+      obj.action = ProjectAiProposalAction.warning_only;
+      const reason = typeof obj.reason === "string" && obj.reason.length > 0 ? obj.reason : "AI trả về action không hợp lệ, đã quy về cảnh báo.";
+      obj.reason = `${reason} (action gốc: ${action || "<rỗng>"})`;
+    }
+    const section = typeof obj.section === "string" ? obj.section : "";
+    if (!VALID_PROPOSAL_SECTIONS.has(section)) {
+      coerced.sections.push(section || "<rỗng>");
+      obj.section = ProjectAiProposalSection.document;
+    }
+    return obj;
+  });
+
+  const fixedConflicts = conflicts.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+    const obj = { ...(entry as Record<string, unknown>) };
+    const conflictType = typeof obj.conflictType === "string" ? obj.conflictType : "";
+    if (!VALID_CONFLICT_TYPES.has(conflictType)) {
+      coerced.conflicts.push(conflictType || "<rỗng>");
+      obj.conflictType = ProjectAiConflictType.ambiguous;
+    }
+    return obj;
+  });
+
+  if (coerced.actions.length > 0 || coerced.sections.length > 0 || coerced.conflicts.length > 0) {
+    console.warn("[project-ai] coerced AI payload enums", coerced);
+  }
+
+  return { ...root, proposals: fixedProposals, conflicts: fixedConflicts };
+}
+
 type DraftFormData = Record<string, unknown>;
 
 type DraftProject = {
@@ -495,10 +542,12 @@ Luật bắt buộc:
 - Với hợp đồng xây dựng Việt Nam: Bên A/chủ đầu tư thường map vào customerName/customerPhone/customerIdNumber/address; tên công trình/gói thầu map vào name; địa điểm công trình map vào address nếu chưa có địa chỉ chủ nhà rõ hơn.
 - Nếu có block "Nội dung OCR fallback" thì dùng nó như nguồn text chính khi document PDF có vẻ không đọc được.
 - create_project: form thường đang trống, nếu đọc được field nào đủ tin cậy thì phải tạo proposal fill_empty cho field đó; không chỉ tạo conflict documents ambiguous chung chung.
+- Trường action CHỈ ĐƯỢC dùng ĐÚNG 1 trong 3 chuỗi sau (lowercase, có dấu gạch dưới): "fill_empty", "supplement", "warning_only". KHÔNG được dùng bất kỳ giá trị khác như "update", "overwrite", "replace", "fill", "warn"... Nếu sai schema, tool sẽ reject.
 - action=fill_empty chỉ dùng khi field đang trống.
 - action=supplement dùng cho dòng bổ sung như lịch thanh toán phụ lục, bản vẽ mới, tài liệu mới.
 - action=warning_only dùng khi chỉ cảnh báo, không được apply.
-- Với update_project: nếu ERP/form đã có dữ liệu meaningful thì KHÔNG đề xuất ghi đè; nếu hồ sơ khác dữ liệu hiện tại thì tạo conflict existing_value hoặc mismatch.
+- Với update_project: nếu ERP/form đã có dữ liệu meaningful nhưng hồ sơ chứa thông tin KHÁC, hãy tạo proposal action=warning_only (kèm suggestedValue và reason). KHÔNG dùng "update"/"overwrite". User sẽ bấm nút "Áp dụng AI" để ghi đè thủ công.
+- Nếu hồ sơ trùng khớp với dữ liệu hiện tại thì KHÔNG đề xuất gì, hoặc tạo conflict existing_value/mismatch.
 - Không đoán UUID user. Nếu thấy tên GĐ/KS trong hồ sơ nhưng không có ID, chỉ cảnh báo hoặc ghi reason.
 - Chỉ đưa proposal có confidence >= 0.55. Nếu thật sự không đọc được dữ liệu từ file thì tạo conflict ambiguous với reason nói rõ là OCR/PDF không trích xuất được hay nội dung thiếu field nào.
 
@@ -632,7 +681,8 @@ ${fileContext || "(không có nội dung trích xuất được)"}`;
     }
 
     const toolArgs = JSON.parse(toolCall.function.arguments);
-    const parsed = analysisSchema.parse(toolArgs);
+    const coercedArgs = coerceAnalysisPayload(toolArgs);
+    const parsed = analysisSchema.parse(coercedArgs);
     const normalizedProposals = normalizeProposals(parsed.proposals, draft.mode, formData);
     const enforced = enforceNoOverwrite({ mode: draft.mode, formData, projectData, proposals: normalizedProposals, conflicts: parsed.conflicts });
     const autoApplied = autoApplyProposals(formData, enforced.proposals);
