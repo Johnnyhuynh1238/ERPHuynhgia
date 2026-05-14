@@ -1177,7 +1177,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
                 const rowErrors = form.formState.errors.paymentSchedules?.[idx];
                 return (
                   <div key={field.id} className="rounded-lg border bg-slate-50 p-3">
-                    <div className="grid gap-3 md:grid-cols-[90px_1fr_100px_150px_150px_auto]">
+                    <div className="grid gap-3 md:grid-cols-[90px_1fr]">
                       <div>
                         <label className="mb-1 block text-xs font-medium">Đợt{renderFieldMarker(`paymentSchedules.${idx}.installmentNo`)}</label>
                         <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.installmentNo`)} {...form.register(`paymentSchedules.${idx}.installmentNo` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
@@ -1185,9 +1185,11 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium">Nội dung công việc{renderFieldMarker(`paymentSchedules.${idx}.description`)}</label>
-                        <input className={getFieldInputClassName(`paymentSchedules.${idx}.description`)} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
+                        <textarea rows={2} className={`${getFieldInputClassName(`paymentSchedules.${idx}.description`)} resize-y`} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
                         {rowErrors?.description ? <p className="mt-1 text-xs text-red-600">{rowErrors.description.message}</p> : null}
                       </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-[120px_180px_180px_auto]">
                       <div>
                         <label className="mb-1 block text-xs font-medium">%{renderFieldMarker(`paymentSchedules.${idx}.percent`)}</label>
                         <input type="number" min={0} max={100} step="0.01" className={getFieldInputClassName(`paymentSchedules.${idx}.percent`)} {...form.register(`paymentSchedules.${idx}.percent` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
@@ -1208,7 +1210,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
                     </div>
                     <div className="mt-3">
                       <label className="mb-1 block text-xs font-medium">Ghi chú{renderFieldMarker(`paymentSchedules.${idx}.paymentNote`)}</label>
-                      <input className={getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
+                      <textarea rows={2} className={`${getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} resize-y`} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
                     </div>
                   </div>
                 );
