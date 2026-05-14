@@ -203,10 +203,33 @@ type AiFieldMarker = {
   applyableConflict?: { id: string; fieldPath: string; suggestedValue: unknown };
 };
 
+const SCALAR_STRING_FIELDS = [
+  "customerName",
+  "customerPhone",
+  "customerIdNumber",
+  "customerPermanentAddress",
+  "address",
+  "name",
+  "contractSignDate",
+  "startDate",
+  "expectedEndDate",
+  "plannedDeadline",
+  "actualEndDate",
+  "notes",
+] as const;
+
+function coerceScalarString(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.filter((v) => v !== null && v !== undefined && v !== "").map(String).join(", ");
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
+}
+
 function mergeDraftFormData(current: ProjectEditorFormValues, formData: unknown): ProjectEditorFormValues {
   if (!formData || typeof formData !== "object" || Array.isArray(formData)) return current;
-  const data = formData as Partial<ProjectEditorFormValues>;
-  return {
+  const data = formData as Partial<ProjectEditorFormValues> & Record<string, unknown>;
+  const next: ProjectEditorFormValues = {
     ...current,
     ...data,
     contractValue: data.contractValue === null || data.contractValue === undefined ? current.contractValue : Number(data.contractValue),
@@ -214,6 +237,13 @@ function mergeDraftFormData(current: ProjectEditorFormValues, formData: unknown)
     paymentSchedules: Array.isArray(data.paymentSchedules) ? data.paymentSchedules : current.paymentSchedules,
     drawings: Array.isArray(data.drawings) ? data.drawings : current.drawings,
   };
+  for (const key of SCALAR_STRING_FIELDS) {
+    if (key in data) {
+      const coerced = coerceScalarString(data[key]);
+      (next as Record<string, unknown>)[key] = coerced ?? (current as Record<string, unknown>)[key];
+    }
+  }
+  return next;
 }
 
 function buildDefaultValues(currentUserId: string, initialValues?: Partial<ProjectEditorFormValues>): ProjectEditorFormValues {

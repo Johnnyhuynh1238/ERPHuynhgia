@@ -93,6 +93,12 @@ type Conflict = z.infer<typeof conflictSchema>;
 const VALID_PROPOSAL_ACTIONS = new Set<string>(Object.values(ProjectAiProposalAction));
 const VALID_PROPOSAL_SECTIONS = new Set<string>(Object.values(ProjectAiProposalSection));
 const VALID_CONFLICT_TYPES = new Set<string>(Object.values(ProjectAiConflictType));
+const ARRAY_LIKE_FIELDS = new Set(["paymentSchedules", "drawings", "documents", "members"]);
+
+function isArrayLikeFieldPath(rawPath: string) {
+  const normalized = rawPath.replace(/^formData\./, "").replace(/^payload\./, "").split(/[.\[]/)[0];
+  return ARRAY_LIKE_FIELDS.has(normalized);
+}
 
 function coerceAnalysisPayload(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
@@ -105,11 +111,17 @@ function coerceAnalysisPayload(raw: unknown): unknown {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
     const obj = { ...(entry as Record<string, unknown>) };
     const action = typeof obj.action === "string" ? obj.action : "";
+    const fieldPathRaw = typeof obj.fieldPath === "string" ? obj.fieldPath : "";
     if (!VALID_PROPOSAL_ACTIONS.has(action)) {
       coerced.actions.push(action || "<rỗng>");
       obj.action = ProjectAiProposalAction.warning_only;
       const reason = typeof obj.reason === "string" && obj.reason.length > 0 ? obj.reason : "AI trả về action không hợp lệ, đã quy về cảnh báo.";
       obj.reason = `${reason} (action gốc: ${action || "<rỗng>"})`;
+    } else if (action === ProjectAiProposalAction.supplement && fieldPathRaw && !isArrayLikeFieldPath(fieldPathRaw)) {
+      coerced.actions.push(`supplement→fill_empty(${fieldPathRaw})`);
+      obj.action = ProjectAiProposalAction.fill_empty;
+      const reason = typeof obj.reason === "string" && obj.reason.length > 0 ? obj.reason : "Field này không phải mảng nên không thể supplement.";
+      obj.reason = `${reason} (AI đặt supplement nhưng field không phải mảng → đã đổi sang fill_empty.)`;
     }
     const section = typeof obj.section === "string" ? obj.section : "";
     if (!VALID_PROPOSAL_SECTIONS.has(section)) {
