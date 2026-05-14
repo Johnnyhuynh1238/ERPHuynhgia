@@ -595,7 +595,9 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
   if (!draft) return NextResponse.json({ message: "Không tìm thấy bản nháp" }, { status: 404 });
   if (draft.files.length === 0) return NextResponse.json({ message: "Cần upload ít nhất 1 hồ sơ trước khi chạy AI" }, { status: 400 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
+  const oauthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const credential = oauthToken || apiKey;
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
   const baseURL = process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_BASE_URL;
   const run = await prisma.$transaction(async (tx) => {
@@ -619,9 +621,9 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
     return created;
   });
 
-  if (!apiKey) {
-    await markRunFailed(run.id, "ANTHROPIC_API_KEY is missing");
-    return NextResponse.json({ message: "Chưa cấu hình ANTHROPIC_API_KEY" }, { status: 500 });
+  if (!credential) {
+    await markRunFailed(run.id, "ANTHROPIC credential missing");
+    return NextResponse.json({ message: "Chưa cấu hình ANTHROPIC_AUTH_TOKEN hoặc ANTHROPIC_API_KEY" }, { status: 500 });
   }
 
   try {
@@ -638,7 +640,13 @@ export async function POST(_request: Request, { params }: { params: { draftId: s
       mimeTypes: draft.files.map((file) => file.mimeType),
       fileBlockCount: fileBlocks.length,
     });
-    const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
+    const client = oauthToken
+      ? new Anthropic({
+          authToken: oauthToken,
+          defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+          ...(baseURL ? { baseURL } : {}),
+        })
+      : new Anthropic({ apiKey: apiKey!, ...(baseURL ? { baseURL } : {}) });
 
     const message = await client.messages.create({
       model,
