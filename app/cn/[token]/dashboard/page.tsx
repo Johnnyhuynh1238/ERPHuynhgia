@@ -28,6 +28,15 @@ function dateText(value: Date | null | undefined) {
   return value ? value.toLocaleDateString("vi-VN") : "Chưa cập nhật";
 }
 
+function shuffle<T>(arr: readonly T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export default async function CustomerDashboardPage({ params }: { params: { token: string } }) {
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
@@ -110,20 +119,19 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const showExpiryBanner = Boolean(expiry && daysBetween(new Date(), expiry) <= 7);
   const currentPhase = overview.project.currentPhase;
 
-  const designGroups: DesignGroup[] = designGroupsRaw
-    .filter((group) => group.photos.length > 0)
-    .map((group) => ({
-      id: group.id,
-      title: group.title,
-      description: group.description,
-      photos: group.photos.map((photo) => ({
-        id: photo.id,
-        groupId: group.id,
-        groupTitle: group.title,
-        photoUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=photo`,
-        thumbnailUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=thumb`,
-      })),
-    }));
+  const visibleGroups = designGroupsRaw.filter((group) => group.photos.length > 0);
+  const designGroups: DesignGroup[] = shuffle(visibleGroups).map((group) => ({
+    id: group.id,
+    title: group.title,
+    description: group.description,
+    photos: shuffle(group.photos).map((photo) => ({
+      id: photo.id,
+      groupId: group.id,
+      groupTitle: group.title,
+      photoUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=photo`,
+      thumbnailUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=thumb`,
+    })),
+  }));
 
   return (
     <div className="owner-portal-page">

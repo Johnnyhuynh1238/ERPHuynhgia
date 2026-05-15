@@ -22,11 +22,11 @@ type Props = {
   autoplayMs?: number;
 };
 
-export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
+export function DesignPhotoCarousel({ groups, autoplayMs = 4000 }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxGroupId, setLightboxGroupId] = useState<string>("all");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const lightboxScrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -40,35 +40,30 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
     return list;
   }, [groups]);
 
-  const visiblePhotos = useMemo(() => {
-    if (selectedGroupId === "all") return flatPhotos;
-    return flatPhotos.filter((p) => p.groupId === selectedGroupId);
-  }, [flatPhotos, selectedGroupId]);
-
-  useEffect(() => {
-    setActiveIndex(0);
-    scrollerRef.current?.scrollTo({ left: 0, behavior: "auto" });
-  }, [selectedGroupId]);
+  const lightboxPhotos = useMemo(() => {
+    if (lightboxGroupId === "all") return flatPhotos;
+    return flatPhotos.filter((p) => p.groupId === lightboxGroupId);
+  }, [flatPhotos, lightboxGroupId]);
 
   const scrollToIndex = useCallback(
     (next: number, behavior: ScrollBehavior = "smooth") => {
       const scroller = scrollerRef.current;
-      if (!scroller || visiblePhotos.length === 0) return;
-      const safeIndex = ((next % visiblePhotos.length) + visiblePhotos.length) % visiblePhotos.length;
+      if (!scroller || flatPhotos.length === 0) return;
+      const safeIndex = ((next % flatPhotos.length) + flatPhotos.length) % flatPhotos.length;
       const slide = scroller.children.item(safeIndex) as HTMLElement | null;
       slide?.scrollIntoView({ behavior, inline: "start", block: "nearest" });
       setActiveIndex(safeIndex);
     },
-    [visiblePhotos.length],
+    [flatPhotos.length],
   );
 
   useEffect(() => {
-    if (paused || lightboxIndex !== null || visiblePhotos.length <= 1) return;
+    if (paused || lightboxIndex !== null || flatPhotos.length <= 1) return;
     const timer = window.setInterval(() => {
       scrollToIndex(activeIndex + 1);
     }, autoplayMs);
     return () => window.clearInterval(timer);
-  }, [paused, lightboxIndex, visiblePhotos.length, activeIndex, autoplayMs, scrollToIndex]);
+  }, [paused, lightboxIndex, flatPhotos.length, activeIndex, autoplayMs, scrollToIndex]);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -76,12 +71,12 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
     slide?.scrollIntoView({ behavior: "instant" as ScrollBehavior, inline: "start", block: "nearest" });
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setLightboxIndex(null);
-      if (event.key === "ArrowRight") setLightboxIndex((i) => (i === null ? null : Math.min(i + 1, visiblePhotos.length - 1)));
+      if (event.key === "ArrowRight") setLightboxIndex((i) => (i === null ? null : Math.min(i + 1, lightboxPhotos.length - 1)));
       if (event.key === "ArrowLeft") setLightboxIndex((i) => (i === null ? null : Math.max(i - 1, 0)));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxIndex, visiblePhotos.length]);
+  }, [lightboxIndex, lightboxPhotos.length]);
 
   function handleScrollMomentum(event: React.UIEvent<HTMLDivElement>) {
     const target = event.currentTarget;
@@ -99,39 +94,30 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
     if (next !== lightboxIndex) setLightboxIndex(next);
   }
 
+  function openLightboxFromCarousel(index: number) {
+    const photo = flatPhotos[index];
+    if (!photo) return;
+    setLightboxGroupId("all");
+    setLightboxIndex(index);
+  }
+
+  function selectLightboxGroup(groupId: string) {
+    if (groupId === lightboxGroupId) return;
+    setLightboxGroupId(groupId);
+    setLightboxIndex(0);
+    requestAnimationFrame(() => {
+      lightboxScrollerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+    });
+  }
+
   if (groups.length === 0 || flatPhotos.length === 0) return null;
 
   return (
     <>
-      <section className="owner-section">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="owner-section-title mb-0">ẢNH THIẾT KẾ</div>
-          <span className="text-xs owner-muted">{visiblePhotos.length} ảnh · vuốt để xem</span>
-        </div>
-
-        <div className="mt-3 -mx-1 flex gap-2 overflow-x-auto pb-2 pl-1 pr-1" style={{ scrollbarWidth: "none" }}>
-          <button
-            type="button"
-            onClick={() => setSelectedGroupId("all")}
-            className={`owner-chip shrink-0 ${selectedGroupId === "all" ? "orange" : ""}`}
-          >
-            Tất cả
-          </button>
-          {groups.map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              onClick={() => setSelectedGroupId(group.id)}
-              className={`owner-chip shrink-0 ${selectedGroupId === group.id ? "orange" : ""}`}
-            >
-              {group.title}
-            </button>
-          ))}
-        </div>
-
+      <section className="owner-section p-0 overflow-hidden">
         <div
           ref={scrollerRef}
-          className="design-carousel mt-3 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth"
+          className="design-carousel flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth"
           onPointerDown={() => setPaused(true)}
           onPointerUp={() => setPaused(false)}
           onPointerCancel={() => setPaused(false)}
@@ -140,49 +126,30 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
           onScroll={handleScrollMomentum}
           style={{ scrollbarWidth: "none" }}
         >
-          {visiblePhotos.map((photo, index) => (
+          {flatPhotos.map((photo, index) => (
             <button
               type="button"
               key={`${photo.id}-${index}`}
-              onClick={() => setLightboxIndex(index)}
-              className="design-carousel-slide group relative block min-w-full snap-center overflow-hidden rounded-2xl bg-black/40"
+              onClick={() => openLightboxFromCarousel(index)}
+              aria-label="Xem ảnh lớn"
+              className="design-carousel-slide group relative block min-w-full snap-center overflow-hidden bg-black/40"
             >
               <img
                 src={photo.thumbnailUrl}
-                alt={photo.groupTitle}
+                alt=""
                 loading="lazy"
-                className="h-64 w-full object-cover transition duration-700 ease-out group-hover:scale-105 md:h-80"
+                className="h-72 w-full object-cover transition duration-700 ease-out group-hover:scale-105 md:h-96"
               />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 text-left">
-                <div className="text-sm font-semibold text-white drop-shadow">{photo.groupTitle}</div>
-                <div className="text-[11px] text-white/75">Bấm để xem lớn</div>
-              </div>
             </button>
           ))}
         </div>
-
-        {visiblePhotos.length > 1 ? (
-          <div className="mt-3 flex items-center justify-center gap-1.5">
-            {visiblePhotos.map((_, index) => (
-              <button
-                key={`dot-${index}`}
-                type="button"
-                onClick={() => scrollToIndex(index)}
-                aria-label={`Xem ảnh ${index + 1}`}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  index === activeIndex ? "w-6 bg-[#ff8a3d]" : "w-1.5 bg-white/30 hover:bg-white/60"
-                }`}
-              />
-            ))}
-          </div>
-        ) : null}
       </section>
 
       {lightboxIndex !== null ? (
         <div className="fixed inset-0 z-[60] flex flex-col bg-black/95 text-white">
           <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
             <div className="min-w-0 truncate font-semibold">
-              {visiblePhotos[lightboxIndex]?.groupTitle} · {lightboxIndex + 1}/{visiblePhotos.length}
+              {lightboxPhotos[lightboxIndex]?.groupTitle} · {lightboxIndex + 1}/{lightboxPhotos.length}
             </div>
             <button
               type="button"
@@ -192,13 +159,34 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
               Đóng
             </button>
           </div>
+
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-4 pb-3" style={{ scrollbarWidth: "none" }}>
+            <button
+              type="button"
+              onClick={() => selectLightboxGroup("all")}
+              className={`owner-chip shrink-0 ${lightboxGroupId === "all" ? "orange" : ""}`}
+            >
+              Tất cả
+            </button>
+            {groups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => selectLightboxGroup(group.id)}
+                className={`owner-chip shrink-0 ${lightboxGroupId === group.id ? "orange" : ""}`}
+              >
+                {group.title}
+              </button>
+            ))}
+          </div>
+
           <div
             ref={lightboxScrollerRef}
             className="flex flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth"
             onScroll={handleLightboxScroll}
             style={{ scrollbarWidth: "none" }}
           >
-            {visiblePhotos.map((photo, index) => (
+            {lightboxPhotos.map((photo, index) => (
               <div key={`lb-${photo.id}-${index}`} className="flex min-w-full snap-center items-center justify-center px-4 py-4">
                 <img src={photo.photoUrl} alt={photo.groupTitle} className="max-h-full max-w-full rounded-xl object-contain" />
               </div>
@@ -216,8 +204,8 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 2000 }: Props) {
             <span>Vuốt ngang hoặc dùng phím ← →</span>
             <button
               type="button"
-              onClick={() => setLightboxIndex(Math.min(visiblePhotos.length - 1, lightboxIndex + 1))}
-              disabled={lightboxIndex === visiblePhotos.length - 1}
+              onClick={() => setLightboxIndex(Math.min(lightboxPhotos.length - 1, lightboxIndex + 1))}
+              disabled={lightboxIndex === lightboxPhotos.length - 1}
               className="rounded-full bg-white/10 px-3 py-1 transition disabled:opacity-30 enabled:hover:bg-white/20"
             >
               Sau →
