@@ -91,7 +91,9 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const normalizedPayments = payments.map(normalizePaymentSchedule);
   const paidTotal = normalizedPayments.reduce((sum, payment) => sum + (payment.status === "paid" ? payment.paidAmount || payment.amount : 0), 0);
   const contractValue = overview.project.contractValue || normalizedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const nextPayment = normalizedPayments.find((payment) => payment.status === "pending" || payment.status === "overdue") || null;
+  const nextPayment = normalizedPayments
+    .filter((payment) => (payment.status === "pending" || payment.status === "overdue") && payment.dueDate)
+    .sort((a, b) => (a.dueDate as Date).getTime() - (b.dueDate as Date).getTime())[0] || null;
   const expiry = resolveExpiry(project.actualEndDate);
   const showExpiryBanner = Boolean(expiry && daysBetween(new Date(), expiry) <= 7);
   const currentPhase = overview.project.currentPhase;
