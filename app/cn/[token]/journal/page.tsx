@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { buildCustomerJournalEvents } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
-import { CustomerJournalDownloadButtons } from "../_components/customer-journal-download-buttons";
 import { CustomerPhotoAlbum } from "../_components/customer-photo-album";
 
 const typeOptions = [
@@ -160,7 +159,6 @@ export default async function CustomerJournalPage({
           </details>
         </div>
         <a href={`/cn/${params.token}/journal?view=photos`} className="owner-card mt-4 block py-2 text-center text-sm font-semibold text-white">Xem toàn bộ ảnh</a>
-        <CustomerJournalDownloadButtons token={params.token} />
       </section>
 
       <section className="owner-section">
