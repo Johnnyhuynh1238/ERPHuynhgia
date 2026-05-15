@@ -86,16 +86,27 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
     const paymentComments = comments.filter((comment) => comment.targetId === payment.id);
     const days = daysUntil(payment.dueDate);
     const dueSoon = payment.status !== "paid" && days !== null && days >= 0 && days <= 30;
+    const isPaid = payment.status === "paid";
+    const summaryAmount = isPaid ? payment.paidAmount || payment.amount : payment.amount;
+    const summaryDateLabel = isPaid ? "Ngày thu" : "Hạn thu";
+    const summaryDateValue = isPaid ? dateText(payment.paidAt) : dateText(payment.dueDate);
+    const summaryAmountClass = isPaid ? "text-emerald-200" : "text-white";
 
     return (
-      <article key={payment.id} className="owner-card">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs owner-muted">Đợt {payment.installmentNo}</div>
-            <h2 className="font-semibold text-white">{payment.description}</h2>
+      <details key={payment.id} className="owner-payment-card owner-card">
+        <summary className="owner-payment-summary cursor-pointer list-none">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs owner-muted">Đợt {payment.installmentNo}</div>
+              <h2 className="truncate font-semibold text-white">{payment.description}</h2>
+            </div>
+            <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusClass(payment.status)}`}>{statusText(payment.status)}</span>
           </div>
-          <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusClass(payment.status)}`}>{statusText(payment.status)}</span>
-        </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+            <span className={`font-semibold ${summaryAmountClass}`}>{money(summaryAmount)}</span>
+            <span className="owner-muted text-xs">{summaryDateLabel}: <span className="text-white">{summaryDateValue}</span></span>
+          </div>
+        </summary>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl bg-[#1a1a1a] p-3">
@@ -106,7 +117,7 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
             <div className="text-xs owner-muted">Hạn thu</div>
             <div className="font-semibold text-white">{dateText(payment.dueDate)}</div>
           </div>
-          {payment.status === "paid" ? (
+          {isPaid ? (
             <>
               <div className="rounded-xl bg-emerald-500/10 p-3">
                 <div className="text-xs text-emerald-200/70">Đã thu</div>
@@ -146,7 +157,7 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
             ))}
           </div>
         </div>
-      </article>
+      </details>
     );
   };
 
@@ -155,15 +166,15 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
       <section className="owner-section">
         <div className="owner-section-title">TÀI CHÍNH</div>
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="owner-card"><div className="text-sm font-bold text-white">{money(contractValue)}</div><div className="owner-muted">Tổng</div></div>
-          <div className="owner-card"><div className="text-sm font-bold text-emerald-300">{money(paidTotal)}</div><div className="owner-muted">Đã thu</div></div>
-          <div className="owner-card"><div className="text-sm font-bold text-amber-200">{money(remaining)}</div><div className="owner-muted">Còn lại</div></div>
+          <div className="owner-card overflow-hidden px-2"><div className="truncate whitespace-nowrap text-[12px] font-bold text-white">{money(contractValue)}</div><div className="owner-muted">Tổng</div></div>
+          <div className="owner-card overflow-hidden px-2"><div className="truncate whitespace-nowrap text-[12px] font-bold text-emerald-300">{money(paidTotal)}</div><div className="owner-muted">Đã thu</div></div>
+          <div className="owner-card overflow-hidden px-2"><div className="truncate whitespace-nowrap text-[12px] font-bold text-amber-200">{money(remaining)}</div><div className="owner-muted">Còn lại</div></div>
         </div>
         <div className="mt-4 owner-progress-track"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${paidPercent}%` }} /></div>
       </section>
 
       <section className="owner-section space-y-3">
-        <div className="owner-section-title">THEO HỢP ĐỒNG</div>
+        <div className="owner-section-title">LỊCH THANH TOÁN</div>
         {contractPayments.length === 0 ? <div className="text-sm owner-muted">Chưa có lịch thanh toán hợp đồng.</div> : null}
         {contractPayments.map(renderPayment)}
       </section>

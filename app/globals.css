@@ -390,6 +390,17 @@ body {
   color: #fff;
 }
 
+.owner-payment-card > summary {
+  list-style: none;
+}
+.owner-payment-card > summary::-webkit-details-marker {
+  display: none;
+}
+.owner-payment-card[open] > summary {
+  border-bottom: 1px solid #3a3a3a;
+  padding-bottom: 10px;
+}
+
 .owner-input,
 .owner-textarea,
 .owner-select {
