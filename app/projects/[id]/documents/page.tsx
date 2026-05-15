@@ -33,6 +33,7 @@ export default async function ProjectDocumentsPage({ params }: { params: { id: s
     mimeType: true,
     uploadedBy: true,
     uploadedAt: true,
+    visibleToCustomer: true,
     uploader: { select: { id: true, fullName: true } },
   } as const;
 
@@ -70,6 +71,7 @@ export default async function ProjectDocumentsPage({ params }: { params: { id: s
       mimeType: doc.mimeType,
       uploader: doc.uploader,
       uploadedAt: doc.uploadedAt.toISOString(),
+      visibleToCustomer: doc.visibleToCustomer,
       viewUrl: `/api/projects/${params.id}/documents/${doc.id}/file`,
       grantedUsers: accessList?.map((a) => a.user),
     };

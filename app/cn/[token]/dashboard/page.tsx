@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CommentTargetType, TaskStatus } from "@prisma/client";
+import { CommentTargetType, ProjectDocumentCategory, TaskStatus } from "@prisma/client";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { getPortalExpiry as resolveExpiry } from "@/lib/customer-portal";
 import { getCustomerPortalOverview, normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
 
-const completedStatuses: TaskStatus[] = [TaskStatus.done, TaskStatus.inspected, TaskStatus.internal_approved, TaskStatus.completed];
+const CATEGORY_LABEL: Record<ProjectDocumentCategory, string> = {
+  contract: "Hợp đồng",
+  estimate: "Báo giá",
+  drawing: "Bản vẽ",
+  legal: "Pháp lý",
+  other: "Khác",
+};
 
 function daysBetween(a: Date, b: Date) {
   const ms = b.getTime() - a.getTime();
@@ -50,11 +56,11 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         notes: true,
       },
     }),
-    prisma.projectDrawing.findMany({
-      where: { projectId: project.id },
-      orderBy: [{ displayOrder: "asc" }, { uploadedAt: "desc" }],
-      take: 6,
-      select: { id: true, name: true, description: true, fileSizeBytes: true, uploadedAt: true },
+    prisma.projectDocument.findMany({
+      where: { projectId: project.id, visibleToCustomer: true },
+      orderBy: { uploadedAt: "desc" },
+      take: 12,
+      select: { id: true, title: true, category: true, fileName: true, fileSize: true, uploadedAt: true },
     }),
     prisma.customerComment.findMany({
       where: { projectId: project.id, targetType: CommentTargetType.project, targetId: project.id, parentId: null },
@@ -176,11 +182,11 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
           <span className="text-xs owner-muted">{drawings.length} file</span>
         </div>
         <div className="space-y-2">
-          {drawings.length === 0 ? <div className="text-sm owner-muted">Chưa có bản vẽ được chia sẻ.</div> : null}
-          {drawings.map((drawing) => (
-            <a key={drawing.id} href={`/api/drawings/${drawing.id}/file?token=${params.token}`} target="_blank" className="owner-card block text-sm">
-              <div className="font-semibold text-white">{drawing.name}</div>
-              <div className="text-xs owner-muted">{drawing.description || "PDF bản vẽ"} · {Math.round(drawing.fileSizeBytes / 1024).toLocaleString("vi-VN")} KB</div>
+          {drawings.length === 0 ? <div className="text-sm owner-muted">Chưa có hồ sơ được chia sẻ.</div> : null}
+          {drawings.map((doc) => (
+            <a key={doc.id} href={`/api/projects/${project.id}/documents/${doc.id}/file?token=${params.token}`} target="_blank" className="owner-card block text-sm">
+              <div className="font-semibold text-white">{doc.title}</div>
+              <div className="text-xs owner-muted">{CATEGORY_LABEL[doc.category]} · {doc.fileName} · {Math.round(doc.fileSize / 1024).toLocaleString("vi-VN")} KB</div>
             </a>
           ))}
         </div>

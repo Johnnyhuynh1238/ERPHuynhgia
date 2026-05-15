@@ -29,6 +29,7 @@ export type DocumentDto = {
   mimeType: string;
   uploader: { id: string; fullName: string };
   uploadedAt: string;
+  visibleToCustomer: boolean;
   viewUrl: string;
   grantedUsers?: Array<{ id: string; fullName: string; role: string }>;
 };
@@ -103,6 +104,23 @@ export function DocumentsClient({
     } finally {
       setUploading(false);
     }
+  }
+
+  async function toggleCustomerVisibility(doc: DocumentDto) {
+    const next = !doc.visibleToCustomer;
+    setDocuments((prev) => prev.map((d) => (d.id === doc.id ? { ...d, visibleToCustomer: next } : d)));
+    const res = await fetch(`/api/projects/${projectId}/documents/${doc.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ visibleToCustomer: next }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    if (!res.ok) {
+      toast.error(data.message || "Cập nhật thất bại");
+      setDocuments((prev) => prev.map((d) => (d.id === doc.id ? { ...d, visibleToCustomer: !next } : d)));
+      return;
+    }
+    toast.success(next ? "Chủ nhà thấy được hồ sơ này" : "Đã ẩn khỏi chủ nhà");
   }
 
   async function handleDelete(doc: DocumentDto) {
@@ -214,6 +232,7 @@ export function DocumentsClient({
                   <th className="py-2 pr-2">Người upload</th>
                   <th className="py-2 pr-2">Ngày</th>
                   <th className="py-2 pr-2">Size</th>
+                  {isAdmin ? <th className="py-2 pr-2">Chủ nhà</th> : null}
                   <th className="py-2 pr-2 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -233,6 +252,23 @@ export function DocumentsClient({
                     <td className="py-2 pr-2 text-xs">{doc.uploader.fullName}</td>
                     <td className="py-2 pr-2 text-xs">{formatDate(doc.uploadedAt)}</td>
                     <td className="py-2 pr-2 text-xs">{formatBytes(doc.fileSize)}</td>
+                    {isAdmin ? (
+                      <td className="py-2 pr-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomerVisibility(doc)}
+                          className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-xs ${
+                            doc.visibleToCustomer
+                              ? "bg-emerald-900/40 text-emerald-300"
+                              : "bg-[#13151f] text-[#8892b0]"
+                          }`}
+                          title="Bật/tắt cho chủ nhà xem"
+                        >
+                          <span className={`inline-block h-2 w-2 rounded-full ${doc.visibleToCustomer ? "bg-emerald-400" : "bg-[#4b5563]"}`} />
+                          {doc.visibleToCustomer ? "Đang chia sẻ" : "Riêng tư"}
+                        </button>
+                      </td>
+                    ) : null}
                     <td className="py-2 pr-2 text-right">
                       <div className="flex justify-end gap-2">
                         <a

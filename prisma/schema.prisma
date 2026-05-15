@@ -1061,6 +1061,7 @@ model ProjectDocument {
   uploadedBy  String                  @map("uploaded_by") @db.Uuid
   uploadedAt  DateTime                @default(now()) @map("uploaded_at")
   updatedAt   DateTime                @updatedAt @map("updated_at")
+  visibleToCustomer Boolean           @default(false) @map("visible_to_customer")
 
   project    Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   uploader   User                    @relation("ProjectDocumentUploader", fields: [uploadedBy], references: [id])
@@ -1068,6 +1069,7 @@ model ProjectDocument {
 
   @@index([projectId, category])
   @@index([projectId, uploadedAt])
+  @@index([projectId, visibleToCustomer])
   @@map("project_documents")
 }
 

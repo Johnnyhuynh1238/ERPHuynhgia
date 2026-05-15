@@ -10,6 +10,7 @@ export const runtime = "nodejs";
 const updateSchema = z.object({
   title: z.string().trim().min(1, "Tiêu đề không được trống").optional(),
   category: z.nativeEnum(ProjectDocumentCategory).optional(),
+  visibleToCustomer: z.boolean().optional(),
 });
 
 function authError(error: unknown) {
@@ -45,7 +46,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const updated = await prisma.projectDocument.update({
     where: { id: params.docId },
     data: parsed.data,
-    select: { id: true, title: true, category: true },
+    select: { id: true, title: true, category: true, visibleToCustomer: true },
   });
 
   return NextResponse.json({ document: updated, message: "Đã cập nhật hồ sơ" });

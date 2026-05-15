@@ -56,6 +56,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     mimeType: true,
     uploadedBy: true,
     uploadedAt: true,
+    visibleToCustomer: true,
     uploader: { select: { id: true, fullName: true } },
   } as const;
 
@@ -92,6 +93,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       mimeType: doc.mimeType,
       uploader: doc.uploader,
       uploadedAt: doc.uploadedAt,
+      visibleToCustomer: doc.visibleToCustomer,
       viewUrl: fileViewUrl(params.id, doc.id),
       grantedUsers: accessList ? accessList.map((a) => a.user) : undefined,
     };
@@ -153,6 +155,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       fileSize: true,
       mimeType: true,
       uploadedAt: true,
+      visibleToCustomer: true,
       uploader: { select: { id: true, fullName: true } },
     },
   });
