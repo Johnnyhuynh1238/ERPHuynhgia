@@ -9,10 +9,8 @@ import { CustomerPhotoAlbum } from "../_components/customer-photo-album";
 const typeOptions = [
   { value: "all", label: "Tất cả" },
   { value: "report", label: "Nhật ký" },
-  { value: "photo", label: "Ảnh" },
-  { value: "qc", label: "QC" },
-  { value: "acknowledgment", label: "Nghiệm thu" },
-  { value: "payment", label: "Thanh toán" },
+  { value: "photo", label: "Ảnh tiến độ" },
+  { value: "qc", label: "Ảnh QC" },
 ];
 
 function dateText(value: Date) {
@@ -26,17 +24,13 @@ function timeText(value: Date) {
 function eventLabel(type: string) {
   if (type === "report") return "Nhật ký";
   if (type === "photo") return "Ảnh tiến độ";
-  if (type === "qc") return "QC";
-  if (type === "acknowledgment") return "Nghiệm thu";
-  if (type === "payment") return "Thanh toán";
+  if (type === "qc") return "Ảnh QC";
   return "Sự kiện";
 }
 
 function eventTone(type: string) {
   if (type === "photo") return "border-sky-500/30 bg-sky-500/10 text-sky-200";
   if (type === "qc") return "border-violet-500/30 bg-violet-500/10 text-violet-200";
-  if (type === "acknowledgment") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
-  if (type === "payment") return "border-amber-500/30 bg-amber-500/10 text-amber-200";
   return "border-[#2d3249] bg-[#13151f] text-[#d9def3]";
 }
 
@@ -167,22 +161,27 @@ export default async function CustomerJournalPage({
                     {event.description ? <div className="text-sm text-neutral-300">{event.description}</div> : null}
                     {event.taskId ? <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="mt-2 inline-block text-xs font-semibold text-[#ff8a3d] underline">Xem task {event.taskCode}</a> : null}
 
-                    {event.type === "payment" && event.photos?.length ? (
-                      <a href={`/api/payment-schedules/${event.targetId}/receipt?token=${params.token}`} target="_blank" className="owner-button mt-3 w-full">Xem biên lai</a>
-                    ) : event.photos?.length ? (
+                    {event.photos?.length ? (
                       <CustomerPhotoAlbum
                         photos={event.photos.map((photo, index) => {
-                          const qcPhotoUrl = event.type === "qc" ? `/api/customer/${params.token}/journal/qc-logs/${event.targetId}/photos/${index}/file` : null;
+                          let url = photo.url;
+                          let thumbnailUrl = photo.thumbnailUrl || null;
+                          if (event.type === "qc") {
+                            url = `/api/customer/${params.token}/journal/qc-logs/${event.targetId}/photos/${index}/file`;
+                            thumbnailUrl = url;
+                          } else if (event.type === "photo" && event.taskId && photo.id) {
+                            url = `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file`;
+                            thumbnailUrl = `${url}?variant=thumb`;
+                          }
                           return {
                             id: `${event.id}-photo-${index}`,
-                            url: qcPhotoUrl || photo.url,
-                            thumbnailUrl: qcPhotoUrl || photo.thumbnailUrl,
+                            url,
+                            thumbnailUrl,
                             caption: event.title,
                           };
                         })}
                         gridClassName="mt-3 grid grid-cols-3 gap-2"
                         triggerLabel={event.type === "photo" ? `Xem album ảnh (${event.photos.length} ảnh)` : undefined}
-                        compactTrigger={event.type === "photo"}
                       />
                     ) : null}
 

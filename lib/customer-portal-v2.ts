@@ -268,17 +268,21 @@ export async function buildCustomerJournalEvents(
     ...(phaseFilter ? { phaseId: phaseFilter } : {}),
   };
 
-  const [reports, progressUpdates, qcLogs, acknowledgments, payments, commentCounts] = await Promise.all([
+  const [reports, progressUpdates, qcLogs, commentCounts] = await Promise.all([
     typeFilter && typeFilter !== "report"
       ? Promise.resolve([])
       : prisma.eveningReport.findMany({
-          where: { projectId, submittedAt: { not: null } },
+          where: {
+            projectId,
+            submittedAt: { not: null },
+            overallNote: { not: null },
+            taskReports: { some: { task: taskWhere } },
+          },
           orderBy: { reportDate: "desc" },
           take: 80,
           select: {
             id: true,
             reportDate: true,
-            issues: true,
             overallNote: true,
             reporter: { select: { fullName: true } },
           },
@@ -303,57 +307,15 @@ export async function buildCustomerJournalEvents(
     typeFilter && typeFilter !== "qc"
       ? Promise.resolve([])
       : prisma.taskQcLog.findMany({
-          where: { task: taskWhere },
+          where: { task: taskWhere, NOT: { photos: { equals: [] } } },
           orderBy: { checkedAt: "desc" },
           take: 120,
           select: {
             id: true,
             checkedAt: true,
             photos: true,
-            note: true,
             qcItem: { select: { content: true } },
-            checker: { select: { fullName: true } },
             task: { select: { id: true, code: true, name: true, phase: true, projectPhase: { select: { name: true } } } },
-          },
-        }),
-    typeFilter && typeFilter !== "acknowledgment"
-      ? Promise.resolve([])
-      : prisma.customerAcknowledgment.findMany({
-          where: { projectId, task: phaseFilter ? { phaseId: phaseFilter } : undefined },
-          orderBy: { acknowledgedAt: "desc" },
-          take: 80,
-          select: {
-            id: true,
-            taskId: true,
-            acknowledgedAt: true,
-            task: { select: { id: true, code: true, name: true, phase: true, projectPhase: { select: { name: true } } } },
-            project: { select: { customerName: true } },
-          },
-        }),
-    typeFilter && typeFilter !== "payment"
-      ? Promise.resolve([])
-      : prisma.paymentSchedule.findMany({
-          where: { projectId, status: { in: [PaymentStatus.collected, PaymentStatus.paid] } },
-          orderBy: [{ paidAt: "desc" }, { actualPaidDate: "desc" }],
-          take: 80,
-          select: {
-            id: true,
-            type: true,
-            installmentNo: true,
-            phaseNumber: true,
-            description: true,
-            milestoneDescription: true,
-            amount: true,
-            dueDate: true,
-            expectedDate: true,
-            status: true,
-            paidAt: true,
-            paidAmount: true,
-            actualPaidDate: true,
-            actualPaidAmount: true,
-            receiptUrl: true,
-            paymentNote: true,
-            notes: true,
           },
         }),
     prisma.customerComment.groupBy({
@@ -375,7 +337,7 @@ export async function buildCustomerJournalEvents(
       type: "report" as const,
       date: report.reportDate,
       title: `${report.reporter.fullName} cập nhật nhật ký`,
-      description: report.overallNote || report.issues || null,
+      description: report.overallNote,
       targetType: CommentTargetType.journal_entry,
       targetId: report.id,
       commentCount: withCommentCount(CommentTargetType.journal_entry, report.id),
@@ -407,8 +369,8 @@ export async function buildCustomerJournalEvents(
       id: `qc:${log.id}`,
       type: "qc" as const,
       date: log.checkedAt,
-      title: `${log.task.code} - QC ${log.qcItem.content}`,
-      description: log.note || `${log.checker.fullName} cập nhật QC`,
+      title: `${log.task.code} - Ảnh QC: ${log.qcItem.content}`,
+      description: null,
       taskId: log.task.id,
       taskCode: log.task.code,
       taskName: log.task.name,
@@ -419,37 +381,6 @@ export async function buildCustomerJournalEvents(
       targetId: log.id,
       commentCount: withCommentCount(CommentTargetType.journal_entry, log.id),
     })),
-    ...acknowledgments.map((ack) => ({
-      id: `ack:${ack.id}`,
-      type: "acknowledgment" as const,
-      date: ack.acknowledgedAt,
-      title: `${ack.project.customerName} đã ký nghiệm thu ${ack.task.code}`,
-      description: ack.task.name,
-      taskId: ack.task.id,
-      taskCode: ack.task.code,
-      taskName: ack.task.name,
-      phase: ack.task.phase,
-      phaseName: ack.task.projectPhase?.name || null,
-      targetType: CommentTargetType.task,
-      targetId: ack.taskId,
-      commentCount: withCommentCount(CommentTargetType.task, ack.taskId),
-    })),
-    ...payments.flatMap((row) => {
-      const payment = normalizePaymentSchedule(row);
-      const date = payment.paidAt || payment.dueDate;
-      if (!date) return [];
-      return [{
-        id: `payment:${payment.id}`,
-        type: "payment" as const,
-        date,
-        title: `Đã thu ${payment.description}`,
-        description: `${Math.round(payment.paidAmount || payment.amount).toLocaleString("vi-VN")}đ`,
-        photos: payment.receiptUrl ? [{ url: payment.receiptUrl }] : [],
-        targetType: CommentTargetType.payment_schedule,
-        targetId: payment.id,
-        commentCount: withCommentCount(CommentTargetType.payment_schedule, payment.id),
-      }];
-    }),
   ];
 
   return events.sort((a, b) => b.date.getTime() - a.date.getTime());
