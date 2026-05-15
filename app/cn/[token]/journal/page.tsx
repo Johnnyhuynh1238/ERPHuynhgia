@@ -200,7 +200,7 @@ export default async function CustomerJournalPage({
                     <div className="min-w-0">
                       <div className="font-semibold text-white">
                         {event.taskId ? (
-                          <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="text-[#ffb37b] underline decoration-[#ff8a3d]/40 underline-offset-2">
+                          <a href={`/cn/${params.token}/tasks/${event.taskId}?from=journal`} className="text-[#ffb37b] underline decoration-[#ff8a3d]/40 underline-offset-2">
                             {event.title}
                           </a>
                         ) : (

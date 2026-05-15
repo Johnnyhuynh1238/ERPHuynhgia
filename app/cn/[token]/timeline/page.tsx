@@ -93,7 +93,7 @@ export default async function CustomerTimelinePage({ params }: { params: { token
             <div className="mt-4 space-y-2">
               {phase.tasks.length === 0 ? <div className="owner-card text-sm owner-muted">Chưa có task hiển thị.</div> : null}
               {phase.tasks.map((task) => (
-                <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}`} className="owner-card block">
+                <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}?from=timeline`} className="owner-card block">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs owner-muted">{task.code}</div>

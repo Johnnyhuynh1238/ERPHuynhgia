@@ -155,7 +155,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
           <div className="owner-section-title text-amber-100">CẦN XÁC NHẬN ({pendingAck.length})</div>
           <div className="space-y-2 text-sm">
             {pendingAck.map((task) => (
-              <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}`} className="owner-card block text-amber-100">
+              <Link key={task.id} href={`/cn/${params.token}/tasks/${task.id}?from=dashboard`} className="owner-card block text-amber-100">
                 {task.code} · {task.name}
               </Link>
             ))}

@@ -32,9 +32,22 @@ function statusClass(status: TaskStatus) {
   return "border-[#2d3249] bg-[#13151f] text-[#a8b0c8]";
 }
 
-export default async function CustomerTaskDetailPage({ params }: { params: { token: string; taskId: string } }) {
+const backTargets: Record<string, { href: (token: string) => string; label: string }> = {
+  timeline: { href: (token) => `/cn/${token}/timeline`, label: "← Tiến độ" },
+  dashboard: { href: (token) => `/cn/${token}/dashboard`, label: "← Tổng quan" },
+  journal: { href: (token) => `/cn/${token}/journal`, label: "← Nhật ký" },
+};
+
+export default async function CustomerTaskDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { token: string; taskId: string };
+  searchParams?: { from?: string };
+}) {
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
+  const back = backTargets[searchParams?.from || ""] || backTargets.journal;
 
   const task = await prisma.task.findFirst({
     where: { id: params.taskId, projectId: project.id, isActive: true, visibleToCustomer: true },
@@ -97,7 +110,7 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
-        <a href={`/cn/${params.token}/journal`} className="mb-3 inline-block text-sm font-semibold text-[#ff8a3d]">← Nhật ký</a>
+        <a href={back.href(params.token)} className="mb-3 inline-block text-sm font-semibold text-[#ff8a3d]">{back.label}</a>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs owner-muted">{task.projectPhase?.name || task.phase}</div>
