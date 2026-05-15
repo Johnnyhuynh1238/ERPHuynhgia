@@ -12,7 +12,7 @@ type PaymentRow = {
   milestoneDescription: string;
   percent: number;
   amount: number;
-  expectedDate: string;
+  expectedDate: string | null;
   actualPaidDate: string | null;
   actualPaidAmount: number | null;
   status: PaymentStatus;
@@ -60,7 +60,8 @@ function toInputDate(dateIso: string | null) {
   return dateIso.slice(0, 10);
 }
 
-function daysDiffFromToday(dateIso: string) {
+function daysDiffFromToday(dateIso: string | null) {
+  if (!dateIso) return null;
   const t = new Date();
   const today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
   const d = new Date(dateIso);
@@ -76,6 +77,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
   const [editing, setEditing] = useState<PaymentRow | null>(null);
   const [status, setStatus] = useState<PaymentStatus>("not_collected");
+  const [expectedDate, setExpectedDate] = useState("");
   const [actualPaidDate, setActualPaidDate] = useState("");
   const [actualPaidAmount, setActualPaidAmount] = useState("");
   const [notes, setNotes] = useState("");
@@ -113,6 +115,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   function openEdit(row: PaymentRow) {
     setEditing(row);
     setStatus(row.status);
+    setExpectedDate(toInputDate(row.expectedDate));
     setActualPaidDate(toInputDate(row.actualPaidDate));
     setActualPaidAmount(row.actualPaidAmount != null ? String(row.actualPaidAmount) : String(row.amount));
     setNotes(row.notes || "");
@@ -139,6 +142,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
     const payload = {
       status,
+      expectedDate: expectedDate || null,
       actualPaidDate: status === "collected" ? actualPaidDate : null,
       actualPaidAmount: status === "collected" ? Number(actualPaidAmount) : null,
       notes: notes.trim() || null,
@@ -165,6 +169,12 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
   function paymentHint(row: PaymentRow) {
     const d = daysDiffFromToday(row.expectedDate);
+    if (d == null) {
+      if (row.status === "customer_late") {
+        return { icon: "⚠️", className: "bg-red-50", text: "Quá hạn" };
+      }
+      return null;
+    }
     if (row.status === "not_collected" && d >= 0 && d <= 7) {
       return { icon: "🔔", className: "bg-yellow-50", text: "Sắp đến hạn" };
     }
@@ -274,6 +284,17 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
                   <option value="collected">Đã thu</option>
                   <option value="customer_late">Khách chậm</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm">Ngày dự kiến</label>
+                <input
+                  type="date"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  value={expectedDate}
+                  onChange={(e) => setExpectedDate(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-slate-500">Để trống nếu chưa có ngày.</p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">

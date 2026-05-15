@@ -9,6 +9,7 @@ const patchSchema = z.object({
   actualPaidDate: z.string().nullable().optional(),
   actualPaidAmount: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
+  expectedDate: z.string().nullable().optional(),
 });
 
 function normalizeDate(raw: string | null | undefined) {
@@ -35,6 +36,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     select: {
       id: true,
       amount: true,
+      project: { select: { startDate: true } },
     },
   });
 
@@ -49,7 +51,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const { status, actualPaidDate, actualPaidAmount, notes } = parsed.data;
+  const { status, actualPaidDate, actualPaidAmount, notes, expectedDate } = parsed.data;
 
   if (status === PaymentStatus.collected) {
     if (!actualPaidDate || actualPaidAmount == null || Number(actualPaidAmount) <= 0) {
@@ -57,14 +59,36 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  const updateData: {
+    status: PaymentStatus;
+    actualPaidDate: Date | null;
+    actualPaidAmount: number | null;
+    notes: string | null;
+    expectedDate?: Date | null;
+    dueDate?: Date | null;
+    dayOffset?: number | null;
+  } = {
+    status,
+    actualPaidDate: status === PaymentStatus.collected ? normalizeDate(actualPaidDate) : null,
+    actualPaidAmount: status === PaymentStatus.collected ? actualPaidAmount ?? null : null,
+    notes: notes || null,
+  };
+
+  if (expectedDate !== undefined) {
+    const parsedExpected = normalizeDate(expectedDate);
+    updateData.expectedDate = parsedExpected;
+    updateData.dueDate = parsedExpected;
+    if (parsedExpected && row.project?.startDate) {
+      const ms = parsedExpected.getTime() - new Date(row.project.startDate).getTime();
+      updateData.dayOffset = Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)));
+    } else {
+      updateData.dayOffset = null;
+    }
+  }
+
   const updated = await prisma.paymentSchedule.update({
     where: { id: row.id },
-    data: {
-      status,
-      actualPaidDate: status === PaymentStatus.collected ? normalizeDate(actualPaidDate) : null,
-      actualPaidAmount: status === PaymentStatus.collected ? actualPaidAmount : null,
-      notes: notes || null,
-    },
+    data: updateData,
     select: {
       id: true,
       phaseNumber: true,

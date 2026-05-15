@@ -248,8 +248,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         const amount = row.amount && row.amount > 0 ? row.amount : 0;
         const percent = row.percent !== null && row.percent !== undefined ? row.percent : contractValue > 0 ? (amount / contractValue) * 100 : 0;
         const dueDate = row.dueDate ? normalizeDate(row.dueDate) : null;
-        const expectedDate = dueDate ?? addDays(projectStartDate, 0);
-        const dayOffset = dueDate ? diffDays(projectStartDate, dueDate) : 0;
+        const expectedDate = dueDate;
+        const dayOffset = dueDate ? diffDays(projectStartDate, dueDate) : null;
 
         if (row.id && existingById.has(row.id)) {
           submittedIds.add(row.id);
@@ -262,7 +262,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               milestoneDescription: row.description,
               percent,
               amount,
-              ...(dueDate ? { dueDate, expectedDate, dayOffset } : {}),
+              dueDate,
+              expectedDate,
+              dayOffset,
               paymentNote: row.paymentNote || null,
               phaseNumber: row.installmentNo,
             },
@@ -278,7 +280,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               milestoneDescription: row.description,
               percent,
               amount,
-              dueDate: dueDate ?? projectStartDate,
+              dueDate,
               expectedDate,
               dayOffset,
               paymentNote: row.paymentNote || null,
@@ -555,10 +557,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       });
 
       for (const payment of payments) {
+        if (payment.dayOffset == null) continue;
+        const newExpected = addDays(startDate, payment.dayOffset);
         await tx.paymentSchedule.update({
           where: { id: payment.id },
           data: {
-            expectedDate: addDays(startDate, payment.dayOffset),
+            expectedDate: newExpected,
+            dueDate: newExpected,
           },
         });
       }

@@ -1001,8 +1001,8 @@ model PaymentSchedule {
   milestoneDescription String              @map("milestone_description")
   percent              Decimal             @db.Decimal(5, 2)
   amount               Decimal             @db.Decimal(15, 2)
-  expectedDate         DateTime            @map("expected_date") @db.Date
-  dayOffset            Int                 @map("day_offset")
+  expectedDate         DateTime?           @map("expected_date") @db.Date
+  dayOffset            Int?                @map("day_offset")
   status               PaymentStatus       @default(not_collected)
   actualPaidDate       DateTime?           @map("actual_paid_date") @db.Date
   actualPaidAmount     Decimal?            @map("actual_paid_amount") @db.Decimal(15, 2)

@@ -34,7 +34,7 @@ type PaymentRow = {
   milestoneDescription: string;
   amount: Prisma.Decimal | number;
   dueDate: Date | null;
-  expectedDate: Date;
+  expectedDate: Date | null;
   status: PaymentStatus;
   paidAt: Date | null;
   paidAmount: Prisma.Decimal | number | null;
@@ -53,7 +53,7 @@ export type NormalizedPaymentSchedule = {
   installmentNo: number;
   description: string;
   amount: number;
-  dueDate: Date;
+  dueDate: Date | null;
   status: NormalizedPaymentStatus;
   paidAt: Date | null;
   paidAmount: number | null;
@@ -97,7 +97,7 @@ export function normalizePaymentSchedule(row: PaymentRow): NormalizedPaymentSche
     installmentNo: row.installmentNo ?? row.phaseNumber,
     description: row.description || row.milestoneDescription,
     amount: toNumber(row.amount) || 0,
-    dueDate: row.dueDate || row.expectedDate,
+    dueDate: row.dueDate || row.expectedDate || null,
     status: mapPaymentStatus(row.status),
     paidAt: row.paidAt || row.actualPaidDate,
     paidAmount: toNumber(row.paidAmount) ?? toNumber(row.actualPaidAmount),
@@ -434,19 +434,21 @@ export async function buildCustomerJournalEvents(
       targetId: ack.taskId,
       commentCount: withCommentCount(CommentTargetType.task, ack.taskId),
     })),
-    ...payments.map((row) => {
+    ...payments.flatMap((row) => {
       const payment = normalizePaymentSchedule(row);
-      return {
+      const date = payment.paidAt || payment.dueDate;
+      if (!date) return [];
+      return [{
         id: `payment:${payment.id}`,
         type: "payment" as const,
-        date: payment.paidAt || payment.dueDate,
+        date,
         title: `Đã thu ${payment.description}`,
         description: `${Math.round(payment.paidAmount || payment.amount).toLocaleString("vi-VN")}đ`,
         photos: payment.receiptUrl ? [{ url: payment.receiptUrl }] : [],
         targetType: CommentTargetType.payment_schedule,
         targetId: payment.id,
         commentCount: withCommentCount(CommentTargetType.payment_schedule, payment.id),
-      };
+      }];
     }),
   ];
 

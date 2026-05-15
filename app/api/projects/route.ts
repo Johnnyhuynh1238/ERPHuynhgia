@@ -522,7 +522,7 @@ export async function POST(request: Request) {
             const installmentNo = item.installmentNo || index + 1;
             const amount = item.amount ?? (paymentBaseValue > 0 && item.percent !== undefined ? Math.round(paymentBaseValue * (item.percent / 100)) : 0);
             if (amount <= 0) throw new Error(`Đợt thanh toán ${installmentNo} thiếu số tiền hoặc % hợp lệ`);
-            const dueDate = item.dueDate ? normalizeDate(item.dueDate) : addDays(startDate, Math.round((dayDiff(startDate, expectedEndDate) * index) / Math.max(paymentScheduleInputs.length - 1, 1)));
+            const dueDate = item.dueDate ? normalizeDate(item.dueDate) : null;
             const percent = item.percent !== undefined ? item.percent : paymentBaseValue > 0 ? Math.round((amount / paymentBaseValue) * 10000) / 100 : 0;
 
             return {
@@ -532,7 +532,7 @@ export async function POST(request: Request) {
               percent,
               amount,
               expectedDate: dueDate,
-              dayOffset: dayDiff(startDate, dueDate),
+              dayOffset: dueDate ? dayDiff(startDate, dueDate) : null,
               status: "not_collected" as const,
               actualPaidDate: null,
               actualPaidAmount: null,
