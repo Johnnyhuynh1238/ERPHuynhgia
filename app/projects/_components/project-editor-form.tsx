@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -327,6 +327,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   const [aiConflicts, setAiConflicts] = useState<AiConflict[]>([]);
   const [paymentMismatchResolution, setPaymentMismatchResolution] = useState<"none" | "contract_wrong" | "has_reason">("none");
   const [paymentMismatchReason, setPaymentMismatchReason] = useState<string>("");
+  const [expandedPaymentRows, setExpandedPaymentRows] = useState<Set<string>>(new Set());
   const [draftAudits, setDraftAudits] = useState<DraftAudit[]>([]);
   const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
   const [fileKind, setFileKind] = useState<DraftFile["fileKind"]>("contract");
@@ -494,6 +495,18 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       setPaymentMismatchReason("");
     }
   }, [paymentTotals.hasMismatch, paymentMismatchResolution]);
+
+  useEffect(() => {
+    if (!expandNextAddRef.current) return;
+    const last = paymentSchedulesFieldArray.fields[paymentSchedulesFieldArray.fields.length - 1];
+    if (!last) return;
+    expandNextAddRef.current = false;
+    setExpandedPaymentRows((prev) => {
+      const next = new Set(prev);
+      next.add(last.id);
+      return next;
+    });
+  }, [paymentSchedulesFieldArray.fields]);
 
   const blockSubmitForPaymentMismatch =
     paymentTotals.hasMismatch && paymentMismatchResolution === "none";
@@ -675,7 +688,10 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return `⚠ Lịch thanh toán chênh lệch so với HĐ — lý do: ${paymentMismatchReason}. Chi tiết: ${detail}`;
   }
 
+  const expandNextAddRef = useRef(false);
+
   function addPaymentSchedule() {
+    expandNextAddRef.current = true;
     paymentSchedulesFieldArray.append({
       type: "contract",
       installmentNo: paymentSchedulesFieldArray.fields.length + 1,
@@ -684,6 +700,15 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       amount: undefined,
       dueDate: "",
       paymentNote: "",
+    });
+  }
+
+  function togglePaymentRowExpanded(fieldId: string) {
+    setExpandedPaymentRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldId)) next.delete(fieldId);
+      else next.add(fieldId);
+      return next;
     });
   }
 
@@ -1410,51 +1435,136 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         {paymentSchedulesFieldArray.fields.length === 0 ? (
           <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa có đợt thanh toán. Có thể bấm + để nhập thủ công, hoặc upload hợp đồng rồi chạy AI.</div>
         ) : (
-            <div className="space-y-3">
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-100 text-left text-xs font-medium text-slate-600">
+                    <th className="w-16 px-2 py-2">Đợt</th>
+                    <th className="px-2 py-2">Nội dung công việc</th>
+                    <th className="w-20 px-2 py-2">%</th>
+                    <th className="w-40 px-2 py-2">Số tiền</th>
+                    <th className="w-36 px-2 py-2">Ngày hạn</th>
+                    <th className="w-16 px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentSchedulesFieldArray.fields.map((field, idx) => {
+                    const rowErrors = form.formState.errors.paymentSchedules?.[idx];
+                    const expanded = expandedPaymentRows.has(field.id);
+                    return (
+                      <Fragment key={field.id}>
+                        <tr className="border-b align-top">
+                          <td className="px-2 py-2">
+                            <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.installmentNo`)} {...form.register(`paymentSchedules.${idx}.installmentNo` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.installmentNo ? <p className="mt-1 text-xs text-red-600">{rowErrors.installmentNo.message}</p> : null}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input className={getFieldInputClassName(`paymentSchedules.${idx}.description`)} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
+                            {rowErrors?.description ? <p className="mt-1 text-xs text-red-600">{rowErrors.description.message}</p> : null}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="number" min={0} max={100} step="0.01" className={getFieldInputClassName(`paymentSchedules.${idx}.percent`)} {...form.register(`paymentSchedules.${idx}.percent` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.percent ? <p className="mt-1 text-xs text-red-600">{rowErrors.percent.message}</p> : null}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.amount`)} {...form.register(`paymentSchedules.${idx}.amount` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.amount ? <p className="mt-1 text-xs text-red-600">{rowErrors.amount.message}</p> : null}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="date" className={getFieldInputClassName(`paymentSchedules.${idx}.dueDate`)} {...form.register(`paymentSchedules.${idx}.dueDate` as const)} />
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <button type="button" aria-label="Xóa đợt" onClick={() => paymentSchedulesFieldArray.remove(idx)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">✕</button>
+                          </td>
+                        </tr>
+                        <tr className="border-b bg-slate-50/50">
+                          <td className="px-2 pb-2" />
+                          <td colSpan={5} className="px-2 pb-2">
+                            <button type="button" onClick={() => togglePaymentRowExpanded(field.id)} className="text-xs text-slate-500 hover:text-slate-900">
+                              {expanded ? "▾ Ẩn ghi chú" : "▸ Ghi chú"}
+                            </button>
+                            {expanded ? (
+                              <textarea rows={2} className={`mt-1 ${getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} resize-y`} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
+                            ) : null}
+                          </td>
+                        </tr>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-3 md:hidden">
               {paymentSchedulesFieldArray.fields.map((field, idx) => {
                 const rowErrors = form.formState.errors.paymentSchedules?.[idx];
+                const expanded = expandedPaymentRows.has(field.id);
+                const row = paymentSchedulesValue?.[idx];
+                const summaryParts: string[] = [];
+                if (row?.percent !== undefined && row?.percent !== null && !Number.isNaN(Number(row.percent))) summaryParts.push(`${row.percent}%`);
+                if (row?.amount !== undefined && row?.amount !== null && !Number.isNaN(Number(row.amount))) summaryParts.push(formatMoney(Number(row.amount)));
+                if (row?.dueDate) summaryParts.push(`Hạn ${row.dueDate}`);
                 return (
-                  <div key={field.id} className="rounded-lg border bg-slate-50 p-3">
-                    <div className="grid gap-3 md:grid-cols-[90px_1fr]">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Đợt{renderFieldMarker(`paymentSchedules.${idx}.installmentNo`)}</label>
-                        <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.installmentNo`)} {...form.register(`paymentSchedules.${idx}.installmentNo` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
-                        {rowErrors?.installmentNo ? <p className="mt-1 text-xs text-red-600">{rowErrors.installmentNo.message}</p> : null}
+                  <div key={field.id} className="rounded-lg border bg-slate-50">
+                    {!expanded ? (
+                      <button type="button" onClick={() => togglePaymentRowExpanded(field.id)} className="flex w-full items-start justify-between gap-3 p-3 text-left">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-slate-900">
+                            #{row?.installmentNo ?? idx + 1} · {row?.description || <span className="italic text-slate-400">(chưa có nội dung)</span>}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {summaryParts.length > 0 ? summaryParts.join("  ·  ") : "Bấm để chỉnh sửa"}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-xs text-slate-400">▸</span>
+                      </button>
+                    ) : (
+                      <div className="space-y-3 p-3">
+                        <div className="grid grid-cols-[80px_1fr] gap-3">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">Đợt{renderFieldMarker(`paymentSchedules.${idx}.installmentNo`)}</label>
+                            <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.installmentNo`)} {...form.register(`paymentSchedules.${idx}.installmentNo` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.installmentNo ? <p className="mt-1 text-xs text-red-600">{rowErrors.installmentNo.message}</p> : null}
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">Nội dung công việc{renderFieldMarker(`paymentSchedules.${idx}.description`)}</label>
+                            <input className={getFieldInputClassName(`paymentSchedules.${idx}.description`)} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
+                            {rowErrors?.description ? <p className="mt-1 text-xs text-red-600">{rowErrors.description.message}</p> : null}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">%{renderFieldMarker(`paymentSchedules.${idx}.percent`)}</label>
+                            <input type="number" min={0} max={100} step="0.01" className={getFieldInputClassName(`paymentSchedules.${idx}.percent`)} {...form.register(`paymentSchedules.${idx}.percent` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.percent ? <p className="mt-1 text-xs text-red-600">{rowErrors.percent.message}</p> : null}
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">Số tiền{renderFieldMarker(`paymentSchedules.${idx}.amount`)}</label>
+                            <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.amount`)} {...form.register(`paymentSchedules.${idx}.amount` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
+                            {rowErrors?.amount ? <p className="mt-1 text-xs text-red-600">{rowErrors.amount.message}</p> : null}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium">Ngày hạn{renderFieldMarker(`paymentSchedules.${idx}.dueDate`)}</label>
+                          <input type="date" className={getFieldInputClassName(`paymentSchedules.${idx}.dueDate`)} {...form.register(`paymentSchedules.${idx}.dueDate` as const)} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium">Ghi chú{renderFieldMarker(`paymentSchedules.${idx}.paymentNote`)}</label>
+                          <textarea rows={2} className={`${getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} resize-y`} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button type="button" variant="outline" onClick={() => togglePaymentRowExpanded(field.id)}>Thu gọn</Button>
+                          <Button type="button" variant="outline" onClick={() => paymentSchedulesFieldArray.remove(idx)}>Xóa</Button>
+                        </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Nội dung công việc{renderFieldMarker(`paymentSchedules.${idx}.description`)}</label>
-                        <textarea rows={2} className={`${getFieldInputClassName(`paymentSchedules.${idx}.description`)} resize-y`} placeholder="VD: Tạm ứng khởi công" {...form.register(`paymentSchedules.${idx}.description` as const)} />
-                        {rowErrors?.description ? <p className="mt-1 text-xs text-red-600">{rowErrors.description.message}</p> : null}
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-3 md:grid-cols-[120px_180px_180px_auto]">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">%{renderFieldMarker(`paymentSchedules.${idx}.percent`)}</label>
-                        <input type="number" min={0} max={100} step="0.01" className={getFieldInputClassName(`paymentSchedules.${idx}.percent`)} {...form.register(`paymentSchedules.${idx}.percent` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
-                        {rowErrors?.percent ? <p className="mt-1 text-xs text-red-600">{rowErrors.percent.message}</p> : null}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Số tiền{renderFieldMarker(`paymentSchedules.${idx}.amount`)}</label>
-                        <input type="number" min={1} className={getFieldInputClassName(`paymentSchedules.${idx}.amount`)} {...form.register(`paymentSchedules.${idx}.amount` as const, { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} />
-                        {rowErrors?.amount ? <p className="mt-1 text-xs text-red-600">{rowErrors.amount.message}</p> : null}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Ngày hạn{renderFieldMarker(`paymentSchedules.${idx}.dueDate`)}</label>
-                        <input type="date" className={getFieldInputClassName(`paymentSchedules.${idx}.dueDate`)} {...form.register(`paymentSchedules.${idx}.dueDate` as const)} />
-                      </div>
-                      <div className="flex items-end">
-                        <Button type="button" variant="outline" onClick={() => paymentSchedulesFieldArray.remove(idx)}>Xóa</Button>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <label className="mb-1 block text-xs font-medium">Ghi chú{renderFieldMarker(`paymentSchedules.${idx}.paymentNote`)}</label>
-                      <textarea rows={2} className={`${getFieldInputClassName(`paymentSchedules.${idx}.paymentNote`)} resize-y`} placeholder="VD: Chủ đầu tư thanh toán phần còn lại" {...form.register(`paymentSchedules.${idx}.paymentNote` as const)} />
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-          )}
+          </>
+        )}
 
         {paymentTotals.rowCount > 0 ? (
           <div className={`mt-4 rounded-lg border p-3 text-sm ${paymentTotals.hasMismatch ? (paymentMismatchResolution === "none" ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900") : "border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
