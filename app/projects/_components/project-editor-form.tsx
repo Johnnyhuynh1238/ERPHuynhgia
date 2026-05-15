@@ -373,13 +373,29 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       setEngineers(data.engineers || []);
       setMembers(data.members || []);
 
-      if (!form.getValues("projectManagerId") && data.admins?.[0]) {
-        form.setValue("projectManagerId", data.admins[0].id);
-      }
+      const current = form.getValues();
+      const initialPm = initialValues?.projectManagerId;
+
+      const pmStillValid = current.projectManagerId && (data.admins || []).some((u) => u.id === current.projectManagerId);
+      const nextPm = pmStillValid
+        ? current.projectManagerId
+        : initialPm && (data.admins || []).some((u) => u.id === initialPm)
+          ? initialPm
+          : data.admins?.[0]?.id || "";
+
+      const initialEng = initialValues?.mainEngineerId;
+      const engStillValid = current.mainEngineerId && (data.engineers || []).some((u) => u.id === current.mainEngineerId);
+      const nextEng = engStillValid
+        ? current.mainEngineerId
+        : initialEng && (data.engineers || []).some((u) => u.id === initialEng)
+          ? initialEng
+          : current.mainEngineerId;
+
+      form.reset({ ...current, projectManagerId: nextPm, mainEngineerId: nextEng });
     }
 
     loadOptions();
-  }, [currentUserId, form]);
+  }, [currentUserId, form, initialValues?.projectManagerId, initialValues?.mainEngineerId]);
 
   const contractValueWatch = form.watch("contractValue");
   const selectedMembers = form.watch("members");
