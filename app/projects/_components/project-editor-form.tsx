@@ -325,6 +325,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   const [draftFiles, setDraftFiles] = useState<DraftFile[]>([]);
   const [aiProposals, setAiProposals] = useState<AiProposal[]>([]);
   const [aiConflicts, setAiConflicts] = useState<AiConflict[]>([]);
+  const [paymentMismatchResolution, setPaymentMismatchResolution] = useState<"none" | "contract_wrong" | "has_reason">("none");
+  const [paymentMismatchReason, setPaymentMismatchReason] = useState<string>("");
   const [draftAudits, setDraftAudits] = useState<DraftAudit[]>([]);
   const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
   const [fileKind, setFileKind] = useState<DraftFile["fileKind"]>("contract");
@@ -402,8 +404,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   const startDateValue = form.watch("startDate");
   const plannedDeadlineValue = form.watch("plannedDeadline");
   const templateCategoryValue = form.watch("templateCategory");
-  const paymentSchedulesValue = form.watch("paymentSchedules") || [];
-  const drawingsValue = form.watch("drawings") || [];
+  const paymentSchedulesValue = form.watch("paymentSchedules");
+  const drawingsValue = form.watch("drawings");
   const supplementalPaymentCount = Array.isArray(paymentSchedulesValue) ? paymentSchedulesValue.length : 0;
   const supplementalDrawingCount = Array.isArray(drawingsValue) ? drawingsValue.length : 0;
 
@@ -465,7 +467,43 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     return Math.floor(diffMs / 86400000);
   }, [calculatedEndDate, plannedDeadlineValue]);
 
-  const isSubmitDisabled = submitting || hasDuplicateMembers || loadingOptions || loadingTemplateSummary;
+  const paymentTotals = useMemo(() => {
+    const rows = Array.isArray(paymentSchedulesValue) ? paymentSchedulesValue : [];
+    const amountSum = rows.reduce((s, r) => s + (Number(r?.amount) || 0), 0);
+    const percentSum = rows.reduce((s, r) => s + (Number(r?.percent) || 0), 0);
+    const cv = Number(contractValue) || 0;
+    const amountDelta = amountSum - cv;
+    const percentDelta = percentSum - 100;
+    const hasAmountMismatch = cv > 0 && rows.length > 0 && Math.abs(amountDelta) > 1000;
+    const hasPercentMismatch = rows.length > 0 && Math.abs(percentDelta) > 0.1;
+    return {
+      amountSum,
+      percentSum,
+      amountDelta,
+      percentDelta,
+      hasAmountMismatch,
+      hasPercentMismatch,
+      hasMismatch: hasAmountMismatch || hasPercentMismatch,
+      rowCount: rows.length,
+    };
+  }, [paymentSchedulesValue, contractValue]);
+
+  useEffect(() => {
+    if (!paymentTotals.hasMismatch && paymentMismatchResolution !== "none") {
+      setPaymentMismatchResolution("none");
+      setPaymentMismatchReason("");
+    }
+  }, [paymentTotals.hasMismatch, paymentMismatchResolution]);
+
+  const blockSubmitForPaymentMismatch =
+    paymentTotals.hasMismatch && paymentMismatchResolution === "none";
+
+  const isSubmitDisabled =
+    submitting ||
+    hasDuplicateMembers ||
+    loadingOptions ||
+    loadingTemplateSummary ||
+    blockSubmitForPaymentMismatch;
 
   const aiFieldMarkers = useMemo(() => {
     const markerMap = new Map<string, AiFieldMarker[]>();
@@ -592,6 +630,49 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
         ))}
       </span>
     );
+  }
+
+  function clearAllPaymentSchedules() {
+    paymentSchedulesFieldArray.replace([]);
+    setPaymentMismatchResolution("none");
+    setPaymentMismatchReason("");
+    toast.success("Đã xoá toàn bộ đợt thanh toán, mời nhập lại");
+  }
+
+  function acceptPaymentMismatchAsContractError() {
+    setPaymentMismatchResolution("contract_wrong");
+    setPaymentMismatchReason("");
+  }
+
+  function acceptPaymentMismatchWithReason() {
+    const reason = window.prompt(
+      "Nhập lý do chênh lệch (VD: VAT 10%, giảm giá khuyến mại, đối ứng vật tư...):",
+      paymentMismatchReason || "",
+    );
+    if (reason === null) return;
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      toast.error("Lý do không được để trống");
+      return;
+    }
+    setPaymentMismatchReason(trimmed);
+    setPaymentMismatchResolution("has_reason");
+  }
+
+  function buildPaymentMismatchNote() {
+    if (paymentMismatchResolution === "none" || !paymentTotals.hasMismatch) return null;
+    const parts: string[] = [];
+    if (paymentTotals.hasAmountMismatch) {
+      parts.push(`tổng tiền các đợt ${formatMoney(paymentTotals.amountSum)} ≠ giá trị HĐ ${formatMoney(Number(contractValue))} (chênh ${formatMoney(paymentTotals.amountDelta)})`);
+    }
+    if (paymentTotals.hasPercentMismatch) {
+      parts.push(`tổng % = ${paymentTotals.percentSum.toFixed(2)}% (cần 100%)`);
+    }
+    const detail = parts.join("; ");
+    if (paymentMismatchResolution === "contract_wrong") {
+      return `⚠ Lịch thanh toán chênh lệch so với HĐ — admin xác nhận HĐ ghi sai: ${detail}`;
+    }
+    return `⚠ Lịch thanh toán chênh lệch so với HĐ — lý do: ${paymentMismatchReason}. Chi tiết: ${detail}`;
   }
 
   function addPaymentSchedule() {
@@ -903,6 +984,9 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
   }
 
   async function submitCreate(values: ProjectEditorFormValues) {
+    const mismatchNote = buildPaymentMismatchNote();
+    const mergedNotes = [values.notes || null, mismatchNote].filter(Boolean).join("\n") || null;
+
     const payload = {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
@@ -923,6 +1007,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       warrantyLeakYears: values.warrantyLeakYears,
       members: values.members,
       paymentSchedules: values.paymentSchedules || [],
+      notes: mergedNotes,
     };
 
     const res = await fetch("/api/projects", {
@@ -955,6 +1040,9 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
       if (!ok) return;
     }
 
+    const mismatchNote = buildPaymentMismatchNote();
+    const mergedNotes = [values.notes || null, mismatchNote].filter(Boolean).join("\n") || null;
+
     const requests = [
       fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
@@ -983,7 +1071,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
             plannedDeadline: values.plannedDeadline || null,
             actualEndDate: values.actualEndDate || null,
             status: values.status,
-            notes: values.notes || null,
+            notes: mergedNotes,
           },
         }),
       }),
@@ -1367,6 +1455,43 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
               })}
             </div>
           )}
+
+        {paymentTotals.rowCount > 0 ? (
+          <div className={`mt-4 rounded-lg border p-3 text-sm ${paymentTotals.hasMismatch ? (paymentMismatchResolution === "none" ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900") : "border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div><span className="font-medium">Tổng tiền các đợt:</span> {formatMoney(paymentTotals.amountSum)} / Giá trị HĐ: {formatMoney(Number(contractValue))}{paymentTotals.hasAmountMismatch ? ` (chênh ${formatMoney(paymentTotals.amountDelta)})` : ""}</div>
+                <div className="mt-1"><span className="font-medium">Tổng %:</span> {paymentTotals.percentSum.toFixed(2)}% / Cần 100%{paymentTotals.hasPercentMismatch ? ` (chênh ${paymentTotals.percentDelta.toFixed(2)}%)` : ""}</div>
+              </div>
+              {!paymentTotals.hasMismatch ? <div className="text-xs font-medium">Khớp</div> : null}
+            </div>
+
+            {paymentTotals.hasMismatch && paymentMismatchResolution === "none" ? (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs text-red-700">Lịch thanh toán không khớp giá trị HĐ. Chọn 1 trong 3 hướng xử lý để được bấm &quot;Cập Nhật Dự Án&quot;:</div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <Button type="button" variant="outline" onClick={clearAllPaymentSchedules}>1. AI đọc sai → Xoá hết và nhập lại</Button>
+                  <Button type="button" variant="outline" onClick={acceptPaymentMismatchAsContractError}>2. HĐ ghi sai thật → Giữ + ghi cảnh báo</Button>
+                  <Button type="button" variant="outline" onClick={acceptPaymentMismatchWithReason}>3. Có lý do hợp lệ → Nhập lý do</Button>
+                </div>
+              </div>
+            ) : null}
+
+            {paymentTotals.hasMismatch && paymentMismatchResolution === "contract_wrong" ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>Admin xác nhận HĐ ghi sai → khi cập nhật, sẽ tự thêm cảnh báo vào Ghi chú dự án.</div>
+                <Button type="button" variant="outline" onClick={() => { setPaymentMismatchResolution("none"); setPaymentMismatchReason(""); }}>Chọn lại</Button>
+              </div>
+            ) : null}
+
+            {paymentTotals.hasMismatch && paymentMismatchResolution === "has_reason" ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>Lý do chênh lệch: <span className="font-medium">{paymentMismatchReason}</span></div>
+                <Button type="button" variant="outline" onClick={() => { setPaymentMismatchResolution("none"); setPaymentMismatchReason(""); }}>Chọn lại</Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-xl border bg-white p-5 text-slate-900">

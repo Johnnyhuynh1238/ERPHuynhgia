@@ -74,6 +74,7 @@ const createProjectSchema = z.object({
     )
     .default([]),
   paymentSchedules: z.array(paymentScheduleInputSchema).default([]),
+  notes: z.string().trim().optional().nullable(),
 });
 
 function mapAuthError(message: string) {
@@ -385,7 +386,7 @@ export async function POST(request: Request) {
           projectManagerId,
           mainEngineerId: parsed.data.mainEngineerId,
           status: ProjectStatus.planning,
-          notes: null,
+          notes: parsed.data.notes || null,
           contractMeta:
             Object.keys(contractMetaPayload).length > 0
               ? (contractMetaPayload as Prisma.InputJsonValue)
