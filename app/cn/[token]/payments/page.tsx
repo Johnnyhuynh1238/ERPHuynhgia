@@ -82,25 +82,43 @@ export default async function CustomerPaymentsPage({ params }: { params: { token
   const contractPayments = payments.filter((payment) => payment.type === "contract");
   const addendumPayments = payments.filter((payment) => payment.type === "addendum");
 
+  const displayStatus = (payment: (typeof payments)[number]): string => {
+    if (payment.status === "paid" || payment.status === "cancelled") return payment.status;
+    const days = daysUntil(payment.dueDate);
+    if (days !== null && days < 0) return "overdue";
+    return "pending";
+  };
+
+  const unpaidWithDate = payments
+    .filter((p) => p.status !== "paid" && p.status !== "cancelled" && p.dueDate)
+    .sort((a, b) => (a.dueDate as Date).getTime() - (b.dueDate as Date).getTime());
+  const upcomingPayment = unpaidWithDate.find((p) => {
+    const d = daysUntil(p.dueDate);
+    return d !== null && d >= 0;
+  }) || unpaidWithDate[unpaidWithDate.length - 1] || null;
+  const upcomingId = upcomingPayment?.id || null;
+
   const renderPayment = (payment: (typeof payments)[number]) => {
     const paymentComments = comments.filter((comment) => comment.targetId === payment.id);
     const days = daysUntil(payment.dueDate);
     const dueSoon = payment.status !== "paid" && days !== null && days >= 0 && days <= 30;
     const isPaid = payment.status === "paid";
+    const shownStatus = displayStatus(payment);
     const summaryAmount = isPaid ? payment.paidAmount || payment.amount : payment.amount;
     const summaryDateLabel = isPaid ? "Ngày thu" : "Hạn thu";
     const summaryDateValue = isPaid ? dateText(payment.paidAt) : dateText(payment.dueDate);
     const summaryAmountClass = isPaid ? "text-emerald-200" : "text-white";
+    const isUpcoming = payment.id === upcomingId;
 
     return (
-      <details key={payment.id} className="owner-payment-card owner-card">
+      <details key={payment.id} className={`owner-payment-card owner-card ${isUpcoming ? "owner-payment-upcoming" : ""}`}>
         <summary className="owner-payment-summary cursor-pointer list-none">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-xs owner-muted">Đợt {payment.installmentNo}</div>
+              <div className="text-xs owner-muted">Đợt {payment.installmentNo}{isUpcoming ? " · Sắp đến hạn" : ""}</div>
               <h2 className="truncate font-semibold text-white">{payment.description}</h2>
             </div>
-            <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusClass(payment.status)}`}>{statusText(payment.status)}</span>
+            <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${statusClass(shownStatus)}`}>{statusText(shownStatus)}</span>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 text-sm">
             <span className={`font-semibold ${summaryAmountClass}`}>{money(summaryAmount)}</span>

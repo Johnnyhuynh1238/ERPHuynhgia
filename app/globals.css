@@ -400,6 +400,11 @@ body {
   border-bottom: 1px solid #3a3a3a;
   padding-bottom: 10px;
 }
+.owner-payment-upcoming {
+  border: 1px solid rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 14px rgba(255, 138, 61, 0.35);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.08), rgba(255, 138, 61, 0.02));
+}
 
 .owner-input,
 .owner-textarea,
