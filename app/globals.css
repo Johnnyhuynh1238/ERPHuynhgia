@@ -363,7 +363,7 @@ body {
 .owner-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: #ff8a3d;
+  background: #3b82f6;
 }
 
 .owner-button {
@@ -376,6 +376,17 @@ body {
   padding: 10px 14px;
   font-size: 14px;
   font-weight: 800;
+}
+
+.owner-comment-toggle > summary {
+  list-style: none;
+}
+.owner-comment-toggle > summary::-webkit-details-marker {
+  display: none;
+}
+.owner-comment-toggle[open] > summary {
+  background: #4b5563;
+  color: #fff;
 }
 
 .owner-input,

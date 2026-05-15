@@ -25,7 +25,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
 
-  const [overview, payments, drawings, projectComments, pendingAck, runningTask] = await Promise.all([
+  const [overview, payments, drawings, projectComments, pendingAck] = await Promise.all([
     getCustomerPortalOverview(project.id),
     prisma.paymentSchedule.findMany({
       where: { projectId: project.id },
@@ -78,11 +78,6 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
       select: { id: true, code: true, name: true },
       orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
       take: 3,
-    }),
-    prisma.task.findFirst({
-      where: { projectId: project.id, isActive: true, visibleToCustomer: true, status: TaskStatus.in_progress },
-      select: { id: true, code: true, name: true, progressPercent: true },
-      orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
     }),
   ]);
 
@@ -138,7 +133,6 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         <div className="owner-section-title">THÔNG TIN NHÀ</div>
         <div className="owner-info-row"><span>Mã dự án</span><span>{overview.project.code}</span></div>
         <div className="owner-info-row"><span>Địa chỉ</span><span className="text-right">{overview.project.address || "Chưa cập nhật"}</span></div>
-        <div className="owner-info-row"><span>Diện tích</span><span>{overview.project.areaM2 ? `${overview.project.areaM2} m²` : "Chưa cập nhật"}</span></div>
         <div className="owner-info-row"><span>Dự kiến bàn giao</span><span>{dateText(overview.project.expectedEndDate)}</span></div>
       </section>
 
@@ -148,19 +142,6 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         <div className="owner-info-row"><span>Đã thu</span><span className="text-emerald-300">{money(paidTotal)}</span></div>
         <div className="owner-info-row"><span>Còn lại</span><span>{money(Math.max(0, contractValue - paidTotal))}</span></div>
         {nextPayment ? <div className="owner-card mt-3 text-sm">Sắp tới: {nextPayment.description} · {money(nextPayment.amount)} · {dateText(nextPayment.dueDate)}</div> : null}
-      </section>
-
-      <section className="owner-section">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="owner-section-title mb-0">TIẾN ĐỘ</div>
-          <Link href={`/cn/${params.token}/timeline`} className="text-xs font-semibold text-[#ff8a3d] underline">Xem tất cả</Link>
-        </div>
-        {runningTask ? (
-          <Link href={`/cn/${params.token}/tasks/${runningTask.id}`} className="owner-card block text-sm">
-            <div className="font-semibold text-white">{runningTask.code} · {runningTask.name}</div>
-            <div className="mt-3 owner-progress-track"><div className="owner-progress-fill" style={{ width: `${runningTask.progressPercent || 0}%` }} /></div>
-          </Link>
-        ) : <div className="text-sm owner-muted">Hiện chưa có task đang thi công.</div>}
       </section>
 
       {pendingAck.length ? (
@@ -207,12 +188,15 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
 
       <section className="owner-section">
         <div className="owner-section-title">BÌNH LUẬN CHUNG</div>
-        <form action={`/cn/${params.token}/comments/new`} method="post" className="space-y-2">
-          <input type="hidden" name="targetType" value={CommentTargetType.project} />
-          <input type="hidden" name="targetId" value={project.id} />
-          <textarea name="content" rows={3} placeholder="Nhắn câu hỏi hoặc ghi chú cho đội thi công..." className="owner-textarea placeholder:text-neutral-500" />
-          <button className="owner-button w-full" type="submit">Gửi bình luận</button>
-        </form>
+        <details className="owner-comment-toggle">
+          <summary className="owner-button w-full cursor-pointer text-center">Viết bình luận</summary>
+          <form action={`/cn/${params.token}/comments/new`} method="post" className="mt-3 space-y-2">
+            <input type="hidden" name="targetType" value={CommentTargetType.project} />
+            <input type="hidden" name="targetId" value={project.id} />
+            <textarea name="content" rows={3} placeholder="Nhắn câu hỏi hoặc ghi chú cho đội thi công..." className="owner-textarea placeholder:text-neutral-500" />
+            <button className="owner-button w-full" type="submit">Gửi bình luận</button>
+          </form>
+        </details>
         <div className="mt-4 space-y-3">
           {projectComments.length === 0 ? <div className="text-sm owner-muted">Chưa có bình luận chung.</div> : null}
           {projectComments.map((comment) => (
