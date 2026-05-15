@@ -466,19 +466,55 @@ body {
   padding: 10px 12px;
 }
 
+.owner-timeline-day {
+  margin-top: 14px;
+}
+.owner-timeline-day:first-child {
+  margin-top: 0;
+}
 .owner-day-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 1px solid #2a2a2a;
-  padding-top: 10px;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 8px;
 }
-.owner-day-header:first-child,
-.owner-section .owner-day-header:first-of-type {
-  border-top: 0;
-  padding-top: 0;
+
+.owner-timeline {
+  position: relative;
+  padding-left: 4px;
+}
+.owner-timeline-event {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  column-gap: 10px;
+  position: relative;
+  padding-bottom: 14px;
+}
+.owner-timeline-event:last-child {
+  padding-bottom: 0;
+}
+.owner-timeline-event::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: #2a2a2a;
+}
+.owner-timeline-event:last-child::before {
+  display: none;
+}
+.owner-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 5px;
+  z-index: 1;
+  box-shadow: 0 0 0 2px #1a1a1a;
 }
 
 @media (min-width: 768px) {

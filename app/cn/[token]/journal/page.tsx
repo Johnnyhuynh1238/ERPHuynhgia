@@ -163,19 +163,19 @@ export default async function CustomerJournalPage({
         <CustomerJournalDownloadButtons token={params.token} />
       </section>
 
-      <section className="owner-section space-y-4">
+      <section className="owner-section">
         <div className="owner-section-title">DÒNG THỜI GIAN</div>
         {events.length === 0 ? (
           <div className="text-sm owner-muted">Chưa có sự kiện phù hợp bộ lọc.</div>
         ) : null}
 
         {Array.from(groupedByDay.entries()).map(([day, group]) => (
-          <div key={day}>
+          <div key={day} className="owner-timeline-day">
             <div className="owner-day-header">
               <span className="font-semibold text-white">{group.label}</span>
               <span className="text-xs owner-muted">{group.events.length} log</span>
             </div>
-            <div className="mt-2 space-y-2">
+            <div className="owner-timeline">
               {group.events.map((event) => {
                 const photos = event.photos?.length
                   ? event.photos.map((photo, index) => {
@@ -191,40 +191,36 @@ export default async function CustomerJournalPage({
                 const progressText = event.progressFrom != null && event.progressTo != null
                   ? `${event.progressFrom}% → ${event.progressTo}%`
                   : null;
+                const metaParts: string[] = [timeText(event.date)];
+                if (event.phaseName) metaParts.push(event.phaseName);
+                if (progressText) metaParts.push(`${event.actor || "KS"} cập nhật ${progressText}`);
+                else if (event.actor) metaParts.push(event.actor);
+                if (event.description && !progressText) metaParts.push(event.description);
                 return (
-                  <article key={event.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
-                    <div className="flex items-start gap-2">
-                      <span className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${eventDotClass(event.type)}`} aria-hidden />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs owner-muted">
-                          {timeText(event.date)}
-                          {event.phaseName ? ` · ${event.phaseName}` : ""}
-                          {event.actor ? ` · ${event.actor}` : ""}
-                        </div>
-                        <div className="mt-1 font-semibold text-white">{event.title}</div>
-                        {progressText ? (
-                          <div className="mt-1 text-sm text-sky-200">Tiến độ {progressText}</div>
+                  <div key={event.id} className="owner-timeline-event">
+                    <span className={`owner-timeline-dot ${eventDotClass(event.type)}`} aria-hidden />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white">
+                        {event.taskId ? (
+                          <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="text-[#ffb37b] underline decoration-[#ff8a3d]/40 underline-offset-2">
+                            {event.title}
+                          </a>
+                        ) : (
+                          <span>{event.title}</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs owner-muted">
+                        <span className="truncate">{metaParts.join(" · ")}</span>
+                        {photos.length ? (
+                          <CustomerPhotoAlbum
+                            photos={photos}
+                            triggerLabel={`Xem ảnh (${photos.length})`}
+                            triggerClassName="font-semibold text-[#ffb37b] underline"
+                          />
                         ) : null}
-                        {event.description ? (
-                          <div className="mt-1 whitespace-pre-line text-sm text-neutral-300">{event.description}</div>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                          {photos.length ? (
-                            <CustomerPhotoAlbum
-                              photos={photos}
-                              triggerLabel={`Xem ảnh (${photos.length})`}
-                              compactTrigger
-                            />
-                          ) : null}
-                          {event.taskId ? (
-                            <a href={`/cn/${params.token}/tasks/${event.taskId}`} className="font-semibold text-[#ff8a3d] underline">
-                              Xem task {event.taskCode}
-                            </a>
-                          ) : null}
-                        </div>
                       </div>
                     </div>
-                  </article>
+                  </div>
                 );
               })}
             </div>

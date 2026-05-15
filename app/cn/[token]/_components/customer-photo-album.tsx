@@ -15,6 +15,7 @@ type CustomerPhotoAlbumProps = {
   thumbnailClassName?: string;
   triggerLabel?: string;
   compactTrigger?: boolean;
+  triggerClassName?: string;
 };
 
 export function CustomerPhotoAlbum({
@@ -23,6 +24,7 @@ export function CustomerPhotoAlbum({
   thumbnailClassName = "h-24",
   triggerLabel,
   compactTrigger = false,
+  triggerClassName,
 }: CustomerPhotoAlbumProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -42,7 +44,7 @@ export function CustomerPhotoAlbum({
         <button
           type="button"
           onClick={() => setActiveIndex(0)}
-          className={compactTrigger ? "mt-3 inline-block text-xs font-semibold text-[#ffb37b] underline" : "owner-button mt-3 w-full"}
+          className={triggerClassName || (compactTrigger ? "mt-3 inline-block text-xs font-semibold text-[#ffb37b] underline" : "owner-button mt-3 w-full")}
         >
           {triggerLabel}
         </button>
