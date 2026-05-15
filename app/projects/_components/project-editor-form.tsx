@@ -1374,36 +1374,32 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           </div>
         </div>
 
-        {isCreate ? (
-          <div className="mt-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium">Thành viên dự án (multi select){renderFieldMarker("members")}</h3>
-              <Button type="button" variant="outline" onClick={() => membersFieldArray.append({ userId: "", roleInProject: "engineer" })}>+ Thêm thành viên</Button>
-            </div>
-            {membersFieldArray.fields.length === 0 ? (
-              <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa thêm thành viên.</div>
-            ) : (
-              membersFieldArray.fields.map((field, idx) => (
-                <div key={field.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_220px_auto]">
-                  <select className={hasFieldWarning(`members.${idx}.userId`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.userId`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.userId`)}>
-                    <option value="">Chọn user</option>
-                    {members.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
-                  </select>
-                  <select className={hasFieldWarning(`members.${idx}.roleInProject`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.roleInProject`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.roleInProject`)}>
-                    <option value="engineer">engineer</option>
-                    <option value="foreman">foreman</option>
-                    <option value="accountant">accountant</option>
-                    <option value="construction_manager">construction_manager</option>
-                  </select>
-                  <Button type="button" variant="outline" onClick={() => membersFieldArray.remove(idx)}>Xóa</Button>
-                </div>
-              ))
-            )}
-            {hasDuplicateMembers ? <p className="text-xs text-red-600">Không được chọn trùng user trong thành viên dự án.</p> : null}
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">Thành viên dự án (ngoài GĐ Thi Công + KS chính){renderFieldMarker("members")}</h3>
+            <Button type="button" variant="outline" onClick={() => membersFieldArray.append({ userId: "", roleInProject: "engineer" })}>+ Thêm thành viên</Button>
           </div>
-        ) : (
-          <div className="mt-5 rounded-md border border-dashed p-3 text-sm text-slate-500">Thành viên phụ cập nhật ở tab Thành viên; màn này chỉ cập nhật GĐ Thi Công và KS chính.</div>
-        )}
+          {membersFieldArray.fields.length === 0 ? (
+            <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">Chưa thêm thành viên.</div>
+          ) : (
+            membersFieldArray.fields.map((field, idx) => (
+              <div key={field.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_220px_auto]">
+                <select className={hasFieldWarning(`members.${idx}.userId`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.userId`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.userId`)}>
+                  <option value="">Chọn user</option>
+                  {members.map((u) => <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>)}
+                </select>
+                <select className={hasFieldWarning(`members.${idx}.roleInProject`) ? "rounded-md border border-amber-400 px-3 py-2 text-sm" : getFieldMarkers(`members.${idx}.roleInProject`).length > 0 ? "rounded-md border border-emerald-400 px-3 py-2 text-sm" : "rounded-md border px-3 py-2 text-sm"} {...form.register(`members.${idx}.roleInProject`)}>
+                  <option value="engineer">engineer</option>
+                  <option value="foreman">foreman</option>
+                  <option value="accountant">accountant</option>
+                  <option value="construction_manager">construction_manager</option>
+                </select>
+                <Button type="button" variant="outline" onClick={() => membersFieldArray.remove(idx)}>Xóa</Button>
+              </div>
+            ))
+          )}
+          {hasDuplicateMembers ? <p className="text-xs text-red-600">Không được chọn trùng user trong thành viên dự án.</p> : null}
+        </div>
       </div>
 
       <div className="rounded-xl border bg-white p-5 text-slate-900">
