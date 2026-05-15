@@ -16,6 +16,15 @@ if [ ! -f "$ROOT_DIR/.env.production" ]; then
   exit 1
 fi
 
+DISK_USE_PCT=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+if [ "${DISK_USE_PCT:-0}" -ge 90 ]; then
+  echo "[Deploy] ABORT: disk usage is ${DISK_USE_PCT}% (>=90%). Free space before deploying." >&2
+  df -h /
+  exit 1
+elif [ "${DISK_USE_PCT:-0}" -ge 80 ]; then
+  echo "[Deploy] WARN: disk usage is ${DISK_USE_PCT}% (>=80%). Consider pruning soon." >&2
+fi
+
 if [ ! -x "$PRE_DEPLOY_SCRIPT" ]; then
   chmod +x "$PRE_DEPLOY_SCRIPT"
 fi
@@ -45,13 +54,23 @@ docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" exec -T
 echo "[Deploy] Migration completed."
 
 echo "[Deploy] Health check on http://127.0.0.1:3001 ..."
+HEALTHY=0
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:3001" >/dev/null; then
     echo "[Deploy] App is healthy."
-    exit 0
+    HEALTHY=1
+    break
   fi
   sleep 2
 done
 
-echo "Health check failed after deploy." >&2
-exit 1
+if [ "$HEALTHY" -ne 1 ]; then
+  echo "Health check failed after deploy." >&2
+  exit 1
+fi
+
+echo "[Deploy] Pruning Docker build cache older than 24h + dangling images..."
+docker builder prune -f --filter "until=24h" >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true
+echo "[Deploy] Done."
+exit 0
