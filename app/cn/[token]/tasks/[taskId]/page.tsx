@@ -97,6 +97,7 @@ export default async function CustomerTaskDetailPage({ params }: { params: { tok
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
+        <a href={`/cn/${params.token}/journal`} className="mb-3 inline-block text-sm font-semibold text-[#ff8a3d]">← Nhật ký</a>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs owner-muted">{task.projectPhase?.name || task.phase}</div>

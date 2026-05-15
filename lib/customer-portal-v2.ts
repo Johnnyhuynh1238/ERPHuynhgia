@@ -67,6 +67,9 @@ export type CustomerJournalEvent = {
   date: Date;
   title: string;
   description: string | null;
+  actor?: string | null;
+  progressFrom?: number | null;
+  progressTo?: number | null;
   taskId?: string;
   taskCode?: string;
   taskName?: string;
@@ -344,8 +347,9 @@ export async function buildCustomerJournalEvents(
       id: `report:${report.id}`,
       type: "report" as const,
       date: report.reportDate,
-      title: `${report.reporter.fullName} cập nhật nhật ký`,
+      title: "Nhật ký công trình",
       description: report.overallNote,
+      actor: report.reporter.fullName,
       targetType: CommentTargetType.journal_entry,
       targetId: report.id,
       commentCount: withCommentCount(CommentTargetType.journal_entry, report.id),
@@ -360,7 +364,10 @@ export async function buildCustomerJournalEvents(
           type: "photo" as const,
           date: update.createdAt,
           title: `${update.task.code} - ${update.task.name}`,
-          description: update.note || `${update.user.fullName} cập nhật tiến độ ${update.fromPercent}% → ${update.toPercent}%`,
+          description: update.note || null,
+          actor: update.user.fullName,
+          progressFrom: update.fromPercent,
+          progressTo: update.toPercent,
           taskId: update.task.id,
           taskCode: update.task.code,
           taskName: update.task.name,
