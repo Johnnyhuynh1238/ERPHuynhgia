@@ -172,7 +172,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
 
       <section className="owner-section">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="owner-section-title mb-0">BẢN VẼ</div>
+          <div className="owner-section-title mb-0">HỒ SƠ</div>
           <span className="text-xs owner-muted">{drawings.length} file</span>
         </div>
         <div className="space-y-2">
