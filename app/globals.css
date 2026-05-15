@@ -475,6 +475,14 @@ body {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
+.design-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.design-carousel-slide img {
+  will-change: transform;
+}
+
 .owner-timeline-day {
   margin-top: 14px;
 }

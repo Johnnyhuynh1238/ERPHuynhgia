@@ -5,6 +5,7 @@ import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { getPortalExpiry as resolveExpiry } from "@/lib/customer-portal";
 import { getCustomerPortalOverview, normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
+import { DesignPhotoCarousel, type DesignGroup } from "../_components/design-photo-carousel";
 
 const CATEGORY_LABEL: Record<ProjectDocumentCategory, string> = {
   contract: "Hợp đồng",
@@ -31,7 +32,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
 
-  const [overview, payments, drawings, projectComments, pendingAck] = await Promise.all([
+  const [overview, payments, drawings, projectComments, pendingAck, designGroupsRaw] = await Promise.all([
     getCustomerPortalOverview(project.id),
     prisma.paymentSchedule.findMany({
       where: { projectId: project.id },
@@ -85,6 +86,16 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
       orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
       take: 3,
     }),
+    prisma.designPhotoGroup.findMany({
+      where: { projectId: project.id, visibleToCustomer: true },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      include: {
+        photos: {
+          orderBy: [{ displayOrder: "asc" }, { uploadedAt: "asc" }],
+          select: { id: true },
+        },
+      },
+    }),
   ]);
 
   if (!overview) notFound();
@@ -98,6 +109,21 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const expiry = resolveExpiry(project.actualEndDate);
   const showExpiryBanner = Boolean(expiry && daysBetween(new Date(), expiry) <= 7);
   const currentPhase = overview.project.currentPhase;
+
+  const designGroups: DesignGroup[] = designGroupsRaw
+    .filter((group) => group.photos.length > 0)
+    .map((group) => ({
+      id: group.id,
+      title: group.title,
+      description: group.description,
+      photos: group.photos.map((photo) => ({
+        id: photo.id,
+        groupId: group.id,
+        groupTitle: group.title,
+        photoUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=photo`,
+        thumbnailUrl: `/api/customer/${params.token}/design-photos/${photo.id}/file?variant=thumb`,
+      })),
+    }));
 
   return (
     <div className="owner-portal-page">
@@ -134,6 +160,8 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
           </div>
         </div>
       </section>
+
+      <DesignPhotoCarousel groups={designGroups} />
 
       <section className="owner-section">
         <div className="owner-section-title">THÔNG TIN NHÀ</div>

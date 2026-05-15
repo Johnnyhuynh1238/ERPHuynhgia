@@ -1,0 +1,49 @@
+import { UserRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+
+export type DesignViewer = { id: string; role: UserRole | string };
+
+export function buildDesignGroupVisibilityWhere(viewer: DesignViewer) {
+  if (viewer.role === UserRole.admin) return {};
+  return {
+    OR: [
+      { createdBy: viewer.id },
+      { accessList: { some: { userId: viewer.id } } },
+    ],
+  };
+}
+
+export function canViewDesignGroupSync(
+  viewer: DesignViewer,
+  group: { createdBy?: string | null; accessList?: Array<{ userId: string }> },
+) {
+  if (viewer.role === UserRole.admin) return true;
+  if (group.createdBy === viewer.id) return true;
+  if (group.accessList?.some((a) => a.userId === viewer.id)) return true;
+  return false;
+}
+
+export async function canViewDesignGroup(viewer: DesignViewer, groupId: string) {
+  if (viewer.role === UserRole.admin) return true;
+  const group = await prisma.designPhotoGroup.findUnique({
+    where: { id: groupId },
+    select: {
+      createdBy: true,
+      accessList: { where: { userId: viewer.id }, select: { id: true } },
+    },
+  });
+  if (!group) return false;
+  if (group.createdBy === viewer.id) return true;
+  if (group.accessList.length > 0) return true;
+  return false;
+}
+
+export function extractMinioKey(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.startsWith("minio://")) return value.slice("minio://".length);
+  try {
+    return new URL(value, "http://local").searchParams.get("key");
+  } catch {
+    return null;
+  }
+}
