@@ -57,8 +57,9 @@ export default async function CustomerJournalPage({
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
 
+  const photoGalleryMode = searchParams?.view === "photos";
   const selectedPhase = searchParams?.phase || "all";
-  const selectedType = searchParams?.view === "photos" ? "photo" : searchParams?.type || "all";
+  const selectedType = photoGalleryMode ? "all" : searchParams?.type || "all";
 
   const [phases, events] = await Promise.all([
     prisma.projectPhase.findMany({
@@ -66,8 +67,50 @@ export default async function CustomerJournalPage({
       orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true },
     }),
-    buildCustomerJournalEvents(project.id, { phase: selectedPhase, type: selectedType }),
+    buildCustomerJournalEvents(project.id, { phase: selectedPhase, type: photoGalleryMode ? "all" : selectedType }),
   ]);
+
+  if (photoGalleryMode) {
+    const photoEvents = events.filter((event) => (event.type === "photo" || event.type === "qc") && event.photos?.length);
+    const flatPhotos = photoEvents.flatMap((event) =>
+      (event.photos || []).map((photo, index) => {
+        let url = photo.url;
+        let thumbnailUrl = photo.thumbnailUrl || null;
+        if (event.type === "qc") {
+          url = `/api/customer/${params.token}/journal/qc-logs/${event.targetId}/photos/${index}/file`;
+          thumbnailUrl = url;
+        } else if (event.taskId && photo.id) {
+          url = `/api/customer/${params.token}/tasks/${event.taskId}/photos/${photo.id}/file`;
+          thumbnailUrl = `${url}?variant=thumb`;
+        }
+        return {
+          id: `${event.id}-photo-${index}`,
+          url,
+          thumbnailUrl,
+          caption: `${dateText(event.date)} · ${event.title}`,
+        };
+      }),
+    );
+
+    return (
+      <div className="owner-portal-page">
+        <section className="owner-section">
+          <div className="flex items-center justify-between gap-3">
+            <div className="owner-section-title mb-0">TOÀN BỘ ẢNH</div>
+            <a href={`/cn/${params.token}/journal`} className="owner-chip shrink-0">← Nhật ký</a>
+          </div>
+          <div className="mt-1 text-sm owner-muted">{flatPhotos.length} ảnh từ thi công và QC.</div>
+        </section>
+        <section className="owner-section">
+          {flatPhotos.length === 0 ? (
+            <div className="text-sm owner-muted">Chưa có ảnh nào được chia sẻ.</div>
+          ) : (
+            <CustomerPhotoAlbum photos={flatPhotos} gridClassName="grid grid-cols-3 gap-2" thumbnailClassName="h-28" />
+          )}
+        </section>
+      </div>
+    );
+  }
   const eventComments = events.length
     ? await prisma.customerComment.findMany({
         where: {
@@ -106,7 +149,7 @@ export default async function CustomerJournalPage({
     <div className="owner-portal-page">
       <section className="owner-section">
         <div className="owner-section-title">NHẬT KÝ CÔNG TRÌNH</div>
-        <div className="text-sm owner-muted">Timeline thi công theo ngày, ảnh, QC, nghiệm thu và thanh toán.</div>
+        <div className="text-sm owner-muted">Timeline cập nhật thi công, ảnh tiến độ và ảnh QC.</div>
         <a href={`/cn/${params.token}/journal?view=photos`} className="owner-card mt-4 block py-2 text-center text-sm font-semibold text-white">Xem toàn bộ ảnh</a>
         <CustomerJournalDownloadButtons token={params.token} />
       </section>

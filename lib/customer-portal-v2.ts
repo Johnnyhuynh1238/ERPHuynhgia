@@ -63,7 +63,7 @@ export type NormalizedPaymentSchedule = {
 
 export type CustomerJournalEvent = {
   id: string;
-  type: "report" | "photo" | "qc" | "acknowledgment" | "payment";
+  type: "report" | "photo" | "qc";
   date: Date;
   title: string;
   description: string | null;
@@ -106,6 +106,11 @@ export function normalizePaymentSchedule(row: PaymentRow): NormalizedPaymentSche
   };
 }
 
+function extractTaskPhotoId(value: string | null | undefined) {
+  if (!value) return undefined;
+  return value.match(/\/photos\/([^/?#]+)(?:\/file)?/)?.[1];
+}
+
 function parseProgressPhotos(value: string) {
   if (!value) return [] as Array<{ id?: string; url: string; thumbnailUrl?: string | null }>;
 
@@ -113,16 +118,19 @@ function parseProgressPhotos(value: string) {
     const parsed = JSON.parse(value) as { photos?: Array<{ id?: string; photoUrl?: string; thumbnailUrl?: string }> };
     if (Array.isArray(parsed.photos)) {
       return parsed.photos
-        .map((photo) => ({
-          id: typeof photo.id === "string" ? photo.id : undefined,
-          url: typeof photo.photoUrl === "string" ? photo.photoUrl : "",
-          thumbnailUrl: typeof photo.thumbnailUrl === "string" ? photo.thumbnailUrl : null,
-        }))
+        .map((photo) => {
+          const url = typeof photo.photoUrl === "string" ? photo.photoUrl : "";
+          return {
+            id: typeof photo.id === "string" ? photo.id : extractTaskPhotoId(url),
+            url,
+            thumbnailUrl: typeof photo.thumbnailUrl === "string" ? photo.thumbnailUrl : null,
+          };
+        })
         .filter((photo) => Boolean(photo.url));
     }
   } catch {}
 
-  return [{ url: value }];
+  return [{ url: value, id: extractTaskPhotoId(value) }];
 }
 
 export async function requireCustomerPortalApiAccess(token: string): Promise<PortalApiAccessResult> {

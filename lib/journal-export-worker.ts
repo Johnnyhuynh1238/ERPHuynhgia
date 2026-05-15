@@ -205,16 +205,6 @@ async function buildZip(projectId: string) {
       ),
     },
     {
-      name: "05_NghiemThu/acknowledgments.csv",
-      data: Buffer.from(
-        [
-          "date,task,title,description",
-          ...events.filter((event) => event.type === "acknowledgment").map((event) => [event.date, event.taskCode, event.title, event.description].map(csvEscape).join(",")),
-        ].join("\n"),
-        "utf8",
-      ),
-    },
-    {
       name: "06_BienLai/receipts.csv",
       data: Buffer.from(
         [
