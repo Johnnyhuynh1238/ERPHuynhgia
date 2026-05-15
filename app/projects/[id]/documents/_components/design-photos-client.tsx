@@ -162,6 +162,7 @@ function GroupCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   async function handleUpload() {
     const files = Array.from(fileRef.current?.files || []);
@@ -169,24 +170,35 @@ function GroupCard({
       toast.error("Chọn ít nhất 1 ảnh để upload");
       return;
     }
-    const fd = new FormData();
-    for (const f of files) fd.append("files", f);
     setUploading(true);
+    setProgress({ done: 0, total: files.length });
+    let successCount = 0;
     try {
-      const res = await fetch(`/api/projects/${projectId}/design-groups/${group.id}/photos`, {
-        method: "POST",
-        body: fd,
-      });
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
-      if (!res.ok) {
-        toast.error(data.message || "Upload thất bại");
-        return;
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i];
+        const fd = new FormData();
+        fd.append("files", file);
+        const res = await fetch(`/api/projects/${projectId}/design-groups/${group.id}/photos`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { message?: string };
+          const detail = data.message || (res.status === 413 ? `File "${file.name}" quá lớn so với giới hạn proxy (25MB)` : `Upload thất bại (HTTP ${res.status})`);
+          toast.error(`${file.name}: ${detail}`);
+          break;
+        }
+        successCount += 1;
+        setProgress({ done: i + 1, total: files.length });
       }
-      toast.success(data.message || "Đã upload");
-      if (fileRef.current) fileRef.current.value = "";
-      await onChanged();
+      if (successCount > 0) {
+        toast.success(`Đã upload ${successCount}/${files.length} ảnh`);
+        if (fileRef.current) fileRef.current.value = "";
+        await onChanged();
+      }
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   }
 
@@ -332,7 +344,7 @@ function GroupCard({
             onClick={handleUpload}
             className="ml-auto rounded-md bg-[#f97316] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
-            {uploading ? "Đang upload..." : "Upload ảnh"}
+            {uploading ? (progress ? `Đang upload ${progress.done}/${progress.total}...` : "Đang upload...") : "Upload ảnh"}
           </button>
         </div>
       ) : null}
