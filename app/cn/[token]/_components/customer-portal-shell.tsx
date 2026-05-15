@@ -28,7 +28,6 @@ export function CustomerPortalShell({ token, projectName, customerName, children
     <div className="app-wrapper owner-portal-v2">
       <div className="bg-glow" />
       <header className="owner-app-bar">
-        <div className="owner-app-kicker">Cổng thông tin chủ nhà</div>
         <div className="owner-app-title">{projectName}</div>
         <div className="owner-app-subtitle">Xin chào {customerName}</div>
       </header>
