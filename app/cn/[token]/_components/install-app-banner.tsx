@@ -111,33 +111,14 @@ export function InstallAppBanner() {
     }
   }
 
-  const platformCopy: Record<Platform, { title: string; body: string; cta: string }> = {
-    ios_safari: {
-      title: "Cài app cho nhanh hơn",
-      body: "Thêm Cổng Chủ Nhà vào màn hình chính iPhone — mở 1 chạm, không cần dò link.",
-      cta: "Hướng dẫn cài",
-    },
-    ios_in_app: {
-      title: "Mở trong Safari để cài app",
-      body: "Bạn đang xem trong app khác (Zalo/Messenger…). Để cài shortcut, mở link này trong Safari.",
-      cta: "Sao chép link",
-    },
-    android_chrome: {
-      title: "Cài app cho nhanh hơn",
-      body: "Thêm Cổng Chủ Nhà vào màn hình chính — mở 1 chạm.",
-      cta: "Cài đặt",
-    },
-    android_in_app: {
-      title: "Mở trong Chrome để cài app",
-      body: "Bạn đang xem trong app khác. Để cài shortcut, mở link này trong Chrome.",
-      cta: "Sao chép link",
-    },
-    desktop: {
-      title: "",
-      body: "",
-      cta: "",
-    },
-    other: { title: "", body: "", cta: "" },
+  const BANNER_TEXT = "Thêm vào màn hình - sử dụng như app.";
+  const platformCopy: Record<Platform, { cta: string }> = {
+    ios_safari: { cta: "Hướng dẫn cài" },
+    ios_in_app: { cta: "Sao chép link" },
+    android_chrome: { cta: "Cài đặt" },
+    android_in_app: { cta: "Sao chép link" },
+    desktop: { cta: "" },
+    other: { cta: "" },
   };
 
   if (platform === "desktop" || platform === "other") return null;
@@ -147,8 +128,7 @@ export function InstallAppBanner() {
   return (
     <>
       <div className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-16px)] max-w-[430px] -translate-x-1/2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] p-3 text-sm shadow-xl">
-        <div className="font-semibold text-white">{copy.title}</div>
-        <div className="mt-1 text-xs text-[#8892b0]">{copy.body}</div>
+        <div className="text-sm text-white">{BANNER_TEXT}</div>
         <div className="mt-2 flex justify-end gap-2">
           <button className="rounded-lg border border-[#2d3249] px-3 py-1 text-xs text-[#d9def3]" onClick={dismiss}>
             Để sau
