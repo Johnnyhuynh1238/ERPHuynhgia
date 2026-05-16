@@ -6,6 +6,7 @@ import { getPortalExpiry as resolveExpiry } from "@/lib/customer-portal";
 import { getCustomerPortalOverview, normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
 import { DesignPhotoCarousel, type DesignGroup } from "../_components/design-photo-carousel";
+import { TeamSection } from "../_components/team-section";
 
 const CATEGORY_LABEL: Record<ProjectDocumentCategory, string> = {
   contract: "Hợp đồng",
@@ -199,18 +200,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         </section>
       ) : null}
 
-      <section className="owner-section">
-        <div className="owner-section-title">ĐỘI NGŨ</div>
-        <div className="grid gap-2">
-          {overview.team.filter((member) => member.id).map((member) => (
-            <div key={`${member.role}-${member.id}`} className="owner-card text-sm">
-              <div className="text-xs owner-muted">{member.role}</div>
-              <div className="font-semibold text-white">{member.fullName}</div>
-              <div className="owner-muted">{member.phone || "Chưa cập nhật SĐT"}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <TeamSection members={overview.team} />
 
       <section className="owner-section">
         <div className="mb-3 flex items-center justify-between gap-3">
