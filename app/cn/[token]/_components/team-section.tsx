@@ -53,22 +53,20 @@ export function TeamSection({ members }: { members: TeamMember[] }) {
                 <span className="flex h-full w-full items-center justify-center">{initialsOf(member.fullName)}</span>
               )}
             </button>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold text-white">{member.fullName}</div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span className="owner-chip orange">{member.role}</span>
-                {member.phone ? (
-                  <a
-                    href={`tel:${member.phone}`}
-                    aria-label={`Gọi ${member.fullName}`}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8a3d] text-black transition active:scale-95"
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-                      <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.58.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.36 11.36 0 0 0 .57 3.58 1 1 0 0 1-.24 1.02l-2.2 2.2Z" />
-                    </svg>
-                  </a>
-                ) : null}
-              </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <div className="min-w-0 truncate font-semibold text-white">{member.fullName}</div>
+              <span className="owner-chip orange shrink-0">{member.role}</span>
+              {member.phone ? (
+                <a
+                  href={`tel:${member.phone}`}
+                  aria-label={`Gọi ${member.fullName}`}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ff8a3d] text-black transition active:scale-95"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.58.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.36 11.36 0 0 0 .57 3.58 1 1 0 0 1-.24 1.02l-2.2 2.2Z" />
+                  </svg>
+                </a>
+              ) : null}
             </div>
           </div>
         ))}
