@@ -28,8 +28,8 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "admin@congty.vn",
-      password: "ChangeMe@2026",
+      email: "",
+      password: "",
     },
   });
 
