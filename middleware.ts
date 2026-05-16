@@ -24,6 +24,14 @@ export async function middleware(req: NextRequest) {
 
   if (isStaticAsset(pathname)) return NextResponse.next();
 
+  // /api/customer/[token]/* tự auth bằng portal session (cookie cn_session_*), không
+  // đi qua NextAuth. Nếu để middleware NextAuth chặn, ảnh/file/comment của chủ nhà bị
+  // redirect 307 về /login → trình duyệt render hỏng ảnh. Các API staff vẫn ở các path
+  // khác (/api/customer-portal/, /api/customer-comments/...) nên không bypass nhầm.
+  if (pathname.startsWith("/api/customer/")) {
+    return NextResponse.next();
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);
