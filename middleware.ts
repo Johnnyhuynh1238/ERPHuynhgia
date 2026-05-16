@@ -30,12 +30,13 @@ export async function middleware(req: NextRequest) {
     const token = segments[1] || "";
     const isPortalRoot = pathname === `/cn/${token}` || pathname === `/cn/${token}/`;
     const isPortalLoginPost = pathname === `/cn/${token}/login`;
+    const isPortalManifest = pathname === `/cn/${token}/manifest.webmanifest`;
 
     if (!token) {
       return NextResponse.rewrite(new URL("/404", nextUrl.origin));
     }
 
-    if (!isPortalRoot && !isPortalLoginPost) {
+    if (!isPortalRoot && !isPortalLoginPost && !isPortalManifest) {
       const hasPortalMarker = Boolean(req.cookies.get("cn_portal")?.value);
       if (!hasPortalMarker) {
         return NextResponse.redirect(new URL(`/cn/${token}`, nextUrl.origin));
