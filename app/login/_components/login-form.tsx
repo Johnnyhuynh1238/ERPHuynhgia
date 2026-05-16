@@ -53,7 +53,8 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
     }
 
     toast.success("Đăng nhập thành công");
-    router.push(result.url || callbackUrl);
+    const target = result.url && result.url.startsWith("/") ? result.url : callbackUrl;
+    router.push(target);
     router.refresh();
   }
 

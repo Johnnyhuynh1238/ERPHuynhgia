@@ -10,6 +10,44 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// In-memory rate limit cho staff login (single-server deployment).
+// 10 sai trong 15 phút → khoá 15 phút theo email. Mất khi restart app (chấp nhận trade-off).
+const LOGIN_MAX = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_BLOCK_MS = 15 * 60 * 1000;
+type AttemptRecord = { count: number; firstAt: number; blockedUntil: number };
+const loginAttempts = new Map<string, AttemptRecord>();
+
+function isLoginBlocked(email: string): boolean {
+  const rec = loginAttempts.get(email);
+  if (!rec) return false;
+  const now = Date.now();
+  if (rec.blockedUntil > now) return true;
+  if (now - rec.firstAt > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(email);
+    return false;
+  }
+  return false;
+}
+
+function recordLoginFail(email: string) {
+  const now = Date.now();
+  const rec = loginAttempts.get(email);
+  if (!rec || now - rec.firstAt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(email, { count: 1, firstAt: now, blockedUntil: 0 });
+    return;
+  }
+  rec.count += 1;
+  if (rec.count >= LOGIN_MAX) {
+    rec.blockedUntil = now + LOGIN_BLOCK_MS;
+    console.warn(`[auth] LOGIN_BLOCK email=${email} attempts=${rec.count}`);
+  }
+}
+
+function clearLoginAttempts(email: string) {
+  loginAttempts.delete(email);
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -32,16 +70,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+        const normalizedEmail = email.toLowerCase();
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
+        if (isLoginBlocked(normalizedEmail)) return null;
 
-        if (!user || !user.isActive) return null;
+        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+        if (!user || !user.isActive) {
+          recordLoginFail(normalizedEmail);
+          return null;
+        }
 
         const matched = await bcrypt.compare(password, user.passwordHash);
-        if (!matched) return null;
+        if (!matched) {
+          recordLoginFail(normalizedEmail);
+          return null;
+        }
 
+        clearLoginAttempts(normalizedEmail);
         return {
           id: user.id,
           email: user.email,

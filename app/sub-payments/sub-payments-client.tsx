@@ -251,7 +251,7 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
                   {uploading ? "Đang upload..." : "Chọn ảnh phiếu chi"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadReceipt(openMarkPaid, e.target.files)} />
                 </label>
-                {receiptUrl ? <div className="mt-1 text-xs text-emerald-300">Đã có chứng từ: {receiptUrl}</div> : null}
+                {receiptUrl ? <div className="mt-1 text-xs text-emerald-300">Đã có chứng từ — sẽ lưu khi bấm xác nhận.</div> : null}
               </div>
 
               <div>

@@ -44,8 +44,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Không tìm thấy user" }, { status: 404 });
   }
 
-  // Route này dùng cho luồng đổi mật khẩu bắt buộc lần đầu,
-  // không yêu cầu nhập mật khẩu cũ.
+  // Route này chỉ phục vụ luồng đổi mật khẩu bắt buộc lần đầu;
+  // các trường hợp khác phải dùng /api/profile/change-password (kiểm pass cũ).
+  if (!currentUser.mustChangePassword) {
+    return NextResponse.json({ message: "Vui lòng dùng đổi mật khẩu trong hồ sơ cá nhân" }, { status: 403 });
+  }
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
 

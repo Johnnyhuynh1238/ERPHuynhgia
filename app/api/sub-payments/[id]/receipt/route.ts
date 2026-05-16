@@ -1,15 +1,17 @@
 import crypto from "node:crypto";
-import path from "node:path";
-import { promises as fs } from "node:fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { putObjectToMinio } from "@/lib/minio";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { canMarkPaidSubPayment } from "@/lib/sub-payment-utils";
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+export const runtime = "nodejs";
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"];
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 function extFromType(type: string) {
+  if (type === "application/pdf") return "pdf";
   if (type === "image/png") return "png";
   if (type === "image/webp") return "webp";
   if (type === "image/heic") return "heic";
@@ -46,7 +48,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if (!ALLOWED_IMAGE_TYPES.includes(receipt.type)) {
-    return NextResponse.json({ message: "Chỉ hỗ trợ ảnh jpg/png/webp/heic" }, { status: 400 });
+    return NextResponse.json({ message: "Chỉ hỗ trợ ảnh jpg/png/webp/heic hoặc PDF" }, { status: 400 });
   }
 
   const bytes = await receipt.arrayBuffer();
@@ -54,15 +56,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "File quá lớn (tối đa 8MB)" }, { status: 400 });
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "sub-payments", params.id);
-  await fs.mkdir(uploadDir, { recursive: true });
-
   const ext = extFromType(receipt.type);
   const fileName = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const filePath = path.join(uploadDir, fileName);
+  const key = `sub-payments/${payment.id}/receipts/${fileName}`;
 
-  await fs.writeFile(filePath, Buffer.from(bytes));
+  await putObjectToMinio({ key, body: Buffer.from(bytes), contentType: receipt.type });
 
-  const url = `/uploads/sub-payments/${params.id}/${fileName}`;
+  const url = `minio://${key}`;
   return NextResponse.json({ receiptUrl: url, message: "Đã upload phiếu chi" });
 }

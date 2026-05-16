@@ -1,7 +1,9 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-helpers";
 import { getObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { getTaskWithAccess } from "@/lib/task-permissions";
 
 export const runtime = "nodejs";
 
@@ -33,6 +35,15 @@ async function serveMinioImage(key: string) {
 }
 
 export async function GET(request: Request, { params }: { params: { id: string; photoId: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  const { task, allowed } = await getTaskWithAccess(params.id, { id: user.id, role: user.role });
+  if (!task) return NextResponse.json({ message: "Không tìm thấy task" }, { status: 404 });
+  if (!allowed) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+
   const photo = await prisma.taskPhoto.findFirst({
     where: { id: params.photoId, taskId: params.id },
     select: { photoUrl: true, thumbnailUrl: true },

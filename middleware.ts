@@ -18,6 +18,14 @@ function isStaticAsset(pathname: string) {
   );
 }
 
+function applySecurityHeaders(res: NextResponse, isPortal: boolean) {
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("X-Frame-Options", "SAMEORIGIN");
+  res.headers.set("Referrer-Policy", isPortal ? "no-referrer" : "strict-origin-when-cross-origin");
+  res.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { nextUrl } = req;
   const pathname = nextUrl.pathname;
@@ -29,7 +37,7 @@ export async function middleware(req: NextRequest) {
   // redirect 307 về /login → trình duyệt render hỏng ảnh. Các API staff vẫn ở các path
   // khác (/api/customer-portal/, /api/customer-comments/...) nên không bypass nhầm.
   if (pathname.startsWith("/api/customer/")) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next(), true);
   }
 
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
@@ -51,7 +59,7 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next(), true);
   }
 
   const isAuthRoute = pathname.startsWith("/api/auth");
@@ -70,11 +78,11 @@ export async function middleware(req: NextRequest) {
   const isAuthenticated = Boolean(token?.userId);
 
   if (!isAuthenticated) {
-    if (isLoginRoute) return NextResponse.next();
+    if (isLoginRoute) return applySecurityHeaders(NextResponse.next(), false);
 
     const loginUrl = new URL("/login", nextUrl.origin);
     loginUrl.searchParams.set("callbackUrl", nextUrl.pathname + nextUrl.search);
-    return NextResponse.redirect(loginUrl);
+    return applySecurityHeaders(NextResponse.redirect(loginUrl), false);
   }
 
   const mustChangePassword = Boolean(token?.mustChangePassword);
@@ -87,7 +95,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/change-password", nextUrl.origin));
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next(), false);
 }
 
 export const config = {

@@ -1,13 +1,36 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { putObjectToMinio } from "@/lib/minio";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
+
+export const runtime = "nodejs";
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
+const ALLOWED_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/zip",
+  "application/x-zip-compressed",
+  "text/plain",
+]);
+
 function safeFilename(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+}
+
+function extFromName(name: string) {
+  const m = name.match(/\.([a-zA-Z0-9]{1,8})$/);
+  return m ? m[1].toLowerCase() : "bin";
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -31,13 +54,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   for (const file of files) {
+    if (!ALLOWED_MIME.has(file.type)) {
+      return NextResponse.json({ message: `File ${file.name} không thuộc định dạng cho phép (PDF, ảnh, doc/docx, xls/xlsx, zip, txt)` }, { status: 400 });
+    }
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ message: `File ${file.name} vượt quá 15MB` }, { status: 400 });
     }
   }
-
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "sub-contracts", params.id);
-  await fs.mkdir(uploadDir, { recursive: true });
 
   const created = [];
 
@@ -45,17 +68,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeFilename(file.name)}`;
-    const filePath = path.join(uploadDir, fileName);
+    const id = randomUUID();
+    const ext = extFromName(file.name);
+    const minioKey = `sub-contracts/${params.id}/${id}_${safeFilename(file.name)}.${ext}`;
+    const contentType = file.type || "application/octet-stream";
 
-    await fs.writeFile(filePath, buffer);
+    await putObjectToMinio({ key: minioKey, body: buffer, contentType });
 
     const row = await prisma.subContractFile.create({
       data: {
+        id,
         subContractId: params.id,
         fileName: file.name,
-        fileUrl: `/uploads/sub-contracts/${params.id}/${fileName}`,
-        fileType: file.type || "application/octet-stream",
+        fileUrl: `minio://${minioKey}`,
+        fileType: contentType,
         uploadedBy: user.id,
       },
       include: {
@@ -65,7 +91,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       },
     });
 
-    created.push(row);
+    created.push({
+      ...row,
+      fileUrl: `/api/sub-contracts/${params.id}/files/${row.id}/file`,
+    });
   }
 
   return NextResponse.json({

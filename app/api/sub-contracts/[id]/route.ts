@@ -102,7 +102,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       subcontractor: row.subcontractor,
       creator: row.creator,
       linkedTasks: row.linkedTasks.map((item) => item.task),
-      files: row.files,
+      files: row.files.map((f) => ({
+        ...f,
+        fileUrl: f.fileUrl.startsWith("minio://") ? `/api/sub-contracts/${row.id}/files/${f.id}/file` : f.fileUrl,
+      })),
       paymentCount: row._count.payments,
       evaluationCount: row._count.evaluations,
       fileCount: row._count.files,

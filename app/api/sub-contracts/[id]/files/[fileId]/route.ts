@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { deleteObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
 
@@ -34,8 +35,12 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   await prisma.subContractFile.delete({ where: { id: file.id } });
 
-  const absPath = path.join(process.cwd(), "public", file.fileUrl.replace(/^\//, ""));
-  await Promise.allSettled([fs.unlink(absPath)]);
+  if (file.fileUrl.startsWith("minio://")) {
+    await deleteObjectFromMinio(file.fileUrl.slice("minio://".length)).catch(() => {});
+  } else {
+    const absPath = path.join(process.cwd(), "public", file.fileUrl.replace(/^\//, ""));
+    await fs.unlink(absPath).catch(() => {});
+  }
 
   return NextResponse.json({ message: "Đã xóa tài liệu" });
 }

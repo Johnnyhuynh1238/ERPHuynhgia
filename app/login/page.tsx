@@ -19,7 +19,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     redirect("/");
   }
 
-  const callbackUrl = searchParams?.callbackUrl || "/";
+  const rawCallback = searchParams?.callbackUrl || "/";
+  // Chỉ cho phép path nội bộ (bắt đầu bằng "/" và không phải "//..." hay "/\..." để chặn open redirect)
+  const callbackUrl = /^\/(?![/\\])/.test(rawCallback) ? rawCallback : "/";
   const hasCredentialError = searchParams?.error === "CredentialsSignin";
 
   return (

@@ -7,6 +7,8 @@ export async function generateMetadata({ params }: { params: { token: string } }
     title: "Cổng chủ nhà - Huỳnh Gia",
     manifest: `/cn/${params.token}/manifest.webmanifest`,
     themeColor: "#f97316",
+    referrer: "no-referrer",
+    robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
     appleWebApp: {
       capable: true,
       title: "HG Chủ Nhà",

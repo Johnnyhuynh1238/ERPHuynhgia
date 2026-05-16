@@ -4,7 +4,14 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 
-const schema = z.object({ password: z.string().trim().min(4).max(20) });
+const schema = z.object({
+  password: z
+    .string()
+    .trim()
+    .min(6, "Mật khẩu tối thiểu 6 ký tự")
+    .max(32, "Mật khẩu tối đa 32 ký tự")
+    .regex(/^[A-Za-z0-9!@#$%^&*_-]+$/, "Mật khẩu chỉ chứa chữ, số và ký tự ! @ # $ % ^ & * _ -"),
+});
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
