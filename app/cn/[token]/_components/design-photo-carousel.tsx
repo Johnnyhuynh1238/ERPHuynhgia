@@ -51,7 +51,9 @@ export function DesignPhotoCarousel({ groups, autoplayMs = 4000 }: Props) {
       if (!scroller || flatPhotos.length === 0) return;
       const safeIndex = ((next % flatPhotos.length) + flatPhotos.length) % flatPhotos.length;
       const slide = scroller.children.item(safeIndex) as HTMLElement | null;
-      slide?.scrollIntoView({ behavior, inline: "start", block: "nearest" });
+      if (slide) {
+        scroller.scrollTo({ left: slide.offsetLeft, behavior });
+      }
       setActiveIndex(safeIndex);
     },
     [flatPhotos.length],
