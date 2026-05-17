@@ -61,6 +61,7 @@ export function NotificationsBell({
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -96,6 +97,48 @@ export function NotificationsBell({
     if (!open) return;
     fetchList();
   }, [open, fetchList]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const measure = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const top = rect.bottom + 8;
+
+      if (vw < 768) {
+        // Mobile: full-width centered with 8px side padding, anchored under bell
+        setPopoverStyle({
+          position: "fixed",
+          top,
+          left: 8,
+          right: 8,
+          width: "auto",
+          maxWidth: "none",
+        });
+      } else {
+        // Desktop: right edge aligned to bell's right edge, but kept inside viewport
+        const desiredWidth = 360;
+        const rightOffset = Math.max(8, vw - rect.right);
+        setPopoverStyle({
+          position: "fixed",
+          top,
+          right: rightOffset,
+          width: desiredWidth,
+          maxWidth: `calc(100vw - ${rightOffset + 8}px)`,
+        });
+      }
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -158,7 +201,8 @@ export function NotificationsBell({
       {open ? (
         <div
           ref={popoverRef}
-          className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,360px)] overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl"
+          style={popoverStyle}
+          className="z-50 overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl"
         >
           <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
             <div className="text-sm font-semibold text-[#f0f2ff]">Thông báo</div>
