@@ -27,8 +27,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md items-center px-4">
       <div className="w-full rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="mb-2 text-xl font-semibold text-orange-300">Đăng nhập ERP Huỳnh Gia</h1>
-        <p className="mb-6 text-sm text-slate-500">Nhập email và mật khẩu để vào hệ thống.</p>
+        <div className="mb-3 flex flex-col items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/a6-logo.png" alt="Huỳnh Gia A6" className="h-20 w-20 object-contain" />
+        </div>
+        <h1 className="mb-2 text-center text-xl font-semibold text-orange-500">Đăng nhập ERP Huỳnh Gia</h1>
+        <p className="mb-6 text-center text-sm text-slate-500">Nhập email và mật khẩu để vào hệ thống.</p>
 
         <LoginForm callbackUrl={callbackUrl} hasCredentialError={hasCredentialError} />
       </div>

@@ -167,8 +167,14 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
 
       <aside className="hidden md:fixed md:left-0 md:top-0 md:z-50 md:flex md:h-screen md:w-60 md:flex-col md:border-r md:border-[#252840] md:bg-[#13151f]">
         <div className="border-b border-[#252840] p-5">
-          <div className="text-lg font-bold text-[#f97316]">Huỳnh Gia ERP</div>
-          <div className="mt-0.5 text-xs text-[#8892b0]">{roleLabel}</div>
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/a6-logo.png" alt="A6" className="h-10 w-10 object-contain" />
+            <div className="min-w-0">
+              <div className="text-base font-bold text-[#f97316] leading-tight">Huỳnh Gia ERP</div>
+              <div className="mt-0.5 text-xs text-[#8892b0]">{roleLabel}</div>
+            </div>
+          </div>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -219,9 +225,13 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       <main className="relative z-10 md:ml-60 md:min-h-screen">
         <header className="sticky top-0 z-30 border-b border-[#252840] bg-[#0f1015]/90 backdrop-blur-xl md:hidden">
           <div className="flex h-14 items-center justify-between px-4">
-            <div>
-              <div className="text-sm font-bold text-[#f0f2ff]">ERP Huỳnh Gia</div>
-              <div className="text-[11px] text-[#8892b0]">{user.role}</div>
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/a6-logo.png" alt="A6" className="h-8 w-8 object-contain" />
+              <div>
+                <div className="text-sm font-bold text-[#f0f2ff]">ERP Huỳnh Gia</div>
+                <div className="text-[11px] text-[#8892b0]">{user.role}</div>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
