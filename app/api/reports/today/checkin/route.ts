@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyKsMorningCheckin } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { generateAssignmentsAfterCheckin, getReportDateVn, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
@@ -115,6 +116,30 @@ export async function POST(req: Request) {
       reportDate,
       selectedIds: tptcAssignmentIds,
     });
+
+    // Notify per project (gộp các task của cùng dự án thành 1 thông báo)
+    if (checkedInTaskIds.length) {
+      const tasksWithName = await prisma.task.findMany({
+        where: { id: { in: checkedInTaskIds } },
+        select: { id: true, name: true, projectId: true },
+      });
+      const byProject: Record<string, string[]> = {};
+      for (const t of tasksWithName) {
+        if (!byProject[t.projectId]) byProject[t.projectId] = [];
+        byProject[t.projectId].push(t.name);
+      }
+      for (const [projectId, names] of Object.entries(byProject)) {
+        fireAndForget(
+          notifyKsMorningCheckin({
+            projectId,
+            actorUserId: user.id,
+            actorName: user.name ?? "Kỹ sư",
+            taskCount: names.length,
+            taskNames: names,
+          }),
+        );
+      }
+    }
 
     return NextResponse.json({
       ok: true,

@@ -4,6 +4,7 @@ import { TaskLogType, TaskPhase, TaskStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import {
   canChangeStatus,
   canEditActualDates,
@@ -261,6 +262,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return updatedTask;
     });
 
+    const isCheckout = payload.data.status === TaskStatus.done || payload.data.status === TaskStatus.inspected;
+    fireAndForget(
+      notifyKsTaskUpdate({
+        projectId: task.projectId,
+        taskId: task.id,
+        actorUserId: user.id,
+        actorName: user.name ?? "Người dùng",
+        changeKind: isCheckout ? "checkout" : "status",
+        taskName: task.name,
+        taskVisibleToCustomer: Boolean((task as { visibleToCustomer?: boolean }).visibleToCustomer),
+        detail: `${task.status} → ${payload.data.status}`,
+      }),
+    );
+
     return NextResponse.json({ task: updated, message: "Đã cập nhật trạng thái" });
   }
 
@@ -472,6 +487,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         content: "Đã sửa thông tin task",
       },
     });
+
+    fireAndForget(
+      notifyKsTaskUpdate({
+        projectId: task.projectId,
+        taskId: task.id,
+        actorUserId: user.id,
+        actorName: user.name ?? "Người dùng",
+        changeKind: "meta",
+        taskName: payload.data.name ?? task.name,
+        taskVisibleToCustomer: Boolean(updateData.visibleToCustomer ?? (task as { visibleToCustomer?: boolean }).visibleToCustomer),
+      }),
+    );
 
     return NextResponse.json({ task: updated, message: "Đã cập nhật thông tin task" });
   }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, CreditCard, Home, NotebookPen } from "lucide-react";
 import { InstallAppBanner } from "./install-app-banner";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -27,9 +28,15 @@ export function CustomerPortalShell({ token, projectName, customerName, children
   return (
     <div className="app-wrapper owner-portal-v2">
       <div className="bg-glow" />
-      <header className="owner-app-bar">
-        <div className="owner-app-title">{projectName}</div>
-        <div className="owner-app-subtitle">Xin chào {customerName}</div>
+      <header className="owner-app-bar flex items-start justify-between gap-3">
+        <div>
+          <div className="owner-app-title">{projectName}</div>
+          <div className="owner-app-subtitle">Xin chào {customerName}</div>
+        </div>
+        <NotificationsBell
+          apiBase={`/api/customer/${token}/notifications`}
+          listHref={`/cn/${token}/notifications`}
+        />
       </header>
       <main className="owner-portal-main">{children}</main>
       <InstallAppBanner />

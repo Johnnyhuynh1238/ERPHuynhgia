@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { TaskLogType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { putObjectToMinio } from "@/lib/minio";
 import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
 
@@ -130,6 +131,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
         content: `Đã upload ${created.length} ảnh`,
       },
     });
+
+    fireAndForget(
+      notifyKsTaskUpdate({
+        projectId: task.projectId,
+        taskId: task.id,
+        actorUserId: user.id,
+        actorName: user.name ?? "Người dùng",
+        changeKind: "photo",
+        taskName: task.name,
+        taskVisibleToCustomer: Boolean((task as { visibleToCustomer?: boolean }).visibleToCustomer),
+        detail: `+${created.length} ảnh mới`,
+      }),
+    );
 
     return NextResponse.json({ photos: created, message: `Đã upload ${created.length} ảnh` });
   } catch (error) {

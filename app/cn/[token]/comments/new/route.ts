@@ -2,6 +2,7 @@ import { CommentTargetType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getClientIpFromHeaders } from "@/lib/customer-portal";
 import { requireCustomerPortalApiAccess, validateCustomerCommentTarget } from "@/lib/customer-portal-v2";
+import { fireAndForget, notifyCustomerComment } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 function parseTargetType(value: string) {
@@ -41,7 +42,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
     if (!parent) return NextResponse.json({ message: "Bình luận cha không hợp lệ" }, { status: 400 });
   }
 
-  await prisma.customerComment.create({
+  const created = await prisma.customerComment.create({
     data: {
       projectId: access.project.id,
       taskId: target.taskId,
@@ -56,7 +57,18 @@ export async function POST(request: Request, { params }: { params: { token: stri
       userAgent: request.headers.get("user-agent") || "",
       readByStaff: false,
     },
+    select: { id: true, taskId: true },
   });
+
+  fireAndForget(
+    notifyCustomerComment({
+      projectId: access.project.id,
+      commentId: created.id,
+      authorName: access.project.customerName,
+      contentExcerpt: content.slice(0, 200),
+      taskId: created.taskId,
+    }),
+  );
 
   return NextResponse.redirect(new URL(referer, request.url));
 }

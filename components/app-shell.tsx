@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   BarChart3,
-  Bell,
   FolderKanban,
   Home,
   ListChecks,
@@ -20,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 type AppUser = {
   id: string;
@@ -236,6 +236,12 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
                 </Link>
               ) : null}
 
+              <NotificationsBell
+                apiBase="/api/notifications"
+                listHref="/notifications"
+                triggerClassName="relative rounded-full border border-[#2d3249] bg-[#1a1d2e] p-2 text-[#d9def3]"
+              />
+
               <Link href="/profile" className="flex items-center gap-2 rounded-full bg-[#1a1d2e] px-2 py-1">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f97316] text-xs font-bold text-black">
                   {getInitials(user.name)}
@@ -249,10 +255,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
         <div className="sticky top-0 z-40 hidden items-center justify-between border-b border-[#252840] bg-[#0f1015]/90 px-6 py-4 backdrop-blur-xl md:flex">
           <h1 className="text-lg font-bold text-[#f0f2ff]">{pageTitle}</h1>
           <div className="flex items-center gap-3">
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#2d3249] bg-[#1a1d2e] text-base text-[#d9def3]">
-              <Bell className="h-4 w-4" />
-              {commentUnread > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#f87171]" /> : null}
-            </button>
+            <NotificationsBell apiBase="/api/notifications" listHref="/notifications" />
           </div>
         </div>
 

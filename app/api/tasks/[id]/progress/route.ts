@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { TaskActivityType, TaskLogType, TaskStatus } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 
@@ -253,6 +254,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return { updatedTask, history };
   });
+
+  fireAndForget(
+    notifyKsTaskUpdate({
+      projectId: task.projectId,
+      taskId: task.id,
+      actorUserId: user.id,
+      actorName: user.name ?? "Người dùng",
+      changeKind: "progress",
+      taskName: taskDetail.name,
+      taskVisibleToCustomer: Boolean((task as { visibleToCustomer?: boolean }).visibleToCustomer),
+      detail: `${taskDetail.progressPercent}% → ${parsed.data.progressPercent}%`,
+    }),
+  );
 
   return NextResponse.json({
     message: "Đã cập nhật tiến độ",
