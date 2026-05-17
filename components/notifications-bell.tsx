@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bell, Loader2 } from "lucide-react";
 
 type NotificationItem = {
@@ -61,7 +61,12 @@ export function NotificationsBell({
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [marking, setMarking] = useState(false);
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({
+    position: "fixed",
+    top: -9999,
+    left: -9999,
+    visibility: "hidden",
+  });
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -98,7 +103,7 @@ export function NotificationsBell({
     fetchList();
   }, [open, fetchList]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
 
     const measure = () => {
@@ -108,7 +113,6 @@ export function NotificationsBell({
       const top = rect.bottom + 8;
 
       if (vw < 768) {
-        // Mobile: full-width centered with 8px side padding, anchored under bell
         setPopoverStyle({
           position: "fixed",
           top,
@@ -116,9 +120,9 @@ export function NotificationsBell({
           right: 8,
           width: "auto",
           maxWidth: "none",
+          visibility: "visible",
         });
       } else {
-        // Desktop: right edge aligned to bell's right edge, but kept inside viewport
         const desiredWidth = 360;
         const rightOffset = Math.max(8, vw - rect.right);
         setPopoverStyle({
@@ -127,6 +131,7 @@ export function NotificationsBell({
           right: rightOffset,
           width: desiredWidth,
           maxWidth: `calc(100vw - ${rightOffset + 8}px)`,
+          visibility: "visible",
         });
       }
     };
@@ -137,6 +142,7 @@ export function NotificationsBell({
     return () => {
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
+      setPopoverStyle((s) => ({ ...s, visibility: "hidden" }));
     };
   }, [open]);
 
