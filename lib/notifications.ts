@@ -111,9 +111,98 @@ export async function notifyKsMorningCheckin(input: {
   ]);
 }
 
+const TASK_UPDATE_DEDUPE_MS = 5 * 60 * 1000;
+
+async function upsertStaffTaskUpdate(
+  recipientIds: string[],
+  base: NotifyInput,
+  title: string,
+  body: string | null,
+  link: string,
+) {
+  const uniqueRecipients = Array.from(new Set(recipientIds.filter((id) => id && id !== base.actorUserId)));
+  if (!uniqueRecipients.length) return;
+
+  const cutoff = new Date(Date.now() - TASK_UPDATE_DEDUPE_MS);
+  const now = new Date();
+
+  for (const recipientId of uniqueRecipients) {
+    const existing = await prisma.staffNotification.findFirst({
+      where: {
+        recipientId,
+        kind: "ks_task_update",
+        projectId: base.projectId,
+        refType: "task",
+        refId: base.refId ?? null,
+        actorUserId: base.actorUserId ?? null,
+        createdAt: { gte: cutoff },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.staffNotification.update({
+        where: { id: existing.id },
+        data: { title, body, link, isRead: false, readAt: null, createdAt: now },
+      });
+    } else {
+      await prisma.staffNotification.create({
+        data: {
+          recipientId,
+          projectId: base.projectId,
+          kind: "ks_task_update",
+          title,
+          body,
+          link,
+          actorUserId: base.actorUserId ?? null,
+          actorName: base.actorName ?? null,
+          refType: "task",
+          refId: base.refId ?? null,
+        },
+      });
+    }
+  }
+}
+
+async function upsertCustomerTaskUpdate(
+  base: NotifyInput,
+  title: string,
+  body: string | null,
+  link: string,
+) {
+  const cutoff = new Date(Date.now() - TASK_UPDATE_DEDUPE_MS);
+  const now = new Date();
+
+  const existing = await prisma.customerNotification.findFirst({
+    where: {
+      kind: "ks_task_update",
+      projectId: base.projectId,
+      refType: "task",
+      refId: base.refId ?? null,
+      actorUserId: base.actorUserId ?? null,
+      createdAt: { gte: cutoff },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.customerNotification.update({
+      where: { id: existing.id },
+      data: { title, body, link, isRead: false, readAt: null, createdAt: now },
+    });
+  } else {
+    await createCustomerNotification(base, "ks_task_update", title, body, link);
+  }
+}
+
 /**
  * Event B — KS cập nhật tiến độ task (status / photo / progress / meta / check-out).
  * Recipients: TPTC luôn; Chủ nhà chỉ khi portal bật và task visibleToCustomer.
+ *
+ * Dedupe: trong cửa sổ 5 phút, cùng task + actor → ghi đè notif cũ thay vì tạo
+ * mới. Tránh tình trạng upload 14 ảnh đẻ ra 14 bell.
  */
 export async function notifyKsTaskUpdate(input: {
   projectId: string;
@@ -151,9 +240,9 @@ export async function notifyKsTaskUpdate(input: {
   const shouldNotifyCustomer = project.customerPortalEnabled && input.taskVisibleToCustomer;
 
   await Promise.all([
-    createStaffNotifications(tptcIds, base, "ks_task_update", title, body, `/tasks/${input.taskId}`),
+    upsertStaffTaskUpdate(tptcIds, base, title, body, `/tasks/${input.taskId}`),
     shouldNotifyCustomer
-      ? createCustomerNotification(base, "ks_task_update", title, body, `/tasks/${input.taskId}`)
+      ? upsertCustomerTaskUpdate(base, title, body, `/tasks/${input.taskId}`)
       : Promise.resolve(),
   ]);
 }

@@ -146,6 +146,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
     }
 
+    const recentCount = await prisma.taskPhoto.count({
+      where: {
+        taskId: params.id,
+        uploadedBy: user.id,
+        createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+    });
+
     fireAndForget(
       notifyKsTaskUpdate({
         projectId: task.projectId,
@@ -155,7 +163,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         changeKind: "photo",
         taskName: task.name,
         taskVisibleToCustomer: Boolean((task as { visibleToCustomer?: boolean }).visibleToCustomer),
-        detail: `+${created.length} ảnh mới`,
+        detail: `+${recentCount} ảnh mới`,
       }),
     );
 
