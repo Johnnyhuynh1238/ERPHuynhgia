@@ -441,6 +441,8 @@ model User {
   staffNotifications            StaffNotification[]       @relation("StaffNotificationRecipient")
   staffNotificationsActed       StaffNotification[]       @relation("StaffNotificationActor")
   customerNotificationsActed    CustomerNotification[]    @relation("CustomerNotificationActor")
+  pushSubscriptions             PushSubscription[]
+  pushSendLogs                  PushSendLog[]
 
   @@map("users")
 }
@@ -2137,4 +2139,35 @@ model CustomerNotification {
 
   @@index([projectId, isRead, createdAt(sort: Desc)])
   @@map("customer_notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique @db.Text
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  lastSeen  DateTime @default(now()) @map("last_seen")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model PushSendLog {
+  id      String   @id @default(uuid()) @db.Uuid
+  userId  String   @map("user_id") @db.Uuid
+  refType String   @map("ref_type")
+  refId   String   @map("ref_id")
+  stage   String
+  sentAt  DateTime @default(now()) @map("sent_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, refType, refId, stage])
+  @@index([userId, sentAt])
+  @@map("push_send_logs")
 }

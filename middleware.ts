@@ -14,7 +14,8 @@ function isStaticAsset(pathname: string) {
     pathname.startsWith("/uploads/") ||
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/manifest") ||
-    pathname.startsWith("/cn-manifest")
+    pathname.startsWith("/cn-manifest") ||
+    pathname === "/sw-push.js"
   );
 }
 
@@ -38,6 +39,11 @@ export async function middleware(req: NextRequest) {
   // khác (/api/customer-portal/, /api/customer-comments/...) nên không bypass nhầm.
   if (pathname.startsWith("/api/customer/")) {
     return applySecurityHeaders(NextResponse.next(), true);
+  }
+
+  // Cron endpoints tự auth bằng header x-cron-key. Không đi qua NextAuth.
+  if (pathname.startsWith("/api/cron/")) {
+    return applySecurityHeaders(NextResponse.next(), false);
   }
 
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
