@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TaskCategory, TaskPhase, TaskStatus } from "@prisma/client";
 import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
@@ -23,6 +23,7 @@ type TaskRow = {
   displayOrder?: number | null;
   plannedStartDate: string;
   plannedEndDate: string;
+  actualStartDate?: string | null;
   assignedEngineer: { id: string; fullName: string } | null;
   assignedForeman: { id: string; fullName: string } | null;
   team: string | null;
@@ -309,6 +310,8 @@ function SortablePhaseContainer({
 
 export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const todayOnly = searchParams?.get("filter") === "today";
   const [loading, setLoading] = useState(true);
   const [savingPhase, setSavingPhase] = useState(false);
   const [deletingPhaseId, setDeletingPhaseId] = useState<string | null>(null);
@@ -954,10 +957,24 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const hasPhaseFilter = phaseFilter !== "all";
   const hasStatusFilter = statusFilter !== "all";
 
+  const todayVnDateStr = useMemo(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+
   const visibleTasks = useMemo(() => {
-    const list = [...tasks].sort(compareByDisplayOrder);
+    let list = [...tasks].sort(compareByDisplayOrder);
+    if (todayOnly) {
+      list = list.filter(
+        (t) => t.status === "in_progress" && !!t.actualStartDate && t.actualStartDate.startsWith(todayVnDateStr),
+      );
+    }
     return list;
-  }, [tasks]);
+  }, [tasks, todayOnly, todayVnDateStr]);
 
   const grouped = useMemo(() => {
     if (!(hasStatusFilter && !hasPhaseFilter)) {
@@ -990,6 +1007,21 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-4">
+      {todayOnly ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2">
+          <div className="text-sm text-orange-200">
+            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang làm hôm nay
+          </div>
+          <button
+            type="button"
+            onClick={() => router.replace(`/projects/${projectId}/tasks`)}
+            className="text-xs font-medium text-orange-300 underline"
+          >
+            Xoá lọc
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-xl font-semibold text-orange-300">Tiến độ dự án</h2>
@@ -1078,11 +1110,19 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
           <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Chưa có phase nào</div>
         ) : null}
 
+        {!loading && todayOnly && visibleTasks.length === 0 && phaseOrderDraft.length > 0 ? (
+          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">
+            Hôm nay chưa có nhiệm vụ nào đang thi công.
+          </div>
+        ) : null}
+
         {!loading && phaseOrderDraft.length > 0 ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onPhaseDragEnd}>
             <SortableContext items={phaseOrderDraft.map((phase) => phase.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-3">
-                {phaseOrderDraft.map((phase) => {
+                {phaseOrderDraft
+                  .filter((phase) => !todayOnly || (phaseTaskMap.get(phase.id) || []).length > 0)
+                  .map((phase) => {
                   const phaseTasks = phaseTaskMap.get(phase.id) || [];
                   const phaseProgress = getPhaseProgress(phaseTasks);
                   const isPhaseExpanded = expandedPhaseIds[phase.id] ?? false;

@@ -104,9 +104,9 @@ export async function notifyKsMorningCheckin(input: {
   };
 
   await Promise.all([
-    createStaffNotifications(tptcIds, base, "ks_morning_checkin", title, body, `/projects/${input.projectId}/reports`),
+    createStaffNotifications(tptcIds, base, "ks_morning_checkin", title, body, `/projects/${input.projectId}/tasks?filter=today`),
     project.customerPortalEnabled
-      ? createCustomerNotification(base, "ks_morning_checkin", title, body, `/reports`)
+      ? createCustomerNotification(base, "ks_morning_checkin", title, body, `/timeline?filter=today`)
       : Promise.resolve(),
   ]);
 }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TaskStatus } from "@prisma/client";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getTodayDateVn } from "@/lib/task-centric";
 
 const completedStatuses: TaskStatus[] = [TaskStatus.done, TaskStatus.inspected, TaskStatus.internal_approved, TaskStatus.completed];
 
@@ -24,16 +25,34 @@ function statusTone(status: TaskStatus) {
   return "border-[#2d3249] bg-[#13151f] text-[#a8b0c8]";
 }
 
-export default async function CustomerTimelinePage({ params }: { params: { token: string } }) {
+export default async function CustomerTimelinePage({
+  params,
+  searchParams,
+}: {
+  params: { token: string };
+  searchParams?: { filter?: string };
+}) {
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
+
+  const todayOnly = searchParams?.filter === "today";
+  const taskWhere = {
+    isActive: true,
+    visibleToCustomer: true,
+    ...(todayOnly
+      ? {
+          status: TaskStatus.in_progress,
+          actualStartDate: getTodayDateVn(),
+        }
+      : {}),
+  };
 
   const phases = await prisma.projectPhase.findMany({
     where: { projectId: project.id },
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     include: {
       tasks: {
-        where: { isActive: true, visibleToCustomer: true },
+        where: taskWhere,
         orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
         select: {
           id: true,
@@ -50,6 +69,8 @@ export default async function CustomerTimelinePage({ params }: { params: { token
     },
   });
 
+  const visiblePhases = todayOnly ? phases.filter((p) => p.tasks.length > 0) : phases;
+
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
@@ -57,13 +78,24 @@ export default async function CustomerTimelinePage({ params }: { params: { token
         <div className="text-sm owner-muted">Theo dõi từng giai đoạn và các công việc đang mở cho chủ nhà.</div>
       </section>
 
-      {phases.length === 0 ? (
-        <section className="owner-section text-sm owner-muted">
-          Dự án chưa có giai đoạn hiển thị cho chủ nhà.
+      {todayOnly ? (
+        <section className="owner-section flex items-center justify-between gap-3 border border-orange-500/30 bg-orange-500/10">
+          <div className="text-sm text-orange-200">
+            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang làm hôm nay
+          </div>
+          <Link href={`/cn/${params.token}/timeline`} className="text-xs font-medium text-orange-300 underline">
+            Xoá lọc
+          </Link>
         </section>
       ) : null}
 
-      {phases.map((phase, index) => {
+      {visiblePhases.length === 0 ? (
+        <section className="owner-section text-sm owner-muted">
+          {todayOnly ? "Hôm nay chưa có nhiệm vụ nào đang thi công." : "Dự án chưa có giai đoạn hiển thị cho chủ nhà."}
+        </section>
+      ) : null}
+
+      {visiblePhases.map((phase, index) => {
         const done = phase.tasks.filter((task) => completedStatuses.includes(task.status)).length;
         const total = phase.tasks.length;
         const percent = total ? Math.round((done / total) * 100) : 0;
