@@ -253,6 +253,8 @@ export function TaskPhotoUploadStatus({
   onClear?: () => void;
   onRemove?: (item: TaskPhotoUploadItem) => void;
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
   if (!items.length) return null;
 
   const statusText: Record<UploadStatus, string> = {
@@ -261,6 +263,15 @@ export function TaskPhotoUploadStatus({
     done: "Xong",
     error: "Lỗi",
   };
+
+  function toggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="mt-2 rounded-xl border border-[#2e3347] bg-[#11131b] p-2 text-xs">
@@ -273,25 +284,42 @@ export function TaskPhotoUploadStatus({
         ) : null}
       </div>
       <div className="space-y-1">
-        {items.map((item) => (
-          <div key={item.id} className="rounded-lg border border-[#2e3347] bg-[#1a1d27] p-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 truncate text-[#c8d0e8]">{item.name}</div>
-              <div className="flex shrink-0 items-center gap-2">
-                <div className={item.status === "error" ? "text-rose-300" : item.status === "done" ? "text-emerald-300" : "text-amber-300"}>
-                  {statusText[item.status]}
+        {items.map((item) => {
+          const isError = item.status === "error";
+          const isExpanded = expanded.has(item.id);
+          return (
+            <div key={item.id} className="rounded-lg border border-[#2e3347] bg-[#1a1d27] p-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 truncate text-[#c8d0e8]">{item.name}</div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isError && item.message ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(item.id)}
+                      title={isExpanded ? "Ẩn chi tiết lỗi" : "Xem chi tiết lỗi"}
+                      aria-label="Xem chi tiết lỗi"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-500/50 bg-rose-500/10 text-sm font-bold text-rose-300"
+                    >
+                      !
+                    </button>
+                  ) : null}
+                  <div className={isError ? "text-rose-300" : item.status === "done" ? "text-emerald-300" : "text-amber-300"}>
+                    {statusText[item.status]}
+                  </div>
+                  {onRemove ? (
+                    <button type="button" onClick={() => onRemove(item)} className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2e3347] text-sm font-bold text-[#8891aa]">
+                      ×
+                    </button>
+                  ) : null}
                 </div>
-                {onRemove ? (
-                  <button type="button" onClick={() => onRemove(item)} className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2e3347] text-sm font-bold text-[#8891aa]">
-                    ×
-                  </button>
-                ) : null}
               </div>
+              <div className="mt-0.5 text-[11px] text-[#8891aa]">{fileSizeLabel(item.size)}</div>
+              {item.message && (!isError || isExpanded) ? (
+                <div className={isError ? "mt-1 text-rose-300" : "mt-1 text-[#8891aa]"}>{item.message}</div>
+              ) : null}
             </div>
-            <div className="mt-0.5 text-[11px] text-[#8891aa]">{fileSizeLabel(item.size)}</div>
-            {item.message ? <div className={item.status === "error" ? "mt-1 text-rose-300" : "mt-1 text-[#8891aa]"}>{item.message}</div> : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
