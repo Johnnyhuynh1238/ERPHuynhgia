@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { KsInstallPushModal } from "@/components/ks-install-push-modal";
 
 type AppUser = {
   id: string;
@@ -141,6 +142,9 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   return (
     <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
       <div className="bg-glow" />
+      {user.role === "engineer" ? (
+        <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+      ) : null}
 
       <aside className="hidden md:fixed md:left-0 md:top-0 md:z-50 md:flex md:h-screen md:w-60 md:flex-col md:border-r md:border-[#252840] md:bg-[#13151f]">
         <div className="border-b border-[#252840] p-5">
