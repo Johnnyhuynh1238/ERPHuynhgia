@@ -519,7 +519,10 @@ export function TaskDetailClient({
             {technicalReportStep === 3 ? (
               <div className="rounded-xl border border-[#2e3347] bg-[#222637] p-3 space-y-3">
                 <div className="text-sm font-semibold">Đính kèm hình ảnh chi tiết</div>
-                <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, technical: e.target.files }))} />
+                <input type="file" multiple accept="image/jpeg,image/png,image/webp" capture="environment" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, technical: e.target.files }))} />
+                <div className="text-[11px] text-amber-300/80">
+                  Bắt buộc chụp tại hiện trường. Ảnh cũ &gt; 30 phút hoặc ảnh đã upload trước đó sẽ bị từ chối.
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" className="border-[#2e3347] bg-[#1a1d27]" onClick={() => setTechnicalReportStep(2)}>Quay lại</Button>
                   <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => setTechnicalReportStep(4)}>Tiếp tục</Button>
@@ -574,7 +577,10 @@ export function TaskDetailClient({
         ) : null}
 
         <textarea className="w-full rounded-xl border border-[#2e3347] bg-[#222637] px-3 py-2" rows={3} placeholder="Ghi chú" value={payload.note || ""} onChange={(e) => setPayloads((p) => ({ ...p, [type]: { ...p[type], note: e.target.value } }))} />
-        <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, [type]: e.target.files }))} />
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp" capture="environment" className="block w-full text-xs" onChange={(e) => setPickedFiles((prev) => ({ ...prev, [type]: e.target.files }))} />
+        <div className="text-[11px] text-amber-300/80">
+          Bắt buộc chụp tại hiện trường. Ảnh cũ &gt; 30 phút hoặc ảnh đã upload trước đó sẽ bị từ chối.
+        </div>
         <Button className="bg-amber-500 text-[#0f1117] hover:bg-amber-600" onClick={() => submitReport(type)}>Lưu báo cáo</Button>
       </div>
     );

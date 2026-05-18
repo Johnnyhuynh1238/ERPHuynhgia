@@ -1561,6 +1561,8 @@ model TaskReportPhoto {
   technicalReportId String?         @map("technical_report_id") @db.Uuid
   fileUrl           String          @map("file_url")
   caption           String?
+  takenAt           DateTime?       @map("taken_at")
+  fileHash          String?         @map("file_hash") @db.VarChar(64)
   uploadedAt        DateTime        @default(now()) @map("uploaded_at")
   uploadedBy        String          @map("uploaded_by") @db.Uuid
 
@@ -1570,6 +1572,7 @@ model TaskReportPhoto {
 
   @@index([taskId, reportDate])
   @@index([type])
+  @@index([fileHash])
   @@map("task_report_photos")
 }
 

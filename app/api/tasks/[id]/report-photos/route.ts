@@ -6,6 +6,7 @@ import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { canReport } from "@/lib/task-centric";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { hashPhotoBuffer, validateProgressPhotoFreshness } from "@/lib/photo-validation";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -68,6 +69,26 @@ export async function POST(request: Request, { params }: { params: { id: string 
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      const freshness = await validateProgressPhotoFreshness(buffer, file.name);
+      if (!freshness.ok) {
+        return NextResponse.json({ message: freshness.message }, { status: 400 });
+      }
+
+      const fileHash = hashPhotoBuffer(buffer);
+      const duplicate = await prisma.taskReportPhoto.findFirst({
+        where: { fileHash },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            message: `Ảnh "${file.name}" đã được upload trước đó. Phải chụp ảnh mới tại hiện trường, không tái sử dụng ảnh cũ.`,
+          },
+          { status: 400 },
+        );
+      }
+
       const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeFilename(file.name)}.${ext}`;
       const out = ext === "png" ? await sharp(buffer).png({ compressionLevel: 9 }).toBuffer() : ext === "webp" ? await sharp(buffer).webp({ quality: 88 }).toBuffer() : await sharp(buffer).jpeg({ quality: 88 }).toBuffer();
@@ -83,6 +104,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           technicalReportId: reportType === "technical" ? technicalReportId : null,
           fileUrl: `minio://${key}`,
           uploadedBy: user.id,
+          takenAt: freshness.takenAt,
+          fileHash,
         },
       });
       created.push(row);
