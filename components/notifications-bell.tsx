@@ -57,6 +57,8 @@ export function NotificationsBell({
   hidden = false,
 }: NotificationsBellProps) {
   const [open, setOpen] = useState(false);
+  const [keepMounted, setKeepMounted] = useState(false);
+  const [enterAnim, setEnterAnim] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,12 +101,21 @@ export function NotificationsBell({
   }, [fetchUnread, pollMs, hidden]);
 
   useEffect(() => {
+    if (open) {
+      setKeepMounted(true);
+    } else {
+      const t = setTimeout(() => setKeepMounted(false), 160);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     fetchList();
   }, [open, fetchList]);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!keepMounted) return;
 
     const measure = () => {
       if (!triggerRef.current) return;
@@ -144,6 +155,14 @@ export function NotificationsBell({
       window.removeEventListener("scroll", measure, true);
       setPopoverStyle((s) => ({ ...s, visibility: "hidden" }));
     };
+  }, [keepMounted]);
+
+  useEffect(() => {
+    if (open) {
+      const raf = requestAnimationFrame(() => setEnterAnim(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setEnterAnim(false);
   }, [open]);
 
   useEffect(() => {
@@ -191,10 +210,10 @@ export function NotificationsBell({
         ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         aria-label="Thông báo"
-        className={
+        className={`${
           triggerClassName ??
           "relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#2d3249] bg-[#1a1d2e] text-base text-[#d9def3]"
-        }
+        } transition-transform active:scale-90`}
       >
         <Bell className="h-4 w-4" />
         {unread > 0 ? (
@@ -204,10 +223,17 @@ export function NotificationsBell({
         ) : null}
       </button>
 
-      {open ? (
+      {keepMounted ? (
         <div
           ref={popoverRef}
-          style={popoverStyle}
+          style={{
+            ...popoverStyle,
+            opacity: enterAnim && open ? 1 : 0,
+            transform: enterAnim && open ? "translateY(0) scale(1)" : "translateY(-4px) scale(0.98)",
+            transformOrigin: "top right",
+            transition: "opacity 140ms ease-out, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+            pointerEvents: enterAnim && open ? "auto" : "none",
+          }}
           className="z-50 overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl"
         >
           <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
