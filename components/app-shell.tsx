@@ -9,7 +9,6 @@ import {
   FolderKanban,
   Home,
   ListChecks,
-  MessageSquare,
   MoreHorizontal,
   Receipt,
   Settings,
@@ -127,7 +126,6 @@ function navIcon(href: string, label: string) {
 export function AppShell({ user, children }: { user: AppUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const [openMore, setOpenMore] = useState(false);
-  const [commentUnread, setCommentUnread] = useState(0);
 
   const menus = useMemo(() => {
     return ROLE_MENUS[user.role] ?? [{ label: "Dashboard", href: "/" }];
@@ -139,27 +137,6 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   const pageTitle = menus.find((item) => isActive(pathname, item.href))?.label || "Dashboard";
 
   const displayName = user.name || user.email || "Người dùng";
-  const canViewCommentInbox = ["admin", "construction_manager", "engineer"].includes(user.role);
-
-  useEffect(() => {
-    if (!canViewCommentInbox) return;
-
-    let stop = false;
-    const run = async () => {
-      const res = await fetch("/api/customer-comments/unread-count", { cache: "no-store" });
-      const json = await res.json().catch(() => ({}));
-      if (!stop && res.ok) {
-        setCommentUnread(Number(json.count || 0));
-      }
-    };
-
-    run();
-    const timer = setInterval(run, 30000);
-    return () => {
-      stop = true;
-      clearInterval(timer);
-    };
-  }, [canViewCommentInbox]);
 
   return (
     <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
@@ -235,17 +212,6 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             </div>
 
             <div className="flex items-center gap-2">
-              {canViewCommentInbox ? (
-                <Link href="/projects" className="relative rounded-full border border-[#2d3249] bg-[#1a1d2e] p-2 text-[#d9def3]">
-                  <MessageSquare className="h-4 w-4" />
-                  {commentUnread > 0 ? (
-                    <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-bold text-black">
-                      {commentUnread > 99 ? "99+" : commentUnread}
-                    </span>
-                  ) : null}
-                </Link>
-              ) : null}
-
               <NotificationsBell
                 apiBase="/api/notifications"
                 listHref="/notifications"
