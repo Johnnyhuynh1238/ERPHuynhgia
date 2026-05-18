@@ -8,6 +8,7 @@ import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { putObjectToMinio } from "@/lib/minio";
 import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { hashPhotoBuffer, validateProgressPhotoFreshness } from "@/lib/photo-validation";
 
 export const runtime = "nodejs";
 
@@ -84,6 +85,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      const freshness = await validateProgressPhotoFreshness(buffer, file.name);
+      if (!freshness.ok) {
+        return NextResponse.json({ message: freshness.message }, { status: 400 });
+      }
+
+      const fileHash = hashPhotoBuffer(buffer);
+      const duplicate = await prisma.taskPhoto.findFirst({
+        where: { fileHash },
+        select: { id: true, taskId: true, createdAt: true },
+      });
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            message: `Ảnh "${file.name}" đã được upload trước đó. Phải chụp ảnh mới tại hiện trường, không tái sử dụng ảnh cũ.`,
+          },
+          { status: 400 },
+        );
+      }
+
       const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const id = randomUUID();
       const baseName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBaseName(file.name)}`;
@@ -112,7 +132,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           thumbnailUrl: `minio://${thumbKey}`,
           caption: null,
           fileSizeKb: Math.ceil(file.size / 1024),
-          takenAt: null,
+          takenAt: freshness.takenAt,
+          fileHash,
         },
         include: {
           user: {

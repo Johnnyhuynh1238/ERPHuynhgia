@@ -825,6 +825,7 @@ model TaskPhoto {
   caption             String?
   fileSizeKb          Int       @map("file_size_kb")
   takenAt             DateTime? @map("taken_at")
+  fileHash            String?   @map("file_hash") @db.VarChar(64)
   eveningReportTaskId String?   @map("evening_report_task_id") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at")
 
@@ -834,6 +835,7 @@ model TaskPhoto {
 
   @@index([taskId, createdAt])
   @@index([eveningReportTaskId])
+  @@index([fileHash])
   @@map("task_photos")
 }
 

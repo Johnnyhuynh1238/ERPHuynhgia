@@ -323,6 +323,7 @@ export function TaskProgressSection({
                   type="file"
                   multiple
                   accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
                   disabled={!canUpdate || saving || uploading}
                   onChange={async (e) => {
                     await uploadPhotos(Array.from(e.target.files || []));
@@ -330,6 +331,9 @@ export function TaskProgressSection({
                   }}
                   className="block w-full text-xs"
                 />
+                <div className="mt-1 text-[11px] text-amber-300/80">
+                  Bắt buộc chụp trực tiếp tại hiện trường. Ảnh cũ &gt; 30 phút hoặc ảnh đã upload trước đó sẽ bị từ chối.
+                </div>
                 {uploading ? <div className="mt-1 text-xs text-[#8891aa]">Đang tải ảnh...</div> : null}
                 <TaskPhotoUploadStatus items={photoUploader.items} onClear={photoUploader.clear} />
                 {uploadedPhotos.length > 0 ? (
