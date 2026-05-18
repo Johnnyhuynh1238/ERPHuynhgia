@@ -147,11 +147,15 @@ async function readUploadBody(res: Response) {
 
 async function uploadTaskPhotoFile(taskId: string, file: File) {
   validateFile(file);
+  const originalLastModified = file.lastModified;
   const uploadFile = await resizeImageForUpload(file);
   validateFile(uploadFile);
 
   const form = new FormData();
   form.append("file", uploadFile);
+  if (originalLastModified > 0) {
+    form.append("originalLastModified", String(originalLastModified));
+  }
 
   const res = await fetch(`/api/tasks/${taskId}/photos`, {
     method: "POST",

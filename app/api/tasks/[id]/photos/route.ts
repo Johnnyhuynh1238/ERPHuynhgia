@@ -62,6 +62,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const formData = await request.formData();
     const files = getSubmittedFiles(formData);
+    const originalLastModifiedRaw = formData.get("originalLastModified");
+    const originalLastModified = originalLastModifiedRaw ? Number(originalLastModifiedRaw) : null;
 
     if (files.length === 0) {
       return NextResponse.json({ message: "Vui lòng chọn ít nhất 1 ảnh" }, { status: 400 });
@@ -85,7 +87,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const freshness = await validateProgressPhotoFreshness(buffer, file.name);
+      const freshness = await validateProgressPhotoFreshness(
+        buffer,
+        file.name,
+        originalLastModified ?? (file.lastModified || null),
+      );
       if (!freshness.ok) {
         return NextResponse.json({ message: freshness.message }, { status: 400 });
       }

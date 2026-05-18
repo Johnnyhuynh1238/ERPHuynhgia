@@ -37,9 +37,15 @@ export type FreshnessResult =
 export async function validateProgressPhotoFreshness(
   buffer: Buffer,
   fileName: string,
+  fileLastModified: number | null = null,
   maxAgeMs = PROGRESS_PHOTO_MAX_AGE_MS,
 ): Promise<FreshnessResult> {
-  const takenAt = await readPhotoTakenAt(buffer);
+  const exifAt = await readPhotoTakenAt(buffer);
+
+  let takenAt = exifAt;
+  if (!takenAt && fileLastModified && Number.isFinite(fileLastModified) && fileLastModified > 0) {
+    takenAt = new Date(fileLastModified);
+  }
 
   if (!takenAt) {
     return {

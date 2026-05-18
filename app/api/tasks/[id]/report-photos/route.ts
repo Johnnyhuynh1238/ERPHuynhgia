@@ -70,7 +70,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const freshness = await validateProgressPhotoFreshness(buffer, file.name);
+      const freshness = await validateProgressPhotoFreshness(buffer, file.name, file.lastModified ?? null);
       if (!freshness.ok) {
         return NextResponse.json({ message: freshness.message }, { status: 400 });
       }
