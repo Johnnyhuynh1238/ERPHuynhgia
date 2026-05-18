@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const updateSchema = z.object({
   section: z.enum(["owner", "project", "assignment", "reporting", "customer_portal", "contract_meta", "payment_schedules", "members"]),
@@ -183,6 +184,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
     });
 
+    const { diff, lines } = buildDiff(
+      { customerName: project.customerName, customerPhone: project.customerPhone, customerIdNumber: project.customerIdNumber, address: project.address, customerPermanentAddress: (existingMeta.customerPermanentAddress as string | undefined) ?? null },
+      { customerName: updated.customerName, customerPhone: updated.customerPhone, customerIdNumber: updated.customerIdNumber, address: updated.address, customerPermanentAddress: permanentAddress },
+      [
+        { key: "customerName", label: "Tên chủ nhà" },
+        { key: "customerPhone", label: "SĐT" },
+        { key: "customerIdNumber", label: "CCCD/CMND" },
+        { key: "address", label: "Địa chỉ công trình" },
+        { key: "customerPermanentAddress", label: "Địa chỉ thường trú" },
+      ],
+    );
+    if (Object.keys(diff).length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: project.id,
+        actorId: user.id,
+        entity: "project",
+        entityId: project.id,
+        action: "update",
+        summary: joinSummary("Sửa thông tin chủ nhà", lines, "Cập nhật thông tin chủ nhà"),
+        diff,
+        metadata: { section: "owner" },
+      });
+    }
+
     return NextResponse.json({ project: updated, message: "Đã cập nhật thông tin chủ nhà" });
   }
 
@@ -214,6 +239,39 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
     });
 
+    const { diff, lines } = buildDiff(
+      {
+        contractSignDate: existingMeta.contractSignDate ?? null,
+        warrantyTotalMonths: existingMeta.warrantyTotalMonths ?? null,
+        warrantyStructureYears: existingMeta.warrantyStructureYears ?? null,
+        warrantyLeakYears: existingMeta.warrantyLeakYears ?? null,
+      },
+      {
+        contractSignDate: nextMeta.contractSignDate ?? null,
+        warrantyTotalMonths: nextMeta.warrantyTotalMonths ?? null,
+        warrantyStructureYears: nextMeta.warrantyStructureYears ?? null,
+        warrantyLeakYears: nextMeta.warrantyLeakYears ?? null,
+      },
+      [
+        { key: "contractSignDate", label: "Ngày ký HĐ" },
+        { key: "warrantyTotalMonths", label: "Tổng tháng bảo hành" },
+        { key: "warrantyStructureYears", label: "Bảo hành kết cấu (năm)" },
+        { key: "warrantyLeakYears", label: "Bảo hành chống thấm (năm)" },
+      ],
+    );
+    if (Object.keys(diff).length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: project.id,
+        actorId: user.id,
+        entity: "project",
+        entityId: project.id,
+        action: "update",
+        summary: joinSummary("Sửa điều khoản HĐ", lines, "Cập nhật điều khoản HĐ"),
+        diff,
+        metadata: { section: "contract_meta" },
+      });
+    }
+
     return NextResponse.json({ project: updated, message: "Đã cập nhật điều khoản HĐ" });
   }
 
@@ -236,10 +294,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return Math.max(0, Math.floor((b - a) / (24 * 60 * 60 * 1000)));
     };
 
-    const existingRows = await prisma.paymentSchedule.findMany({
+    const existingRowsFull = await prisma.paymentSchedule.findMany({
       where: { projectId: params.id },
-      select: { id: true, paidAt: true, actualPaidDate: true },
     });
+    const existingFullById = new Map(existingRowsFull.map((row) => [row.id, row]));
+    const existingRows = existingRowsFull.map((r) => ({ id: r.id, paidAt: r.paidAt, actualPaidDate: r.actualPaidDate }));
     const existingById = new Map(existingRows.map((row) => [row.id, row]));
     const submittedIds = new Set<string>();
 
@@ -253,7 +312,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
         if (row.id && existingById.has(row.id)) {
           submittedIds.add(row.id);
-          await tx.paymentSchedule.update({
+          const before = existingFullById.get(row.id)!;
+          const updated = await tx.paymentSchedule.update({
             where: { id: row.id },
             data: {
               type: row.type,
@@ -269,8 +329,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               phaseNumber: row.installmentNo,
             },
           });
+          const { diff, lines } = buildDiff(
+            { installmentNo: before.installmentNo, description: before.description, percent: before.percent ? Number(before.percent) : null, amount: before.amount ? Number(before.amount) : null, dueDate: before.dueDate },
+            { installmentNo: updated.installmentNo, description: updated.description, percent: updated.percent ? Number(updated.percent) : null, amount: updated.amount ? Number(updated.amount) : null, dueDate: updated.dueDate },
+            [
+              { key: "installmentNo", label: "Đợt" },
+              { key: "description", label: "Mô tả" },
+              { key: "percent", label: "%" },
+              { key: "amount", label: "Số tiền", format: fmtMoney },
+              { key: "dueDate", label: "Hạn", format: fmtDate },
+            ],
+          );
+          if (Object.keys(diff).length > 0) {
+            await logProjectActivity(tx, {
+              projectId: params.id,
+              actorId: user.id,
+              entity: "payment_schedule",
+              entityId: updated.id,
+              action: "update",
+              summary: joinSummary(`Sửa đợt TT #${updated.installmentNo}`, lines, `Cập nhật đợt TT #${updated.installmentNo}`),
+              diff,
+            });
+          }
         } else {
-          await tx.paymentSchedule.create({
+          const created = await tx.paymentSchedule.create({
             data: {
               projectId: params.id,
               type: row.type,
@@ -288,11 +370,31 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               createdBy: user.id,
             },
           });
+          await logProjectActivity(tx, {
+            projectId: params.id,
+            actorId: user.id,
+            entity: "payment_schedule",
+            entityId: created.id,
+            action: "create",
+            summary: `Thêm đợt TT #${created.installmentNo} "${created.description}" — ${fmtMoney(created.amount)}${dueDate ? `, hạn ${fmtDate(dueDate)}` : ""}`,
+          });
         }
       }
 
       const toDelete = existingRows.filter((row) => !submittedIds.has(row.id) && !row.paidAt && !row.actualPaidDate);
       if (toDelete.length > 0) {
+        for (const row of toDelete) {
+          const full = existingFullById.get(row.id)!;
+          await logProjectActivity(tx, {
+            projectId: params.id,
+            actorId: user.id,
+            entity: "payment_schedule",
+            entityId: row.id,
+            action: "delete",
+            summary: `Xóa đợt TT #${full.installmentNo} "${full.description}" — ${fmtMoney(full.amount)}`,
+            snapshot: full,
+          });
+        }
         await tx.paymentSchedule.deleteMany({
           where: { id: { in: toDelete.map((row) => row.id) } },
         });
@@ -323,6 +425,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (users.length !== 2) {
       return NextResponse.json({ message: "GĐ Thi Công hoặc KS chính không hợp lệ" }, { status: 400 });
     }
+
+    const prevPm = await prisma.user.findUnique({ where: { id: project.projectManagerId }, select: { id: true, fullName: true } });
+    const prevEng = await prisma.user.findUnique({ where: { id: project.mainEngineerId }, select: { id: true, fullName: true } });
+    const nextPm = await prisma.user.findUnique({ where: { id: payload.data.projectManagerId }, select: { id: true, fullName: true } });
+    const nextEng = await prisma.user.findUnique({ where: { id: payload.data.mainEngineerId }, select: { id: true, fullName: true } });
 
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.project.update({
@@ -378,6 +485,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         skipDuplicates: true,
       });
 
+      const { diff, lines } = buildDiff(
+        { projectManagerId: prevPm?.fullName ?? project.projectManagerId, mainEngineerId: prevEng?.fullName ?? project.mainEngineerId },
+        { projectManagerId: nextPm?.fullName ?? payload.data.projectManagerId, mainEngineerId: nextEng?.fullName ?? payload.data.mainEngineerId },
+        [
+          { key: "projectManagerId", label: "GĐ Thi Công" },
+          { key: "mainEngineerId", label: "KS chính" },
+        ],
+      );
+      if (Object.keys(diff).length > 0) {
+        await logProjectActivity(tx, {
+          projectId: params.id,
+          actorId: user.id,
+          entity: "project",
+          entityId: params.id,
+          action: "update",
+          summary: joinSummary("Đổi phân công dự án", lines, "Cập nhật phân công"),
+          diff,
+          metadata: { section: "assignment", projectManagerId: payload.data.projectManagerId, mainEngineerId: payload.data.mainEngineerId },
+        });
+      }
+
       return result;
     });
 
@@ -419,6 +547,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
+    const beforeMembers = await prisma.projectMember.findMany({
+      where: { projectId: params.id, userId: { notIn: [project.projectManagerId, project.mainEngineerId] } },
+      include: { user: { select: { id: true, fullName: true } } },
+    });
+
     await prisma.$transaction(async (tx) => {
       await tx.projectMember.deleteMany({
         where: {
@@ -437,6 +570,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           skipDuplicates: true,
         });
       }
+
+      const beforeIds = new Set(beforeMembers.map((m) => m.userId));
+      const afterIds = new Set(rows.map((r) => r.userId));
+      const added = rows.filter((r) => !beforeIds.has(r.userId));
+      const removed = beforeMembers.filter((m) => !afterIds.has(m.userId));
+
+      if (added.length > 0 || removed.length > 0) {
+        const addedUsers = added.length > 0 ? await tx.user.findMany({ where: { id: { in: added.map((r) => r.userId) } }, select: { id: true, fullName: true } }) : [];
+        const addedNames = addedUsers.map((u) => u.fullName).join(", ");
+        const removedNames = removed.map((m) => m.user.fullName).join(", ");
+        const parts: string[] = [];
+        if (added.length > 0) parts.push(`Thêm: ${addedNames}`);
+        if (removed.length > 0) parts.push(`Bỏ: ${removedNames}`);
+        await logProjectActivity(tx, {
+          projectId: params.id,
+          actorId: user.id,
+          entity: "project_member",
+          action: "update",
+          summary: `Đổi thành viên dự án — ${parts.join("; ")}`,
+          metadata: { added: addedUsers.map((u) => u.id), removed: removed.map((m) => m.userId) },
+        });
+      }
     });
 
     return NextResponse.json({ message: "Đã cập nhật thành viên" });
@@ -452,12 +607,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ message: payload.error.issues[0]?.message || "Dữ liệu cấu hình báo cáo không hợp lệ" }, { status: 400 });
     }
 
+    const beforeGoLive = project.goLiveDate;
     const updated = await prisma.project.update({
       where: { id: params.id },
       data: {
         goLiveDate: normalizeNullableDate(payload.data.goLiveDate),
       },
     });
+
+    if ((beforeGoLive?.getTime() ?? null) !== (updated.goLiveDate?.getTime() ?? null)) {
+      await logProjectActivity(prisma, {
+        projectId: project.id,
+        actorId: user.id,
+        entity: "project",
+        entityId: project.id,
+        action: "update",
+        summary: `Đổi ngày go-live: ${fmtDate(beforeGoLive)} → ${fmtDate(updated.goLiveDate)}`,
+        diff: { goLiveDate: { from: beforeGoLive, to: updated.goLiveDate } },
+        metadata: { section: "reporting" },
+      });
+    }
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật ngày go-live" });
   }
@@ -496,6 +665,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       where: { id: params.id },
       data: updateData,
     });
+
+    const actions: string[] = [];
+    if (payload.data.customerPortalPassword !== undefined) actions.push("Đổi mật khẩu cổng chủ nhà");
+    if (payload.data.customerPortalEnabled !== undefined && payload.data.customerPortalEnabled !== project.customerPortalEnabled) {
+      actions.push(payload.data.customerPortalEnabled ? "Bật cổng chủ nhà" : "Tắt cổng chủ nhà");
+    }
+    if ((parsed.data.payload as { resetToken?: boolean }).resetToken) actions.push("Đổi link truy cập (reset token)");
+    if (actions.length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: project.id,
+        actorId: user.id,
+        entity: "customer_portal",
+        entityId: project.id,
+        action: "update",
+        summary: actions.join("; "),
+        metadata: { section: "customer_portal" },
+      });
+    }
 
     return NextResponse.json({ project: updated, message: "Đã cập nhật cổng chủ nhà" });
   }
@@ -569,6 +756,51 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
+    const { diff, lines } = buildDiff(
+      {
+        name: project.name,
+        contractValue: project.contractValue ? Number(project.contractValue) : null,
+        startDate: project.startDate,
+        expectedEndDate: project.expectedEndDate,
+        plannedDeadline: project.plannedDeadline,
+        actualEndDate: project.actualEndDate,
+        status: project.status,
+        notes: project.notes ?? null,
+      },
+      {
+        name: updated.name,
+        contractValue: updated.contractValue ? Number(updated.contractValue) : null,
+        startDate: updated.startDate,
+        expectedEndDate: updated.expectedEndDate,
+        plannedDeadline: updated.plannedDeadline,
+        actualEndDate: updated.actualEndDate,
+        status: updated.status,
+        notes: updated.notes ?? null,
+      },
+      [
+        { key: "name", label: "Tên dự án" },
+        { key: "contractValue", label: "Giá HĐ", format: fmtMoney },
+        { key: "startDate", label: "Ngày khởi công", format: fmtDate },
+        { key: "expectedEndDate", label: "Ngày bàn giao DK", format: fmtDate },
+        { key: "plannedDeadline", label: "Hạn nội bộ", format: fmtDate },
+        { key: "actualEndDate", label: "Ngày bàn giao thực tế", format: fmtDate },
+        { key: "status", label: "Trạng thái" },
+        { key: "notes", label: "Ghi chú" },
+      ],
+    );
+    if (Object.keys(diff).length > 0) {
+      await logProjectActivity(tx, {
+        projectId: params.id,
+        actorId: user.id,
+        entity: "project",
+        entityId: params.id,
+        action: "update",
+        summary: joinSummary("Sửa dự án", lines, "Cập nhật dự án"),
+        diff,
+        metadata: { section: "project", taskDatesShifted: isStartDateChanged },
+      });
+    }
+
     return updated;
   });
 
@@ -592,12 +824,15 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const project = await prisma.project.findUnique({
     where: { id: params.id },
-    select: { id: true, name: true },
   });
 
   if (!project) {
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
+
+  // Log delete event with full snapshot. Note: log row itself cascades on
+  // project delete, but the console line below preserves the event server-side.
+  console.log(`[project-delete] actor=${user.id} project=${project.id} code=${project.code} name="${project.name}"`);
 
   await prisma.project.delete({ where: { id: params.id } });
 

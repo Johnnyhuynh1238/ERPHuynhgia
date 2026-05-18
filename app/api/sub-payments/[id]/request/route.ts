@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { canCreateOrRequestSubPayment } from "@/lib/sub-payment-utils";
+import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const schema = z.object({
   note: z.string().trim().max(3000).nullable().optional(),
@@ -25,7 +26,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const row = await prisma.subPayment.findUnique({
     where: { id: params.id },
-    select: { id: true, subContractId: true, status: true },
+    include: {
+      subContract: { select: { projectId: true, code: true, title: true } },
+    },
   });
 
   if (!row) {
@@ -49,6 +52,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       requestedAt: new Date(),
       requestNote: parsed.data.note ?? null,
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: row.subContract.projectId,
+    actorId: user.id,
+    entity: "sub_payment",
+    entityId: row.id,
+    action: "request",
+    summary: `Đề xuất chi đợt TT thầu phụ ${row.code} "${row.description}" (HĐ ${row.subContract.code}) — ${fmtMoney(row.expectedAmount)}`,
+    metadata: { subContractId: row.subContractId, note: parsed.data.note ?? null },
   });
 
   return NextResponse.json({ payment: updated, message: "Đã gửi đề xuất chi" });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 type StoredQcPhoto = {
   id?: string;
@@ -238,6 +239,26 @@ export async function POST(request: Request, { params }: { params: { id: string;
         oldValue: previous ? String(previous.isPassed) : null,
         newValue: String(parsed.data.isPassed),
         content: `${parsed.data.isPassed ? "QC_PASS" : "QC_UNPASS"}: ${item.title}`,
+      },
+    });
+
+    const meta = await tx.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_qc_result",
+      entityId: saved.id,
+      action: parsed.data.isPassed ? "qc_pass" : "qc_unpass",
+      summary: `${parsed.data.isPassed ? "Đạt" : "Bỏ đạt"} tiêu chí QC "${item.title}" task ${meta?.code} "${meta?.name}"`,
+      metadata: {
+        taskId: params.id,
+        itemId: item.id,
+        itemTitle: item.title,
+        previousPassed: previous?.isPassed ?? null,
+        passedAtFirstAttempt,
+        photoCount: photos.length,
+        noteLength: note.length,
+        qcCompleted: isQcCompleted,
       },
     });
 

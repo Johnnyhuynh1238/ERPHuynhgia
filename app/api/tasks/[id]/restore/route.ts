@@ -3,6 +3,7 @@ import { TaskLogType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -54,6 +55,16 @@ export async function POST(_request: Request, { params }: { params: { id: string
         logType: TaskLogType.note,
         content: "Đã khôi phục task",
       },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task",
+      entityId: task.id,
+      action: "restore",
+      summary: `Khôi phục task ${task.code} "${task.name}"`,
+      metadata: { displayOrder: nextDisplayOrder },
     });
   });
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const updatePaymentSchema = z.object({
   type: z.enum(["contract", "addendum"]).optional(),
@@ -51,6 +52,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const parsed = updatePaymentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
 
+  const before = await prisma.paymentSchedule.findUnique({ where: { id: params.id } });
+  if (!before) return NextResponse.json({ message: "Không tìm thấy đợt thanh toán" }, { status: 404 });
+
   const payload = parsed.data;
   const dueDate = payload.dueDate ? atUtcDate(payload.dueDate) : undefined;
   const percent = payload.amount && access.project.contractValue && Number(access.project.contractValue) > 0
@@ -69,6 +73,29 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     },
   });
 
+  const { diff, lines } = buildDiff(
+    { installmentNo: before.installmentNo, description: before.description, amount: before.amount ? Number(before.amount) : null, dueDate: before.dueDate, paymentNote: before.paymentNote },
+    { installmentNo: payment.installmentNo, description: payment.description, amount: payment.amount ? Number(payment.amount) : null, dueDate: payment.dueDate, paymentNote: payment.paymentNote },
+    [
+      { key: "installmentNo", label: "Đợt" },
+      { key: "description", label: "Mô tả" },
+      { key: "amount", label: "Số tiền", format: fmtMoney },
+      { key: "dueDate", label: "Hạn", format: fmtDate },
+      { key: "paymentNote", label: "Ghi chú" },
+    ],
+  );
+  if (Object.keys(diff).length > 0) {
+    await logProjectActivity(prisma, {
+      projectId: payment.projectId,
+      actorId: access.user.id,
+      entity: "payment_schedule",
+      entityId: payment.id,
+      action: "update",
+      summary: joinSummary(`Sửa đợt TT #${payment.installmentNo}`, lines, `Cập nhật đợt TT #${payment.installmentNo}`),
+      diff,
+    });
+  }
+
   return NextResponse.json({ payment, message: "Đã cập nhật đợt thanh toán" });
 }
 
@@ -77,6 +104,21 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (access.error) return access.error;
   if (isPaid(access.payment.status)) return NextResponse.json({ message: "Đợt đã thu không được xóa" }, { status: 400 });
 
-  await prisma.paymentSchedule.delete({ where: { id: params.id } });
+  const before = await prisma.paymentSchedule.findUnique({ where: { id: params.id } });
+  if (!before) return NextResponse.json({ message: "Không tìm thấy đợt thanh toán" }, { status: 404 });
+
+  await prisma.$transaction(async (tx) => {
+    await logProjectActivity(tx, {
+      projectId: before.projectId,
+      actorId: access.user.id,
+      entity: "payment_schedule",
+      entityId: before.id,
+      action: "delete",
+      summary: `Xóa đợt TT #${before.installmentNo} "${before.description}" — ${fmtMoney(before.amount)}`,
+      snapshot: before,
+    });
+    await tx.paymentSchedule.delete({ where: { id: params.id } });
+  });
+
   return NextResponse.json({ message: "Đã xóa đợt thanh toán" });
 }

@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { putObjectToMinio } from "@/lib/minio";
 import { canUploadPhoto, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -131,6 +132,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
         content: `Đã upload ${created.length} ảnh`,
       },
     });
+
+    if (created.length > 0) {
+      const totalSizeKb = files.reduce((sum, f) => sum + Math.ceil(f.size / 1024), 0);
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task_photo",
+        entityId: params.id,
+        action: "upload",
+        summary: `Upload ${created.length} ảnh task ${task.code} "${task.name}" (${(totalSizeKb / 1024).toFixed(2)} MB)`,
+        metadata: { taskId: params.id, count: created.length, totalSizeKb },
+      });
+    }
 
     fireAndForget(
       notifyKsTaskUpdate({

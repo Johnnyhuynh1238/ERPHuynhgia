@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { recalcProjectPhasesTimeline } from "@/lib/project-phase";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const reorderSchema = z.object({
   phaseIds: z.array(z.string().uuid()).min(1, "Danh sách phase không hợp lệ"),
@@ -69,6 +70,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     await recalcProjectPhasesTimeline(tx, params.id);
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "project_phase",
+      entityId: params.id,
+      action: "reorder",
+      summary: `Sắp xếp lại ${phaseIds.length} phase`,
+      metadata: { phaseIds },
+    });
   });
 
   return NextResponse.json({ message: "Đã cập nhật thứ tự phase" });

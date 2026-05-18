@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { canManageItem, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   name: z.string().trim().min(1, "Tên vật tư là bắt buộc"),
@@ -51,5 +52,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const orderIndex = parsed.data.orderIndex ?? ((await prisma.taskMaterialItem.aggregate({ where: { taskId: params.id }, _max: { orderIndex: true } }))._max.orderIndex ?? -1) + 1;
   const item = await prisma.taskMaterialItem.create({ data: { taskId: params.id, name: parsed.data.name, orderIndex } });
+
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task_material",
+    entityId: item.id,
+    action: "create",
+    summary: `Thêm vật tư "${parsed.data.name}" cho task ${task.code} "${task.name}"`,
+    metadata: { taskId: params.id, name: parsed.data.name, orderIndex },
+  });
+
   return NextResponse.json({ item, message: "Đã thêm vật tư" }, { status: 201 });
 }

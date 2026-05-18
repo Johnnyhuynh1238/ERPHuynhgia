@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildDesignGroupVisibilityWhere } from "@/lib/design-photos";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -149,6 +150,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
   });
 
   if (!group) return NextResponse.json({ message: "Tạo nhóm thất bại" }, { status: 500 });
+
+  await logProjectActivity(prisma, {
+    projectId: params.id,
+    actorId: current.id,
+    entity: "design_group",
+    entityId: group.id,
+    action: "create",
+    summary: `Tạo nhóm ảnh thiết kế "${group.title}"${parsed.data.visibleToCustomer ? " (CN xem được)" : ""}`,
+    metadata: { title: group.title, visibleToCustomer: parsed.data.visibleToCustomer || false, viewerCount: viewerIds.length },
+  });
 
   return NextResponse.json({ group: serializeGroup(params.id, group), message: "Đã tạo nhóm ảnh thiết kế" });
 }

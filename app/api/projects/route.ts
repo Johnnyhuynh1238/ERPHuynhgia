@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { getPhaseMeta } from "@/lib/task-template-csv";
+import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const STATUS_PRIORITY: Record<ProjectStatus, number> = {
   in_progress: 0,
@@ -613,6 +614,22 @@ export async function POST(request: Request) {
       await tx.projectMemberAssignment.createMany({
         data: Array.from(assignmentRows.values()),
         skipDuplicates: true,
+      });
+
+      await logProjectActivity(tx, {
+        projectId: project.id,
+        actorId: actorUser.id,
+        entity: "project",
+        entityId: project.id,
+        action: "create",
+        summary: `Tạo dự án ${project.code} "${project.name}" — chủ nhà: ${project.customerName}, giá HĐ: ${fmtMoney(project.contractValue)}`,
+        metadata: {
+          code: project.code,
+          contractValue: project.contractValue?.toString() ?? null,
+          templateCategory: parsed.data.templateCategory,
+          memberCount: dedup.size,
+          paymentScheduleCount: paymentRows.length,
+        },
       });
 
       return project;

@@ -4,6 +4,7 @@ import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const cloneSchema = z.object({
   newProject: z.object({
@@ -178,6 +179,31 @@ export async function POST(request: Request, { params }: { params: { id: string 
         }
       }
     }
+
+    await logProjectActivity(tx, {
+      projectId: project.id,
+      actorId: user.id,
+      entity: "project",
+      entityId: project.id,
+      action: "clone",
+      summary: `Tạo dự án ${project.code} "${project.name}" bằng cách sao chép từ ${sourceProject.code} "${sourceProject.name}"`,
+      metadata: {
+        sourceProjectId: sourceProject.id,
+        sourceCode: sourceProject.code,
+        sourceName: sourceProject.name,
+        copy,
+      },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: sourceProject.id,
+      actorId: user.id,
+      entity: "project",
+      entityId: sourceProject.id,
+      action: "clone_source",
+      summary: `Dự án này được sao chép thành ${project.code} "${project.name}"`,
+      metadata: { newProjectId: project.id, newCode: project.code },
+    });
 
     return project;
   });

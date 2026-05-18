@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       uploadedBy: user.id,
     },
     include: { uploader: { select: { id: true, fullName: true } } },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: params.id,
+    actorId: user.id,
+    entity: "project_drawing",
+    entityId: drawing.id,
+    action: "upload",
+    summary: `Upload bản vẽ "${drawing.name}" (${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
+    metadata: { name: drawing.name, fileSizeBytes: file.size, fileName: file.name },
   });
 
   return NextResponse.json({ drawing: { ...drawing, viewUrl: drawingViewUrl(drawing.id) }, message: "Đã upload bản vẽ" });

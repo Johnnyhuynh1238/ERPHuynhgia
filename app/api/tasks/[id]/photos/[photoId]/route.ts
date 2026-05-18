@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { deleteObjectFromMinio } from "@/lib/minio";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 function extractMinioKey(value: string) {
   if (value.startsWith("minio://")) return value.slice("minio://".length);
@@ -32,6 +33,9 @@ export async function DELETE(
       uploadedBy: true,
       photoUrl: true,
       thumbnailUrl: true,
+      caption: true,
+      fileSizeKb: true,
+      task: { select: { projectId: true, code: true, name: true } },
     },
   });
 
@@ -52,6 +56,23 @@ export async function DELETE(
     photoKey ? deleteObjectFromMinio(photoKey) : Promise.resolve(),
     thumbKey ? deleteObjectFromMinio(thumbKey) : Promise.resolve(),
   ]);
+
+  await logProjectActivity(prisma, {
+    projectId: photo.task.projectId,
+    actorId: user.id,
+    entity: "task_photo",
+    entityId: photo.id,
+    action: "delete",
+    summary: `Xoá 1 ảnh khỏi task ${photo.task.code} "${photo.task.name}"`,
+    snapshot: {
+      taskId: params.id,
+      photoUrl: photo.photoUrl,
+      thumbnailUrl: photo.thumbnailUrl,
+      caption: photo.caption,
+      fileSizeKb: photo.fileSizeKb,
+      uploadedBy: photo.uploadedBy,
+    },
+  });
 
   return NextResponse.json({ message: "Đã xóa ảnh" });
 }

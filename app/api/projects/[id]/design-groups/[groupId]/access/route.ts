@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,7 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
 
   const group = await prisma.designPhotoGroup.findFirst({
     where: { id: params.groupId, projectId: params.id },
-    select: { id: true },
+    select: { id: true, title: true },
   });
   if (!group) return NextResponse.json({ message: "Không tìm thấy nhóm ảnh" }, { status: 404 });
 
@@ -47,11 +48,32 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
     }
   }
 
+  const before = await prisma.designPhotoGroupAccess.findMany({
+    where: { groupId: params.groupId },
+    select: { userId: true },
+  });
+  const beforeIds = new Set(before.map((row) => row.userId));
+  const afterIds = new Set(userIds);
+  const added = userIds.filter((id) => !beforeIds.has(id));
+  const removed = before.map((row) => row.userId).filter((id) => !afterIds.has(id));
+
   await prisma.$transaction(async (tx) => {
     await tx.designPhotoGroupAccess.deleteMany({ where: { groupId: params.groupId } });
     if (userIds.length > 0) {
       await tx.designPhotoGroupAccess.createMany({
         data: userIds.map((userId) => ({ groupId: params.groupId, userId, grantedBy: current.id })),
+      });
+    }
+
+    if (added.length > 0 || removed.length > 0) {
+      await logProjectActivity(tx, {
+        projectId: params.id,
+        actorId: current.id,
+        entity: "design_group",
+        entityId: params.groupId,
+        action: "update_access",
+        summary: `Cập nhật phân quyền nhóm ảnh "${group.title}": +${added.length} / -${removed.length}`,
+        metadata: { groupTitle: group.title, total: userIds.length, addedUserIds: added, removedUserIds: removed },
       });
     }
   });

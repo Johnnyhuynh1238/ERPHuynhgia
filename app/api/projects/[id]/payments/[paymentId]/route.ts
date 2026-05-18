@@ -3,6 +3,7 @@ import { PaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   status: z.nativeEnum(PaymentStatus),
@@ -36,6 +37,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     select: {
       id: true,
       amount: true,
+      installmentNo: true,
+      description: true,
+      status: true,
+      expectedDate: true,
+      actualPaidDate: true,
+      actualPaidAmount: true,
+      notes: true,
       project: { select: { startDate: true } },
     },
   });
@@ -102,6 +110,42 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       notes: true,
     },
   });
+
+  const { diff, lines } = buildDiff(
+    {
+      status: row.status,
+      expectedDate: row.expectedDate,
+      actualPaidDate: row.actualPaidDate,
+      actualPaidAmount: row.actualPaidAmount ? Number(row.actualPaidAmount) : null,
+      notes: row.notes ?? null,
+    },
+    {
+      status: updated.status,
+      expectedDate: updated.expectedDate,
+      actualPaidDate: updated.actualPaidDate,
+      actualPaidAmount: updated.actualPaidAmount ? Number(updated.actualPaidAmount) : null,
+      notes: updated.notes ?? null,
+    },
+    [
+      { key: "status", label: "Trạng thái" },
+      { key: "expectedDate", label: "Hạn", format: fmtDate },
+      { key: "actualPaidDate", label: "Ngày thu", format: fmtDate },
+      { key: "actualPaidAmount", label: "Số tiền thu", format: fmtMoney },
+      { key: "notes", label: "Ghi chú" },
+    ],
+  );
+
+  if (Object.keys(diff).length > 0) {
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "payment_schedule",
+      entityId: updated.id,
+      action: status === PaymentStatus.collected ? "mark_paid" : "update",
+      summary: joinSummary(`Cập nhật đợt TT #${row.installmentNo} "${row.description}"`, lines, `Cập nhật đợt TT #${row.installmentNo}`),
+      diff,
+    });
+  }
 
   return NextResponse.json({
     payment: {

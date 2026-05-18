@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth-helpers";
+import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  let actor;
   try {
     await requireRole(["admin", "construction_manager"]);
+    actor = await getCurrentUser();
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN";
     if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
@@ -20,8 +23,20 @@ export async function POST(_request: Request, { params }: { params: { id: string
     select: { id: true, customerPortalToken: true },
   });
 
-  await prisma.customerSession.deleteMany({ where: { projectId: params.id } });
-  await prisma.customerLoginAttempt.deleteMany({ where: { projectId: params.id } });
+  const sessions = await prisma.customerSession.deleteMany({ where: { projectId: params.id } });
+  const attempts = await prisma.customerLoginAttempt.deleteMany({ where: { projectId: params.id } });
+
+  if (actor?.id) {
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: actor.id,
+      entity: "customer_portal",
+      entityId: params.id,
+      action: "reset_token",
+      summary: `Reset link cổng chủ nhà (huỷ ${sessions.count} session, xoá ${attempts.count} login attempt)`,
+      metadata: { clearedSessions: sessions.count, clearedAttempts: attempts.count },
+    });
+  }
 
   return NextResponse.json({ project, message: "Đã reset link chủ nhà" });
 }

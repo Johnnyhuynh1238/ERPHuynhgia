@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { getTaskWithAccess } from "@/lib/task-permissions";
 import { setTaskInspected } from "@/lib/task-status-auto";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const reviewSchema = z.object({
   action: z.nativeEnum(QcReviewAction),
@@ -44,6 +45,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (parsed.data.action === QcReviewAction.approved) {
     await setTaskInspected(params.id, user.id, "qc approved", { db: prisma });
   }
+
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task",
+    entityId: params.id,
+    action: parsed.data.action === QcReviewAction.approved ? "qc_approve" : "qc_reject",
+    summary: `${parsed.data.action === QcReviewAction.approved ? "Duyệt" : "Từ chối"} QC task ${task.code} "${task.name}"${parsed.data.note ? ` — ${parsed.data.note}` : ""}`,
+    metadata: { reviewId: review.id, note: parsed.data.note?.trim() || null },
+  });
 
   return NextResponse.json({ review, message: parsed.data.action === QcReviewAction.approved ? "Đã duyệt QC" : "Đã từ chối QC" });
 }

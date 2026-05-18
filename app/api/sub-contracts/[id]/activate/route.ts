@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
 import { serializeSubContract } from "@/lib/sub-contract-utils";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireSubContractWriteUser();
@@ -19,7 +20,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const row = await prisma.subContract.findUnique({
     where: { id: params.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, projectId: true, code: true, title: true },
   });
 
   if (!row) {
@@ -33,6 +34,16 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const updated = await prisma.subContract.update({
     where: { id: params.id },
     data: { status: SubContractStatus.active },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: row.projectId,
+    actorId: user.id,
+    entity: "sub_contract",
+    entityId: row.id,
+    action: "activate",
+    summary: `Kích hoạt HĐ thầu phụ ${row.code} "${row.title}"`,
+    metadata: { previousStatus: row.status },
   });
 
   return NextResponse.json({

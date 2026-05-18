@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   qcItemId: z.string().uuid("qcItemId không hợp lệ"),
@@ -85,6 +86,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
       },
     });
 
+    const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(prisma, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_qc_log",
+      entityId: created.id,
+      action: "create",
+      summary: `Check QC mục "${created.qcItem?.content ?? ''}" task ${meta?.code} "${meta?.name}"`,
+      metadata: { taskId: params.id, qcItemId, photoCount: photos.length, hasNote: Boolean(noteInput), eveningReportId: eveningReportIdInput || null },
+    });
+
     return NextResponse.json({ log: created }, { status: 201 });
   }
 
@@ -108,6 +120,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
       qcItem: { select: { id: true, content: true } },
       checker: { select: { id: true, fullName: true, email: true } },
     },
+  });
+
+  const meta2 = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task_qc_log",
+    entityId: created.id,
+    action: "create",
+    summary: `Check QC mục "${created.qcItem?.content ?? ''}" task ${meta2?.code} "${meta2?.name}"`,
+    metadata: { taskId: params.id, qcItemId: parsed.data.qcItemId, photoCount: parsed.data.photos.length, hasNote: Boolean(parsed.data.note?.trim()), eveningReportId: parsed.data.eveningReportId || null },
   });
 
   return NextResponse.json({ log: created }, { status: 201 });

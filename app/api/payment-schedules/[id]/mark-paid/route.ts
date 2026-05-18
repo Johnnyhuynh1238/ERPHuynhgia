@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const markPaidSchema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày thu không hợp lệ"),
@@ -29,7 +30,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
   if (!canEdit(user.role as UserRole)) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
-  const payment = await prisma.paymentSchedule.findUnique({ where: { id: params.id }, select: { id: true, projectId: true, status: true } });
+  const payment = await prisma.paymentSchedule.findUnique({ where: { id: params.id } });
   if (!payment) return NextResponse.json({ message: "Không tìm thấy đợt thanh toán" }, { status: 404 });
   if (isPaid(payment.status)) return NextResponse.json({ message: "Đợt này đã thu" }, { status: 400 });
 
@@ -56,6 +57,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       actualPaidAmount: payload.paidAmount,
       notes: payload.paymentNote || null,
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: updated.projectId,
+    actorId: user.id,
+    entity: "payment_schedule",
+    entityId: updated.id,
+    action: "mark_paid",
+    summary: `Đã thu đợt TT #${updated.installmentNo} "${updated.description}" — ${fmtMoney(payload.paidAmount)} (ngày ${fmtDate(paidAt)})`,
+    metadata: { paidAmount: payload.paidAmount, paidAt: payload.paidAt, receiptUrl: payload.receiptUrl, paymentNote: payload.paymentNote ?? null },
   });
 
   return NextResponse.json({ payment: updated, message: "Đã đánh dấu đã thu" });

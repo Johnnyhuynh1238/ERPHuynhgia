@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
 import { serializeSubContract, startOfUtcDay } from "@/lib/sub-contract-utils";
+import { fmtDate, logProjectActivity } from "@/lib/project-activity-log";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireSubContractWriteUser();
@@ -19,7 +20,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const row = await prisma.subContract.findUnique({
     where: { id: params.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, projectId: true, code: true, title: true },
   });
 
   if (!row) {
@@ -30,12 +31,23 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return NextResponse.json({ message: "Chỉ có thể hoàn thành hợp đồng đang active" }, { status: 400 });
   }
 
+  const actualEnd = startOfUtcDay();
   const updated = await prisma.subContract.update({
     where: { id: params.id },
     data: {
       status: SubContractStatus.completed,
-      actualEndDate: startOfUtcDay(),
+      actualEndDate: actualEnd,
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: row.projectId,
+    actorId: user.id,
+    entity: "sub_contract",
+    entityId: row.id,
+    action: "complete",
+    summary: `Hoàn thành HĐ thầu phụ ${row.code} "${row.title}" (ngày ${fmtDate(actualEnd)})`,
+    metadata: { previousStatus: row.status, actualEndDate: actualEnd.toISOString() },
   });
 
   return NextResponse.json({

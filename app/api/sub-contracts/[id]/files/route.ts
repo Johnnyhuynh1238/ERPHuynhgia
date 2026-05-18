@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { putObjectToMinio } from "@/lib/minio";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   }
 
+  const contractMeta = await prisma.subContract.findUnique({
+    where: { id: params.id },
+    select: { id: true, code: true, title: true },
+  });
+
   const created = [];
 
   for (const file of files) {
@@ -94,6 +100,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
     created.push({
       ...row,
       fileUrl: `/api/sub-contracts/${params.id}/files/${row.id}/file`,
+    });
+  }
+
+  if (created.length > 0 && contractMeta) {
+    await logProjectActivity(prisma, {
+      projectId: access.projectId,
+      actorId: user.id,
+      entity: "sub_contract_file",
+      entityId: params.id,
+      action: "upload",
+      summary: `Tải lên ${created.length} tài liệu cho HĐ thầu phụ ${contractMeta.code} "${contractMeta.title}": ${created.map((f) => f.fileName).join(", ")}`,
+      metadata: {
+        subContractId: params.id,
+        fileCount: created.length,
+        fileNames: created.map((f) => f.fileName),
+        fileIds: created.map((f) => f.id),
+      },
     });
   }
 

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { canReport } from "@/lib/task-centric";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -85,6 +86,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
         },
       });
       created.push(row);
+    }
+
+    if (created.length > 0) {
+      const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+      const totalSizeKb = files.reduce((sum, f) => sum + Math.ceil(f.size / 1024), 0);
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task_report_photo",
+        entityId: params.id,
+        action: "upload",
+        summary: `Upload ${created.length} ảnh báo cáo ${reportType} task ${meta?.code} "${meta?.name}" (${(totalSizeKb / 1024).toFixed(2)} MB)`,
+        metadata: { taskId: params.id, reportType, count: created.length, totalSizeKb, reportDate: reportDate.toISOString(), technicalReportId },
+      });
     }
 
     return NextResponse.json({ photos: created, message: `Đã upload ${created.length} ảnh` }, { status: 201 });

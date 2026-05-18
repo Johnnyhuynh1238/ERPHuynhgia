@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
 import { appendCancelReason, canViewSubContractFinancial, parseSubContractUnit, serializeSubContract } from "@/lib/sub-contract-utils";
+import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const updateSchema = z.object({
   title: z.string().trim().min(3).optional(),
@@ -136,13 +137,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const existed = await prisma.subContract.findUnique({
     where: { id: params.id },
-    select: {
-      id: true,
-      status: true,
-      projectId: true,
-      startDate: true,
-      expectedEndDate: true,
-    },
   });
 
   if (!existed) {
@@ -193,7 +187,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
-    return tx.subContract.update({
+    const result = await tx.subContract.update({
       where: { id: params.id },
       data: {
         ...(payload.title !== undefined ? { title: payload.title } : {}),
@@ -216,6 +210,49 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         },
       },
     });
+
+    const { diff, lines } = buildDiff(
+      {
+        title: existed.title,
+        scopeOfWork: existed.scopeOfWork,
+        contractValue: existed.contractValue ? Number(existed.contractValue) : null,
+        startDate: existed.startDate,
+        expectedEndDate: existed.expectedEndDate,
+        notes: existed.notes ?? null,
+        linkedTasks: taskIds ? "[changed]" : null,
+      },
+      {
+        title: result.title,
+        scopeOfWork: result.scopeOfWork,
+        contractValue: result.contractValue ? Number(result.contractValue) : null,
+        startDate: result.startDate,
+        expectedEndDate: result.expectedEndDate,
+        notes: result.notes ?? null,
+        linkedTasks: taskIds ? `${taskIds.length} task` : null,
+      },
+      [
+        { key: "title", label: "Tiêu đề" },
+        { key: "scopeOfWork", label: "Phạm vi" },
+        { key: "contractValue", label: "Giá trị HĐ", format: fmtMoney },
+        { key: "startDate", label: "Ngày bắt đầu", format: fmtDate },
+        { key: "expectedEndDate", label: "Ngày kết thúc DK", format: fmtDate },
+        { key: "notes", label: "Ghi chú" },
+        { key: "linkedTasks", label: "Công việc liên kết" },
+      ],
+    );
+    if (Object.keys(diff).length > 0) {
+      await logProjectActivity(tx, {
+        projectId: existed.projectId,
+        actorId: user.id,
+        entity: "sub_contract",
+        entityId: result.id,
+        action: "update",
+        summary: joinSummary(`Sửa HĐ thầu phụ ${result.code}`, lines, `Cập nhật HĐ thầu phụ ${result.code}`),
+        diff,
+      });
+    }
+
+    return result;
   });
 
   const serialized = serializeSubContract(updated, true);
@@ -244,7 +281,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
   const existed = await prisma.subContract.findUnique({
     where: { id: params.id },
-    select: { id: true, status: true, notes: true },
   });
 
   if (!existed) {
@@ -266,6 +302,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       status: SubContractStatus.cancelled,
       notes: appendCancelReason(existed.notes, parsed.data.reason),
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: existed.projectId,
+    actorId: user.id,
+    entity: "sub_contract",
+    entityId: existed.id,
+    action: "delete",
+    summary: `Hủy HĐ thầu phụ ${existed.code} "${existed.title}" — lý do: ${parsed.data.reason}`,
+    snapshot: existed,
+    metadata: { reason: parsed.data.reason, previousStatus: existed.status },
   });
 
   const serialized = serializeSubContract(updated, true);

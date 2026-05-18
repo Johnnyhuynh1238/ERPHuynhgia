@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { syncPhaseStatusByTaskId } from "@/lib/project-phase";
 import { canChangeStatus, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const approveSchema = z.object({
   note: z.string().optional(),
@@ -96,6 +97,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     });
 
     await syncPhaseStatusByTaskId(tx, params.id, now);
+
+    const meta = await tx.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task",
+      entityId: params.id,
+      action: "internal_approve",
+      summary: `Duyệt nội bộ task ${meta?.code} "${meta?.name}"${note ? ` — ${note}` : ""}`,
+      diff: { status: { from: taskDetail.status, to: TaskStatus.internal_approved } },
+      metadata: { note: note || null },
+    });
 
     return updated;
   });

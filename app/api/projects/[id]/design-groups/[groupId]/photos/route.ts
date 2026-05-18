@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: { id: string;
   try {
     const group = await prisma.designPhotoGroup.findFirst({
       where: { id: params.groupId, projectId: params.id },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!group) return NextResponse.json({ message: "Không tìm thấy nhóm ảnh" }, { status: 404 });
 
@@ -122,6 +123,25 @@ export async function POST(request: Request, { params }: { params: { id: string;
         photoUrl: `/api/projects/${params.id}/design-photos/${row.id}/file?variant=photo`,
         thumbnailUrl: `/api/projects/${params.id}/design-photos/${row.id}/file?variant=thumb`,
         displayOrder: row.displayOrder,
+      });
+    }
+
+    if (created.length > 0) {
+      const totalSizeKb = files.reduce((sum, f) => sum + Math.ceil(f.size / 1024), 0);
+      await logProjectActivity(prisma, {
+        projectId: params.id,
+        actorId: current.id,
+        entity: "design_photo",
+        entityId: params.groupId,
+        action: "upload",
+        summary: `Upload ${created.length} ảnh vào nhóm "${group.title}" (${(totalSizeKb / 1024).toFixed(2)} MB)`,
+        metadata: {
+          groupId: params.groupId,
+          groupTitle: group.title,
+          count: created.length,
+          totalSizeKb,
+          photoIds: created.map((p) => p.id),
+        },
       });
     }
 

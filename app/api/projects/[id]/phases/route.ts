@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { addDaysUtc, recalcProjectPhasesTimeline } from "@/lib/project-phase";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createPhaseSchema = z.object({
   name: z.string().trim().min(1, "Tên phase là bắt buộc"),
@@ -163,6 +164,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     await recalcProjectPhasesTimeline(tx, params.id);
     await resequencePhaseCodes(tx, params.id);
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "project_phase",
+      entityId: created.id,
+      action: "create",
+      summary: `Thêm phase "${created.name}" (${payload.duration} ngày)`,
+      metadata: { name: created.name, duration: payload.duration, displayOrder: insertOrder },
+    });
 
     return created;
   });

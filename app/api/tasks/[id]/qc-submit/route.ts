@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const submitSchema = z.object({
   overallComment: z.string().trim().min(1, "Nhận xét tổng thể là bắt buộc"),
@@ -78,6 +79,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
       action: "note_updated",
       note: `KS gửi báo cáo QC lên TPTC: ${parsed.data.overallComment.trim()}`,
       performedBy: user.id,
+    },
+  });
+
+  const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task",
+    entityId: params.id,
+    action: "qc_submit",
+    summary: `Gửi báo cáo QC task ${meta?.code} "${meta?.name}"`,
+    metadata: {
+      taskId: params.id,
+      itemCount: items.length,
+      overallComment: parsed.data.overallComment.trim(),
+      issueNote: parsed.data.issueNote?.trim() || null,
+      suggestion: parsed.data.suggestion?.trim() || null,
     },
   });
 

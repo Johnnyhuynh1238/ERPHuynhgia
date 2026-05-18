@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createFromTemplateSchema = z.object({
   templateId: z.string().uuid("Template không hợp lệ"),
@@ -170,6 +171,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
         userId: user.id,
         logType: "note",
         content: "Đã thêm task từ thư viện chuẩn",
+      },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "task",
+      entityId: task.id,
+      action: "create",
+      summary: `Thêm task từ thư viện ${task.code} "${task.name}" (template ${template.code}, ${task.durationDays} ngày)`,
+      metadata: {
+        code: task.code,
+        templateId: template.id,
+        templateCode: template.code,
+        phase: task.phase,
+        durationDays: task.durationDays,
+        origin: "template",
       },
     });
 

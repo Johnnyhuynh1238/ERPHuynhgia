@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { deleteObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractWriteUser } from "@/lib/sub-contract-auth";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function DELETE(_request: Request, { params }: { params: { id: string; fileId: string } }) {
   const { user, error } = await requireSubContractWriteUser();
@@ -26,6 +27,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     select: {
       id: true,
       fileUrl: true,
+      fileName: true,
+      fileType: true,
+      uploadedAt: true,
+      uploadedBy: true,
+      subContract: { select: { code: true, title: true } },
     },
   });
 
@@ -41,6 +47,17 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     const absPath = path.join(process.cwd(), "public", file.fileUrl.replace(/^\//, ""));
     await fs.unlink(absPath).catch(() => {});
   }
+
+  await logProjectActivity(prisma, {
+    projectId: access.projectId,
+    actorId: user.id,
+    entity: "sub_contract_file",
+    entityId: file.id,
+    action: "delete",
+    summary: `Xóa tài liệu "${file.fileName}" khỏi HĐ thầu phụ ${file.subContract.code} "${file.subContract.title}"`,
+    snapshot: { id: file.id, fileName: file.fileName, fileUrl: file.fileUrl, fileType: file.fileType, uploadedAt: file.uploadedAt, uploadedBy: file.uploadedBy },
+    metadata: { subContractId: params.id },
+  });
 
   return NextResponse.json({ message: "Đã xóa tài liệu" });
 }

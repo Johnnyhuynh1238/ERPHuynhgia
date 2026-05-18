@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const noteSchema = z.object({
   content: z.string().trim().min(1, "Nội dung không được để trống"),
@@ -39,6 +40,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
         select: { id: true, fullName: true, email: true, avatarUrl: true },
       },
     },
+  });
+
+  const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task_log",
+    entityId: log.id,
+    action: "note",
+    summary: `Ghi nhật ký task ${meta?.code} "${meta?.name}"`,
+    metadata: { taskId: params.id, contentLength: parsed.data.content.length, content: parsed.data.content.slice(0, 280) },
   });
 
   return NextResponse.json({ log, message: "Đã ghi nhật ký" });

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const progressPhotoSchema = z.object({
   id: z.string().optional(),
@@ -250,6 +251,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
         newValue: String(parsed.data.progressPercent),
         content: `PROGRESS_UPDATE: ${taskDetail.progressPercent}% -> ${parsed.data.progressPercent}%`,
       },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task",
+      entityId: params.id,
+      action: "update_progress",
+      summary: `Cập nhật tiến độ task ${task.code} "${taskDetail.name}": ${taskDetail.progressPercent}% → ${parsed.data.progressPercent}%${reason ? ` (${reason})` : ""}`,
+      diff: { progressPercent: { from: taskDetail.progressPercent, to: parsed.data.progressPercent } },
+      metadata: { reason: reason || null, note: note || null, photoCount: parsed.data.photos?.length ?? 1 },
     });
 
     return { updatedTask, history };

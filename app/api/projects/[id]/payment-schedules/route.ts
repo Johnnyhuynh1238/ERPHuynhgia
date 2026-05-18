@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const createPaymentSchema = z.object({
   type: z.enum(["contract", "addendum"]).optional().default("contract"),
@@ -103,6 +104,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
       percent,
       expectedDate: dueDate,
       dayOffset: diffDays(project.startDate, dueDate),
+    },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: params.id,
+    actorId: user.id,
+    entity: "payment_schedule",
+    entityId: payment.id,
+    action: "create",
+    summary: `Tạo đợt TT #${payment.installmentNo} "${payment.description}" — ${fmtMoney(payment.amount)} (hạn ${fmtDate(payment.dueDate)})`,
+    metadata: {
+      type: payment.type,
+      installmentNo: payment.installmentNo,
+      amount: Number(payment.amount),
+      dueDate: payment.dueDate ? payment.dueDate.toISOString() : null,
     },
   });
 

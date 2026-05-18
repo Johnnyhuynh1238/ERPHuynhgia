@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -58,7 +59,7 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
 
   const doc = await prisma.projectDocument.findFirst({
     where: { id: params.docId, projectId: params.id },
-    select: { id: true },
+    select: { id: true, title: true },
   });
   if (!doc) return NextResponse.json({ message: "Không tìm thấy hồ sơ" }, { status: 404 });
 
@@ -75,6 +76,13 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
   }
 
   await prisma.$transaction(async (tx) => {
+    const before = await tx.projectDocumentAccess.findMany({
+      where: { documentId: params.docId },
+      select: { userId: true },
+    });
+    const beforeIds = new Set(before.map((b) => b.userId));
+    const afterIds = new Set(userIds);
+
     await tx.projectDocumentAccess.deleteMany({ where: { documentId: params.docId } });
     if (userIds.length > 0) {
       await tx.projectDocumentAccess.createMany({
@@ -83,6 +91,21 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
           userId,
           grantedBy: current.id,
         })),
+      });
+    }
+
+    const added = userIds.filter((id) => !beforeIds.has(id));
+    const removed = Array.from(beforeIds).filter((id) => !afterIds.has(id));
+
+    if (added.length > 0 || removed.length > 0) {
+      await logProjectActivity(tx, {
+        projectId: params.id,
+        actorId: current.id,
+        entity: "project_document",
+        entityId: params.docId,
+        action: "update_access",
+        summary: `Cập nhật quyền xem hồ sơ "${doc.title}" — +${added.length} / -${removed.length} người`,
+        metadata: { addedUserIds: added, removedUserIds: removed, total: userIds.length },
       });
     }
   });

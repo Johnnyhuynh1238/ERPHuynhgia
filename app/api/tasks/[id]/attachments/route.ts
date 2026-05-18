@@ -3,6 +3,7 @@ import { TechnicalAttachmentType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { canReport } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const rows = await prisma.taskTechnicalAttachment.findMany({ where: { taskId: params.id }, orderBy: { uploadedAt: "desc" } });
@@ -29,6 +30,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         type: (body.type as TechnicalAttachmentType) || TechnicalAttachmentType.drawing,
         description: body.description || null,
         uploadedBy: user.id,
+      },
+    });
+
+    const taskCode = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(prisma, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_attachment",
+      entityId: attachment.id,
+      action: "upload",
+      summary: `Upload tài liệu kỹ thuật "${attachment.fileName}" (${attachment.type}) cho task ${taskCode?.code} "${taskCode?.name}"`,
+      metadata: {
+        taskId: params.id,
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
+        fileSize: attachment.fileSize,
+        type: attachment.type,
       },
     });
 

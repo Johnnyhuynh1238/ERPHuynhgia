@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { buildDocumentVisibilityWhere, sha256Hex } from "@/lib/project-document-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -158,6 +159,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       visibleToCustomer: true,
       uploader: { select: { id: true, fullName: true } },
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: params.id,
+    actorId: current.id,
+    entity: "project_document",
+    entityId: doc.id,
+    action: "upload",
+    summary: `Upload hồ sơ "${doc.title}" (${doc.category}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
+    metadata: { title: doc.title, category: doc.category, fileName: file.name, fileSize: file.size, mimeType: doc.mimeType },
   });
 
   return NextResponse.json({

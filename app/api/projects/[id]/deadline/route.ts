@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { fmtDate, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   plannedDeadline: z.string().nullable(),
@@ -31,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const exists = await prisma.project.findUnique({
     where: { id: params.id },
-    select: { id: true },
+    select: { id: true, plannedDeadline: true },
   });
 
   if (!exists) {
@@ -51,6 +52,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       plannedDeadline: true,
     },
   });
+
+  const beforeStr = exists.plannedDeadline ? fmtDate(exists.plannedDeadline) : "(không có)";
+  const afterStr = updated.plannedDeadline ? fmtDate(updated.plannedDeadline) : "(không có)";
+  if (beforeStr !== afterStr) {
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "project",
+      entityId: params.id,
+      action: "update_deadline",
+      summary: `Đổi deadline: ${beforeStr} → ${afterStr}`,
+      diff: { plannedDeadline: { from: exists.plannedDeadline, to: updated.plannedDeadline } },
+    });
+  }
 
   return NextResponse.json({ project: updated, message: "Đã cập nhật deadline" });
 }

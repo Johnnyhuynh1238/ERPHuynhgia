@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
 import { putObjectToMinio } from "@/lib/minio";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   qcItemId: z.string().uuid("qcItemId không hợp lệ"),
@@ -93,7 +94,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const item = await prisma.qcItem.findFirst({
     where: { id: qcItemId, taskId: params.id },
-    select: { id: true },
+    select: { id: true, content: true },
   });
 
   if (!item) {
@@ -122,6 +123,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
         note: `Upload ${rows.length} ảnh QC`,
         performedBy: user.id,
       },
+    });
+
+    const meta = await tx.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_qc_photo",
+      entityId: item.id,
+      action: "upload",
+      summary: `Upload ${rows.length} ảnh QC mục "${item.content ?? ''}" task ${meta?.code} "${meta?.name}"`,
+      metadata: { taskId: params.id, qcItemId: item.id, count: rows.length },
     });
 
     return rows;

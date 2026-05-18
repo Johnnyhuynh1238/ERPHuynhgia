@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { LEGACY_PHASE_META, resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createCustomTaskSchema = z.object({
   name: z.string().trim().min(3, "Tên task tối thiểu 3 ký tự"),
@@ -161,6 +162,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
         userId: user.id,
         logType: "note",
         content: "Đã thêm task tùy ý",
+      },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "task",
+      entityId: task.id,
+      action: "create",
+      summary: `Thêm task tùy ý ${task.code} "${task.name}" (giai đoạn ${task.phase}, ${task.durationDays} ngày)`,
+      metadata: {
+        code: task.code,
+        phase: task.phase,
+        durationDays: task.durationDays,
+        origin: "custom",
+        category: task.category,
+        isMilestone: task.isMilestone,
       },
     });
 

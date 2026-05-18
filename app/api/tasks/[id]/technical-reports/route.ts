@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { canReport } from "@/lib/task-centric";
 import { prisma } from "@/lib/prisma";
 import { getTaskProject, upsertTechnicalReport } from "@/lib/task-report-service";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const rows = await prisma.taskTechnicalReport.findMany({
@@ -21,6 +22,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (!task) return NextResponse.json({ message: "Task not found" }, { status: 404 });
     if (!(await canReport(user.id, user.role as any, task.projectId, "technical"))) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     const report = await upsertTechnicalReport(params.id, user.id, await req.json());
+    const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+    await logProjectActivity(prisma, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_technical_report",
+      entityId: report.id,
+      action: "upsert",
+      summary: `Cập nhật báo cáo kỹ thuật task ${meta?.code} "${meta?.name}" (${report.status})`,
+      metadata: {
+        taskId: params.id,
+        reportDate: report.reportDate,
+        status: report.status,
+        pauseReason: report.pauseReason ?? null,
+        technicalIssue: report.technicalIssue ?? null,
+      },
+    });
     return NextResponse.json({ report });
   } catch (e: any) {
     return NextResponse.json({ message: e.message || "Failed" }, { status: 500 });

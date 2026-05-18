@@ -11,6 +11,7 @@ import {
   normalizeSubPaymentDate,
   serializeSubPayment,
 } from "@/lib/sub-payment-utils";
+import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   stage: z.number().int().min(1).max(10).optional(),
@@ -48,6 +49,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           id: true,
           projectId: true,
           contractValue: true,
+          code: true,
+          title: true,
         },
       },
     },
@@ -131,6 +134,55 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const canViewFinancial = canViewSubContractFinancial(user.role);
 
+  const { diff, lines } = buildDiff(
+    {
+      stage: row.stage,
+      description: row.description,
+      expectedAmount: row.expectedAmount ? Number(row.expectedAmount) : null,
+      percentage: row.percentage ? Number(row.percentage) : null,
+      expectedDate: row.expectedDate,
+      status: row.status,
+      linkedTaskId: row.linkedTaskId,
+      requestNote: row.requestNote ?? null,
+      approveNote: row.approveNote ?? null,
+    },
+    {
+      stage: updated.stage,
+      description: updated.description,
+      expectedAmount: updated.expectedAmount ? Number(updated.expectedAmount) : null,
+      percentage: updated.percentage ? Number(updated.percentage) : null,
+      expectedDate: updated.expectedDate,
+      status: updated.status,
+      linkedTaskId: updated.linkedTaskId,
+      requestNote: updated.requestNote ?? null,
+      approveNote: updated.approveNote ?? null,
+    },
+    [
+      { key: "stage", label: "Đợt" },
+      { key: "description", label: "Mô tả" },
+      { key: "expectedAmount", label: "Số tiền dự kiến", format: fmtMoney },
+      { key: "percentage", label: "%", format: (v) => (v == null ? "—" : `${v}%`) },
+      { key: "expectedDate", label: "Ngày dự kiến", format: fmtDate },
+      { key: "status", label: "Trạng thái" },
+      { key: "linkedTaskId", label: "Task liên kết" },
+      { key: "requestNote", label: "Ghi chú đề nghị" },
+      { key: "approveNote", label: "Ghi chú duyệt" },
+    ],
+  );
+
+  if (Object.keys(diff).length > 0) {
+    await logProjectActivity(prisma, {
+      projectId: row.subContract.projectId,
+      actorId: user.id,
+      entity: "sub_payment",
+      entityId: updated.id,
+      action: "update",
+      summary: joinSummary(`Sửa đợt TT thầu phụ ${updated.code} (HĐ ${row.subContract.code})`, lines, `Cập nhật đợt TT thầu phụ ${updated.code}`),
+      diff,
+      metadata: { subContractId: row.subContractId },
+    });
+  }
+
   return NextResponse.json({
     payment: serializeSubPayment(updated, canViewFinancial),
     message: "Đã cập nhật đợt thanh toán",
@@ -147,10 +199,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const row = await prisma.subPayment.findUnique({
     where: { id: params.id },
-    select: {
-      id: true,
-      subContractId: true,
-      status: true,
+    include: {
+      subContract: { select: { id: true, projectId: true, code: true, title: true } },
     },
   });
 
@@ -169,6 +219,18 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   if (row.status === SubPaymentStatus.pending) {
     await prisma.subPayment.delete({ where: { id: row.id } });
+
+    await logProjectActivity(prisma, {
+      projectId: row.subContract.projectId,
+      actorId: user.id,
+      entity: "sub_payment",
+      entityId: row.id,
+      action: "delete",
+      summary: `Xóa đợt TT thầu phụ ${row.code} "${row.description}" (HĐ ${row.subContract.code}) — ${fmtMoney(row.expectedAmount)}`,
+      snapshot: row,
+      metadata: { subContractId: row.subContractId, previousStatus: row.status },
+    });
+
     return NextResponse.json({ hardDeleted: true, message: "Đã xóa đợt thanh toán (pending)" });
   }
 
@@ -184,6 +246,17 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   });
 
   const canViewFinancial = canViewSubContractFinancial(user.role);
+
+  await logProjectActivity(prisma, {
+    projectId: row.subContract.projectId,
+    actorId: user.id,
+    entity: "sub_payment",
+    entityId: row.id,
+    action: "cancel",
+    summary: `Hủy đợt TT thầu phụ ${row.code} "${row.description}" (HĐ ${row.subContract.code}) — ${fmtMoney(row.expectedAmount)}`,
+    snapshot: row,
+    metadata: { subContractId: row.subContractId, previousStatus: row.status },
+  });
 
   return NextResponse.json({
     hardDeleted: false,

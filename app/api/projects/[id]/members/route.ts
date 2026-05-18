@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   userId: z.string().uuid(),
@@ -125,6 +126,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
         skipDuplicates: true,
       });
     }
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: current.id,
+      entity: "project_member",
+      entityId: member.id,
+      action: "create",
+      summary: `Thêm thành viên ${member.user.fullName} (${parsed.data.roleInProject})${parsed.data.assignmentRoles.length ? ` + roles: ${parsed.data.assignmentRoles.join(", ")}` : ""}`,
+      metadata: { userId: parsed.data.userId, roleInProject: parsed.data.roleInProject, assignmentRoles: parsed.data.assignmentRoles },
+    });
 
     return member;
   });

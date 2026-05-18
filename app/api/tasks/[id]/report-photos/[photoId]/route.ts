@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { deleteObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 function canDeleteReportPhoto(role: string) {
   return role === UserRole.admin || role === UserRole.construction_manager;
@@ -25,7 +26,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const photo = await prisma.taskReportPhoto.findFirst({
     where: { id: params.photoId, taskId: params.id },
-    select: { id: true, uploadedBy: true, fileUrl: true },
+    select: { id: true, uploadedBy: true, fileUrl: true, type: true, reportDate: true, technicalReportId: true },
   });
 
   if (!photo) {
@@ -42,6 +43,24 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (key) {
     await deleteObjectFromMinio(key).catch(() => undefined);
   }
+
+  const meta = await prisma.task.findUnique({ where: { id: params.id }, select: { code: true, name: true } });
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task_report_photo",
+    entityId: photo.id,
+    action: "delete",
+    summary: `Xoá 1 ảnh báo cáo ${photo.type} task ${meta?.code} "${meta?.name}"`,
+    snapshot: {
+      taskId: params.id,
+      type: photo.type,
+      reportDate: photo.reportDate,
+      technicalReportId: photo.technicalReportId,
+      fileUrl: photo.fileUrl,
+      uploadedBy: photo.uploadedBy,
+    },
+  });
 
   return NextResponse.json({ message: "Đã xóa ảnh báo cáo" });
 }

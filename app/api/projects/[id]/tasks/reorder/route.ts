@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const reorderItemSchema = z.object({
   taskId: z.string().uuid("Task id không hợp lệ"),
@@ -63,14 +64,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     seen.add(item.taskId);
   }
 
-  await prisma.$transaction(
-    reorderItems.map((item) =>
-      prisma.task.update({
+  await prisma.$transaction(async (tx) => {
+    for (const item of reorderItems) {
+      await tx.task.update({
         where: { id: item.taskId },
         data: { displayOrder: item.displayOrder },
-      }),
-    ),
-  );
+      });
+    }
+
+    await logProjectActivity(tx, {
+      projectId: params.id,
+      actorId: user.id,
+      entity: "task",
+      entityId: params.id,
+      action: "reorder",
+      summary: `Sắp xếp lại thứ tự ${reorderItems.length} task`,
+      metadata: { count: reorderItems.length },
+    });
+  });
 
   return NextResponse.json({ message: "Đã cập nhật thứ tự task" });
 }

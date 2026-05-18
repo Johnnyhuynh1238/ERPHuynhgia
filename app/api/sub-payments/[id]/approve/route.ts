@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
+import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const schema = z.object({
   note: z.string().trim().max(3000).nullable().optional(),
@@ -24,7 +25,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const row = await prisma.subPayment.findUnique({
     where: { id: params.id },
-    select: { id: true, subContractId: true, status: true },
+    include: {
+      subContract: { select: { projectId: true, code: true, title: true } },
+    },
   });
 
   if (!row) {
@@ -48,6 +51,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       approvedAt: new Date(),
       approveNote: parsed.data.note ?? null,
     },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: row.subContract.projectId,
+    actorId: user.id,
+    entity: "sub_payment",
+    entityId: row.id,
+    action: "approve",
+    summary: `Duyệt đợt TT thầu phụ ${row.code} "${row.description}" (HĐ ${row.subContract.code}) — ${fmtMoney(row.expectedAmount)}`,
+    metadata: { subContractId: row.subContractId, note: parsed.data.note ?? null },
   });
 
   return NextResponse.json({ payment: updated, message: "Đã duyệt đề xuất chi" });

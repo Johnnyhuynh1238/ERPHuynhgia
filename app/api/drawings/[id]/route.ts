@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { deleteObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { buildDiff, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 function minioKey(url: string) {
   return url.startsWith("minio://") ? url.slice("minio://".length) : null;
@@ -14,7 +15,7 @@ async function requireAdminDrawingAccess(id: string) {
   if (!user?.id || !user.role) return { error: NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 }) };
   if (user.role !== UserRole.admin) return { error: NextResponse.json({ message: "Chỉ admin được chỉnh bản vẽ" }, { status: 403 }) };
 
-  const drawing = await prisma.projectDrawing.findUnique({ where: { id }, select: { id: true, projectId: true, fileUrl: true } });
+  const drawing = await prisma.projectDrawing.findUnique({ where: { id }, select: { id: true, projectId: true, fileUrl: true, name: true, description: true, displayOrder: true } });
   if (!drawing) return { error: NextResponse.json({ message: "Không tìm thấy bản vẽ" }, { status: 404 }) };
 
   const project = await prisma.project.findFirst({
@@ -46,6 +47,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     },
   });
 
+  const { diff, lines } = buildDiff(
+    { name: access.drawing.name, description: access.drawing.description, displayOrder: access.drawing.displayOrder },
+    { name: drawing.name, description: drawing.description, displayOrder: drawing.displayOrder },
+    [
+      { key: "name", label: "Tên" },
+      { key: "description", label: "Mô tả" },
+      { key: "displayOrder", label: "Thứ tự" },
+    ],
+  );
+
+  if (Object.keys(diff).length > 0) {
+    await logProjectActivity(prisma, {
+      projectId: access.drawing.projectId,
+      actorId: access.user.id,
+      entity: "project_drawing",
+      entityId: drawing.id,
+      action: "update",
+      summary: joinSummary(`Sửa bản vẽ "${drawing.name}"`, lines, `Cập nhật bản vẽ "${drawing.name}"`),
+      diff,
+    });
+  }
+
   return NextResponse.json({ drawing, message: "Đã cập nhật bản vẽ" });
 }
 
@@ -56,6 +79,16 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   await prisma.projectDrawing.delete({ where: { id: params.id } });
   const key = minioKey(access.drawing.fileUrl);
   if (key) await deleteObjectFromMinio(key).catch(() => null);
+
+  await logProjectActivity(prisma, {
+    projectId: access.drawing.projectId,
+    actorId: access.user.id,
+    entity: "project_drawing",
+    entityId: access.drawing.id,
+    action: "delete",
+    summary: `Xóa bản vẽ "${access.drawing.name}"`,
+    snapshot: access.drawing,
+  });
 
   return NextResponse.json({ message: "Đã xóa bản vẽ" });
 }

@@ -38,6 +38,7 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
     select: {
       id: true,
       projectId: true,
+      code: true,
       assignedEngineerId: true,
       assignedForemanId: true,
       visibleToCustomer: true,

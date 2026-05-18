@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ProjectRoleType } from "@prisma/client";
 import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
@@ -39,7 +40,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         isPrimary: Boolean(body.isPrimary),
         assignedBy: actor.id,
       },
+      include: { user: { select: { id: true, fullName: true } } },
     });
+
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: actor.id,
+      entity: "project_member",
+      entityId: assignment.id,
+      action: "create",
+      summary: `Phân công ${assignment.user.fullName} làm ${role}${assignment.isPrimary ? " (chính)" : ""}`,
+      metadata: { userId: body.userId, role, isPrimary: Boolean(body.isPrimary) },
+    });
+
     return NextResponse.json({ assignment });
   } catch (e: any) {
     return NextResponse.json({ message: e.message || "Failed" }, { status: 500 });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { canMarkPaidSubPayment, getPaidProgressWarning, normalizeSubPaymentDate } from "@/lib/sub-payment-utils";
+import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const schema = z.object({
   actualAmount: z.number().positive().optional(),
@@ -36,7 +37,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     where: { id: params.id },
     include: {
       subContract: {
-        select: { id: true, projectId: true, contractValue: true },
+        select: { id: true, projectId: true, contractValue: true, code: true, title: true },
       },
     },
   });
@@ -102,6 +103,26 @@ export async function POST(request: Request, { params }: { params: { id: string 
       requester: { select: { id: true, fullName: true } },
       approver: { select: { id: true, fullName: true } },
       payer: { select: { id: true, fullName: true } },
+    },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: row.subContract.projectId,
+    actorId: user.id,
+    entity: "sub_payment",
+    entityId: row.id,
+    action: "mark_paid",
+    summary: `Đã chi đợt TT thầu phụ ${row.code} "${row.description}" (HĐ ${row.subContract.code}) — ${fmtMoney(amount)} (ngày ${fmtDate(paidDate)}, ${payload.paymentMethod})`,
+    metadata: {
+      subContractId: row.subContractId,
+      actualAmount: amount,
+      expectedAmount: Number(row.expectedAmount),
+      actualPaidDate: paidDate.toISOString(),
+      paymentMethod: payload.paymentMethod,
+      receiptUrl: payload.receiptUrl,
+      note: payload.note ?? null,
+      paidAfter,
+      contractValue,
     },
   });
 

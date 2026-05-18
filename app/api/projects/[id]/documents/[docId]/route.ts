@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { ProjectDocumentCategory } from "@prisma/client";
 import { z } from "zod";
-import { requireRole } from "@/lib/auth-helpers";
+import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { deleteObjectFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { buildDiff, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return authError(error);
   }
 
+  const actor = await getCurrentUser();
+
   const body = await request.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
@@ -39,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const doc = await prisma.projectDocument.findFirst({
     where: { id: params.docId, projectId: params.id },
-    select: { id: true },
+    select: { id: true, title: true, category: true, visibleToCustomer: true },
   });
   if (!doc) return NextResponse.json({ message: "Không tìm thấy hồ sơ" }, { status: 404 });
 
@@ -48,6 +51,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     data: parsed.data,
     select: { id: true, title: true, category: true, visibleToCustomer: true },
   });
+
+  const { diff, lines } = buildDiff(
+    { title: doc.title, category: doc.category, visibleToCustomer: doc.visibleToCustomer },
+    { title: updated.title, category: updated.category, visibleToCustomer: updated.visibleToCustomer },
+    [
+      { key: "title", label: "Tiêu đề" },
+      { key: "category", label: "Loại" },
+      { key: "visibleToCustomer", label: "CN xem được" },
+    ],
+  );
+
+  if (Object.keys(diff).length > 0 && actor?.id) {
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: actor.id,
+      entity: "project_document",
+      entityId: updated.id,
+      action: "update",
+      summary: joinSummary(`Sửa hồ sơ "${updated.title}"`, lines, `Cập nhật hồ sơ "${updated.title}"`),
+      diff,
+    });
+  }
 
   return NextResponse.json({ document: updated, message: "Đã cập nhật hồ sơ" });
 }
@@ -59,9 +84,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return authError(error);
   }
 
+  const actor = await getCurrentUser();
+
   const doc = await prisma.projectDocument.findFirst({
     where: { id: params.docId, projectId: params.id },
-    select: { id: true, fileUrl: true },
+    select: { id: true, fileUrl: true, title: true, category: true, fileName: true, fileSize: true, mimeType: true, visibleToCustomer: true, uploadedBy: true, uploadedAt: true },
   });
   if (!doc) return NextResponse.json({ message: "Không tìm thấy hồ sơ" }, { status: 404 });
 
@@ -75,6 +102,18 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   await prisma.projectDocument.delete({ where: { id: params.docId } });
+
+  if (actor?.id) {
+    await logProjectActivity(prisma, {
+      projectId: params.id,
+      actorId: actor.id,
+      entity: "project_document",
+      entityId: doc.id,
+      action: "delete",
+      summary: `Xóa hồ sơ "${doc.title}" (${doc.category})`,
+      snapshot: doc,
+    });
+  }
 
   return NextResponse.json({ message: "Đã xóa hồ sơ" });
 }

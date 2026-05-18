@@ -10,6 +10,7 @@ import {
   parseSubContractUnit,
   serializeSubContract,
 } from "@/lib/sub-contract-utils";
+import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   subcontractorId: z.string().uuid("Thầu phụ không hợp lệ"),
@@ -199,6 +200,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await tx.subcontractor.update({
         where: { id: payload.subcontractorId },
         data: { totalContracts },
+      });
+
+      await logProjectActivity(tx, {
+        projectId: params.id,
+        actorId: user.id,
+        entity: "sub_contract",
+        entityId: row.id,
+        action: "create",
+        summary: `Tạo HĐ thầu phụ ${row.code} "${row.title}" — thầu phụ ${row.subcontractor.name}, giá trị ${fmtMoney(row.contractValue)}`,
+        metadata: { code: row.code, contractValue: row.contractValue.toString(), subcontractorId: row.subcontractorId, linkedTaskCount: taskIds.length },
       });
 
       return row;

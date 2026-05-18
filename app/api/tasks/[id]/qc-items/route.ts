@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
   content: z.string().trim().min(1, "Nội dung mục QC là bắt buộc"),
@@ -116,6 +117,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
         action: QcLogAction.item_added,
         note: `Thêm mục QC: ${parsed.data.content}`,
         performedBy: user.id,
+      },
+    });
+
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task_qc_item",
+      entityId: item.id,
+      action: "create",
+      summary: `Thêm mục QC "${parsed.data.content}" cho task ${task.code} "${task.name}"`,
+      metadata: {
+        taskId: params.id,
+        requirePhoto: parsed.data.requirePhoto ?? false,
+        requireNote: parsed.data.requireNote ?? false,
       },
     });
 

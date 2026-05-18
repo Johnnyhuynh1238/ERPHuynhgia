@@ -11,6 +11,7 @@ import {
   normalizeSubPaymentDate,
   serializeSubPayment,
 } from "@/lib/sub-payment-utils";
+import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const createRowSchema = z.object({
   stage: z.number().int().min(1).max(10).optional(),
@@ -130,7 +131,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const contract = await prisma.subContract.findUnique({
     where: { id: params.id },
-    select: { id: true, contractValue: true, projectId: true },
+    select: { id: true, contractValue: true, projectId: true, code: true, title: true },
   });
 
   if (!contract) {
@@ -219,7 +220,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       nextStage += 1;
     }
 
-    return tx.subPayment.findMany({
+    const rows = await tx.subPayment.findMany({
       where: { id: { in: out.map((x) => x.id) } },
       include: {
         linkedTask: { select: { id: true, code: true, name: true, status: true } },
@@ -229,6 +230,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
       },
       orderBy: [{ stage: "asc" }, { createdAt: "asc" }],
     });
+
+    const totalExpected = rows.reduce((sum, r) => sum + Number(r.expectedAmount || 0), 0);
+    await logProjectActivity(tx, {
+      projectId: contract.projectId,
+      actorId: user.id,
+      entity: "sub_payment",
+      entityId: contract.id,
+      action: "create",
+      summary: `Tạo ${rows.length} đợt thanh toán cho HĐ thầu phụ ${contract.code} "${contract.title}" — tổng dự kiến ${fmtMoney(totalExpected)}`,
+      metadata: {
+        subContractId: contract.id,
+        count: rows.length,
+        totalExpected,
+        codes: rows.map((r) => r.code),
+        statuses: rows.map((r) => r.status),
+      },
+    });
+
+    return rows;
   });
 
   const percentTotal = await prisma.subPayment.aggregate({

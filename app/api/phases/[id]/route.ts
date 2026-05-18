@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { recalcProjectPhasesTimeline } from "@/lib/project-phase";
+import { buildDiff, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).optional(),
@@ -199,6 +200,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     await resequenceAfterDelete(tx, phase.projectId);
     await recalcProjectPhasesTimeline(tx, phase.projectId);
+
+    const after = await tx.projectPhase.findUnique({ where: { id: phase.id }, select: { name: true, duration: true, displayOrder: true } });
+    const { diff, lines } = buildDiff(
+      { name: phase.name, duration: phase.duration, displayOrder: phase.displayOrder },
+      { name: after?.name, duration: after?.duration, displayOrder: after?.displayOrder },
+      [
+        { key: "name", label: "Tên" },
+        { key: "duration", label: "Số ngày" },
+        { key: "displayOrder", label: "Thứ tự" },
+      ],
+    );
+    if (Object.keys(diff).length > 0) {
+      await logProjectActivity(tx, {
+        projectId: phase.projectId,
+        actorId: user.id,
+        entity: "project_phase",
+        entityId: phase.id,
+        action: "update",
+        summary: joinSummary(`Sửa phase "${phase.name}"`, lines, `Cập nhật phase "${phase.name}"`),
+        diff,
+      });
+    }
   });
 
   const updated = await prisma.projectPhase.findUnique({ where: { id: params.id } });
@@ -269,6 +292,16 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     await tx.projectPhase.delete({ where: { id: phase.id } });
     await resequenceAfterDelete(tx, phase.projectId);
     await recalcProjectPhasesTimeline(tx, phase.projectId);
+
+    await logProjectActivity(tx, {
+      projectId: phase.projectId,
+      actorId: user.id,
+      entity: "project_phase",
+      entityId: phase.id,
+      action: "delete",
+      summary: `Xóa phase "${phase.name}" (${phase.tasks.length} task bị tắt theo)`,
+      snapshot: phase,
+    });
   });
 
   return NextResponse.json({ message: "Đã xóa phase" });

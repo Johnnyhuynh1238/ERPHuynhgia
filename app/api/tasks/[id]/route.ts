@@ -13,6 +13,7 @@ import {
   getTaskWithAccess,
 } from "@/lib/task-permissions";
 import { addDaysUtc, LEGACY_PHASE_META, syncPhaseStatusByTaskId } from "@/lib/project-phase";
+import { buildDiff, fmtDate, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   section: z.enum(["status", "dates", "assignment", "qc", "meta", "customer_visibility"]),
@@ -259,6 +260,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
       await syncPhaseStatusByTaskId(tx, task.id, now);
 
+      await logProjectActivity(tx, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task",
+        entityId: task.id,
+        action: "update_status",
+        summary: `Đổi trạng thái task ${task.code} "${task.name}": ${task.status} → ${payload.data.status}${naReason ? ` (${naReason})` : ""}`,
+        diff: { status: { from: task.status, to: payload.data.status } },
+        metadata: { naReason: naReason || null },
+      });
+
       return updatedTask;
     });
 
@@ -347,6 +359,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       data: updateData,
     });
 
+    const { diff, lines } = buildDiff(task as any, updated as any, [
+      ["plannedStartDate", "Bắt đầu kế hoạch", (v) => (v ? fmtDate(v as Date) : "(trống)")],
+      ["plannedEndDate", "Kết thúc kế hoạch", (v) => (v ? fmtDate(v as Date) : "(trống)")],
+      ["actualStartDate", "Bắt đầu thực tế", (v) => (v ? fmtDate(v as Date) : "(trống)")],
+      ["actualEndDate", "Kết thúc thực tế", (v) => (v ? fmtDate(v as Date) : "(trống)")],
+    ]);
+    if (lines.length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task",
+        entityId: task.id,
+        action: "update_dates",
+        summary: joinSummary(`Sửa ngày task ${task.code} "${task.name}"`, lines, "Sửa ngày task"),
+        diff,
+      });
+    }
+
     return NextResponse.json({ task: updated, message: "Đã cập nhật ngày task" });
   }
 
@@ -379,6 +409,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
     });
 
+    const { diff, lines } = buildDiff(task as any, updated as any, [
+      ["assignedEngineerId", "KS phụ trách"],
+      ["assignedForemanId", "Tổ trưởng"],
+      ["team", "Đội thi công"],
+      ["inspectorName", "Người nghiệm thu"],
+    ]);
+    if (lines.length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task",
+        entityId: task.id,
+        action: "update_assignment",
+        summary: joinSummary(`Cập nhật phân công task ${task.code} "${task.name}"`, lines, "Cập nhật phân công task"),
+        diff,
+      });
+    }
+
     return NextResponse.json({ task: updated, message: "Đã cập nhật phân công" });
   }
 
@@ -407,6 +455,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         content: payload.data.visibleToCustomer ? "Bật hiển thị cổng chủ nhà" : "Ẩn khỏi cổng chủ nhà",
       },
     });
+
+    if ((task as { visibleToCustomer?: boolean }).visibleToCustomer !== payload.data.visibleToCustomer) {
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task",
+        entityId: task.id,
+        action: "update_customer_visibility",
+        summary: `${payload.data.visibleToCustomer ? "Bật" : "Ẩn"} hiển thị cổng chủ nhà cho task ${task.code} "${task.name}"`,
+        diff: {
+          visibleToCustomer: {
+            from: (task as { visibleToCustomer?: boolean }).visibleToCustomer,
+            to: payload.data.visibleToCustomer,
+          },
+        },
+      });
+    }
 
     return NextResponse.json({ task: updated, message: "Đã cập nhật hiển thị cổng chủ nhà" });
   }
@@ -488,6 +553,33 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
     });
 
+    const { diff, lines } = buildDiff(task as any, updated as any, [
+      ["name", "Tên task"],
+      ["phase", "Giai đoạn"],
+      ["offsetDays", "Offset (ngày)"],
+      ["durationDays", "Số ngày"],
+      ["team", "Đội"],
+      ["inspectorName", "Người nghiệm thu"],
+      ["materialsNeeded", "Vật tư"],
+      ["qcChecklist", "QC checklist"],
+      ["isMilestone", "Mốc"],
+      ["visibleToCustomer", "Hiện chủ nhà"],
+      ["proposerRole", "Người đề xuất"],
+      ["ordererRole", "Người đặt hàng"],
+      ["receiverRole", "Người nhận"],
+    ]);
+    if (lines.length > 0) {
+      await logProjectActivity(prisma, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task",
+        entityId: task.id,
+        action: "update",
+        summary: joinSummary(`Sửa task ${task.code} "${task.name}"`, lines, "Sửa thông tin task"),
+        diff,
+      });
+    }
+
     fireAndForget(
       notifyKsTaskUpdate({
         projectId: task.projectId,
@@ -560,6 +652,28 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
       userId: user.id,
       logType: TaskLogType.note,
       content: "Đã xóa task",
+    },
+  });
+
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task",
+    entityId: task.id,
+    action: "delete",
+    summary: `Xóa task ${task.code} "${task.name}" (giai đoạn ${task.phase}, status=${task.status})`,
+    snapshot: {
+      code: task.code,
+      name: task.name,
+      phase: task.phase,
+      status: task.status,
+      assignedEngineerId: task.assignedEngineerId,
+      assignedForemanId: task.assignedForemanId,
+      durationDays: task.durationDays,
+      plannedStartDate: task.plannedStartDate,
+      plannedEndDate: task.plannedEndDate,
+      actualStartDate: task.actualStartDate,
+      actualEndDate: task.actualEndDate,
     },
   });
 

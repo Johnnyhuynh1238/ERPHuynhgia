@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { toUtcStartOfDay } from "@/lib/date";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { fmtDate, logProjectActivity } from "@/lib/project-activity-log";
 
 export async function DELETE(_request: Request, { params }: { params: { id: string; restDayId: string } }) {
   const user = await getCurrentUser();
@@ -36,6 +37,9 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     select: {
       id: true,
       createdAt: true,
+      restDate: true,
+      reason: true,
+      note: true,
     },
   });
 
@@ -50,6 +54,16 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   await prisma.siteRestDay.delete({ where: { id: row.id } });
+
+  await logProjectActivity(prisma, {
+    projectId: params.id,
+    actorId: user.id,
+    entity: "site_rest_day",
+    entityId: row.id,
+    action: "delete",
+    summary: `Hủy đánh dấu nghỉ ngày ${fmtDate(row.restDate)} — ${row.reason}`,
+    snapshot: row,
+  });
 
   return NextResponse.json({ message: "Đã hủy đánh dấu công trường nghỉ" });
 }

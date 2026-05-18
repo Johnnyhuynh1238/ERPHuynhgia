@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth-helpers";
+import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string; memberId: string } },
 ) {
+  let actor;
   try {
     await requireRole(["admin"]);
+    actor = await getCurrentUser();
   } catch (error) {
     const msg = error instanceof Error ? error.message : "UNKNOWN";
     if (msg === "401_UNAUTHORIZED") return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
@@ -25,9 +28,11 @@ export async function DELETE(
       id: true,
       userId: true,
       projectId: true,
+      roleInProject: true,
       user: {
         select: {
           email: true,
+          fullName: true,
         },
       },
     },
@@ -58,17 +63,43 @@ export async function DELETE(
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.projectMember.delete({ where: { id: member.id } });
+  const removedAssignments = await prisma.$transaction(async (tx) => {
+    const existingAssignments = await tx.projectMemberAssignment.findMany({
+      where: {
+        projectId: member.projectId,
+        userId: member.userId,
+      },
+      select: { role: true, isPrimary: true },
+    });
 
-    // Đồng bộ: xóa member thì xóa luôn tất cả phân công vai trò dự án của user đó
-    // để user mất truy cập dự án ngay lập tức.
+    await tx.projectMember.delete({ where: { id: member.id } });
     await tx.projectMemberAssignment.deleteMany({
       where: {
         projectId: member.projectId,
         userId: member.userId,
       },
     });
+
+    if (actor?.id) {
+      await logProjectActivity(tx, {
+        projectId: params.id,
+        actorId: actor.id,
+        entity: "project_member",
+        entityId: member.id,
+        action: "delete",
+        summary: `Xóa thành viên ${member.user.fullName} (${member.roleInProject})${existingAssignments.length ? ` + ${existingAssignments.length} phân công` : ""}${assignedTaskCount ? ` (đang phụ trách ${assignedTaskCount} task)` : ""}`,
+        snapshot: {
+          userId: member.userId,
+          email: member.user.email,
+          fullName: member.user.fullName,
+          roleInProject: member.roleInProject,
+          removedAssignments: existingAssignments,
+          assignedTaskCount,
+        },
+      });
+    }
+
+    return existingAssignments;
   });
 
   return NextResponse.json({

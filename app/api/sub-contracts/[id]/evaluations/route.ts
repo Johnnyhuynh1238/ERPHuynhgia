@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { computeWeightedOverallRating, recomputeSubcontractorAggregates } from "@/lib/sub-evaluation-utils";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 const scoreSchema = z.object({
   criterionId: z.string().uuid("Tiêu chí không hợp lệ"),
@@ -98,7 +99,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const [contract, criteria] = await Promise.all([
     prisma.subContract.findUnique({
       where: { id: params.id },
-      select: { id: true, subcontractorId: true },
+      select: { id: true, subcontractorId: true, projectId: true, code: true, title: true },
     }),
     prisma.evaluationCriterion.findMany({
       where: { isActive: true },
@@ -166,6 +167,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
 
       await recomputeSubcontractorAggregates(tx, contract.subcontractorId);
+
+      await logProjectActivity(tx, {
+        projectId: contract.projectId,
+        actorId: user.id,
+        entity: "sub_evaluation",
+        entityId: created.id,
+        action: "create",
+        summary: `Đánh giá HĐ thầu phụ ${contract.code} "${contract.title}" — ${overallRating.toFixed(2)}/5${payload.willHireAgain === false ? " (không thuê lại)" : ""}`,
+        metadata: {
+          subContractId: contract.id,
+          overallRating,
+          willHireAgain: payload.willHireAgain ?? true,
+          comment: payload.comment || null,
+          scoreCount: payload.scores.length,
+        },
+      });
 
       return created;
     });

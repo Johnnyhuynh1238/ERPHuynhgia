@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { syncPhaseStatusByTaskId } from "@/lib/project-phase";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
+import { logProjectActivity } from "@/lib/project-activity-log";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -168,6 +169,17 @@ export async function POST(_request: Request, { params }: { params: { id: string
     });
 
     await syncPhaseStatusByTaskId(tx, params.id, now);
+
+    await logProjectActivity(tx, {
+      projectId: task.projectId,
+      actorId: user.id,
+      entity: "task",
+      entityId: params.id,
+      action: "mark_done",
+      summary: `KS đánh dấu hoàn thành task ${task.code} "${taskDetail.name}"`,
+      diff: { status: { from: taskDetail.status, to: TaskStatus.done } },
+      metadata: { origin: taskDetail.origin, progressPercent: taskDetail.progressPercent },
+    });
 
     return updated;
   });

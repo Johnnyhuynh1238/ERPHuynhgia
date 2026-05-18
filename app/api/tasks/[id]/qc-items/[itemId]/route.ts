@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
+import { buildDiff, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
 
 const patchSchema = z.object({
   status: z.nativeEnum(QcItemStatus).optional(),
@@ -158,6 +159,40 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       });
     }
 
+    const metaDiff = buildDiff(item as any, updatedItem as any, [
+      ["content", "Nội dung"],
+      ["requirePhoto", "Bắt buộc ảnh"],
+      ["requireNote", "Bắt buộc ghi chú"],
+    ]);
+
+    const prevStatus = item.progress?.status ?? QcItemStatus.unchecked;
+    const statusChanged = payload.status !== undefined && payload.status !== prevStatus;
+
+    if (metaDiff.lines.length > 0) {
+      await logProjectActivity(tx, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task_qc_item",
+        entityId: item.id,
+        action: "update",
+        summary: joinSummary(`Sửa mục QC "${item.content}" task ${task.code}`, metaDiff.lines, "Sửa mục QC"),
+        diff: metaDiff.diff,
+      });
+    }
+
+    if (statusChanged) {
+      await logProjectActivity(tx, {
+        projectId: task.projectId,
+        actorId: user.id,
+        entity: "task_qc_item",
+        entityId: item.id,
+        action: "update_status",
+        summary: `QC "${item.content}" task ${task.code}: ${prevStatus} → ${payload.status}`,
+        diff: { status: { from: prevStatus, to: payload.status } },
+        metadata: { note: String(nextNote || "").trim() || null },
+      });
+    }
+
     return { updatedItem, progress };
   });
 
@@ -187,7 +222,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const item = await prisma.qcItem.findFirst({
     where: { id: params.itemId, taskId: params.id },
-    select: { id: true },
+    select: { id: true, content: true, requirePhoto: true, requireNote: true, orderIndex: true },
   });
 
   if (!item) {
@@ -195,5 +230,16 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   await prisma.qcItem.delete({ where: { id: item.id } });
+
+  await logProjectActivity(prisma, {
+    projectId: task.projectId,
+    actorId: user.id,
+    entity: "task_qc_item",
+    entityId: item.id,
+    action: "delete",
+    summary: `Xóa mục QC "${item.content}" khỏi task ${task.code} "${task.name}"`,
+    snapshot: { content: item.content, requirePhoto: item.requirePhoto, requireNote: item.requireNote, orderIndex: item.orderIndex },
+  });
+
   return NextResponse.json({ message: "Đã xóa mục QC" });
 }
