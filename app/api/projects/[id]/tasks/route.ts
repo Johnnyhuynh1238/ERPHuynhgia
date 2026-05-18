@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { LEGACY_PHASE_META, resolveProjectPhaseIdForTaskPhase } from "@/lib/project-phase";
+import { getTodayDateVn } from "@/lib/task-centric";
 
 const createTaskSchema = z.object({
   insertAfterTaskId: z.string().uuid("Task chèn sau không hợp lệ"),
@@ -107,6 +108,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const engineerId = searchParams.get("engineerId") || "";
   const search = (searchParams.get("search") || "").trim();
   const includeDeleted = searchParams.get("includeDeleted") === "1";
+  const todayCheckin = searchParams.get("todayCheckin") === "1";
 
   const isAdminLike =
     user.role === UserRole.admin ||
@@ -131,6 +133,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
       ...(status ? { status } : {}),
       ...(engineerId ? { assignedEngineerId: engineerId } : {}),
       ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+      ...(todayCheckin
+        ? {
+            morningCheckinTasks: {
+              some: {
+                checkin: {
+                  reportDate: getTodayDateVn(),
+                  projectId: params.id,
+                },
+              },
+            },
+          }
+        : {}),
       ...roleFilter,
     },
     include: {

@@ -432,6 +432,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       engineerId: engineerFilter,
       search,
       ...(showDeleted ? { includeDeleted: "1" } : {}),
+      ...(todayOnly ? { todayCheckin: "1" } : {}),
     });
 
     try {
@@ -501,7 +502,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       abortControllerRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
+  }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted, todayOnly]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -513,7 +514,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       window.removeEventListener("pageshow", reloadTasks);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted]);
+  }, [phaseFilter, statusFilter, engineerFilter, search, projectId, showDeleted, todayOnly]);
 
   useEffect(() => {
     if (!createTaskOpen || createTaskMode !== "template") return;
@@ -958,12 +959,8 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const hasStatusFilter = statusFilter !== "all";
 
   const visibleTasks = useMemo(() => {
-    let list = [...tasks].sort(compareByDisplayOrder);
-    if (todayOnly) {
-      list = list.filter((t) => t.status === "in_progress");
-    }
-    return list;
-  }, [tasks, todayOnly]);
+    return [...tasks].sort(compareByDisplayOrder);
+  }, [tasks]);
 
   const grouped = useMemo(() => {
     if (!(hasStatusFilter && !hasPhaseFilter)) {
@@ -999,7 +996,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       {todayOnly ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2">
           <div className="text-sm text-orange-200">
-            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang thi công
+            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ KS đã check-in hôm nay
           </div>
           <button
             type="button"
@@ -1101,7 +1098,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
         {!loading && todayOnly && visibleTasks.length === 0 && phaseOrderDraft.length > 0 ? (
           <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">
-            Hiện chưa có nhiệm vụ nào đang thi công.
+            Hôm nay KS chưa check-in nhiệm vụ nào trong dự án này.
           </div>
         ) : null}
 

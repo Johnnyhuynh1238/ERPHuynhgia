@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TaskStatus } from "@prisma/client";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getTodayDateVn } from "@/lib/task-centric";
 
 const completedStatuses: TaskStatus[] = [TaskStatus.done, TaskStatus.inspected, TaskStatus.internal_approved, TaskStatus.completed];
 
@@ -38,7 +39,18 @@ export default async function CustomerTimelinePage({
   const taskWhere = {
     isActive: true,
     visibleToCustomer: true,
-    ...(todayOnly ? { status: TaskStatus.in_progress } : {}),
+    ...(todayOnly
+      ? {
+          morningCheckinTasks: {
+            some: {
+              checkin: {
+                reportDate: getTodayDateVn(),
+                projectId: project.id,
+              },
+            },
+          },
+        }
+      : {}),
   };
 
   const phases = await prisma.projectPhase.findMany({
@@ -75,7 +87,7 @@ export default async function CustomerTimelinePage({
       {todayOnly ? (
         <section className="owner-section flex items-center justify-between gap-3 border border-orange-500/30 bg-orange-500/10">
           <div className="text-sm text-orange-200">
-            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang thi công
+            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ KS thi công hôm nay
           </div>
           <Link href={`/cn/${params.token}/timeline`} className="text-xs font-medium text-orange-300 underline">
             Xoá lọc
@@ -85,7 +97,7 @@ export default async function CustomerTimelinePage({
 
       {visiblePhases.length === 0 ? (
         <section className="owner-section text-sm owner-muted">
-          {todayOnly ? "Hiện chưa có nhiệm vụ nào đang thi công." : "Dự án chưa có giai đoạn hiển thị cho chủ nhà."}
+          {todayOnly ? "Hôm nay KS chưa check-in nhiệm vụ nào." : "Dự án chưa có giai đoạn hiển thị cho chủ nhà."}
         </section>
       ) : null}
 
