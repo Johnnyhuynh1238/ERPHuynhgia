@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import {
   TaskPhotoAlbumViewer,
   TaskPhotoImage,
-  TaskPhotoUploadStatus,
   useTaskPhotoUploader,
   type TaskPhotoAlbumState,
   type TaskPhotoItem,
+  type TaskPhotoUploadItem,
 } from "./task-photo-tools";
 
 type ProgressHistory = {
@@ -83,11 +83,10 @@ export function TaskProgressSection({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
   const [percent, setPercent] = useState(0);
   const [savedPercent, setSavedPercent] = useState(0);
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<TaskPhotoItem[]>([]);
   const [photoAlbum, setPhotoAlbum] = useState<TaskPhotoAlbumState | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [reason, setReason] = useState("");
@@ -97,6 +96,15 @@ export function TaskProgressSection({
   const [history, setHistory] = useState<ProgressHistory[]>([]);
   const [hasInteractedWithProgress, setHasInteractedWithProgress] = useState(false);
   const photoUploader = useTaskPhotoUploader(taskId);
+
+  const uploadedPhotos = useMemo<TaskPhotoItem[]>(
+    () =>
+      photoUploader.items
+        .filter((item) => item.status === "done" && item.photo)
+        .map((item) => item.photo as TaskPhotoItem),
+    [photoUploader.items],
+  );
+  const photoUrl = uploadedPhotos[0]?.photoUrl || "";
 
   const isRollback = percent < savedPercent;
   const showUpdateFields = canUpdate && hasInteractedWithProgress && percent !== savedPercent;
@@ -123,13 +131,12 @@ export function TaskProgressSection({
       setStatus(json.progress?.status || null);
       setUpdatedAt(json.progress?.updatedAt || null);
       setHistory(json.history || []);
-      setPhotoUrl("");
-      setUploadedPhotos([]);
       setPhotoAlbum(null);
       setShowHistoryModal(false);
       setReason("");
       setNote("");
       setHasInteractedWithProgress(false);
+      setExpandedErrors(new Set());
       photoUploader.clear();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không tải được tiến độ");
@@ -144,8 +151,6 @@ export function TaskProgressSection({
     try {
       const result = await photoUploader.upload(files);
       if (result.uploaded.length) {
-        setUploadedPhotos((prev) => [...prev, ...result.uploaded]);
-        setPhotoUrl((current) => current || result.uploaded[0]?.photoUrl || "");
         toast.success(`Đã tải ${result.uploaded.length} ảnh tiến độ`);
       }
       if (result.failed.length) {
@@ -158,44 +163,47 @@ export function TaskProgressSection({
     }
   }
 
-  async function deleteUploadedPhoto(photo: TaskPhotoItem) {
-    if (!photo.id) {
-      setUploadedPhotos((prev) => {
-        const next = prev.filter((item) => item.photoUrl !== photo.photoUrl);
-        if (photoUrl === photo.photoUrl) {
-          setPhotoUrl(next[0]?.photoUrl || "");
-        }
-        return next;
-      });
-      return;
-    }
+  function toggleErrorDetail(itemId: string) {
+    setExpandedErrors((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
 
-    setDeletingPhotoId(photo.id);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/photos/${photo.id}`, { method: "DELETE" });
-      const json = await res.json().catch(() => ({} as { message?: string }));
-      if (!res.ok) {
-        throw new Error(json.message || "Xóa ảnh thất bại");
-      }
-      setUploadedPhotos((prev) => {
-        const next = prev.filter((item) => item.id !== photo.id);
-        if (photoUrl === photo.photoUrl) {
-          setPhotoUrl(next[0]?.photoUrl || "");
+  async function removeUploadItem(item: TaskPhotoUploadItem) {
+    const serverPhotoId = item.status === "done" ? item.photo?.id : null;
+    if (serverPhotoId) {
+      setDeletingItemId(item.id);
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/photos/${serverPhotoId}`, { method: "DELETE" });
+        const json = await res.json().catch(() => ({} as { message?: string }));
+        if (!res.ok) {
+          throw new Error(json.message || "Xóa ảnh thất bại");
         }
-        return next;
-      });
+        toast.success(json.message || "Đã xóa ảnh");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Xóa ảnh thất bại");
+        setDeletingItemId(null);
+        return;
+      } finally {
+        setDeletingItemId(null);
+      }
       setPhotoAlbum((current) => {
         if (!current) return current;
-        const nextPhotos = current.photos.filter((item) => (item.id || item.photoUrl) !== (photo.id || photo.photoUrl));
+        const nextPhotos = current.photos.filter((entry) => entry.id !== serverPhotoId);
         if (!nextPhotos.length) return null;
         return { ...current, photos: nextPhotos, index: Math.min(current.index, nextPhotos.length - 1) };
       });
-      toast.success(json.message || "Đã xóa ảnh");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Xóa ảnh thất bại");
-    } finally {
-      setDeletingPhotoId(null);
     }
+    photoUploader.remove(item.id);
+    setExpandedErrors((prev) => {
+      if (!prev.has(item.id)) return prev;
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
   }
 
   async function saveProgress() {
@@ -333,51 +341,80 @@ export function TaskProgressSection({
                 <div className="mt-1 text-[11px] text-amber-300/80">
                   Bắt buộc chụp trực tiếp tại hiện trường. Ảnh cũ &gt; 30 phút hoặc ảnh đã upload trước đó sẽ bị từ chối.
                 </div>
-                {uploading ? <div className="mt-1 text-xs text-[#8891aa]">Đang tải ảnh...</div> : null}
-                <TaskPhotoUploadStatus items={photoUploader.items} onClear={photoUploader.clear} />
-                {uploadedPhotos.length > 0 ? (
+                {photoUploader.items.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-semibold text-[#c8d0e8]">Ảnh đã upload ({uploadedPhotos.length})</div>
-                      <Button
-                        variant="outline"
-                        className="h-8 border-[#2e3347] bg-[#1a1d27] px-2 text-xs"
-                        onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index: 0 })}
-                      >
-                        Xem album
-                      </Button>
+                      <div className="text-xs font-semibold text-[#c8d0e8]">Ảnh tiến độ ({photoUploader.items.length})</div>
+                      {uploadedPhotos.length > 0 ? (
+                        <Button
+                          variant="outline"
+                          className="h-8 border-[#2e3347] bg-[#1a1d27] px-2 text-xs"
+                          onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index: 0 })}
+                        >
+                          Xem album
+                        </Button>
+                      ) : null}
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {uploadedPhotos.map((photo, index) => (
-                        <div key={photo.id || photo.photoUrl} className={`rounded-xl border p-2 ${photoUrl === photo.photoUrl ? "border-amber-500 bg-amber-500/10" : "border-[#2e3347] bg-[#1a1d27]"}`}>
-                          <button
-                            type="button"
-                            onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index })}
-                            className="block h-20 w-full overflow-hidden rounded-lg bg-[#11131b]"
-                          >
-                            <TaskPhotoImage src={photo.thumbnailUrl || photo.photoUrl} alt="Ảnh tiến độ" className="h-full w-full object-cover" />
-                          </button>
-                          <div className="mt-2 flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              className="h-7 flex-1 border-[#2e3347] bg-[#222637] px-2 text-[11px]"
-                              onClick={() => setPhotoUrl(photo.photoUrl)}
-                            >
-                              {photoUrl === photo.photoUrl ? "Đang chọn" : "Chọn"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="h-7 border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-200"
-                              disabled={deletingPhotoId === photo.id || saving}
-                              onClick={() => deleteUploadedPhoto(photo)}
-                            >
-                              Xóa
-                            </Button>
+                      {photoUploader.items.map((item) => {
+                        const isDone = item.status === "done" && item.photo;
+                        const isError = item.status === "error";
+                        const isLoading = item.status === "queued" || item.status === "uploading";
+                        const isErrorExpanded = expandedErrors.has(item.id);
+                        const doneIndex = isDone ? uploadedPhotos.findIndex((p) => p.photoUrl === item.photo?.photoUrl) : -1;
+                        return (
+                          <div key={item.id} className="rounded-xl border border-[#2e3347] bg-[#1a1d27] p-2">
+                            <div className="relative h-20 w-full overflow-hidden rounded-lg bg-[#11131b]">
+                              {isDone && item.photo ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPhotoAlbum({ title: "Ảnh tiến độ đã upload", photos: uploadedPhotos, index: doneIndex >= 0 ? doneIndex : 0 })}
+                                  className="block h-full w-full"
+                                >
+                                  <TaskPhotoImage src={item.photo.thumbnailUrl || item.photo.photoUrl} alt="Ảnh tiến độ" className="h-full w-full object-cover" />
+                                </button>
+                              ) : isError ? (
+                                <div className="flex h-full w-full items-center justify-center bg-rose-500/10">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleErrorDetail(item.id)}
+                                    title={isErrorExpanded ? "Ẩn chi tiết lỗi" : "Xem chi tiết lỗi"}
+                                    aria-label="Xem chi tiết lỗi"
+                                    className="flex h-9 w-9 items-center justify-center rounded-full border border-rose-500/50 bg-rose-500/20 text-lg font-bold text-rose-300"
+                                  >
+                                    !
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[11px] text-[#8891aa]">
+                                  <div className="text-center">
+                                    <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-500" />
+                                    <div className="mt-1">{item.status === "queued" ? "Chờ tải" : "Đang tải"}</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-1 truncate text-[11px] text-[#c8d0e8]">{item.name}</div>
+                            {isError && isErrorExpanded && item.message ? (
+                              <div className="mt-1 text-[11px] text-rose-300">{item.message}</div>
+                            ) : null}
+                            <div className="mt-2">
+                              <Button
+                                variant="outline"
+                                className="h-7 w-full border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-200"
+                                disabled={deletingItemId === item.id || isLoading || saving}
+                                onClick={() => removeUploadItem(item)}
+                              >
+                                {deletingItemId === item.id ? "Đang xóa..." : "Xóa"}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
+                ) : uploading ? (
+                  <div className="mt-2 text-xs text-[#8891aa]">Đang tải ảnh...</div>
                 ) : null}
               </div>
 
