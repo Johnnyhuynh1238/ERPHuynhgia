@@ -323,7 +323,6 @@ export function TaskProgressSection({
                   type="file"
                   multiple
                   accept="image/jpeg,image/png,image/webp"
-                  capture="environment"
                   disabled={!canUpdate || saving || uploading}
                   onChange={async (e) => {
                     await uploadPhotos(Array.from(e.target.files || []));
