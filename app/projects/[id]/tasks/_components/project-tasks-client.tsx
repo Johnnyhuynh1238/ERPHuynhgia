@@ -957,24 +957,13 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
   const hasPhaseFilter = phaseFilter !== "all";
   const hasStatusFilter = statusFilter !== "all";
 
-  const todayVnDateStr = useMemo(() => {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  }, []);
-
   const visibleTasks = useMemo(() => {
     let list = [...tasks].sort(compareByDisplayOrder);
     if (todayOnly) {
-      list = list.filter(
-        (t) => t.status === "in_progress" && !!t.actualStartDate && t.actualStartDate.startsWith(todayVnDateStr),
-      );
+      list = list.filter((t) => t.status === "in_progress");
     }
     return list;
-  }, [tasks, todayOnly, todayVnDateStr]);
+  }, [tasks, todayOnly]);
 
   const grouped = useMemo(() => {
     if (!(hasStatusFilter && !hasPhaseFilter)) {
@@ -1010,7 +999,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       {todayOnly ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2">
           <div className="text-sm text-orange-200">
-            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang làm hôm nay
+            <span className="font-semibold">Đang lọc:</span> Nhiệm vụ đang thi công
           </div>
           <button
             type="button"
@@ -1112,7 +1101,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
 
         {!loading && todayOnly && visibleTasks.length === 0 && phaseOrderDraft.length > 0 ? (
           <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">
-            Hôm nay chưa có nhiệm vụ nào đang thi công.
+            Hiện chưa có nhiệm vụ nào đang thi công.
           </div>
         ) : null}
 
