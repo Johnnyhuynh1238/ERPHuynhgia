@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, StaffNotificationKind, CustomerNotificationKind } from "@prisma/client";
-import { sendPushToProjectCustomer } from "@/lib/push-server";
+import { sendPushToProjectCustomer, sendPushToUser } from "@/lib/push-server";
 
 const TPTC_ROLE = "construction_manager";
 
@@ -28,6 +28,36 @@ function buildCustomerPortalUrl(token: string | null, link: string) {
   if (!token) return link;
   if (link.startsWith("http")) return link;
   return link.startsWith("/") ? `/cn/${token}${link}` : `/cn/${token}/${link}`;
+}
+
+async function pushStaffNotification(args: {
+  recipientIds: string[];
+  actorUserId?: string | null;
+  title: string;
+  body: string | null;
+  link: string;
+  tag: string;
+}) {
+  const ids = Array.from(new Set(args.recipientIds.filter((id) => id && id !== args.actorUserId)));
+  if (!ids.length) return;
+  await Promise.all(
+    ids.map(async (recipientId) => {
+      const badgeCount = await prisma.staffNotification.count({
+        where: { recipientId, isRead: false },
+      });
+      try {
+        await sendPushToUser(recipientId, {
+          title: args.title,
+          body: args.body ?? undefined,
+          url: args.link,
+          tag: args.tag,
+          badgeCount,
+        });
+      } catch (err) {
+        console.error("[notifications] staff push failed:", recipientId, err);
+      }
+    }),
+  );
 }
 
 async function pushCustomerNotification(args: {
@@ -135,12 +165,22 @@ export async function notifyKsMorningCheckin(input: {
     refId: input.checkinId ?? null,
   };
 
+  const staffLink = `/projects/${input.projectId}/tasks?filter=today`;
   await Promise.all([
-    createStaffNotifications(tptcIds, base, "ks_morning_checkin", title, body, `/projects/${input.projectId}/tasks?filter=today`),
+    createStaffNotifications(tptcIds, base, "ks_morning_checkin", title, body, staffLink),
     project.customerPortalEnabled
       ? createCustomerNotification(base, "ks_morning_checkin", title, body, `/timeline?filter=today`)
       : Promise.resolve(),
   ]);
+
+  await pushStaffNotification({
+    recipientIds: tptcIds,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link: staffLink,
+    tag: `ks-morning-${input.projectId}`,
+  });
 
   if (project.customerPortalEnabled) {
     await pushCustomerNotification({
@@ -282,12 +322,22 @@ export async function notifyKsTaskUpdate(input: {
 
   const shouldNotifyCustomer = project.customerPortalEnabled && input.taskVisibleToCustomer;
 
+  const link = `/tasks/${input.taskId}`;
   await Promise.all([
-    upsertStaffTaskUpdate(tptcIds, base, title, body, `/tasks/${input.taskId}`),
+    upsertStaffTaskUpdate(tptcIds, base, title, body, link),
     shouldNotifyCustomer
-      ? upsertCustomerTaskUpdate(base, title, body, `/tasks/${input.taskId}`)
+      ? upsertCustomerTaskUpdate(base, title, body, link)
       : Promise.resolve(),
   ]);
+
+  await pushStaffNotification({
+    recipientIds: tptcIds,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `ks-task-${input.taskId}`,
+  });
 
   if (shouldNotifyCustomer) {
     await pushCustomerNotification({
@@ -295,7 +345,7 @@ export async function notifyKsTaskUpdate(input: {
       customerPortalToken: project.customerPortalToken,
       title,
       body,
-      link: `/tasks/${input.taskId}`,
+      link,
       tag: `ks-task-${input.taskId}`,
     });
   }
