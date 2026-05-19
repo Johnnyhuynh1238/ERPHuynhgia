@@ -238,7 +238,7 @@ export function TestActionsClient() {
       </section>
 
       <footer className="text-xs text-slate-400">
-        State lưu localStorage trên máy này. Đổi máy → state không sync. Dùng "Export JSON" để backup.
+        State lưu localStorage trên máy này. Đổi máy → state không sync. Dùng &quot;Export JSON&quot; để backup.
       </footer>
     </div>
   );
