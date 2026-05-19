@@ -166,7 +166,7 @@ export function KsInstallPushModal({ publicKey }: { publicKey?: string }) {
                 </div>
                 <div>
                   <div className="text-base font-semibold text-white">Cài app Huỳnh Gia</div>
-                  <div className="text-xs text-[#8892b0]">Để nhận nhắc nhiệm vụ ngay cả khi tắt app</div>
+                  <div className="text-xs text-[#8892b0]">Để nhận thông báo ngay cả khi tắt app</div>
                 </div>
               </div>
 
@@ -211,7 +211,7 @@ export function KsInstallPushModal({ publicKey }: { publicKey?: string }) {
                   onClick={() => setStep("push")}
                   className="mt-3 block w-full text-center text-xs text-[#8892b0] underline"
                 >
-                  Bỏ qua, chỉ bật thông báo đẩy
+                  Bỏ qua, chỉ bật thông báo
                 </button>
               ) : null}
             </>
@@ -222,8 +222,8 @@ export function KsInstallPushModal({ publicKey }: { publicKey?: string }) {
                   <Bell className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-base font-semibold text-white">Bật thông báo đẩy</div>
-                  <div className="text-xs text-[#8892b0]">Nhắc check-in sáng + nhiệm vụ trước hạn</div>
+                  <div className="text-base font-semibold text-white">Bật thông báo</div>
+                  <div className="text-xs text-[#8892b0]">Nhận thông báo từ hệ thống</div>
                 </div>
               </div>
 
