@@ -504,6 +504,7 @@ model Project {
   staffNotifications      StaffNotification[]
   customerNotifications   CustomerNotification[]
   activityLogs            ProjectActivityLog[]
+  customerPushSubscriptions CustomerPushSubscription[]
 
   @@index([status])
   @@map("projects")
@@ -2162,6 +2163,22 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+model CustomerPushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  endpoint  String   @unique @db.Text
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  lastSeen  DateTime @default(now()) @map("last_seen")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("customer_push_subscriptions")
 }
 
 model PushSendLog {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, StaffNotificationKind, CustomerNotificationKind } from "@prisma/client";
+import { sendPushToProjectCustomer } from "@/lib/push-server";
 
 const TPTC_ROLE = "construction_manager";
 
@@ -14,7 +15,38 @@ async function getTptcUserIds(): Promise<string[]> {
 async function getProjectContext(projectId: string) {
   return prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, mainEngineerId: true, customerPortalEnabled: true },
+    select: {
+      id: true,
+      mainEngineerId: true,
+      customerPortalEnabled: true,
+      customerPortalToken: true,
+    },
+  });
+}
+
+function buildCustomerPortalUrl(token: string | null, link: string) {
+  if (!token) return link;
+  if (link.startsWith("http")) return link;
+  return link.startsWith("/") ? `/cn/${token}${link}` : `/cn/${token}/${link}`;
+}
+
+async function pushCustomerNotification(args: {
+  projectId: string;
+  customerPortalToken: string | null;
+  title: string;
+  body: string | null;
+  link: string;
+  tag: string;
+}) {
+  const badgeCount = await prisma.customerNotification.count({
+    where: { projectId: args.projectId, isRead: false },
+  });
+  await sendPushToProjectCustomer(args.projectId, {
+    title: args.title,
+    body: args.body ?? undefined,
+    url: buildCustomerPortalUrl(args.customerPortalToken, args.link),
+    tag: args.tag,
+    badgeCount,
   });
 }
 
@@ -109,6 +141,17 @@ export async function notifyKsMorningCheckin(input: {
       ? createCustomerNotification(base, "ks_morning_checkin", title, body, `/timeline?filter=today`)
       : Promise.resolve(),
   ]);
+
+  if (project.customerPortalEnabled) {
+    await pushCustomerNotification({
+      projectId: input.projectId,
+      customerPortalToken: project.customerPortalToken,
+      title,
+      body,
+      link: `/timeline?filter=today`,
+      tag: `ks-morning-${input.projectId}`,
+    });
+  }
 }
 
 const TASK_UPDATE_DEDUPE_MS = 5 * 60 * 1000;
@@ -245,6 +288,17 @@ export async function notifyKsTaskUpdate(input: {
       ? upsertCustomerTaskUpdate(base, title, body, `/tasks/${input.taskId}`)
       : Promise.resolve(),
   ]);
+
+  if (shouldNotifyCustomer) {
+    await pushCustomerNotification({
+      projectId: input.projectId,
+      customerPortalToken: project.customerPortalToken,
+      title,
+      body,
+      link: `/tasks/${input.taskId}`,
+      tag: `ks-task-${input.taskId}`,
+    });
+  }
 }
 
 /**

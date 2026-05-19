@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, CreditCard, Home, NotebookPen } from "lucide-react";
 import { InstallAppBanner } from "./install-app-banner";
+import { CustomerPushPrompt } from "./customer-push-prompt";
 import { NotificationsBell } from "@/components/notifications-bell";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -38,6 +39,7 @@ export function CustomerPortalShell({ token, projectName, customerName, children
           listHref={`/cn/${token}/notifications`}
         />
       </header>
+      <CustomerPushPrompt token={token} />
       <main className="owner-portal-main">{children}</main>
       <InstallAppBanner />
       <nav className="owner-bottom-nav" aria-label="Cổng chủ nhà">

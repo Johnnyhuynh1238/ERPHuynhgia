@@ -101,6 +101,19 @@ export function NotificationsBell({
   }, [fetchUnread, pollMs, hidden]);
 
   useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const nav = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (unread > 0 && typeof nav.setAppBadge === "function") {
+      nav.setAppBadge(unread).catch(() => {});
+    } else if (unread === 0 && typeof nav.clearAppBadge === "function") {
+      nav.clearAppBadge().catch(() => {});
+    }
+  }, [unread]);
+
+  useEffect(() => {
     if (open) {
       setKeepMounted(true);
     } else {

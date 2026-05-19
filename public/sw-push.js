@@ -25,7 +25,16 @@ self.addEventListener("push", (event) => {
     requireInteraction: !!payload.requireInteraction,
     data: { url: payload.url || "/" },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  const tasks = [self.registration.showNotification(title, options)];
+  if (typeof self.navigator !== "undefined" && "setAppBadge" in self.navigator) {
+    const count = typeof payload.badgeCount === "number" ? payload.badgeCount : undefined;
+    tasks.push(
+      self.navigator
+        .setAppBadge(count)
+        .catch(() => {}),
+    );
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener("notificationclick", (event) => {
