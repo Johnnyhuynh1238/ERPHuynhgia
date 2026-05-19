@@ -74,11 +74,14 @@ export async function POST(request: Request) {
         select: { id: true },
       });
       for (const ks of ksUsers) {
-        const submitted = await prisma.dailyReportSubmission.findUnique({
-          where: { ksUserId_reportDate: { ksUserId: ks.id, reportDate: today } },
+        // Morning check-in lives in MorningCheckin (created when KS picks
+        // today's tasks). DailyReportSubmission is the EOD submission and
+        // is irrelevant for the morning reminder.
+        const checkedIn = await prisma.morningCheckin.findFirst({
+          where: { userId: ks.id, reportDate: today },
           select: { id: true },
         });
-        if (submitted) continue;
+        if (checkedIn) continue;
         const title =
           stage === "overdue"
             ? "⚠️ Đã quá 8:00 — chưa check-in sáng"
