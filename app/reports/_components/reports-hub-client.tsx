@@ -822,15 +822,16 @@ export function ReportsHubClient() {
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="text-xl font-bold text-[#f0f2ff]">📋 Nhiệm vụ hôm nay</div>
         <div className="mt-1 text-xs text-[#8892b0]">{new Date(today.date).toLocaleDateString("vi-VN")}</div>
-        <div className="mt-2 inline-block rounded-full bg-[#2a1a05] px-2 py-1 text-[11px] font-medium text-[#ff8a3d]">
-          ⏰ {remainLabel(today.submissionDeadline, today.currentTime)}
-        </div>
         {today.submitted ? (
-          <div className="mt-2 text-xs font-medium text-emerald-300">
-            Đã gửi lúc {formatClock(today.submission?.submittedAt || null)}
+          <div className="mt-2 inline-block rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300">
+            ✅ Đã nộp lúc {formatClock(today.submission?.submittedAt || null)}
             {today.submission?.isLate ? " · Trễ" : " · Đúng giờ"}
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-2 inline-block rounded-full bg-[#2a1a05] px-2 py-1 text-[11px] font-medium text-[#ff8a3d]">
+            ⏰ {remainLabel(today.submissionDeadline, today.currentTime)}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-4 gap-2">
