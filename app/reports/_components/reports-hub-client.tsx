@@ -852,7 +852,7 @@ export function ReportsHubClient() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-1">
+      <div className="sticky top-14 z-20 grid grid-cols-3 gap-1.5 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-1 md:top-[64px]">
         <button
           type="button"
           onClick={() => {
