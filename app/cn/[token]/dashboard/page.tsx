@@ -212,7 +212,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
           {drawings.map((doc) => (
             <a key={doc.id} href={`/api/projects/${project.id}/documents/${doc.id}/file?token=${params.token}`} target="_blank" className="owner-card block text-sm">
               <div className="font-semibold text-white">{doc.title}</div>
-              <div className="text-xs owner-muted">{CATEGORY_LABEL[doc.category]} · {doc.fileName} · {Math.round(doc.fileSize / 1024).toLocaleString("vi-VN")} KB</div>
+              <div className="text-xs owner-muted">{CATEGORY_LABEL[doc.category]}</div>
             </a>
           ))}
         </div>

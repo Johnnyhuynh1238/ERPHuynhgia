@@ -41,17 +41,6 @@ type UserOption = {
   role: UserRole;
 };
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 export function DocumentsClient({
   projectId,
   isAdmin,
@@ -224,24 +213,27 @@ export function DocumentsClient({
           <p className="text-sm text-[#8892b0]">Chưa có hồ sơ nào{isAdmin ? "" : " được chia sẻ với bạn"}.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase text-[#8892b0]">
                   <th className="py-2 pr-2">Tiêu đề</th>
                   <th className="py-2 pr-2">Loại</th>
-                  <th className="py-2 pr-2">Người upload</th>
-                  <th className="py-2 pr-2">Ngày</th>
-                  <th className="py-2 pr-2">Size</th>
                   {isAdmin ? <th className="py-2 pr-2">Chủ nhà</th> : null}
-                  <th className="py-2 pr-2 text-right">Thao tác</th>
+                  {isAdmin ? <th className="py-2 pr-2 text-right">Thao tác</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id} className="border-t border-[#2d3249] text-[#d1d5e0]">
                     <td className="py-2 pr-2">
-                      <div className="font-medium text-[#f0f2ff]">{doc.title}</div>
-                      <div className="text-xs text-[#8892b0]">{doc.fileName}</div>
+                      <a
+                        href={doc.viewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-[#fb923c] hover:underline"
+                      >
+                        {doc.title}
+                      </a>
                       {isAdmin && doc.grantedUsers && doc.grantedUsers.length > 0 ? (
                         <div className="mt-1 text-xs text-[#94a3b8]">
                           Được xem bởi: {doc.grantedUsers.map((u) => u.fullName).join(", ")}
@@ -249,9 +241,6 @@ export function DocumentsClient({
                       ) : null}
                     </td>
                     <td className="py-2 pr-2 text-xs">{CATEGORY_LABEL[doc.category]}</td>
-                    <td className="py-2 pr-2 text-xs">{doc.uploader.fullName}</td>
-                    <td className="py-2 pr-2 text-xs">{formatDate(doc.uploadedAt)}</td>
-                    <td className="py-2 pr-2 text-xs">{formatBytes(doc.fileSize)}</td>
                     {isAdmin ? (
                       <td className="py-2 pr-2">
                         <button
@@ -269,36 +258,26 @@ export function DocumentsClient({
                         </button>
                       </td>
                     ) : null}
-                    <td className="py-2 pr-2 text-right">
-                      <div className="flex justify-end gap-2">
-                        <a
-                          href={doc.viewUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded border border-[#2d3249] px-2 py-1 text-xs text-[#fb923c] hover:bg-[#13151f]"
-                        >
-                          Xem
-                        </a>
-                        {isAdmin ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => openAccessDialog(doc)}
-                              className="rounded border border-[#2d3249] px-2 py-1 text-xs text-[#7dd3fc] hover:bg-[#13151f]"
-                            >
-                              Phân quyền
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(doc)}
-                              className="rounded border border-red-700 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
-                            >
-                              Xóa
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </td>
+                    {isAdmin ? (
+                      <td className="py-2 pr-2 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openAccessDialog(doc)}
+                            className="rounded border border-[#2d3249] px-2 py-1 text-xs text-[#7dd3fc] hover:bg-[#13151f]"
+                          >
+                            Phân quyền
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(doc)}
+                            className="rounded border border-red-700 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
