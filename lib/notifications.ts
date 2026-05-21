@@ -202,12 +202,13 @@ async function upsertStaffTaskUpdate(
   title: string,
   body: string | null,
   link: string,
-) {
+): Promise<string[]> {
   const uniqueRecipients = Array.from(new Set(recipientIds.filter((id) => id && id !== base.actorUserId)));
-  if (!uniqueRecipients.length) return;
+  if (!uniqueRecipients.length) return [];
 
   const cutoff = new Date(Date.now() - TASK_UPDATE_DEDUPE_MS);
   const now = new Date();
+  const freshRecipients: string[] = [];
 
   for (const recipientId of uniqueRecipients) {
     const existing = await prisma.staffNotification.findFirst({
@@ -244,8 +245,11 @@ async function upsertStaffTaskUpdate(
           refId: base.refId ?? null,
         },
       });
+      freshRecipients.push(recipientId);
     }
   }
+
+  return freshRecipients;
 }
 
 async function upsertCustomerTaskUpdate(
@@ -253,7 +257,7 @@ async function upsertCustomerTaskUpdate(
   title: string,
   body: string | null,
   link: string,
-) {
+): Promise<boolean> {
   const cutoff = new Date(Date.now() - TASK_UPDATE_DEDUPE_MS);
   const now = new Date();
 
@@ -275,9 +279,10 @@ async function upsertCustomerTaskUpdate(
       where: { id: existing.id },
       data: { title, body, link, isRead: false, readAt: null, createdAt: now },
     });
-  } else {
-    await createCustomerNotification(base, "ks_task_update", title, body, link);
+    return false;
   }
+  await createCustomerNotification(base, "ks_task_update", title, body, link);
+  return true;
 }
 
 /**
@@ -323,23 +328,25 @@ export async function notifyKsTaskUpdate(input: {
   const shouldNotifyCustomer = project.customerPortalEnabled && input.taskVisibleToCustomer;
 
   const link = `/tasks/${input.taskId}`;
-  await Promise.all([
+  const [freshStaffIds, freshCustomer] = await Promise.all([
     upsertStaffTaskUpdate(tptcIds, base, title, body, link),
     shouldNotifyCustomer
       ? upsertCustomerTaskUpdate(base, title, body, link)
-      : Promise.resolve(),
+      : Promise.resolve(false),
   ]);
 
-  await pushStaffNotification({
-    recipientIds: tptcIds,
-    actorUserId: input.actorUserId,
-    title,
-    body,
-    link,
-    tag: `ks-task-${input.taskId}`,
-  });
+  if (freshStaffIds.length) {
+    await pushStaffNotification({
+      recipientIds: freshStaffIds,
+      actorUserId: input.actorUserId,
+      title,
+      body,
+      link,
+      tag: `ks-task-${input.taskId}`,
+    });
+  }
 
-  if (shouldNotifyCustomer) {
+  if (shouldNotifyCustomer && freshCustomer) {
     await pushCustomerNotification({
       projectId: input.projectId,
       customerPortalToken: project.customerPortalToken,
