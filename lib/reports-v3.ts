@@ -231,3 +231,122 @@ export async function upsertPendingTptcAssignmentsForDay({
 
   return { created: batch.length };
 }
+
+/**
+ * Khi task chạm 100% tiến độ:
+ *  - Nếu task có QC checklist (templateId + qcChecklistItem) chưa pass đủ → sinh
+ *    1 assignment qc_checklist trong /reports để KS không quên.
+ *  - Nếu task không có QC checklist → auto mark-done luôn (không sinh assignment).
+ * Trả về { qcAssignmentCreated, autoCompleted } để caller biết hành vi.
+ */
+export async function handleTaskReach100({
+  taskId,
+  ksUserId,
+  now,
+}: {
+  taskId: string;
+  ksUserId: string;
+  now: Date;
+}): Promise<{ qcAssignmentCreated: boolean; autoCompleted: boolean }> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      origin: true,
+      templateId: true,
+      status: true,
+      progressPercent: true,
+      actualStartDate: true,
+      actualEndDate: true,
+      assignedEngineerId: true,
+    },
+  });
+  if (!task) return { qcAssignmentCreated: false, autoCompleted: false };
+  if (task.progressPercent !== 100) return { qcAssignmentCreated: false, autoCompleted: false };
+  if (task.status === "done" || task.status === "internal_approved" || task.status === "completed") {
+    return { qcAssignmentCreated: false, autoCompleted: false };
+  }
+
+  let qcItemCount = 0;
+  let passedCount = 0;
+
+  if (task.origin === "template" && task.templateId) {
+    const [items, results] = await Promise.all([
+      prisma.qcChecklistItem.findMany({
+        where: { template: { taskTemplateId: task.templateId } },
+        select: { id: true },
+      }),
+      prisma.taskQcResult.findMany({
+        where: { taskId },
+        select: { itemId: true, isPassed: true },
+      }),
+    ]);
+    qcItemCount = items.length;
+    const passedSet = new Set(results.filter((r) => r.isPassed).map((r) => r.itemId));
+    passedCount = items.filter((i) => passedSet.has(i.id)).length;
+  }
+
+  // Có QC checklist và chưa hoàn tất → sinh assignment
+  if (qcItemCount > 0 && passedCount < qcItemCount) {
+    const reportDate = getReportDateVn();
+    const existing = await prisma.taskDailyAssignment.findFirst({
+      where: {
+        ksUserId,
+        taskId,
+        type: DailyAssignmentType.qc_checklist,
+        status: DailyAssignmentStatus.pending,
+      },
+      select: { id: true },
+    });
+    if (existing) return { qcAssignmentCreated: false, autoCompleted: false };
+
+    await prisma.taskDailyAssignment.create({
+      data: {
+        ksUserId,
+        reportDate,
+        taskId,
+        type: DailyAssignmentType.qc_checklist,
+        title: `Làm QC checklist · ${task.code} · ${task.name}`,
+        priority: AssignmentPriority.critical,
+        requirePhoto: false,
+      },
+    });
+    return { qcAssignmentCreated: true, autoCompleted: false };
+  }
+
+  // Không có QC checklist → auto mark-done
+  if (qcItemCount === 0) {
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: "done",
+        qcCompletedAt: now,
+        actualStartDate: task.actualStartDate || now,
+        actualEndDate: task.actualEndDate || now,
+      },
+    });
+    return { qcAssignmentCreated: false, autoCompleted: true };
+  }
+
+  return { qcAssignmentCreated: false, autoCompleted: false };
+}
+
+/**
+ * Đóng pending qc_checklist assignment khi task đã done/QC xong.
+ */
+export async function closeQcChecklistAssignment(taskId: string) {
+  const now = new Date();
+  await prisma.taskDailyAssignment.updateMany({
+    where: {
+      taskId,
+      type: DailyAssignmentType.qc_checklist,
+      status: DailyAssignmentStatus.pending,
+    },
+    data: {
+      status: DailyAssignmentStatus.done,
+      doneAt: now,
+    },
+  });
+}

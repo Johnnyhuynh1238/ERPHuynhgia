@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { type TaskPhotoItem, TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
 
 type AssignmentStatus = "pending" | "done" | "not_applicable";
-type AssignmentType = "template_item" | "progress_update" | "tptc_assignment";
+type AssignmentType = "template_item" | "progress_update" | "tptc_assignment" | "qc_checklist";
 type AssignmentPriority = "normal" | "important" | "urgent" | "critical";
 
 type FlatAssignment = {
@@ -546,8 +546,32 @@ export function ReportsHubClient() {
   function renderAssignmentItem(item: FlatAssignment) {
     const isDone = item.status === "done";
     const isNa = item.status === "not_applicable";
+    const isQc = item.type === "qc_checklist";
     const displayTitle = item.type === "progress_update" && item.taskName ? `Cập nhật tiến độ · ${item.taskName}` : item.title;
     const metaLine = `${item.taskCode ? `${item.taskCode} · ` : ""}${item.projectName || "Không rõ dự án"}`;
+
+    if (isQc && item.taskId) {
+      return (
+        <a
+          key={item.id}
+          href={`/tasks/${item.taskId}?tab=qc`}
+          className={`block w-full rounded-2xl border p-4 text-left transition active:scale-[0.97] ${
+            isDone
+              ? "border-emerald-500/30 bg-emerald-500/10 opacity-80"
+              : "border-red-500/40 bg-red-500/10 hover:bg-red-500/20"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-red-300">QC CHECKLIST · Task 100%</div>
+              <div className="mt-1 text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
+              <div className="mt-1 text-xs leading-5 text-[#8892b0]">{metaLine}</div>
+            </div>
+            <div className="shrink-0 text-xs font-semibold text-red-300">Mở →</div>
+          </div>
+        </a>
+      );
+    }
 
     function handleCardClick() {
       if (item.status !== "pending") {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { syncPhaseStatusByTaskId } from "@/lib/project-phase";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { closeQcChecklistAssignment } from "@/lib/reports-v3";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -183,6 +184,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
     return updated;
   });
+
+  await closeQcChecklistAssignment(params.id);
 
   return NextResponse.json({
     message: "Đã chuyển task sang Hoàn thành",

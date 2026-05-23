@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getTaskWithAccess } from "@/lib/task-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { closeQcChecklistAssignment } from "@/lib/reports-v3";
 
 const submitSchema = z.object({
   overallComment: z.string().trim().min(1, "Nhận xét tổng thể là bắt buộc"),
@@ -98,6 +99,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       suggestion: parsed.data.suggestion?.trim() || null,
     },
   });
+
+  await closeQcChecklistAssignment(params.id);
 
   return NextResponse.json({ task: updatedTask, message: "Đã gửi báo cáo QC lên TPTC" });
 }

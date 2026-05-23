@@ -345,6 +345,7 @@ enum DailyAssignmentType {
   template_item
   progress_update
   tptc_assignment
+  qc_checklist
 }
 
 enum DailyAssignmentStatus {

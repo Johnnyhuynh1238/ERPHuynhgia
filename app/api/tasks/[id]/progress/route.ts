@@ -6,6 +6,8 @@ import { fireAndForget, notifyKsTaskUpdate } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { handleTaskReach100 } from "@/lib/reports-v3";
+import { syncPhaseStatusByTaskId } from "@/lib/project-phase";
 
 const progressPhotoSchema = z.object({
   id: z.string().optional(),
@@ -267,6 +269,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return { updatedTask, history };
   });
 
+  let autoCompleted = false;
+  let qcAssignmentCreated = false;
+  if (parsed.data.progressPercent === 100) {
+    const outcome = await handleTaskReach100({ taskId: params.id, ksUserId: user.id, now });
+    autoCompleted = outcome.autoCompleted;
+    qcAssignmentCreated = outcome.qcAssignmentCreated;
+    if (autoCompleted) {
+      await syncPhaseStatusByTaskId(prisma, params.id, now);
+    }
+  }
+
   fireAndForget(
     notifyKsTaskUpdate({
       projectId: task.projectId,
@@ -281,12 +294,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
   );
 
   return NextResponse.json({
-    message: "Đã cập nhật tiến độ",
+    message: autoCompleted
+      ? "Đã cập nhật tiến độ. Task không có QC checklist → tự động hoàn tất."
+      : qcAssignmentCreated
+      ? "Đã cập nhật tiến độ. Vui lòng làm QC checklist trong Nhiệm vụ hôm nay."
+      : "Đã cập nhật tiến độ",
     progress: {
       percent: result.updatedTask.progressPercent,
       updatedAt: result.updatedTask.progressUpdatedAt,
-      status: result.updatedTask.status,
+      status: autoCompleted ? "done" : result.updatedTask.status,
     },
+    autoCompleted,
+    qcAssignmentCreated,
     history: result.history,
   });
 }
