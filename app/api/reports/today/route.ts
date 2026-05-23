@@ -134,6 +134,15 @@ export async function GET(request: Request) {
       };
     }
 
+    if (row.type === DailyAssignmentType.qc_checklist) {
+      return {
+        ...base,
+        taskId: row.task?.id || null,
+        taskCode: row.task?.code || null,
+        taskName: row.task?.name || null,
+      };
+    }
+
     return {
       ...base,
       tptcAssignmentId: row.tptcAssignment?.id || null,
