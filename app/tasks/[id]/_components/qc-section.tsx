@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,7 +104,10 @@ export function QcSection({
   canUpdateQc: boolean;
   canManageItem?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<QcSubTab>("missions");
+  const searchParams = useSearchParams();
+  const subParam = (searchParams.get("sub") || searchParams.get("subTab") || "").toLowerCase();
+  const initialSubTab: QcSubTab = subParam === "checklist" ? "checklist" : "missions";
+  const [activeTab, setActiveTab] = useState<QcSubTab>(initialSubTab);
   const [loading, setLoading] = useState(false);
   const [savingByItem, setSavingByItem] = useState<Record<string, boolean>>({});
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);

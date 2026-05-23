@@ -554,7 +554,7 @@ export function ReportsHubClient() {
       return (
         <a
           key={item.id}
-          href={`/tasks/${item.taskId}?tab=qc`}
+          href={`/tasks/${item.taskId}?tab=qc&sub=checklist`}
           className={`block w-full rounded-2xl border p-4 text-left transition active:scale-[0.97] ${
             isDone
               ? "border-emerald-500/30 bg-emerald-500/10 opacity-80"
