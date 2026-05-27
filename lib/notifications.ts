@@ -359,6 +359,50 @@ export async function notifyKsTaskUpdate(input: {
 }
 
 /**
+ * Event D — KS hoàn tất checklist QC → task chờ TPTC duyệt nội bộ.
+ * Recipients: TPTC. Tag push riêng để không bị dedupe của ks_task_update nuốt
+ * (KS thường vừa upload ảnh/đổi tiến độ ngay trước khi mark-done).
+ */
+export async function notifyKsTaskAwaitingApproval(input: {
+  projectId: string;
+  taskId: string;
+  taskCode: string | null;
+  taskName: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const tptcIds = await getTptcUserIds();
+  if (!tptcIds.length) return;
+
+  const codePrefix = input.taskCode ? `${input.taskCode} ` : "";
+  const title = `${input.actorName} đã hoàn tất QC nhiệm vụ "${codePrefix}${input.taskName}"`;
+  const body = "Chờ TPTC duyệt nội bộ";
+  const link = `/tasks/${input.taskId}`;
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "task",
+    refId: input.taskId,
+  };
+
+  await createStaffNotifications(tptcIds, base, "task_awaiting_internal_approval", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: tptcIds,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `task-approval-${input.taskId}`,
+  });
+}
+
+/**
  * Event C — Chủ nhà comment trên portal.
  * Recipients: KS phụ trách + TPTC.
  */

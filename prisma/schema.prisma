@@ -2096,6 +2096,7 @@ enum StaffNotificationKind {
   customer_comment
   ks_morning_checkin
   ks_task_update
+  task_awaiting_internal_approval
 }
 
 enum CustomerNotificationKind {

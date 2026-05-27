@@ -6,6 +6,7 @@ import { syncPhaseStatusByTaskId } from "@/lib/project-phase";
 import { canUpdateQc, getTaskWithAccess } from "@/lib/task-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
 import { closeQcChecklistAssignment } from "@/lib/reports-v3";
+import { fireAndForget, notifyKsTaskAwaitingApproval } from "@/lib/notifications";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -186,6 +187,17 @@ export async function POST(_request: Request, { params }: { params: { id: string
   });
 
   await closeQcChecklistAssignment(params.id);
+
+  fireAndForget(
+    notifyKsTaskAwaitingApproval({
+      projectId: task.projectId,
+      taskId: params.id,
+      taskCode: task.code ?? null,
+      taskName: taskDetail.name,
+      actorUserId: user.id,
+      actorName: user.name ?? "KS",
+    }),
+  );
 
   return NextResponse.json({
     message: "Đã chuyển task sang Hoàn thành",
