@@ -41,6 +41,20 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Một số API file/receipt dùng chung cho staff & customer; customer gọi kèm
+  // ?token=<portalToken>. Route handler tự xác thực token qua requireCustomerPortalApiAccess.
+  // Nếu để NextAuth chặn, chủ nhà bấm vào hồ sơ/biên lai/bản vẽ sẽ bị redirect về /login.
+  if (nextUrl.searchParams.get("token")) {
+    const portalApiWhitelist = [
+      "/api/projects/",
+      "/api/payment-schedules/",
+      "/api/drawings/",
+    ];
+    if (portalApiWhitelist.some((prefix) => pathname.startsWith(prefix))) {
+      return applySecurityHeaders(NextResponse.next(), true);
+    }
+  }
+
   // Cron endpoints tự auth bằng header x-cron-key. Không đi qua NextAuth.
   if (pathname.startsWith("/api/cron/")) {
     return applySecurityHeaders(NextResponse.next(), false);
