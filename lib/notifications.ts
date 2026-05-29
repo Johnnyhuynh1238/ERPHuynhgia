@@ -403,6 +403,90 @@ export async function notifyKsTaskAwaitingApproval(input: {
 }
 
 /**
+ * Event E — TPTC đánh dấu công trường nghỉ hôm nay.
+ * Recipients: Chủ nhà (nếu portal bật) + KS chính + tất cả KS có task active trên project.
+ * Không gán link (bell hiển thị info, click không jump).
+ */
+export async function notifySiteRestDay(input: {
+  projectId: string;
+  restDate: Date;
+  reason: string;
+  note?: string | null;
+  actorUserId: string;
+  actorName: string;
+  siteRestDayId: string;
+}) {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      mainEngineerId: true,
+      customerPortalEnabled: true,
+      customerPortalToken: true,
+    },
+  });
+  if (!project) return;
+
+  const reasonLabel: Record<string, string> = {
+    SUNDAY: "Chủ Nhật",
+    HOLIDAY: "Lễ/Tết",
+    STORM: "Mưa bão",
+    OTHER: "Khác",
+  };
+  const reasonText = reasonLabel[input.reason] ?? input.reason;
+  const dateText = `${String(input.restDate.getUTCDate()).padStart(2, "0")}/${String(input.restDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const title = `🏖️ Công trường nghỉ ngày ${dateText} — ${project.name}`;
+  const body = input.note ? `${reasonText} · ${input.note}` : reasonText;
+
+  const ksTasks = await prisma.task.findMany({
+    where: {
+      projectId: input.projectId,
+      isActive: true,
+      assignedEngineerId: { not: null },
+    },
+    select: { assignedEngineerId: true },
+  });
+  const ksIds = Array.from(
+    new Set(
+      [project.mainEngineerId, ...ksTasks.map((t) => t.assignedEngineerId).filter(Boolean) as string[]],
+    ),
+  );
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "site_rest_day",
+    refId: input.siteRestDayId,
+  };
+
+  await createStaffNotifications(ksIds, base, "project_site_rest", title, body, "");
+
+  await pushStaffNotification({
+    recipientIds: ksIds,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link: "",
+    tag: `site-rest-${input.projectId}-${input.siteRestDayId}`,
+  });
+
+  if (project.customerPortalEnabled) {
+    await createCustomerNotification(base, "project_site_rest", title, body, "");
+    await pushCustomerNotification({
+      projectId: input.projectId,
+      customerPortalToken: project.customerPortalToken,
+      title,
+      body,
+      link: "",
+      tag: `site-rest-${input.projectId}-${input.siteRestDayId}`,
+    });
+  }
+}
+
+/**
  * Event C — Chủ nhà comment trên portal.
  * Recipients: KS phụ trách + TPTC.
  */

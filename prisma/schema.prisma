@@ -2097,11 +2097,13 @@ enum StaffNotificationKind {
   ks_morning_checkin
   ks_task_update
   task_awaiting_internal_approval
+  project_site_rest
 }
 
 enum CustomerNotificationKind {
   ks_morning_checkin
   ks_task_update
+  project_site_rest
 }
 
 model StaffNotification {

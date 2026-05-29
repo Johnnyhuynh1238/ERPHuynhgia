@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { parseYmdToUtcDate, toUtcStartOfDay } from "@/lib/date";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { fmtDate, logProjectActivity } from "@/lib/project-activity-log";
+import { fireAndForget, notifySiteRestDay } from "@/lib/notifications";
 
 const createSchema = z.object({
   restDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -77,6 +78,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     summary: `Đánh dấu nghỉ ngày ${fmtDate(restDate)} — ${parsed.data.reason}${parsed.data.note ? ` (${parsed.data.note})` : ""}`,
     metadata: { restDate: parsed.data.restDate, reason: parsed.data.reason, note: parsed.data.note || null },
   });
+
+  fireAndForget(
+    notifySiteRestDay({
+      projectId: params.id,
+      restDate,
+      reason: parsed.data.reason,
+      note: parsed.data.note,
+      actorUserId: user.id,
+      actorName: user.name ?? "TPTC",
+      siteRestDayId: row.id,
+    }),
+  );
 
   return NextResponse.json({ siteRestDay: row, message: "Đã đánh dấu công trường nghỉ" });
 }
