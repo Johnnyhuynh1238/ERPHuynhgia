@@ -51,6 +51,7 @@ export async function getKsAttendanceForMonth(args: {
   const users = await prisma.user.findMany({
     where: {
       role: UserRole.engineer,
+      isActive: true,
       ...(args.userId ? { id: args.userId } : {}),
     },
     select: { id: true, fullName: true, email: true, isActive: true },

@@ -20,7 +20,7 @@ export default async function AdminAttendancePage() {
   }
 
   const engineers = await prisma.user.findMany({
-    where: { role: UserRole.engineer },
+    where: { role: UserRole.engineer, isActive: true },
     select: { id: true, fullName: true, email: true, isActive: true },
     orderBy: { fullName: "asc" },
   });
