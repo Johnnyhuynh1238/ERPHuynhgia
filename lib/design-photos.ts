@@ -3,8 +3,12 @@ import { prisma } from "@/lib/prisma";
 
 export type DesignViewer = { id: string; role: UserRole | string };
 
+function isGlobalViewer(role: UserRole | string) {
+  return role === UserRole.admin || role === UserRole.construction_manager;
+}
+
 export function buildDesignGroupVisibilityWhere(viewer: DesignViewer) {
-  if (viewer.role === UserRole.admin) return {};
+  if (isGlobalViewer(viewer.role)) return {};
   return {
     OR: [
       { createdBy: viewer.id },
@@ -17,14 +21,14 @@ export function canViewDesignGroupSync(
   viewer: DesignViewer,
   group: { createdBy?: string | null; accessList?: Array<{ userId: string }> },
 ) {
-  if (viewer.role === UserRole.admin) return true;
+  if (isGlobalViewer(viewer.role)) return true;
   if (group.createdBy === viewer.id) return true;
   if (group.accessList?.some((a) => a.userId === viewer.id)) return true;
   return false;
 }
 
 export async function canViewDesignGroup(viewer: DesignViewer, groupId: string) {
-  if (viewer.role === UserRole.admin) return true;
+  if (isGlobalViewer(viewer.role)) return true;
   const group = await prisma.designPhotoGroup.findUnique({
     where: { id: groupId },
     select: {
