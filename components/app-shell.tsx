@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { KsInstallPushModal } from "@/components/ks-install-push-modal";
+import { AttendanceReminder } from "@/components/attendance-reminder";
 
 type AppUser = {
   id: string;
@@ -151,6 +152,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {user.role === "engineer" || user.role === "construction_manager" ? (
         <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       ) : null}
+      {user.role === "engineer" && pathname !== "/cham-cong" ? <AttendanceReminder /> : null}
 
       <aside className="hidden md:fixed md:left-0 md:top-0 md:z-50 md:flex md:h-screen md:w-60 md:flex-col md:border-r md:border-[#252840] md:bg-[#13151f]">
         <div className="border-b border-[#252840] p-5">
