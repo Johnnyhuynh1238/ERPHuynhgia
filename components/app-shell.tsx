@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   BarChart3,
+  Clock,
   FolderKanban,
   Home,
   ListChecks,
@@ -55,6 +56,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Dashboard", href: "/" },
     { label: "Dự án của tôi", href: "/projects" },
     { label: "Nhiệm Vụ", href: "/reports" },
+    { label: "Chấm công", href: "/cham-cong" },
     { label: "KPI/Lương", href: "/me/kpi" },
   ],
   foreman: [
@@ -112,6 +114,7 @@ function isActive(pathname: string, href: string) {
 
 function navIcon(href: string, label: string) {
   if (href === "/") return Home;
+  if (href.includes("cham-cong")) return Clock;
   if (href.includes("projects")) return FolderKanban;
   if (href.includes("reports")) return BarChart3;
   if (href.includes("tasks")) return ListChecks;
