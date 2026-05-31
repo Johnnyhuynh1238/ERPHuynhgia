@@ -257,6 +257,14 @@ export function validateEveningTaskPauseInput(input: {
   return null;
 }
 
+// Chủ Nhật theo lịch VN được coi là ngày nghỉ mặc định: không yêu cầu check-in,
+// không push reminder, không tính vào "required days" cho KPI báo cáo.
+// `reportDate` luôn được lưu là UTC midnight tương ứng ngày VN local
+// (xem getTodayDateVn) nên getUTCDay() === 0 ánh xạ đúng Chủ Nhật VN.
+export function isDefaultRestDay(date: Date) {
+  return date.getUTCDay() === 0;
+}
+
 export function getActivityDates(project: { goLiveDate: Date | null }, from: Date, to: Date, restDates: Date[]) {
   if (!project.goLiveDate) return [] as Date[];
 
@@ -268,7 +276,7 @@ export function getActivityDates(project: { goLiveDate: Date | null }, from: Dat
   const days: Date[] = [];
   let cursor = start;
   while (cursor <= end) {
-    if (!restSet.has(formatUtcYmd(cursor))) {
+    if (!isDefaultRestDay(cursor) && !restSet.has(formatUtcYmd(cursor))) {
       days.push(cursor);
     }
     cursor = addUtcDays(cursor, 1);

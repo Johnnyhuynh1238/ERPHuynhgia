@@ -9,6 +9,7 @@ import {
   sortFlatAssignments,
   upsertPendingTptcAssignmentsForDay,
 } from "@/lib/reports-v3";
+import { isDefaultRestDay } from "@/lib/reporting";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -207,6 +208,14 @@ export async function GET(request: Request) {
     }, {}),
   );
 
+  const defaultRest = isDefaultRestDay(reportDate)
+    ? {
+        isSunday: true,
+        message:
+          "Chủ Nhật — công trường nghỉ mặc định. Bạn không bắt buộc check-in/báo cáo và KPI không tính ngày này. Nếu có làm việc phát sinh, hãy check-in và báo cáo như bình thường.",
+      }
+    : null;
+
   return NextResponse.json({
     date: reportDate,
     submissionDeadline: getSubmissionDeadline(reportDate),
@@ -215,6 +224,7 @@ export async function GET(request: Request) {
     submission,
     mode,
     stats,
+    defaultRest,
     assignments: mode === "flat" ? sorted : assignments,
     taskGroups,
     projectGroups,

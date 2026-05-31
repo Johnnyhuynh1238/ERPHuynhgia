@@ -50,6 +50,7 @@ type TodayResponse = {
   mode: "flat" | "task" | "project";
   submission: { id: string; submittedAt: string; isLate: boolean } | null;
   stats: { total: number; done: number; notApplicable: number; pending: number };
+  defaultRest: { isSunday: boolean; message: string } | null;
   assignments: FlatAssignment[];
   taskGroups: TaskGroup[];
   projectGroups: ProjectGroup[];
@@ -616,6 +617,12 @@ export function ReportsHubClient() {
   if (needCheckin) {
     return (
       <div className="space-y-4">
+        {today?.defaultRest?.isSunday ? (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-[13px] text-amber-200">
+            <div className="text-sm font-semibold text-amber-200">🏖️ Chủ Nhật — công trường nghỉ mặc định</div>
+            <div className="mt-1 text-xs text-amber-100/80">{today.defaultRest.message}</div>
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
           <div className="text-lg font-bold text-[#f0f2ff]">☀️ Check-in sáng</div>
           <div className="mt-1 text-xs text-[#8892b0]">Ngày {checkin?.reportDate ? new Date(checkin.reportDate).toLocaleDateString("vi-VN") : "--/--/----"}</div>
@@ -843,6 +850,12 @@ export function ReportsHubClient() {
 
   return (
     <div className="space-y-4">
+      {today.defaultRest?.isSunday ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-[13px] text-amber-200">
+          <div className="text-sm font-semibold text-amber-200">🏖️ Chủ Nhật — công trường nghỉ mặc định</div>
+          <div className="mt-1 text-xs text-amber-100/80">{today.defaultRest.message}</div>
+        </div>
+      ) : null}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="text-xl font-bold text-[#f0f2ff]">📋 Nhiệm vụ hôm nay</div>
         <div className="mt-1 text-xs text-[#8892b0]">{new Date(today.date).toLocaleDateString("vi-VN")}</div>

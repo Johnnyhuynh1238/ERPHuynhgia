@@ -3,6 +3,7 @@ import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 import { getTodayDateVn } from "@/lib/task-centric";
+import { isDefaultRestDay } from "@/lib/reporting";
 
 type Stage = "r30" | "r15" | "overdue";
 
@@ -62,8 +63,11 @@ export async function POST(request: Request) {
     eod: { fired: 0, dedup: 0 },
   };
 
+  const isSundayDefaultRest = isDefaultRestDay(today);
+
   // 1) Morning check-in deadline: 08:00 VN = 01:00 UTC of reportDate.
-  {
+  // Chủ Nhật mặc định công trường nghỉ → bỏ qua push check-in sáng.
+  if (!isSundayDefaultRest) {
     const deadline = new Date(today);
     deadline.setUTCHours(1, 0, 0, 0);
     const minutes = (deadline.getTime() - now.getTime()) / 60000;
@@ -147,7 +151,8 @@ export async function POST(request: Request) {
   }
 
   // 3) Task daily EOD: 17:00 VN = 10:00 UTC of reportDate. Recipients: KS still have pending TaskDailyAssignment.
-  {
+  // Chủ Nhật mặc định công trường nghỉ → bỏ qua push nhắc EOD nhiệm vụ ngày.
+  if (!isSundayDefaultRest) {
     const deadline = new Date(today);
     deadline.setUTCHours(10, 0, 0, 0);
     const minutes = (deadline.getTime() - now.getTime()) / 60000;
@@ -184,5 +189,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, now: now.toISOString(), results });
+  return NextResponse.json({ ok: true, now: now.toISOString(), isSundayDefaultRest, results });
 }

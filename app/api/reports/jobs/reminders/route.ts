@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { formatUtcYmd, nowUtcDateOnly } from "@/lib/date";
-import { createTaskLog, getReminderTargetProjects } from "@/lib/reporting";
+import { createTaskLog, getReminderTargetProjects, isDefaultRestDay } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
 
 function minuteOfDayInVietnam(date: Date) {
@@ -49,6 +49,19 @@ export async function POST(request: Request) {
   } as const;
 
   const executedAt = `${String(Math.floor(currentMinuteOfDay / 60)).padStart(2, "0")}:${String(currentMinuteOfDay % 60).padStart(2, "0")}`;
+
+  if (isDefaultRestDay(today)) {
+    return NextResponse.json({
+      mode,
+      date: formatUtcYmd(today),
+      reminders: 0,
+      skippedRest: 0,
+      skippedSubmitted: 0,
+      scheduledAt: expectedTimes[mode],
+      executedAt,
+      skippedSundayDefaultRest: true,
+    });
+  }
 
   const projects = await getReminderTargetProjects();
   if (!projects.length) {
