@@ -41,9 +41,6 @@ type CalendarResponse = { month: string; days: CalendarDay[] };
 const SELFIE_GUIDE =
   "Vui lòng chụp selfie có khuôn mặt anh và bối cảnh công trình phía sau. Ảnh sẽ được lưu để xác minh KS có mặt tại công trình. Camera sẽ tự bật ống kính trước.";
 
-const GEO_GUIDE =
-  "Định vị không được vượt quá 100m từ vị trí công trình, thực hiện đúng để được tính lương đầy đủ.";
-
 function formatClock(iso: string | null | undefined) {
   if (!iso) return "--:--";
   return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -208,13 +205,6 @@ export function ChamCongClient() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm font-semibold text-amber-100">
-        <div className="flex items-start gap-2">
-          <span className="text-base leading-5">📍</span>
-          <span>{GEO_GUIDE}</span>
-        </div>
-      </div>
-
       {today?.hasOpenSession ? (
         <button
           type="button"
@@ -357,9 +347,6 @@ export function ChamCongClient() {
             </div>
             <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-[12px] text-amber-100/90">
               {SELFIE_GUIDE}
-            </div>
-            <div className="mt-2 rounded-xl border border-amber-500/60 bg-amber-500/15 p-3 text-[12px] font-semibold text-amber-100">
-              📍 {GEO_GUIDE}
             </div>
 
             <label className="mt-3 flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#f97316]/40 bg-[#13151f] px-3 py-6 text-center text-sm font-semibold text-[#fb923c] transition active:scale-[0.98]">
