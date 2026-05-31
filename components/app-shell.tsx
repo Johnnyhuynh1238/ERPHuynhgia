@@ -8,6 +8,7 @@ import {
   BarChart3,
   Clock,
   FolderKanban,
+  GraduationCap,
   Home,
   ListChecks,
   MoreHorizontal,
@@ -60,6 +61,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Nhiệm Vụ", href: "/reports" },
     { label: "Chấm công", href: "/cham-cong" },
     { label: "KPI/Lương", href: "/me/kpi" },
+    { label: "Đào tạo", href: "/dao-tao" },
   ],
   foreman: [
     { label: "Dashboard", href: "/" },
@@ -119,6 +121,7 @@ function isActive(pathname: string, href: string) {
 function navIcon(href: string, label: string) {
   if (href === "/") return Home;
   if (href.includes("cham-cong") || href.includes("attendance")) return Clock;
+  if (href.includes("dao-tao")) return GraduationCap;
   if (href.includes("projects")) return FolderKanban;
   if (href.includes("reports")) return BarChart3;
   if (href.includes("tasks")) return ListChecks;
