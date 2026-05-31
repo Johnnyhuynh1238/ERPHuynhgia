@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TodaySession = {
@@ -185,6 +186,15 @@ export function ChamCongClient() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <Link
+          href="/"
+          className="inline-flex items-center rounded-full border border-[#3a446d] bg-[#0f1424] px-3 py-1.5 text-xs font-semibold text-[#d9def3]"
+        >
+          ← Quay lại
+        </Link>
+      </div>
+
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="text-xl font-bold text-[#f0f2ff]">⏱️ Chấm công hôm nay</div>
         <div className="mt-1 text-xs text-[#8892b0]">
