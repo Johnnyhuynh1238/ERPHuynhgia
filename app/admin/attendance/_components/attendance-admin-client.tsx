@@ -16,6 +16,7 @@ type SummaryRow = {
   userId: string;
   fullName: string;
   email: string;
+  role: string;
   daysWorked: number;
   openDays: number;
   totalMinutes: number;
@@ -27,7 +28,14 @@ type Engineer = {
   fullName: string;
   email: string;
   isActive: boolean;
+  role: string;
 };
+
+function roleLabel(role: string) {
+  if (role === "engineer") return "KS";
+  if (role === "accountant") return "Kế toán";
+  return role;
+}
 
 function minutesToHM(mins: number) {
   if (!mins || mins <= 0) return "0";
@@ -99,9 +107,9 @@ export function AttendanceAdminClient({
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-white">Chấm công KS</h1>
+        <h1 className="text-2xl font-semibold text-white">Chấm công nhân viên</h1>
         <p className="text-sm text-white/60">
-          Thống kê chấm công của kỹ sư theo tháng. Có thể lọc theo từng người và xuất Excel.
+          Thống kê chấm công của KS và kế toán theo tháng. Có thể lọc theo từng người và xuất Excel.
         </p>
       </header>
 
@@ -116,7 +124,7 @@ export function AttendanceAdminClient({
           />
         </label>
         <label className="space-y-1 text-sm">
-          <span className="block text-white/70">Kỹ sư</span>
+          <span className="block text-white/70">Nhân viên</span>
           <select
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
@@ -125,7 +133,7 @@ export function AttendanceAdminClient({
             <option value="">Tất cả</option>
             {engineers.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.fullName} {u.isActive ? "" : "(ngưng)"}
+                [{roleLabel(u.role)}] {u.fullName} {u.isActive ? "" : "(ngưng)"}
               </option>
             ))}
           </select>
@@ -149,7 +157,7 @@ export function AttendanceAdminClient({
 
       <div className="rounded-xl border border-white/10 bg-white/5">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/70">
-          <span>{summary.length} kỹ sư</span>
+          <span>{summary.length} nhân viên</span>
           <span>Tổng giờ tháng: <strong className="text-white">{minutesToHM(totalAll)}</strong></span>
         </div>
         <div className="overflow-x-auto">
@@ -157,6 +165,7 @@ export function AttendanceAdminClient({
             <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/60">
               <tr>
                 <th className="px-4 py-3"></th>
+                <th className="px-4 py-3">Vai trò</th>
                 <th className="px-4 py-3">Họ tên</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3 text-right">Ngày có chấm</th>
@@ -167,7 +176,7 @@ export function AttendanceAdminClient({
             <tbody className="divide-y divide-white/5">
               {summary.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-white/50">
+                  <td colSpan={7} className="px-4 py-8 text-center text-white/50">
                     Chưa có dữ liệu chấm công cho tháng này.
                   </td>
                 </tr>
@@ -186,6 +195,11 @@ export function AttendanceAdminClient({
                           {isOpen ? "−" : "+"}
                         </button>
                       </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
+                          {roleLabel(row.role)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-medium">{row.fullName}</td>
                       <td className="px-4 py-3 text-white/70">{row.email}</td>
                       <td className="px-4 py-3 text-right">{row.daysWorked}</td>
@@ -202,7 +216,7 @@ export function AttendanceAdminClient({
                     </tr>
                     {isOpen ? (
                       <tr className="bg-white/5">
-                        <td colSpan={6} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3">
                           {row.days.length === 0 ? (
                             <div className="text-sm text-white/50">Không có ngày chấm công.</div>
                           ) : (

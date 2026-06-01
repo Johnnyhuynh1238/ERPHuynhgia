@@ -5,8 +5,8 @@ import { parseLatLng, uploadAttendanceSelfie } from "@/lib/attendance";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user?.id || user.role !== "engineer") {
-    return NextResponse.json({ message: "Chỉ kỹ sư được chấm công" }, { status: 403 });
+  if (!user?.id || (user.role !== "engineer" && user.role !== "accountant")) {
+    return NextResponse.json({ message: "Bạn không có quyền chấm công" }, { status: 403 });
   }
 
   const formData = await request.formData().catch(() => null);

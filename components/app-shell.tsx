@@ -47,7 +47,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
     { label: "Lương KS", href: "/admin/engineers/salary" },
-    { label: "Chấm công KS", href: "/admin/attendance" },
+    { label: "Chấm công NV", href: "/admin/attendance" },
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
     { label: "User", href: "/admin/users" },
@@ -70,13 +70,14 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   ],
   accountant: [
     { label: "Dashboard", href: "/" },
+    { label: "Chấm công", href: "/cham-cong" },
     { label: "Dự án", href: "/projects" },
     { label: "Thầu phụ", href: "/subcontractors" },
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
     { label: "Chi thầu phụ", href: "/sub-payments" },
     { label: "Thanh toán", href: "/payments" },
     { label: "KPI tổng", href: "/admin/kpi" },
-    { label: "Chấm công KS", href: "/admin/attendance" },
+    { label: "Chấm công NV", href: "/admin/attendance" },
   ],
   construction_manager: [
     { label: "Dashboard", href: "/" },
@@ -88,7 +89,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
     { label: "KPI tổng", href: "/admin/kpi" },
-    { label: "Chấm công KS", href: "/admin/attendance" },
+    { label: "Chấm công NV", href: "/admin/attendance" },
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
   ],
@@ -155,7 +156,9 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {user.role === "engineer" || user.role === "construction_manager" ? (
         <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       ) : null}
-      {user.role === "engineer" && pathname !== "/cham-cong" ? <AttendanceReminder /> : null}
+      {(user.role === "engineer" || user.role === "accountant") && pathname !== "/cham-cong" ? (
+        <AttendanceReminder />
+      ) : null}
 
       <aside className="hidden md:fixed md:left-0 md:top-0 md:z-50 md:flex md:h-screen md:w-60 md:flex-col md:border-r md:border-[#252840] md:bg-[#13151f]">
         <div className="border-b border-[#252840] p-5">

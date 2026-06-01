@@ -31,6 +31,7 @@ export type KsAttendanceSummary = {
   userId: string;
   fullName: string;
   email: string;
+  role: string;
   daysWorked: number;
   openDays: number;
   totalMinutes: number;
@@ -50,12 +51,12 @@ export async function getKsAttendanceForMonth(args: {
 
   const users = await prisma.user.findMany({
     where: {
-      role: UserRole.engineer,
+      role: { in: [UserRole.engineer, UserRole.accountant] },
       isActive: true,
       ...(args.userId ? { id: args.userId } : {}),
     },
-    select: { id: true, fullName: true, email: true, isActive: true },
-    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true, email: true, isActive: true, role: true },
+    orderBy: [{ role: "asc" }, { fullName: "asc" }],
   });
 
   if (users.length === 0) return [];
@@ -110,6 +111,7 @@ export async function getKsAttendanceForMonth(args: {
       userId: u.id,
       fullName: u.fullName,
       email: u.email,
+      role: u.role,
       daysWorked: days.length,
       openDays,
       totalMinutes,

@@ -45,10 +45,14 @@ export async function GET(request: Request) {
 
   const workbook = new ExcelJS.Workbook();
 
+  const roleLabelOf = (role: string) =>
+    role === "engineer" ? "KS" : role === "accountant" ? "Kế toán" : role;
+
   // Sheet 1: Tổng hợp
   const overview = workbook.addWorksheet("Tổng hợp");
   overview.columns = [
-    { header: "Họ tên KS", key: "fullName", width: 24 },
+    { header: "Vai trò", key: "role", width: 10 },
+    { header: "Họ tên", key: "fullName", width: 24 },
     { header: "Email", key: "email", width: 28 },
     { header: "Số ngày có chấm", key: "daysWorked", width: 18 },
     { header: "Tổng giờ", key: "totalHM", width: 14 },
@@ -57,6 +61,7 @@ export async function GET(request: Request) {
   ];
   summary.forEach((row) => {
     overview.addRow({
+      role: roleLabelOf(row.role),
       fullName: row.fullName,
       email: row.email,
       daysWorked: row.daysWorked,
@@ -70,7 +75,8 @@ export async function GET(request: Request) {
   // Sheet 2: Chi tiết theo ngày
   const detail = workbook.addWorksheet("Chi tiết ngày");
   detail.columns = [
-    { header: "Họ tên KS", key: "fullName", width: 24 },
+    { header: "Vai trò", key: "role", width: 10 },
+    { header: "Họ tên", key: "fullName", width: 24 },
     { header: "Ngày", key: "date", width: 14 },
     { header: "Số phiên", key: "sessions", width: 10 },
     { header: "Tổng giờ", key: "totalHM", width: 12 },
@@ -82,6 +88,7 @@ export async function GET(request: Request) {
   summary.forEach((row) => {
     row.days.forEach((day) => {
       detail.addRow({
+        role: roleLabelOf(row.role),
         fullName: row.fullName,
         date: day.date,
         sessions: day.sessions,

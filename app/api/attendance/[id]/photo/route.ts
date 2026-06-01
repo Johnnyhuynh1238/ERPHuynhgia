@@ -18,8 +18,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (!row) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
 
   const isOwner = row.userId === user.id;
-  const isAdminOrTptc = user.role === "admin" || user.role === "construction_manager";
-  if (!isOwner && !isAdminOrTptc) {
+  const isAdminViewer =
+    user.role === "admin" || user.role === "construction_manager" || user.role === "accountant";
+  if (!isOwner && !isAdminViewer) {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 

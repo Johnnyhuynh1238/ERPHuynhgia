@@ -96,10 +96,10 @@ export function AttendanceReminder() {
   if (!reminder) return null;
 
   const isIn = reminder.kind === "in";
-  const title = isIn ? "Anh chưa chấm công vào hôm nay" : "Anh đã ở công trình hơn 17h, nhớ chấm ra";
+  const title = isIn ? "Anh chưa chấm công vào hôm nay" : "Đã qua 17h, anh nhớ chấm ra";
   const body = isIn
-    ? "Vui lòng vào trang chấm công để xác nhận anh đang ở công trình. Việc này cần thiết để tính lương đầy đủ."
-    : "Khi rời công trình, anh nhớ vào trang chấm công và bấm 'Chấm ra' để chốt số giờ làm hôm nay.";
+    ? "Vui lòng vào trang chấm công để xác nhận anh đang làm việc. Việc này cần thiết để tính lương đầy đủ."
+    : "Khi kết thúc giờ làm, anh nhớ vào trang chấm công và bấm 'Chấm ra' để chốt số giờ làm hôm nay.";
   const cta = isIn ? "🏗️ Chấm vào ngay" : "🚪 Chấm ra ngay";
 
   return (

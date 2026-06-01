@@ -5,8 +5,8 @@ import { getWorkDateVn } from "@/lib/attendance";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user?.id || user.role !== "engineer") {
-    return NextResponse.json({ message: "Chỉ kỹ sư được xem trang này" }, { status: 403 });
+  if (!user?.id || (user.role !== "engineer" && user.role !== "accountant")) {
+    return NextResponse.json({ message: "Không có quyền xem" }, { status: 403 });
   }
 
   const workDate = getWorkDateVn();

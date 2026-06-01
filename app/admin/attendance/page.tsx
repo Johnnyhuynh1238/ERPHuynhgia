@@ -19,10 +19,13 @@ export default async function AdminAttendancePage() {
     redirect("/?denied=1");
   }
 
-  const engineers = await prisma.user.findMany({
-    where: { role: UserRole.engineer, isActive: true },
-    select: { id: true, fullName: true, email: true, isActive: true },
-    orderBy: { fullName: "asc" },
+  const staff = await prisma.user.findMany({
+    where: {
+      role: { in: [UserRole.engineer, UserRole.accountant] },
+      isActive: true,
+    },
+    select: { id: true, fullName: true, email: true, isActive: true, role: true },
+    orderBy: [{ role: "asc" }, { fullName: "asc" }],
   });
 
   const now = new Date();
@@ -32,11 +35,12 @@ export default async function AdminAttendancePage() {
     <ProtectedLayout>
       <AttendanceAdminClient
         initialMonth={month}
-        engineers={engineers.map((u) => ({
+        engineers={staff.map((u) => ({
           id: u.id,
           fullName: u.fullName,
           email: u.email,
           isActive: u.isActive,
+          role: u.role,
         }))}
       />
     </ProtectedLayout>
