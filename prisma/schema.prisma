@@ -446,6 +446,7 @@ model User {
   pushSendLogs                  PushSendLog[]
   projectActivityLogs           ProjectActivityLog[]      @relation("ProjectActivityActor")
   ksAttendances                 KsAttendance[]            @relation("KsAttendanceUser")
+  shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
 
   @@map("users")
 }
@@ -475,6 +476,39 @@ model KsAttendance {
   @@map("ks_attendance")
 }
 
+model Shift {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @unique
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  graceMinutes Int      @default(5) @map("grace_minutes")
+  isActive     Boolean  @default(true) @map("is_active")
+  note         String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  assignments UserShiftAssignment[] @relation("ShiftAssignmentShift")
+
+  @@map("shifts")
+}
+
+model UserShiftAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  shiftId    String   @map("shift_id") @db.Uuid
+  daysOfWeek Int[]    @map("days_of_week")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation("UserShiftAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  shift Shift @relation("ShiftAssignmentShift", fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shiftId])
+  @@index([userId])
+  @@map("user_shift_assignments")
+}
+
 model Project {
   id                     String        @id @default(uuid()) @db.Uuid
   code                   String        @unique
@@ -502,35 +536,35 @@ model Project {
   createdAt              DateTime      @default(now()) @map("created_at")
   updatedAt              DateTime      @updatedAt @map("updated_at")
 
-  projectManager          User                      @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  mainEngineer            User                      @relation("MainEngineer", fields: [mainEngineerId], references: [id])
-  tasks                   Task[]
-  phases                  ProjectPhase[]
-  paymentSchedules        PaymentSchedule[]
-  drawings                ProjectDrawing[]
-  customerExportJobs      CustomerExportJob[]
-  changeDrafts            ProjectChangeDraft[]
-  projectMembers          ProjectMember[]
-  memberAssignments       ProjectMemberAssignment[]
-  siteRestDays            SiteRestDay[]
-  morningCheckins         MorningCheckin[]
-  morningReports          MorningReport[]
-  eveningReports          EveningReport[]
-  kpiSnapshots            KpiSnapshot[]
-  customerComments        CustomerComment[]
-  customerAcknowledgments CustomerAcknowledgment[]
-  customerTaskRatings     CustomerTaskRating[]
-  customerKsRatings       CustomerKsRating[]
-  customerSessions        CustomerSession[]
-  customerLoginAttempts   CustomerLoginAttempt[]
-  subContracts            SubContract[]
-  tptcAssignments         TptcAssignment[]
-  documents               ProjectDocument[]
-  aiAnalysisCaches        ProjectAiAnalysisCache[]
-  designPhotoGroups       DesignPhotoGroup[]
-  staffNotifications      StaffNotification[]
-  customerNotifications   CustomerNotification[]
-  activityLogs            ProjectActivityLog[]
+  projectManager            User                       @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  mainEngineer              User                       @relation("MainEngineer", fields: [mainEngineerId], references: [id])
+  tasks                     Task[]
+  phases                    ProjectPhase[]
+  paymentSchedules          PaymentSchedule[]
+  drawings                  ProjectDrawing[]
+  customerExportJobs        CustomerExportJob[]
+  changeDrafts              ProjectChangeDraft[]
+  projectMembers            ProjectMember[]
+  memberAssignments         ProjectMemberAssignment[]
+  siteRestDays              SiteRestDay[]
+  morningCheckins           MorningCheckin[]
+  morningReports            MorningReport[]
+  eveningReports            EveningReport[]
+  kpiSnapshots              KpiSnapshot[]
+  customerComments          CustomerComment[]
+  customerAcknowledgments   CustomerAcknowledgment[]
+  customerTaskRatings       CustomerTaskRating[]
+  customerKsRatings         CustomerKsRating[]
+  customerSessions          CustomerSession[]
+  customerLoginAttempts     CustomerLoginAttempt[]
+  subContracts              SubContract[]
+  tptcAssignments           TptcAssignment[]
+  documents                 ProjectDocument[]
+  aiAnalysisCaches          ProjectAiAnalysisCache[]
+  designPhotoGroups         DesignPhotoGroup[]
+  staffNotifications        StaffNotification[]
+  customerNotifications     CustomerNotification[]
+  activityLogs              ProjectActivityLog[]
   customerPushSubscriptions CustomerPushSubscription[]
 
   @@index([status])

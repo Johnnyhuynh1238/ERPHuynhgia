@@ -48,6 +48,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
     { label: "Lương KS", href: "/admin/engineers/salary" },
     { label: "Chấm công NV", href: "/admin/attendance" },
+    { label: "Ca làm việc", href: "/admin/shifts" },
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
     { label: "User", href: "/admin/users" },
@@ -78,6 +79,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Thanh toán", href: "/payments" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Chấm công NV", href: "/admin/attendance" },
+    { label: "Ca làm việc", href: "/admin/shifts" },
   ],
   construction_manager: [
     { label: "Dashboard", href: "/" },
@@ -121,7 +123,7 @@ function isActive(pathname: string, href: string) {
 
 function navIcon(href: string, label: string) {
   if (href === "/") return Home;
-  if (href.includes("cham-cong") || href.includes("attendance")) return Clock;
+  if (href.includes("cham-cong") || href.includes("attendance") || href.includes("/shifts")) return Clock;
   if (href.includes("dao-tao")) return GraduationCap;
   if (href.includes("projects")) return FolderKanban;
   if (href.includes("reports")) return BarChart3;
