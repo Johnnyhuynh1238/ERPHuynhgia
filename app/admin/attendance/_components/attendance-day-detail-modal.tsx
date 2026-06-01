@@ -52,9 +52,65 @@ function formatVnDateLong(ymd: string) {
   return `${d}/${m}/${y}`;
 }
 
-function gmapsUrl(lat: number | null, lng: number | null) {
-  if (lat === null || lng === null) return null;
+function gmapsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+function gmapsEmbedUrl(lat: number, lng: number) {
+  return `https://maps.google.com/maps?q=${lat},${lng}&z=17&output=embed`;
+}
+
+function LocationBlock({
+  lat,
+  lng,
+  accuracy,
+  emptyText = "Không có vị trí GPS",
+}: {
+  lat: number | null;
+  lng: number | null;
+  accuracy: number | null;
+  emptyText?: string;
+}) {
+  if (lat === null || lng === null) {
+    return (
+      <div className="mt-3 rounded-md border border-dashed border-white/15 bg-white/[0.02] px-3 py-2 text-center text-[11px] text-white/40">
+        📍 {emptyText}
+      </div>
+    );
+  }
+  const href = gmapsUrl(lat, lng);
+  const embed = gmapsEmbedUrl(lat, lng);
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="overflow-hidden rounded-md border border-white/10">
+        <iframe
+          src={embed}
+          title="Bản đồ vị trí"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          className="block h-32 w-full"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/25"
+        >
+          📍 Mở Google Maps
+        </a>
+        {accuracy ? (
+          <span className="shrink-0 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/60">
+            ±{Math.round(accuracy)}m
+          </span>
+        ) : null}
+      </div>
+      <div className="text-center text-[10px] text-white/35">
+        {lat.toFixed(6)}, {lng.toFixed(6)}
+      </div>
+    </div>
+  );
 }
 
 export function AttendanceDayDetailModal({
@@ -145,8 +201,6 @@ export function AttendanceDayDetailModal({
           ) : (
             <div className="space-y-4">
               {data.sessions.map((s, idx) => {
-                const inMaps = gmapsUrl(s.checkInLat, s.checkInLng);
-                const outMaps = gmapsUrl(s.checkOutLat, s.checkOutLng);
                 const photoIn = s.hasCheckInPhoto ? `/api/attendance/${s.id}/photo?which=in` : null;
                 const photoOut = s.hasCheckOutPhoto ? `/api/attendance/${s.id}/photo?which=out` : null;
                 return (
@@ -213,23 +267,11 @@ export function AttendanceDayDetailModal({
                           </div>
                         )}
 
-                        {inMaps ? (
-                          <a
-                            href={inMaps}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"
-                          >
-                            📍 Mở Google Maps
-                            {s.checkInAccuracy ? (
-                              <span className="text-white/40">
-                                (±{Math.round(s.checkInAccuracy)}m)
-                              </span>
-                            ) : null}
-                          </a>
-                        ) : (
-                          <div className="mt-2 text-[11px] text-white/40">Không có vị trí</div>
-                        )}
+                        <LocationBlock
+                          lat={s.checkInLat}
+                          lng={s.checkInLng}
+                          accuracy={s.checkInAccuracy}
+                        />
                       </div>
 
                       {/* Check-out column */}
@@ -284,25 +326,12 @@ export function AttendanceDayDetailModal({
                           </div>
                         )}
 
-                        {outMaps ? (
-                          <a
-                            href={outMaps}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"
-                          >
-                            📍 Mở Google Maps
-                            {s.checkOutAccuracy ? (
-                              <span className="text-white/40">
-                                (±{Math.round(s.checkOutAccuracy)}m)
-                              </span>
-                            ) : null}
-                          </a>
-                        ) : (
-                          <div className="mt-2 text-[11px] text-white/40">
-                            {s.checkOutAt ? "Không có vị trí" : "—"}
-                          </div>
-                        )}
+                        <LocationBlock
+                          lat={s.checkOutLat}
+                          lng={s.checkOutLng}
+                          accuracy={s.checkOutAccuracy}
+                          emptyText={s.checkOutAt ? "Không có vị trí GPS" : "Chưa chấm ra"}
+                        />
                       </div>
                     </div>
 
