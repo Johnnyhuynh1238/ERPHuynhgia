@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { parseLatLng, uploadAttendanceSelfie } from "@/lib/attendance";
+import { resolveCheckOutShift } from "@/lib/shift-resolver";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   const open = await prisma.ksAttendance.findFirst({
     where: { userId: user.id, checkOutAt: null },
     orderBy: { checkInAt: "desc" },
-    select: { id: true, checkInAt: true },
+    select: { id: true, checkInAt: true, shiftIdAtCheckIn: true },
   });
   if (!open) {
     return NextResponse.json(
@@ -51,6 +52,12 @@ export async function POST(request: Request) {
     Math.round((now.getTime() - open.checkInAt.getTime()) / 60000),
   );
 
+  const { shiftId, earlyLeaveMinutes } = await resolveCheckOutShift({
+    userId: user.id,
+    at: now,
+    hintShiftId: open.shiftIdAtCheckIn,
+  });
+
   const row = await prisma.ksAttendance.update({
     where: { id: open.id },
     data: {
@@ -60,6 +67,8 @@ export async function POST(request: Request) {
       checkOutAccuracy: accuracy,
       checkOutPhotoKey: photoKey,
       durationMinutes,
+      shiftIdAtCheckOut: shiftId,
+      earlyLeaveMinutes,
       note: note || null,
     },
     select: { id: true, checkOutAt: true, durationMinutes: true },

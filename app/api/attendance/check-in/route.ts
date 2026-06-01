@@ -6,6 +6,7 @@ import {
   parseLatLng,
   uploadAttendanceSelfie,
 } from "@/lib/attendance";
+import { resolveCheckInShift } from "@/lib/shift-resolver";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
     throw err;
   }
 
+  const { shiftId, lateMinutes } = await resolveCheckInShift({ userId: user.id, at: now });
+
   const row = await prisma.ksAttendance.create({
     data: {
       userId: user.id,
@@ -80,6 +83,8 @@ export async function POST(request: Request) {
       checkInLng: lng,
       checkInAccuracy: accuracy,
       checkInPhotoKey: photoKey,
+      shiftIdAtCheckIn: shiftId,
+      lateMinutes,
     },
     select: { id: true, checkInAt: true },
   });
