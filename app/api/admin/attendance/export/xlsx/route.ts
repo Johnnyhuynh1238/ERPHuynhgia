@@ -54,10 +54,14 @@ export async function GET(request: Request) {
     { header: "Vai trò", key: "role", width: 10 },
     { header: "Họ tên", key: "fullName", width: 24 },
     { header: "Email", key: "email", width: 28 },
-    { header: "Số ngày có chấm", key: "daysWorked", width: 18 },
-    { header: "Tổng giờ", key: "totalHM", width: 14 },
-    { header: "Tổng phút", key: "totalMinutes", width: 14 },
-    { header: "Số ngày chưa chấm ra", key: "openDays", width: 22 },
+    { header: "Số ngày có chấm", key: "daysWorked", width: 16 },
+    { header: "Tổng giờ", key: "totalHM", width: 12 },
+    { header: "Tổng phút", key: "totalMinutes", width: 12 },
+    { header: "Số ngày trễ", key: "lateDays", width: 12 },
+    { header: "Tổng phút trễ", key: "totalLateMinutes", width: 14 },
+    { header: "Số ngày về sớm", key: "earlyLeaveDays", width: 14 },
+    { header: "Tổng phút về sớm", key: "totalEarlyLeaveMinutes", width: 16 },
+    { header: "Số ngày chưa chấm ra", key: "openDays", width: 20 },
   ];
   summary.forEach((row) => {
     overview.addRow({
@@ -67,23 +71,35 @@ export async function GET(request: Request) {
       daysWorked: row.daysWorked,
       totalHM: minutesToHM(row.totalMinutes),
       totalMinutes: row.totalMinutes,
+      lateDays: row.lateDays,
+      totalLateMinutes: row.totalLateMinutes,
+      earlyLeaveDays: row.earlyLeaveDays,
+      totalEarlyLeaveMinutes: row.totalEarlyLeaveMinutes,
       openDays: row.openDays,
     });
   });
   overview.getRow(1).font = { bold: true };
+  overview.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE8F5E9" },
+  };
 
   // Sheet 2: Chi tiết theo ngày
   const detail = workbook.addWorksheet("Chi tiết ngày");
   detail.columns = [
     { header: "Vai trò", key: "role", width: 10 },
     { header: "Họ tên", key: "fullName", width: 24 },
-    { header: "Ngày", key: "date", width: 14 },
+    { header: "Ngày", key: "date", width: 12 },
     { header: "Số phiên", key: "sessions", width: 10 },
     { header: "Tổng giờ", key: "totalHM", width: 12 },
     { header: "Tổng phút", key: "totalMinutes", width: 12 },
-    { header: "Vào sớm nhất", key: "firstIn", width: 16 },
-    { header: "Ra muộn nhất", key: "lastOut", width: 16 },
-    { header: "Còn phiên hở", key: "hasOpen", width: 14 },
+    { header: "Vào sớm nhất", key: "firstIn", width: 14 },
+    { header: "Ra muộn nhất", key: "lastOut", width: 14 },
+    { header: "Trễ (phút)", key: "lateMinutes", width: 12 },
+    { header: "Về sớm (phút)", key: "earlyLeaveMinutes", width: 14 },
+    { header: "Có ca", key: "hasShiftData", width: 8 },
+    { header: "Còn phiên hở", key: "hasOpen", width: 12 },
   ];
   summary.forEach((row) => {
     row.days.forEach((day) => {
@@ -96,11 +112,19 @@ export async function GET(request: Request) {
         totalMinutes: day.totalMinutes,
         firstIn: formatVnClock(day.firstIn),
         lastOut: formatVnClock(day.lastOut),
+        lateMinutes: day.hasShiftData ? day.lateMinutes : "",
+        earlyLeaveMinutes: day.hasShiftData ? day.earlyLeaveMinutes : "",
+        hasShiftData: day.hasShiftData ? "Có" : "Không",
         hasOpen: day.hasOpen ? "Có" : "",
       });
     });
   });
   detail.getRow(1).font = { bold: true };
+  detail.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE8F5E9" },
+  };
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new NextResponse(Buffer.from(buffer), {

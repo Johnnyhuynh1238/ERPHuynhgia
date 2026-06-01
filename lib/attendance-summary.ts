@@ -25,6 +25,9 @@ export type DaySummary = {
   hasOpen: boolean;
   firstIn: string | null;
   lastOut: string | null;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  hasShiftData: boolean;
 };
 
 export type KsAttendanceSummary = {
@@ -35,6 +38,10 @@ export type KsAttendanceSummary = {
   daysWorked: number;
   openDays: number;
   totalMinutes: number;
+  lateDays: number;
+  earlyLeaveDays: number;
+  totalLateMinutes: number;
+  totalEarlyLeaveMinutes: number;
   days: DaySummary[];
 };
 
@@ -73,6 +80,9 @@ export async function getKsAttendanceForMonth(args: {
       checkInAt: true,
       checkOutAt: true,
       durationMinutes: true,
+      lateMinutes: true,
+      earlyLeaveMinutes: true,
+      shiftIdAtCheckIn: true,
     },
   });
 
@@ -87,10 +97,16 @@ export async function getKsAttendanceForMonth(args: {
       hasOpen: false,
       firstIn: null,
       lastOut: null,
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      hasShiftData: false,
     };
     cur.sessions += 1;
     cur.totalMinutes += row.durationMinutes || 0;
     if (!row.checkOutAt) cur.hasOpen = true;
+    if (row.shiftIdAtCheckIn) cur.hasShiftData = true;
+    if (typeof row.lateMinutes === "number") cur.lateMinutes += row.lateMinutes;
+    if (typeof row.earlyLeaveMinutes === "number") cur.earlyLeaveMinutes += row.earlyLeaveMinutes;
     const inIso = row.checkInAt.toISOString();
     if (!cur.firstIn || inIso < cur.firstIn) cur.firstIn = inIso;
     if (row.checkOutAt) {
@@ -107,6 +123,10 @@ export async function getKsAttendanceForMonth(args: {
     );
     const totalMinutes = days.reduce((s, d) => s + d.totalMinutes, 0);
     const openDays = days.filter((d) => d.hasOpen).length;
+    const lateDays = days.filter((d) => d.lateMinutes > 0).length;
+    const earlyLeaveDays = days.filter((d) => d.earlyLeaveMinutes > 0).length;
+    const totalLateMinutes = days.reduce((s, d) => s + d.lateMinutes, 0);
+    const totalEarlyLeaveMinutes = days.reduce((s, d) => s + d.earlyLeaveMinutes, 0);
     return {
       userId: u.id,
       fullName: u.fullName,
@@ -115,6 +135,10 @@ export async function getKsAttendanceForMonth(args: {
       daysWorked: days.length,
       openDays,
       totalMinutes,
+      lateDays,
+      earlyLeaveDays,
+      totalLateMinutes,
+      totalEarlyLeaveMinutes,
       days,
     };
   });

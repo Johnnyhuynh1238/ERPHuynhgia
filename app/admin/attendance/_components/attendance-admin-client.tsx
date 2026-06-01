@@ -11,6 +11,9 @@ type DaySummary = {
   hasOpen: boolean;
   firstIn: string | null;
   lastOut: string | null;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  hasShiftData: boolean;
 };
 
 type SummaryRow = {
@@ -21,6 +24,10 @@ type SummaryRow = {
   daysWorked: number;
   openDays: number;
   totalMinutes: number;
+  lateDays: number;
+  earlyLeaveDays: number;
+  totalLateMinutes: number;
+  totalEarlyLeaveMinutes: number;
   days: DaySummary[];
 };
 
@@ -95,10 +102,13 @@ export function AttendanceAdminClient({
     fetchData();
   }, [fetchData]);
 
-  const totalAll = useMemo(
-    () => summary.reduce((s, r) => s + r.totalMinutes, 0),
-    [summary],
-  );
+  const stats = useMemo(() => {
+    const totalMinutes = summary.reduce((s, r) => s + r.totalMinutes, 0);
+    const totalLateMinutes = summary.reduce((s, r) => s + r.totalLateMinutes, 0);
+    const totalEarlyMinutes = summary.reduce((s, r) => s + r.totalEarlyLeaveMinutes, 0);
+    const openDays = summary.reduce((s, r) => s + r.openDays, 0);
+    return { totalMinutes, totalLateMinutes, totalEarlyMinutes, openDays };
+  }, [summary]);
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({ month });
@@ -111,9 +121,36 @@ export function AttendanceAdminClient({
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-white">Chấm công nhân viên</h1>
         <p className="text-sm text-white/60">
-          Thống kê chấm công của KS và kế toán theo tháng. Có thể lọc theo từng người và xuất Excel.
+          Thống kê chấm công của KS và kế toán theo tháng. Click vào dòng nhân viên để xem ngày, click vào ngày để xem chi tiết.
         </p>
       </header>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard
+          label="Tổng giờ tháng"
+          value={minutesToHM(stats.totalMinutes)}
+          icon="⏱️"
+          tone="emerald"
+        />
+        <StatCard
+          label="Tổng phút trễ"
+          value={stats.totalLateMinutes > 0 ? `${stats.totalLateMinutes}p` : "0"}
+          icon="⏰"
+          tone="red"
+        />
+        <StatCard
+          label="Tổng phút về sớm"
+          value={stats.totalEarlyMinutes > 0 ? `${stats.totalEarlyMinutes}p` : "0"}
+          icon="🚪"
+          tone="amber"
+        />
+        <StatCard
+          label="Ngày phiên hở"
+          value={String(stats.openDays)}
+          icon="⚠️"
+          tone={stats.openDays > 0 ? "amber" : "slate"}
+        />
+      </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
         <label className="space-y-1 text-sm">
@@ -145,9 +182,9 @@ export function AttendanceAdminClient({
         </Button>
         <a
           href={exportUrl}
-          className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+          className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
         >
-          Xuất Excel
+          📥 Xuất Excel
         </a>
       </div>
 
@@ -157,28 +194,30 @@ export function AttendanceAdminClient({
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-white/10 bg-white/5">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/70">
           <span>{summary.length} nhân viên</span>
-          <span>Tổng giờ tháng: <strong className="text-white">{minutesToHM(totalAll)}</strong></span>
+          <span className="hidden md:block text-xs text-white/40">
+            Click dòng để xem chi tiết theo ngày
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/60">
               <tr>
-                <th className="px-4 py-3"></th>
-                <th className="px-4 py-3">Vai trò</th>
-                <th className="px-4 py-3">Họ tên</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3 text-right">Ngày có chấm</th>
+                <th className="w-10 px-4 py-3"></th>
+                <th className="px-4 py-3">Nhân viên</th>
+                <th className="px-4 py-3 text-right">Ngày</th>
                 <th className="px-4 py-3 text-right">Tổng giờ</th>
+                <th className="px-4 py-3 text-right">Trễ</th>
+                <th className="px-4 py-3 text-right">Về sớm</th>
                 <th className="px-4 py-3 text-right">Phiên hở</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {summary.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-white/50">
+                  <td colSpan={7} className="px-4 py-12 text-center text-white/50">
                     Chưa có dữ liệu chấm công cho tháng này.
                   </td>
                 </tr>
@@ -187,87 +226,144 @@ export function AttendanceAdminClient({
                 const isOpen = expanded === row.userId;
                 return (
                   <Fragment key={row.userId}>
-                    <tr className="text-white/90">
+                    <tr
+                      className={`cursor-pointer text-white/90 transition hover:bg-white/[0.04] ${
+                        isOpen ? "bg-white/[0.04]" : ""
+                      }`}
+                      onClick={() => setExpanded(isOpen ? null : row.userId)}
+                    >
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => setExpanded(isOpen ? null : row.userId)}
-                          className="rounded border border-white/15 px-2 text-white/80 hover:bg-white/10"
+                        <span
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-xs text-white/80 transition ${
+                            isOpen ? "rotate-90" : ""
+                          }`}
                           aria-label={isOpen ? "Thu gọn" : "Xem chi tiết"}
                         >
-                          {isOpen ? "−" : "+"}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
-                          {roleLabel(row.role)}
+                          ▸
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-medium">{row.fullName}</td>
-                      <td className="px-4 py-3 text-white/70">{row.email}</td>
-                      <td className="px-4 py-3 text-right">{row.daysWorked}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{minutesToHM(row.totalMinutes)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar fullName={row.fullName} role={row.role} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-medium text-white">{row.fullName}</span>
+                              <span className="shrink-0 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
+                                {roleLabel(row.role)}
+                              </span>
+                            </div>
+                            <div className="truncate text-xs text-white/50">{row.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-white/85">{row.daysWorked}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-semibold text-white">{minutesToHM(row.totalMinutes)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <MetricBadge
+                          days={row.lateDays}
+                          minutes={row.totalLateMinutes}
+                          tone="red"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <MetricBadge
+                          days={row.earlyLeaveDays}
+                          minutes={row.totalEarlyLeaveMinutes}
+                          tone="amber"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right">
                         {row.openDays > 0 ? (
-                          <span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">
+                          <span className="rounded-md bg-amber-500/20 px-2 py-1 text-xs font-semibold text-amber-200">
                             {row.openDays}
                           </span>
                         ) : (
-                          <span className="text-white/40">0</span>
+                          <span className="text-white/30">—</span>
                         )}
                       </td>
                     </tr>
                     {isOpen ? (
-                      <tr className="bg-white/5">
-                        <td colSpan={7} className="px-4 py-3">
+                      <tr className="bg-black/30">
+                        <td colSpan={7} className="px-4 py-4">
                           {row.days.length === 0 ? (
                             <div className="text-sm text-white/50">Không có ngày chấm công.</div>
                           ) : (
-                            <div className="overflow-x-auto">
-                              <div className="mb-2 text-[11px] text-white/50">
+                            <div>
+                              <div className="mb-3 text-[11px] text-white/50">
                                 💡 Click vào ngày để xem chi tiết ảnh selfie, vị trí, trễ/sớm.
                               </div>
-                              <table className="min-w-full text-xs">
-                                <thead className="text-white/50">
-                                  <tr>
-                                    <th className="px-2 py-1 text-left">Ngày</th>
-                                    <th className="px-2 py-1 text-right">Phiên</th>
-                                    <th className="px-2 py-1 text-right">Tổng giờ</th>
-                                    <th className="px-2 py-1 text-right">Vào sớm nhất</th>
-                                    <th className="px-2 py-1 text-right">Ra muộn nhất</th>
-                                    <th className="px-2 py-1 text-right">Phiên hở</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5 text-white/85">
-                                  {row.days.map((d) => (
-                                    <tr
-                                      key={d.date}
-                                      className="cursor-pointer hover:bg-white/10"
-                                      onClick={() =>
-                                        setDayDetail({
-                                          userId: row.userId,
-                                          date: d.date,
-                                          fullName: row.fullName,
-                                        })
-                                      }
-                                    >
-                                      <td className="px-2 py-1 text-emerald-300 underline-offset-2 hover:underline">
-                                        {formatDate(d.date)}
-                                      </td>
-                                      <td className="px-2 py-1 text-right">{d.sessions}</td>
-                                      <td className="px-2 py-1 text-right">{minutesToHM(d.totalMinutes)}</td>
-                                      <td className="px-2 py-1 text-right">{formatVnClock(d.firstIn)}</td>
-                                      <td className="px-2 py-1 text-right">{formatVnClock(d.lastOut)}</td>
-                                      <td className="px-2 py-1 text-right">
-                                        {d.hasOpen ? (
-                                          <span className="text-amber-300">Có</span>
-                                        ) : (
-                                          <span className="text-white/40">—</span>
-                                        )}
-                                      </td>
+                              <div className="overflow-hidden rounded-lg border border-white/10">
+                                <table className="min-w-full text-xs">
+                                  <thead className="bg-white/[0.03] text-white/50">
+                                    <tr>
+                                      <th className="px-3 py-2 text-left">Ngày</th>
+                                      <th className="px-3 py-2 text-right">Phiên</th>
+                                      <th className="px-3 py-2 text-right">Tổng giờ</th>
+                                      <th className="px-3 py-2 text-right">Vào</th>
+                                      <th className="px-3 py-2 text-right">Ra</th>
+                                      <th className="px-3 py-2 text-right">Trễ</th>
+                                      <th className="px-3 py-2 text-right">Về sớm</th>
+                                      <th className="px-3 py-2 text-right">Phiên hở</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody className="divide-y divide-white/5 text-white/85">
+                                    {row.days.map((d) => (
+                                      <tr
+                                        key={d.date}
+                                        className="cursor-pointer transition hover:bg-emerald-500/5"
+                                        onClick={() =>
+                                          setDayDetail({
+                                            userId: row.userId,
+                                            date: d.date,
+                                            fullName: row.fullName,
+                                          })
+                                        }
+                                      >
+                                        <td className="px-3 py-2">
+                                          <span className="font-medium text-emerald-300 underline-offset-2 hover:underline">
+                                            {formatDate(d.date)}
+                                          </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right">{d.sessions}</td>
+                                        <td className="px-3 py-2 text-right font-medium">
+                                          {minutesToHM(d.totalMinutes)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-white/70">
+                                          {formatVnClock(d.firstIn)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-white/70">
+                                          {formatVnClock(d.lastOut)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                          <MinuteCell
+                                            minutes={d.lateMinutes}
+                                            hasShift={d.hasShiftData}
+                                            tone="red"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                          <MinuteCell
+                                            minutes={d.earlyLeaveMinutes}
+                                            hasShift={d.hasShiftData}
+                                            tone="amber"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                          {d.hasOpen ? (
+                                            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">
+                                              Có
+                                            </span>
+                                          ) : (
+                                            <span className="text-white/30">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           )}
                         </td>
@@ -291,4 +387,125 @@ export function AttendanceAdminClient({
       ) : null}
     </div>
   );
+}
+
+type Tone = "emerald" | "red" | "amber" | "slate";
+
+const TONE_STYLES: Record<Tone, { bg: string; border: string; text: string; iconBg: string }> = {
+  emerald: {
+    bg: "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5",
+    border: "border-emerald-500/25",
+    text: "text-emerald-200",
+    iconBg: "bg-emerald-500/20",
+  },
+  red: {
+    bg: "bg-gradient-to-br from-red-500/10 to-red-500/5",
+    border: "border-red-500/25",
+    text: "text-red-200",
+    iconBg: "bg-red-500/20",
+  },
+  amber: {
+    bg: "bg-gradient-to-br from-amber-500/10 to-amber-500/5",
+    border: "border-amber-500/25",
+    text: "text-amber-200",
+    iconBg: "bg-amber-500/20",
+  },
+  slate: {
+    bg: "bg-white/[0.03]",
+    border: "border-white/10",
+    text: "text-white/70",
+    iconBg: "bg-white/10",
+  },
+};
+
+function StatCard({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: string;
+  tone: Tone;
+}) {
+  const s = TONE_STYLES[tone];
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border ${s.border} ${s.bg} p-4`}>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${s.iconBg} text-lg`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-[11px] uppercase tracking-wide text-white/50">{label}</div>
+        <div className={`truncate text-lg font-semibold ${s.text}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function Avatar({ fullName, role }: { fullName: string; role: string }) {
+  const initials = fullName
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(-2)
+    .join("")
+    .toUpperCase() || "?";
+  const bg =
+    role === "engineer"
+      ? "bg-gradient-to-br from-orange-500/30 to-orange-700/30 text-orange-100"
+      : role === "accountant"
+      ? "bg-gradient-to-br from-sky-500/30 to-sky-700/30 text-sky-100"
+      : "bg-white/10 text-white/70";
+  return (
+    <div
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 text-xs font-bold ${bg}`}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function MetricBadge({
+  days,
+  minutes,
+  tone,
+}: {
+  days: number;
+  minutes: number;
+  tone: "red" | "amber";
+}) {
+  if (days === 0 && minutes === 0) {
+    return <span className="text-white/30">—</span>;
+  }
+  const s =
+    tone === "red"
+      ? "bg-red-500/15 text-red-200 border-red-500/25"
+      : "bg-amber-500/15 text-amber-200 border-amber-500/25";
+  return (
+    <div className={`inline-flex flex-col items-end rounded-md border ${s} px-2 py-1`}>
+      <span className="text-sm font-semibold leading-none">{days} ngày</span>
+      <span className="mt-0.5 text-[10px] opacity-80">{minutes} phút</span>
+    </div>
+  );
+}
+
+function MinuteCell({
+  minutes,
+  hasShift,
+  tone,
+}: {
+  minutes: number;
+  hasShift: boolean;
+  tone: "red" | "amber";
+}) {
+  if (!hasShift) {
+    return <span className="text-[10px] text-white/30">—</span>;
+  }
+  if (minutes <= 0) {
+    return <span className="text-[11px] text-emerald-300/70">✓</span>;
+  }
+  const cls = tone === "red" ? "text-red-300" : "text-amber-300";
+  return <span className={`text-[11px] font-semibold ${cls}`}>{minutes}p</span>;
 }
