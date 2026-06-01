@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AttendanceDayDetailModal } from "./attendance-day-detail-modal";
 
 type DaySummary = {
   date: string;
@@ -71,6 +72,7 @@ export function AttendanceAdminClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [dayDetail, setDayDetail] = useState<{ userId: string; date: string; fullName: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -221,6 +223,9 @@ export function AttendanceAdminClient({
                             <div className="text-sm text-white/50">Không có ngày chấm công.</div>
                           ) : (
                             <div className="overflow-x-auto">
+                              <div className="mb-2 text-[11px] text-white/50">
+                                💡 Click vào ngày để xem chi tiết ảnh selfie, vị trí, trễ/sớm.
+                              </div>
                               <table className="min-w-full text-xs">
                                 <thead className="text-white/50">
                                   <tr>
@@ -234,8 +239,20 @@ export function AttendanceAdminClient({
                                 </thead>
                                 <tbody className="divide-y divide-white/5 text-white/85">
                                   {row.days.map((d) => (
-                                    <tr key={d.date}>
-                                      <td className="px-2 py-1">{formatDate(d.date)}</td>
+                                    <tr
+                                      key={d.date}
+                                      className="cursor-pointer hover:bg-white/10"
+                                      onClick={() =>
+                                        setDayDetail({
+                                          userId: row.userId,
+                                          date: d.date,
+                                          fullName: row.fullName,
+                                        })
+                                      }
+                                    >
+                                      <td className="px-2 py-1 text-emerald-300 underline-offset-2 hover:underline">
+                                        {formatDate(d.date)}
+                                      </td>
                                       <td className="px-2 py-1 text-right">{d.sessions}</td>
                                       <td className="px-2 py-1 text-right">{minutesToHM(d.totalMinutes)}</td>
                                       <td className="px-2 py-1 text-right">{formatVnClock(d.firstIn)}</td>
@@ -263,6 +280,15 @@ export function AttendanceAdminClient({
           </table>
         </div>
       </div>
+
+      {dayDetail ? (
+        <AttendanceDayDetailModal
+          userId={dayDetail.userId}
+          date={dayDetail.date}
+          fullName={dayDetail.fullName}
+          onClose={() => setDayDetail(null)}
+        />
+      ) : null}
     </div>
   );
 }
