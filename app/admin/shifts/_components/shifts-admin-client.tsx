@@ -22,15 +22,24 @@ type ShiftRow = {
   assignedCount: number;
 };
 
-type Assignment = {
+type AssignmentForUser = {
   id: string;
-  userId: string;
+  shiftId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  graceMinutes: number;
+  shiftActive: boolean;
+  daysOfWeek: number[];
+  isActive: boolean;
+};
+
+type UserWithAssignments = {
+  id: string;
   fullName: string;
   email: string;
   role: string;
-  userActive: boolean;
-  daysOfWeek: number[];
-  isActive: boolean;
+  assignments: AssignmentForUser[];
 };
 
 const ALL_DAYS = DAYS_OF_WEEK.map((d) => d.value);
@@ -43,18 +52,17 @@ function roleLabel(role: string) {
 
 export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<UserWithAssignments[]>([]);
+  const [loadingShifts, setLoadingShifts] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [assignLoading, setAssignLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<ShiftRow | null>(null);
+  const [roleFilter, setRoleFilter] = useState<"all" | "engineer" | "accountant">("all");
 
   const loadShifts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoadingShifts(true);
     try {
       const res = await fetch("/api/admin/shifts", { cache: "no-store" });
       const data = await res.json();
@@ -63,40 +71,52 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi không xác định");
     } finally {
-      setLoading(false);
+      setLoadingShifts(false);
     }
   }, []);
 
-  const loadAssignments = useCallback(async (shiftId: string) => {
-    setAssignLoading(true);
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
     try {
-      const res = await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
-        cache: "no-store",
-      });
+      const res = await fetch("/api/admin/shift-assignments", { cache: "no-store" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Không tải được danh sách gán");
-      setAssignments(data.assignments || []);
+      if (!res.ok) throw new Error(data?.message || "Không tải được nhân sự");
+      setUsers(data.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi không xác định");
-      setAssignments([]);
     } finally {
-      setAssignLoading(false);
+      setLoadingUsers(false);
     }
   }, []);
 
   useEffect(() => {
     loadShifts();
-  }, [loadShifts]);
+    loadUsers();
+  }, [loadShifts, loadUsers]);
 
-  useEffect(() => {
-    if (selectedId) loadAssignments(selectedId);
-    else setAssignments([]);
-  }, [selectedId, loadAssignments]);
+  const refreshAll = useCallback(() => {
+    loadShifts();
+    loadUsers();
+  }, [loadShifts, loadUsers]);
 
-  const selectedShift = useMemo(
-    () => shifts.find((s) => s.id === selectedId) || null,
-    [shifts, selectedId],
+  const filteredUsers = useMemo(() => {
+    if (roleFilter === "all") return users;
+    return users.filter((u) => u.role === roleFilter);
+  }, [users, roleFilter]);
+
+  const fallbackCandidates = useMemo(
+    () =>
+      candidates.map((c) => ({
+        id: c.id,
+        fullName: c.fullName,
+        email: c.email,
+        role: c.role,
+        assignments: [] as AssignmentForUser[],
+      })),
+    [candidates],
   );
+
+  const usersToShow = users.length > 0 || !loadingUsers ? filteredUsers : fallbackCandidates;
 
   return (
     <div className="space-y-6">
@@ -113,13 +133,13 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
         <section className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">Danh sách ca</h2>
             <Button onClick={() => setShowCreate(true)}>+ Thêm ca</Button>
           </div>
-          {loading ? (
+          {loadingShifts ? (
             <div className="py-6 text-center text-sm text-white/50">Đang tải…</div>
           ) : shifts.length === 0 ? (
             <div className="py-6 text-center text-sm text-white/50">
@@ -127,87 +147,100 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
             </div>
           ) : (
             <ul className="divide-y divide-white/10">
-              {shifts.map((s) => {
-                const active = s.id === selectedId;
-                return (
-                  <li
-                    key={s.id}
-                    className={`flex items-center justify-between gap-3 py-3 ${
-                      active ? "bg-white/5 -mx-4 px-4 rounded" : ""
-                    }`}
-                  >
-                    <button
-                      onClick={() => setSelectedId(s.id)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-white">{s.name}</span>
-                        {!s.isActive ? (
-                          <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase text-white/60">
-                            Ngưng
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="text-xs text-white/60">
-                        {s.startTime} → {s.endTime} · trễ {s.graceMinutes}′ ·{" "}
-                        {s.assignedCount} người
-                      </div>
-                      {s.note ? (
-                        <div className="text-[11px] text-white/40">{s.note}</div>
+              {shifts.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 py-3"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white">{s.name}</span>
+                      {!s.isActive ? (
+                        <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase text-white/60">
+                          Ngưng
+                        </span>
                       ) : null}
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setEditing(s)}
-                        className="rounded border border-white/15 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`Xóa ca "${s.name}"? Mọi gán sẽ bị gỡ.`)) return;
-                          const res = await fetch(`/api/admin/shifts/${s.id}`, {
-                            method: "DELETE",
-                          });
-                          if (!res.ok) {
-                            const data = await res.json().catch(() => ({}));
-                            alert(data?.message || "Xóa thất bại");
-                            return;
-                          }
-                          if (selectedId === s.id) setSelectedId(null);
-                          loadShifts();
-                        }}
-                        className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
-                      >
-                        Xóa
-                      </button>
                     </div>
-                  </li>
-                );
-              })}
+                    <div className="text-xs text-white/60">
+                      {s.startTime} → {s.endTime} · trễ {s.graceMinutes}′ ·{" "}
+                      {s.assignedCount} người
+                    </div>
+                    {s.note ? (
+                      <div className="text-[11px] text-white/40">{s.note}</div>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditing(s)}
+                      className="rounded border border-white/15 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Xóa ca "${s.name}"? Mọi gán sẽ bị gỡ.`)) return;
+                        const res = await fetch(`/api/admin/shifts/${s.id}`, {
+                          method: "DELETE",
+                        });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          alert(data?.message || "Xóa thất bại");
+                          return;
+                        }
+                        refreshAll();
+                      }}
+                      className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </section>
 
         <section className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
-          <h2 className="text-base font-semibold text-white">
-            {selectedShift ? `Gán người vào "${selectedShift.name}"` : "Chọn 1 ca ở bên trái"}
-          </h2>
-          {!selectedShift ? (
-            <div className="py-8 text-center text-sm text-white/40">
-              Chọn 1 ca để xem & chỉnh danh sách KS / kế toán.
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-white">Gán nhân sự vào ca</h2>
+            <div className="flex gap-1 rounded-md border border-white/10 bg-slate-900/40 p-0.5 text-xs">
+              {([
+                ["all", "Tất cả"],
+                ["engineer", "KS"],
+                ["accountant", "Kế toán"],
+              ] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setRoleFilter(val)}
+                  className={`rounded px-2 py-1 ${
+                    roleFilter === val
+                      ? "bg-white/10 text-white"
+                      : "text-white/60 hover:bg-white/5"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingUsers && users.length === 0 ? (
+            <div className="py-6 text-center text-sm text-white/50">Đang tải…</div>
+          ) : usersToShow.length === 0 ? (
+            <div className="py-6 text-center text-sm text-white/40">
+              Không có nhân sự phù hợp.
             </div>
           ) : (
-            <AssignmentEditor
-              shiftId={selectedShift.id}
-              assignments={assignments}
-              loading={assignLoading}
-              candidates={candidates}
-              onChanged={() => {
-                loadAssignments(selectedShift.id);
-                loadShifts();
-              }}
-            />
+            <ul className="divide-y divide-white/10">
+              {usersToShow.map((u) => (
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  shifts={shifts}
+                  onChanged={refreshAll}
+                />
+              ))}
+            </ul>
           )}
         </section>
       </div>
@@ -218,7 +251,7 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
           onClose={() => setShowCreate(false)}
           onSaved={() => {
             setShowCreate(false);
-            loadShifts();
+            refreshAll();
           }}
         />
       ) : null}
@@ -230,7 +263,7 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            loadShifts();
+            refreshAll();
           }}
         />
       ) : null}
@@ -238,85 +271,60 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
   );
 }
 
-function AssignmentEditor({
-  shiftId,
-  assignments,
-  loading,
-  candidates,
+function UserRow({
+  user,
+  shifts,
   onChanged,
 }: {
-  shiftId: string;
-  assignments: Assignment[];
-  loading: boolean;
-  candidates: Candidate[];
+  user: UserWithAssignments;
+  shifts: ShiftRow[];
   onChanged: () => void;
 }) {
-  const [picking, setPicking] = useState(false);
-  const [newUserId, setNewUserId] = useState<string>("");
-  const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
-  const assignedIds = useMemo(
-    () => new Set(assignments.map((a) => a.userId)),
-    [assignments],
-  );
+  const assignedShiftIds = new Set(user.assignments.map((a) => a.shiftId));
+  const availableShifts = shifts.filter((s) => s.isActive && !assignedShiftIds.has(s.id));
 
-  const available = candidates.filter((c) => !assignedIds.has(c.id));
-
-  async function save() {
-    if (!newUserId) {
-      setErr("Chọn người để gán");
-      return;
-    }
-    if (newDays.length === 0) {
-      setErr("Chọn ít nhất 1 ngày");
+  async function updateDays(shiftId: string, daysOfWeek: number[]) {
+    if (daysOfWeek.length === 0) {
+      alert("Phải chọn ít nhất 1 ngày");
       return;
     }
     setBusy(true);
-    setErr(null);
     try {
       const res = await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: newUserId, daysOfWeek: newDays }),
+        body: JSON.stringify({ userId: user.id, daysOfWeek }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Gán thất bại");
-      setNewUserId("");
-      setNewDays([1, 2, 3, 4, 5, 6]);
-      setPicking(false);
-      onChanged();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Lỗi");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function updateDays(userId: string, daysOfWeek: number[]) {
-    setBusy(true);
-    try {
-      await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, daysOfWeek }),
-      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.message || "Lưu thất bại");
+        return;
+      }
+      setEditingShiftId(null);
       onChanged();
     } finally {
       setBusy(false);
     }
   }
 
-  async function removeAssignment(userId: string) {
-    if (!confirm("Gỡ người này khỏi ca?")) return;
+  async function removeAssignment(shiftId: string, shiftName: string) {
+    if (!confirm(`Gỡ ${user.fullName} khỏi ca "${shiftName}"?`)) return;
     setBusy(true);
     try {
-      await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
+      const res = await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId: user.id }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.message || "Gỡ thất bại");
+        return;
+      }
       onChanged();
     } finally {
       setBusy(false);
@@ -324,95 +332,189 @@ function AssignmentEditor({
   }
 
   return (
-    <div className="space-y-4">
-      {loading ? (
-        <div className="py-6 text-center text-sm text-white/50">Đang tải…</div>
-      ) : assignments.length === 0 ? (
-        <div className="rounded border border-dashed border-white/10 p-4 text-center text-sm text-white/40">
-          Chưa có ai trong ca này.
+    <li className="space-y-2 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
+              {roleLabel(user.role)}
+            </span>
+            <span className="truncate font-medium text-white">{user.fullName}</span>
+          </div>
+          <div className="truncate text-[11px] text-white/50">{user.email}</div>
         </div>
-      ) : (
-        <ul className="divide-y divide-white/10">
-          {assignments.map((a) => (
-            <li key={a.id} className="space-y-2 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
-                      {roleLabel(a.role)}
+        {availableShifts.length > 0 ? (
+          <button
+            onClick={() => setShowAssign((v) => !v)}
+            disabled={busy}
+            className="rounded border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-50"
+          >
+            {showAssign ? "Hủy" : user.assignments.length > 0 ? "+ Gán thêm" : "+ Gán ca"}
+          </button>
+        ) : (
+          <span className="text-[11px] text-white/40">Đã ở tất cả ca</span>
+        )}
+      </div>
+
+      {user.assignments.length === 0 && !showAssign ? (
+        <div className="rounded border border-dashed border-white/10 px-3 py-2 text-xs text-white/40">
+          Chưa được gán ca nào.
+        </div>
+      ) : null}
+
+      {user.assignments.map((a) => {
+        const isEditing = editingShiftId === a.shiftId;
+        return (
+          <div
+            key={a.id}
+            className="rounded-md border border-white/10 bg-slate-900/40 p-2.5 text-xs"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-white">{a.shiftName}</span>
+                  <span className="text-white/60">
+                    {a.startTime}–{a.endTime}
+                  </span>
+                  {!a.shiftActive ? (
+                    <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase text-white/60">
+                      Ca ngưng
                     </span>
-                    <span className="font-medium text-white">{a.fullName}</span>
-                    {!a.userActive ? (
-                      <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">
-                        ngưng việc
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-[11px] text-white/50">{a.email}</div>
+                  ) : null}
                 </div>
+                <div className="text-[11px] text-white/50">
+                  Ngày làm:{" "}
+                  <span className="text-white/80">
+                    {a.daysOfWeek.length ? dayLabels(a.daysOfWeek) : "—"}
+                  </span>{" "}
+                  · trễ {a.graceMinutes}′
+                </div>
+              </div>
+              <div className="flex gap-1">
                 <button
-                  onClick={() => removeAssignment(a.userId)}
+                  onClick={() => setEditingShiftId(isEditing ? null : a.shiftId)}
+                  className="rounded border border-white/15 px-2 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+                >
+                  {isEditing ? "Đóng" : "Sửa ngày"}
+                </button>
+                <button
+                  onClick={() => removeAssignment(a.shiftId, a.shiftName)}
                   disabled={busy}
-                  className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-50"
+                  className="rounded border border-red-500/40 px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-500/10 disabled:opacity-50"
                 >
                   Gỡ
                 </button>
               </div>
-              <DayPicker
-                value={a.daysOfWeek}
-                onChange={(days) => updateDays(a.userId, days)}
-                disabled={busy}
-              />
-              <div className="text-[11px] text-white/40">
-                Ngày làm: {a.daysOfWeek.length ? dayLabels(a.daysOfWeek) : "—"}
+            </div>
+            {isEditing ? (
+              <div className="mt-2 space-y-2">
+                <DayPicker
+                  value={a.daysOfWeek}
+                  onChange={(days) => updateDays(a.shiftId, days)}
+                  disabled={busy}
+                />
+                <div className="text-[10px] text-white/40">
+                  Đổi ngày sẽ lưu ngay.
+                </div>
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {picking ? (
-        <div className="space-y-3 rounded border border-white/10 bg-slate-900/40 p-3">
-          <div className="text-sm font-medium text-white">Gán người mới</div>
-          <select
-            value={newUserId}
-            onChange={(e) => setNewUserId(e.target.value)}
-            className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white"
-          >
-            <option value="">— Chọn KS / kế toán —</option>
-            {available.map((c) => (
-              <option key={c.id} value={c.id}>
-                [{roleLabel(c.role)}] {c.fullName} ({c.email})
-              </option>
-            ))}
-          </select>
-          <DayPicker value={newDays} onChange={setNewDays} disabled={busy} />
-          {err ? <div className="text-xs text-red-300">{err}</div> : null}
-          <div className="flex gap-2">
-            <Button onClick={save} disabled={busy}>
-              {busy ? "Đang lưu…" : "Lưu"}
-            </Button>
-            <button
-              onClick={() => {
-                setPicking(false);
-                setErr(null);
-              }}
-              className="rounded border border-white/15 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10"
-            >
-              Hủy
-            </button>
+            ) : null}
           </div>
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          className="w-full border-white/15 bg-slate-900"
-          onClick={() => setPicking(true)}
-          disabled={available.length === 0}
+        );
+      })}
+
+      {showAssign && availableShifts.length > 0 ? (
+        <AssignForm
+          userId={user.id}
+          shifts={availableShifts}
+          busy={busy}
+          onCancel={() => setShowAssign(false)}
+          onSaved={() => {
+            setShowAssign(false);
+            onChanged();
+          }}
+        />
+      ) : null}
+    </li>
+  );
+}
+
+function AssignForm({
+  userId,
+  shifts,
+  busy,
+  onCancel,
+  onSaved,
+}: {
+  userId: string;
+  shifts: ShiftRow[];
+  busy: boolean;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [shiftId, setShiftId] = useState<string>(shifts[0]?.id ?? "");
+  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    if (!shiftId) {
+      setErr("Chọn ca");
+      return;
+    }
+    if (days.length === 0) {
+      setErr("Chọn ít nhất 1 ngày");
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/admin/shifts/${shiftId}/assignments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, daysOfWeek: days }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Gán thất bại");
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Lỗi");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-emerald-400/30 bg-emerald-500/5 p-3 text-xs">
+      <label className="block space-y-1">
+        <span className="text-white/70">Ca</span>
+        <select
+          value={shiftId}
+          onChange={(e) => setShiftId(e.target.value)}
+          className="w-full rounded-md border border-white/10 bg-slate-900 px-2 py-1.5 text-white"
         >
-          {available.length === 0 ? "Đã gán tất cả người có thể" : "+ Gán người vào ca"}
+          {shifts.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.startTime}–{s.endTime})
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="space-y-1">
+        <span className="text-white/70">Ngày trong tuần</span>
+        <DayPicker value={days} onChange={setDays} disabled={saving || busy} />
+      </div>
+      {err ? <div className="text-red-300">{err}</div> : null}
+      <div className="flex gap-2">
+        <Button onClick={save} disabled={saving || busy}>
+          {saving ? "Đang lưu…" : "Gán"}
         </Button>
-      )}
+        <button
+          onClick={onCancel}
+          className="rounded border border-white/15 px-3 py-1 text-white/80 hover:bg-white/10"
+        >
+          Hủy
+        </button>
+      </div>
     </div>
   );
 }
