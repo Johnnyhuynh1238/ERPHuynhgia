@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type TodaySession = {
   id: string;
@@ -143,6 +144,16 @@ export function ChamCongClient() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(json?.message || "Có lỗi xảy ra");
+      }
+      if (kind === "in" && typeof json?.autoClosedCount === "number" && json.autoClosedCount > 0) {
+        toast.warning(
+          `Đã tự đóng ${json.autoClosedCount} phiên cũ chưa chấm ra. Vui lòng báo kế toán để điều chỉnh giờ làm.`,
+          { duration: 8000 },
+        );
+      } else if (kind === "in") {
+        toast.success("Đã chấm vào");
+      } else {
+        toast.success("Đã chấm ra");
       }
       await Promise.all([loadToday(), loadCalendar(month)]);
       closeSelfie();

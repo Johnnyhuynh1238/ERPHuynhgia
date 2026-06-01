@@ -22,17 +22,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Thiếu ảnh selfie" }, { status: 400 });
   }
 
-  // Chặn check-in mới khi vẫn còn phiên chưa check-out
-  const open = await prisma.ksAttendance.findFirst({
+  const now = new Date();
+  const workDate = getWorkDateVn(now);
+
+  // Chỉ chặn nếu phiên hở thuộc đúng hôm nay; phiên hở của ngày cũ (KS quên chấm ra)
+  // sẽ được tự đóng với durationMinutes=0 + note để kế toán điều chỉnh sau.
+  const opens = await prisma.ksAttendance.findMany({
     where: { userId: user.id, checkOutAt: null },
-    select: { id: true, checkInAt: true },
-    orderBy: { checkInAt: "desc" },
+    select: { id: true, workDate: true, checkInAt: true, note: true },
+    orderBy: { checkInAt: "asc" },
   });
-  if (open) {
+  const openToday = opens.find((o) => o.workDate.getTime() === workDate.getTime());
+  if (openToday) {
     return NextResponse.json(
-      { message: "Bạn còn 1 phiên chấm công chưa Chấm ra. Hãy Chấm ra trước." },
+      { message: "Bạn còn 1 phiên chấm công hôm nay chưa Chấm ra. Hãy Chấm ra trước." },
       { status: 409 },
     );
+  }
+  const stale = opens.filter((o) => o.workDate.getTime() !== workDate.getTime());
+  let autoClosedCount = 0;
+  if (stale.length > 0) {
+    const AUTO_NOTE = "Tự đóng do quên chấm ra. Vui lòng báo kế toán để điều chỉnh.";
+    await Promise.all(
+      stale.map((o) =>
+        prisma.ksAttendance.update({
+          where: { id: o.id },
+          data: {
+            checkOutAt: o.checkInAt,
+            durationMinutes: 0,
+            note: o.note ? `${o.note}\n${AUTO_NOTE}` : AUTO_NOTE,
+          },
+        }),
+      ),
+    );
+    autoClosedCount = stale.length;
   }
 
   const { lat, lng, accuracy } = parseLatLng(formData);
@@ -48,9 +71,6 @@ export async function POST(request: Request) {
     throw err;
   }
 
-  const now = new Date();
-  const workDate = getWorkDateVn(now);
-
   const row = await prisma.ksAttendance.create({
     data: {
       userId: user.id,
@@ -64,5 +84,15 @@ export async function POST(request: Request) {
     select: { id: true, checkInAt: true },
   });
 
-  return NextResponse.json({ id: row.id, checkInAt: row.checkInAt, message: "Đã chấm vào" });
+  const message =
+    autoClosedCount > 0
+      ? `Đã chấm vào. Đã tự đóng ${autoClosedCount} phiên cũ chưa chấm ra — liên hệ kế toán để điều chỉnh giờ.`
+      : "Đã chấm vào";
+
+  return NextResponse.json({
+    id: row.id,
+    checkInAt: row.checkInAt,
+    autoClosedCount,
+    message,
+  });
 }
