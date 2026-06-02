@@ -14,9 +14,11 @@ type Session = {
   checkInLat: number | null;
   checkInLng: number | null;
   checkInAccuracy: number | null;
+  checkInAddress: string | null;
   checkOutLat: number | null;
   checkOutLng: number | null;
   checkOutAccuracy: number | null;
+  checkOutAddress: string | null;
   hasCheckInPhoto: boolean;
   hasCheckOutPhoto: boolean;
   shiftIn: ShiftInfo | null;
@@ -64,20 +66,23 @@ function GpsOverlay({
   lat,
   lng,
   accuracy,
+  address,
   timeLabel,
 }: {
   lat: number | null;
   lng: number | null;
   accuracy: number | null;
+  address: string | null;
   timeLabel: string;
 }) {
+  const hasGps = lat !== null && lng !== null;
   return (
-    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[88%] rounded-md bg-black/70 px-2 py-1 text-left text-[10px] leading-tight text-white shadow-lg backdrop-blur-sm">
-      <div className="flex items-center gap-1 font-semibold">
-        <span>📍</span>
-        {lat !== null && lng !== null ? (
-          <span>
-            {lat.toFixed(5)}, {lng.toFixed(5)}
+    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[92%] rounded-md bg-black/70 px-2 py-1 text-left text-[10px] leading-tight text-white shadow-lg backdrop-blur-sm">
+      <div className="flex items-start gap-1 font-semibold">
+        <span className="shrink-0">📍</span>
+        {hasGps ? (
+          <span className="break-words">
+            {address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}
           </span>
         ) : (
           <span className="text-amber-300">Không có GPS</span>
@@ -85,8 +90,13 @@ function GpsOverlay({
       </div>
       <div className="text-white/80">
         {timeLabel}
-        {accuracy ? ` · ±${Math.round(accuracy)}m` : ""}
+        {hasGps && accuracy ? ` · ±${Math.round(accuracy)}m` : ""}
       </div>
+      {hasGps && address ? (
+        <div className="text-white/50">
+          {lat.toFixed(5)}, {lng.toFixed(5)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -295,6 +305,7 @@ export function AttendanceDayDetailModal({
                               lat={s.checkInLat}
                               lng={s.checkInLng}
                               accuracy={s.checkInAccuracy}
+                              address={s.checkInAddress}
                               timeLabel={formatVnClock(s.checkInAt)}
                             />
                           </button>
@@ -360,6 +371,7 @@ export function AttendanceDayDetailModal({
                               lat={s.checkOutLat}
                               lng={s.checkOutLng}
                               accuracy={s.checkOutAccuracy}
+                              address={s.checkOutAddress}
                               timeLabel={s.checkOutAt ? formatVnClock(s.checkOutAt) : "—"}
                             />
                           </button>

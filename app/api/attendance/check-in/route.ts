@@ -7,6 +7,7 @@ import {
   uploadAttendanceSelfie,
 } from "@/lib/attendance";
 import { resolveCheckInShift } from "@/lib/shift-resolver";
+import { reverseGeocodeVn } from "@/lib/reverse-geocode";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -80,6 +81,8 @@ export async function POST(request: Request) {
 
   const { shiftId, lateMinutes } = await resolveCheckInShift({ userId: user.id, at: now });
 
+  const address = await reverseGeocodeVn(lat, lng);
+
   const row = await prisma.ksAttendance.create({
     data: {
       userId: user.id,
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
       checkInLng: lng,
       checkInAccuracy: accuracy,
       checkInPhotoKey: photoKey,
+      checkInAddress: address,
       shiftIdAtCheckIn: shiftId,
       lateMinutes,
     },

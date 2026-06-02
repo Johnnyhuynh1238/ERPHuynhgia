@@ -460,11 +460,13 @@ model KsAttendance {
   checkInLng        Decimal?  @map("check_in_lng") @db.Decimal(10, 7)
   checkInAccuracy   Decimal?  @map("check_in_accuracy") @db.Decimal(10, 2)
   checkInPhotoKey   String?   @map("check_in_photo_key")
+  checkInAddress    String?   @map("check_in_address") @db.Text
   checkOutAt        DateTime? @map("check_out_at")
   checkOutLat       Decimal?  @map("check_out_lat") @db.Decimal(10, 7)
   checkOutLng       Decimal?  @map("check_out_lng") @db.Decimal(10, 7)
   checkOutAccuracy  Decimal?  @map("check_out_accuracy") @db.Decimal(10, 2)
   checkOutPhotoKey  String?   @map("check_out_photo_key")
+  checkOutAddress   String?   @map("check_out_address") @db.Text
   durationMinutes   Int?      @map("duration_minutes")
   lateMinutes       Int?      @map("late_minutes")
   earlyLeaveMinutes Int?      @map("early_leave_minutes")

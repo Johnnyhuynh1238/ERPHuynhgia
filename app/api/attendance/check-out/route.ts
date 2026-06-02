@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { parseLatLng, uploadAttendanceSelfie } from "@/lib/attendance";
 import { resolveCheckOutShift } from "@/lib/shift-resolver";
+import { reverseGeocodeVn } from "@/lib/reverse-geocode";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
     hintShiftId: open.shiftIdAtCheckIn,
   });
 
+  const address = await reverseGeocodeVn(lat, lng);
+
   const row = await prisma.ksAttendance.update({
     where: { id: open.id },
     data: {
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
       checkOutLng: lng,
       checkOutAccuracy: accuracy,
       checkOutPhotoKey: photoKey,
+      checkOutAddress: address,
       durationMinutes,
       shiftIdAtCheckOut: shiftId,
       earlyLeaveMinutes,
