@@ -60,6 +60,37 @@ function gmapsEmbedUrl(lat: number, lng: number) {
   return `https://maps.google.com/maps?q=${lat},${lng}&z=17&output=embed`;
 }
 
+function GpsOverlay({
+  lat,
+  lng,
+  accuracy,
+  timeLabel,
+}: {
+  lat: number | null;
+  lng: number | null;
+  accuracy: number | null;
+  timeLabel: string;
+}) {
+  return (
+    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[88%] rounded-md bg-black/70 px-2 py-1 text-left text-[10px] leading-tight text-white shadow-lg backdrop-blur-sm">
+      <div className="flex items-center gap-1 font-semibold">
+        <span>📍</span>
+        {lat !== null && lng !== null ? (
+          <span>
+            {lat.toFixed(5)}, {lng.toFixed(5)}
+          </span>
+        ) : (
+          <span className="text-amber-300">Không có GPS</span>
+        )}
+      </div>
+      <div className="text-white/80">
+        {timeLabel}
+        {accuracy ? ` · ±${Math.round(accuracy)}m` : ""}
+      </div>
+    </div>
+  );
+}
+
 function LocationBlock({
   lat,
   lng,
@@ -252,13 +283,19 @@ export function AttendanceDayDetailModal({
                           <button
                             type="button"
                             onClick={() => setZoomKey(photoIn)}
-                            className="block w-full overflow-hidden rounded-md border border-white/10"
+                            className="relative block w-full overflow-hidden rounded-md border border-white/10"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={photoIn}
                               alt="Ảnh chấm vào"
                               className="aspect-[4/3] w-full object-cover transition hover:scale-[1.02]"
+                            />
+                            <GpsOverlay
+                              lat={s.checkInLat}
+                              lng={s.checkInLng}
+                              accuracy={s.checkInAccuracy}
+                              timeLabel={formatVnClock(s.checkInAt)}
                             />
                           </button>
                         ) : (
@@ -311,13 +348,19 @@ export function AttendanceDayDetailModal({
                           <button
                             type="button"
                             onClick={() => setZoomKey(photoOut)}
-                            className="block w-full overflow-hidden rounded-md border border-white/10"
+                            className="relative block w-full overflow-hidden rounded-md border border-white/10"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={photoOut}
                               alt="Ảnh chấm ra"
                               className="aspect-[4/3] w-full object-cover transition hover:scale-[1.02]"
+                            />
+                            <GpsOverlay
+                              lat={s.checkOutLat}
+                              lng={s.checkOutLng}
+                              accuracy={s.checkOutAccuracy}
+                              timeLabel={s.checkOutAt ? formatVnClock(s.checkOutAt) : "—"}
                             />
                           </button>
                         ) : (
