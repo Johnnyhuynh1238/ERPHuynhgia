@@ -1,4 +1,5 @@
 type NominatimAddress = {
+  house_number?: string;
   road?: string;
   hamlet?: string;
   village?: string;
@@ -18,33 +19,39 @@ type NominatimResponse = {
   display_name?: string;
 };
 
-function pickWard(addr: NominatimAddress): string | null {
-  return (
-    addr.village ||
-    addr.town ||
-    addr.suburb ||
-    addr.quarter ||
-    addr.neighbourhood ||
-    addr.hamlet ||
-    null
-  );
-}
-
-function pickDistrict(addr: NominatimAddress): string | null {
-  return addr.city_district || addr.county || null;
-}
-
-function pickProvince(addr: NominatimAddress): string | null {
-  return addr.state || addr.city || null;
-}
-
 export function formatVnAddress(resp: NominatimResponse): string | null {
   const addr = resp.address;
   if (!addr) return resp.display_name || null;
-  const ward = pickWard(addr);
-  const district = pickDistrict(addr);
-  const province = pickProvince(addr);
-  const parts = [ward, district, province].filter(Boolean);
+
+  const parts: string[] = [];
+  const push = (v?: string) => {
+    if (!v) return;
+    if (parts.includes(v)) return;
+    parts.push(v);
+  };
+
+  // Số nhà + đường
+  const street = [addr.house_number, addr.road].filter(Boolean).join(" ").trim();
+  if (street) parts.push(street);
+
+  // Khu phố / xóm
+  push(addr.neighbourhood);
+  push(addr.hamlet);
+
+  // Xã / Phường / Thị trấn
+  push(addr.village);
+  push(addr.town);
+  push(addr.suburb);
+  push(addr.quarter);
+
+  // Quận / Huyện
+  push(addr.city_district);
+  push(addr.county);
+
+  // Tỉnh / Thành phố
+  push(addr.state);
+  push(addr.city);
+
   if (parts.length === 0) return resp.display_name || null;
   return parts.join(", ");
 }
@@ -57,7 +64,7 @@ export async function reverseGeocodeVn(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=vi&zoom=16`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=vi&zoom=18&addressdetails=1`;
     const res = await fetch(url, {
       headers: {
         "User-Agent": "ERP-HuynhGia6/1.0 (contact: admin@huynhgia6.com)",
