@@ -68,18 +68,55 @@ function ymdLocal(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-function getGeolocation(): Promise<GeolocationPosition | null> {
+type GeoResult =
+  | { kind: "ok"; pos: GeolocationPosition }
+  | { kind: "unsupported" }
+  | { kind: "denied" }
+  | { kind: "unavailable" }
+  | { kind: "timeout" };
+
+function getGeolocation(): Promise<GeoResult> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve(null);
+      resolve({ kind: "unsupported" });
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+    const tryOnce = (highAccuracy: boolean, timeoutMs: number) =>
+      new Promise<GeoResult>((res) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => res({ kind: "ok", pos }),
+          (err) => {
+            if (err.code === err.PERMISSION_DENIED) res({ kind: "denied" });
+            else if (err.code === err.POSITION_UNAVAILABLE) res({ kind: "unavailable" });
+            else if (err.code === err.TIMEOUT) res({ kind: "timeout" });
+            else res({ kind: "unavailable" });
+          },
+          { enableHighAccuracy: highAccuracy, timeout: timeoutMs, maximumAge: 0 },
+        );
+      });
+    // Try high-accuracy 12s first; if that fails non-denied, retry low-accuracy 15s.
+    tryOnce(true, 12000).then(async (first) => {
+      if (first.kind === "ok" || first.kind === "denied") {
+        resolve(first);
+        return;
+      }
+      const second = await tryOnce(false, 15000);
+      resolve(second);
+    });
   });
+}
+
+function geoErrorMessage(kind: Exclude<GeoResult["kind"], "ok">): string {
+  if (kind === "unsupported") {
+    return "Trình duyệt không hỗ trợ định vị. Vui lòng dùng Chrome/Safari mới nhất.";
+  }
+  if (kind === "denied") {
+    return "Anh chưa cho phép truy cập vị trí. Vào Cài đặt → Quyền ứng dụng → Vị trí → Cho phép, sau đó tải lại trang và chấm lại.";
+  }
+  if (kind === "timeout") {
+    return "Không lấy được vị trí (quá lâu). Anh kiểm tra GPS đã bật chưa, ra chỗ thoáng (không bị toà nhà che) rồi thử lại.";
+  }
+  return "Không lấy được vị trí. Anh kiểm tra GPS điện thoại đã bật chưa, và đang dùng trình duyệt thường (không phải app Zalo/Messenger), rồi thử lại.";
 }
 
 export function ChamCongClient() {
@@ -129,15 +166,18 @@ export function ChamCongClient() {
     setBusy(kind);
     setError(null);
     try {
-      const pos = await getGeolocation();
+      const geo = await getGeolocation();
+      if (geo.kind !== "ok") {
+        const msg = geoErrorMessage(geo.kind);
+        toast.error(msg, { duration: 10000 });
+        throw new Error(msg);
+      }
       const fd = new FormData();
       fd.append("photo", file);
-      if (pos) {
-        fd.append("lat", String(pos.coords.latitude));
-        fd.append("lng", String(pos.coords.longitude));
-        if (Number.isFinite(pos.coords.accuracy)) {
-          fd.append("accuracy", String(pos.coords.accuracy));
-        }
+      fd.append("lat", String(geo.pos.coords.latitude));
+      fd.append("lng", String(geo.pos.coords.longitude));
+      if (Number.isFinite(geo.pos.coords.accuracy)) {
+        fd.append("accuracy", String(geo.pos.coords.accuracy));
       }
       const endpoint = kind === "in" ? "/api/attendance/check-in" : "/api/attendance/check-out";
       const res = await fetch(endpoint, { method: "POST", body: fd });

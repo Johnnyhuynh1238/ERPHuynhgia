@@ -32,6 +32,12 @@ export async function POST(request: Request) {
   }
 
   const { lat, lng, accuracy } = parseLatLng(formData);
+  if (lat === null || lng === null) {
+    return NextResponse.json(
+      { message: "Thiếu vị trí GPS. Vui lòng bật định vị và cho phép truy cập vị trí rồi chấm lại." },
+      { status: 400 },
+    );
+  }
   const noteRaw = formData.get("note");
   const note = typeof noteRaw === "string" ? noteRaw.trim().slice(0, 500) : null;
 
