@@ -728,12 +728,14 @@ export async function GET() {
   if (user.role === UserRole.accountant) {
     const monthStart = startOfMonthUtc(today);
     const monthEnd = endOfMonthUtc(today);
+    const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
 
     const [upcoming, late, collectedMonthAgg, expectedMonthAgg, approvedSubPayments] = await Promise.all([
       prisma.paymentSchedule.findMany({
         where: {
           status: PaymentStatus.not_collected,
           expectedDate: { gte: today, lte: in7Days },
+          project: projectAccess,
         },
         include: { project: { select: { id: true, code: true, name: true } } },
         orderBy: { expectedDate: "asc" },
@@ -742,6 +744,7 @@ export async function GET() {
         where: {
           OR: [{ status: PaymentStatus.not_collected }, { status: PaymentStatus.customer_late }],
           expectedDate: { lt: today },
+          project: projectAccess,
         },
         include: { project: { select: { id: true, code: true, name: true } } },
         orderBy: { expectedDate: "asc" },
@@ -751,17 +754,20 @@ export async function GET() {
         where: {
           status: PaymentStatus.collected,
           actualPaidDate: { gte: monthStart, lte: monthEnd },
+          project: projectAccess,
         },
       }),
       prisma.paymentSchedule.aggregate({
         _sum: { amount: true },
         where: {
           expectedDate: { gte: monthStart, lte: monthEnd },
+          project: projectAccess,
         },
       }),
       prisma.subPayment.count({
         where: {
           status: "approved",
+          subContract: { project: projectAccess },
         },
       }),
     ]);
