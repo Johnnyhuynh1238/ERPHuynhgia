@@ -216,6 +216,12 @@ export function ChamCongClient() {
       const geo = await getGeolocation();
       if (geo.kind !== "ok") {
         setGeoError({ kind: geo.kind, lastAction: kind });
+        fetch("/api/attendance/geo-error", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: geo.kind, action: kind }),
+          keepalive: true,
+        }).catch(() => {});
         closeSelfie();
         setBusy(null);
         return;

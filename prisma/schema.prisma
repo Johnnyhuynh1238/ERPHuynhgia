@@ -482,6 +482,19 @@ model KsAttendance {
   @@map("ks_attendance")
 }
 
+model KsGeoErrorLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  kind      String   @db.VarChar(20)
+  action    String?  @db.VarChar(10)
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("ks_geo_error_log")
+}
+
 model Shift {
   id           String   @id @default(uuid()) @db.Uuid
   name         String   @unique
