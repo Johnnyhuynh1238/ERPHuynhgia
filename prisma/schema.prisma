@@ -483,12 +483,14 @@ model KsAttendance {
 }
 
 model KsGeoErrorLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  kind      String   @db.VarChar(20)
-  action    String?  @db.VarChar(10)
-  userAgent String?  @map("user_agent") @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  kind            String   @db.VarChar(20)
+  action          String?  @db.VarChar(10)
+  permissionState String?  @map("permission_state") @db.VarChar(20)
+  errorMessage    String?  @map("error_message") @db.Text
+  userAgent       String?  @map("user_agent") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([userId, createdAt])
   @@index([createdAt])

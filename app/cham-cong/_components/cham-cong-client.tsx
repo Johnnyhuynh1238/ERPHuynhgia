@@ -70,38 +70,63 @@ function ymdLocal(d: Date) {
 
 type GeoResult =
   | { kind: "ok"; pos: GeolocationPosition }
-  | { kind: "unsupported" }
-  | { kind: "denied" }
-  | { kind: "unavailable" }
-  | { kind: "timeout" };
+  | { kind: "unsupported"; permissionState: string | null; errorMessage: string | null }
+  | { kind: "denied"; permissionState: string | null; errorMessage: string | null }
+  | { kind: "unavailable"; permissionState: string | null; errorMessage: string | null }
+  | { kind: "timeout"; permissionState: string | null; errorMessage: string | null };
 
-function getGeolocation(): Promise<GeoResult> {
+async function queryPermissionState(): Promise<string | null> {
+  try {
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return null;
+    const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+    return status.state || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getGeolocation(): Promise<GeoResult> {
+  const permissionState = await queryPermissionState();
+
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve({ kind: "unsupported" });
+      resolve({ kind: "unsupported", permissionState, errorMessage: null });
       return;
     }
+    type TryResult =
+      | { kind: "ok"; pos: GeolocationPosition }
+      | { kind: "denied" | "unavailable" | "timeout"; errorMessage: string | null };
+
     const tryOnce = (highAccuracy: boolean, timeoutMs: number) =>
-      new Promise<GeoResult>((res) => {
+      new Promise<TryResult>((res) => {
         navigator.geolocation.getCurrentPosition(
           (pos) => res({ kind: "ok", pos }),
           (err) => {
-            if (err.code === err.PERMISSION_DENIED) res({ kind: "denied" });
-            else if (err.code === err.POSITION_UNAVAILABLE) res({ kind: "unavailable" });
-            else if (err.code === err.TIMEOUT) res({ kind: "timeout" });
-            else res({ kind: "unavailable" });
+            const msg = err?.message ? String(err.message).slice(0, 300) : null;
+            if (err.code === err.PERMISSION_DENIED) res({ kind: "denied", errorMessage: msg });
+            else if (err.code === err.POSITION_UNAVAILABLE) res({ kind: "unavailable", errorMessage: msg });
+            else if (err.code === err.TIMEOUT) res({ kind: "timeout", errorMessage: msg });
+            else res({ kind: "unavailable", errorMessage: msg });
           },
           { enableHighAccuracy: highAccuracy, timeout: timeoutMs, maximumAge: 0 },
         );
       });
-    // Try high-accuracy 12s first; if that fails non-denied, retry low-accuracy 15s.
+
     tryOnce(true, 12000).then(async (first) => {
-      if (first.kind === "ok" || first.kind === "denied") {
-        resolve(first);
+      if (first.kind === "ok") {
+        resolve({ kind: "ok", pos: first.pos });
+        return;
+      }
+      if (first.kind === "denied") {
+        resolve({ kind: "denied", permissionState, errorMessage: first.errorMessage });
         return;
       }
       const second = await tryOnce(false, 15000);
-      resolve(second);
+      if (second.kind === "ok") {
+        resolve({ kind: "ok", pos: second.pos });
+        return;
+      }
+      resolve({ kind: second.kind, permissionState, errorMessage: second.errorMessage });
     });
   });
 }
@@ -219,7 +244,12 @@ export function ChamCongClient() {
         fetch("/api/attendance/geo-error", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: geo.kind, action: kind }),
+          body: JSON.stringify({
+            kind: geo.kind,
+            action: kind,
+            permissionState: geo.permissionState,
+            errorMessage: geo.errorMessage,
+          }),
           keepalive: true,
         }).catch(() => {});
         closeSelfie();
