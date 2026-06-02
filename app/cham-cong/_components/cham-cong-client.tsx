@@ -106,17 +106,62 @@ function getGeolocation(): Promise<GeoResult> {
   });
 }
 
-function geoErrorMessage(kind: Exclude<GeoResult["kind"], "ok">): string {
-  if (kind === "unsupported") {
-    return "Trình duyệt không hỗ trợ định vị. Vui lòng dùng Chrome/Safari mới nhất.";
+type GeoErrorKind = Exclude<GeoResult["kind"], "ok">;
+
+function geoErrorTitle(kind: GeoErrorKind): string {
+  if (kind === "unsupported") return "Trình duyệt không hỗ trợ định vị";
+  if (kind === "denied") return "Anh chưa cho phép truy cập vị trí";
+  if (kind === "timeout") return "Quá lâu không lấy được vị trí";
+  return "Không lấy được vị trí GPS";
+}
+
+function geoErrorHint(kind: GeoErrorKind): string {
+  if (kind === "unsupported") return "Vui lòng dùng Chrome hoặc Safari mới nhất, không dùng app Zalo/Messenger.";
+  if (kind === "denied") return "Cần mở Cài đặt → bật quyền Vị trí cho trình duyệt, sau đó quay lại tải lại trang và chấm lại.";
+  if (kind === "timeout") return "Bật GPS điện thoại, ra chỗ thoáng (không có toà nhà che), rồi thử lại.";
+  return "Bật GPS điện thoại, kiểm tra anh đang dùng trình duyệt thường (Chrome/Safari), rồi thử lại.";
+}
+
+type Platform = "android" | "ios" | "other";
+
+function detectPlatform(): Platform {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent || "";
+  if (/Android/i.test(ua)) return "android";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+  return "other";
+}
+
+function locationSettingsHref(p: Platform): string | null {
+  if (p === "android") {
+    return "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end";
   }
-  if (kind === "denied") {
-    return "Anh chưa cho phép truy cập vị trí. Vào Cài đặt → Quyền ứng dụng → Vị trí → Cho phép, sau đó tải lại trang và chấm lại.";
+  if (p === "ios") {
+    return "App-Prefs:Privacy&path=LOCATION";
   }
-  if (kind === "timeout") {
-    return "Không lấy được vị trí (quá lâu). Anh kiểm tra GPS đã bật chưa, ra chỗ thoáng (không bị toà nhà che) rồi thử lại.";
+  return null;
+}
+
+function platformSteps(p: Platform): string[] {
+  if (p === "android") {
+    return [
+      "1. Bấm nút Mở cài đặt vị trí bên dưới (hoặc vuốt từ trên xuống → bật biểu tượng Vị trí)",
+      "2. Bật công tắc Vị trí (Location) ở đầu màn hình",
+      "3. Quay lại trình duyệt, tải lại trang, bấm Chấm vào lại",
+    ];
   }
-  return "Không lấy được vị trí. Anh kiểm tra GPS điện thoại đã bật chưa, và đang dùng trình duyệt thường (không phải app Zalo/Messenger), rồi thử lại.";
+  if (p === "ios") {
+    return [
+      "1. Vào Cài đặt → Quyền riêng tư & Bảo mật → Dịch vụ định vị → bật ON",
+      "2. Cuộn xuống mục Safari → chọn 'Khi sử dụng App' và bật Vị trí Chính xác",
+      "3. Quay lại Safari, tải lại trang, bấm Chấm vào lại",
+    ];
+  }
+  return [
+    "1. Bấm vào biểu tượng ổ khóa cạnh thanh địa chỉ trình duyệt",
+    "2. Chọn Quyền (Permissions) → Vị trí → Cho phép",
+    "3. Tải lại trang và bấm Chấm vào lại",
+  ];
 }
 
 export function ChamCongClient() {
@@ -127,6 +172,7 @@ export function ChamCongClient() {
   const [error, setError] = useState<string | null>(null);
   const [selfieOpen, setSelfieOpen] = useState<null | "in" | "out">(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [geoError, setGeoError] = useState<{ kind: GeoErrorKind; lastAction: "in" | "out" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadToday = useCallback(async () => {
@@ -154,6 +200,7 @@ export function ChamCongClient() {
 
   const openSelfie = (kind: "in" | "out") => {
     setError(null);
+    setGeoError(null);
     setSelfieOpen(kind);
   };
 
@@ -168,10 +215,12 @@ export function ChamCongClient() {
     try {
       const geo = await getGeolocation();
       if (geo.kind !== "ok") {
-        const msg = geoErrorMessage(geo.kind);
-        toast.error(msg, { duration: 10000 });
-        throw new Error(msg);
+        setGeoError({ kind: geo.kind, lastAction: kind });
+        closeSelfie();
+        setBusy(null);
+        return;
       }
+      setGeoError(null);
       const fd = new FormData();
       fd.append("photo", file);
       fd.append("lat", String(geo.pos.coords.latitude));
@@ -312,7 +361,19 @@ export function ChamCongClient() {
         )}
       </div>
 
-      {error ? (
+      {geoError ? (
+        <GpsHelpCard
+          kind={geoError.kind}
+          onRetry={() => {
+            const k = geoError.lastAction;
+            setGeoError(null);
+            openSelfie(k);
+          }}
+          onDismiss={() => setGeoError(null)}
+        />
+      ) : null}
+
+      {error && !geoError ? (
         <div className="slide-up rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>
       ) : null}
 
@@ -563,6 +624,78 @@ export function ChamCongClient() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function GpsHelpCard({
+  kind,
+  onRetry,
+  onDismiss,
+}: {
+  kind: GeoErrorKind;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  const platform = detectPlatform();
+  const settingsHref = locationSettingsHref(platform);
+  const steps = platformSteps(platform);
+  const platformLabel =
+    platform === "android" ? "Android" : platform === "ios" ? "iPhone/iPad" : "Máy tính";
+
+  return (
+    <div className="slide-up overflow-hidden rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-[#1a1d2e]/60 to-[#13151f]/80 backdrop-blur-sm">
+      <div className="flex items-start gap-3 p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl">
+          📍
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-amber-100">{geoErrorTitle(kind)}</div>
+          <div className="mt-1 text-xs leading-relaxed text-[#cdd3ec]">{geoErrorHint(kind)}</div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="shrink-0 rounded-md border border-white/15 px-2 py-0.5 text-xs text-white/60 hover:bg-white/10"
+          aria-label="Đóng"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 px-4 pb-3">
+        {settingsHref ? (
+          <a
+            href={settingsHref}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/30"
+          >
+            ⚙️ Mở cài đặt vị trí
+          </a>
+        ) : null}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+        >
+          🔄 Thử chấm lại
+        </button>
+      </div>
+
+      <div className="border-t border-white/10 bg-black/20 px-4 py-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200/80">
+          Hướng dẫn cho {platformLabel}
+        </div>
+        <ol className="mt-1.5 space-y-1 text-[12px] text-[#cdd3ec]">
+          {steps.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
+        {platform === "ios" ? (
+          <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-200/80">
+            Lưu ý: iOS không cho web mở thẳng Cài đặt. Nếu nút trên không phản hồi, anh mở Cài đặt thủ công theo các bước trên.
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
