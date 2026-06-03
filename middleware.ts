@@ -23,7 +23,12 @@ function applySecurityHeaders(res: NextResponse, isPortal: boolean) {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("X-Frame-Options", "SAMEORIGIN");
   res.headers.set("Referrer-Policy", isPortal ? "no-referrer" : "strict-origin-when-cross-origin");
-  res.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  res.headers.set(
+    "Permissions-Policy",
+    isPortal
+      ? "camera=(self), microphone=(), geolocation=()"
+      : "camera=(self), microphone=(), geolocation=(self)",
+  );
   return res;
 }
 
