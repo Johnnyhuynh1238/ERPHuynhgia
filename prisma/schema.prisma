@@ -346,6 +346,18 @@ enum DailyAssignmentType {
   progress_update
   tptc_assignment
   qc_checklist
+  worker_attendance_morning
+  worker_attendance_afternoon
+}
+
+enum WorkerRole {
+  tho
+  phu
+}
+
+enum WorkerAttendanceSession {
+  morning
+  afternoon
 }
 
 enum DailyAssignmentStatus {
@@ -447,6 +459,8 @@ model User {
   projectActivityLogs           ProjectActivityLog[]      @relation("ProjectActivityActor")
   ksAttendances                 KsAttendance[]            @relation("KsAttendanceUser")
   shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
+  workersCreated                Worker[]                  @relation("WorkerCreatedBy")
+  workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
 
   @@map("users")
 }
@@ -587,6 +601,8 @@ model Project {
   customerNotifications     CustomerNotification[]
   activityLogs              ProjectActivityLog[]
   customerPushSubscriptions CustomerPushSubscription[]
+  workers                   Worker[]
+  workerAttendances         WorkerAttendance[]
 
   @@index([status])
   @@map("projects")
@@ -776,6 +792,46 @@ model DailyReportSubmission {
 
   @@unique([ksUserId, reportDate])
   @@map("daily_report_submissions")
+}
+
+model Worker {
+  id             String     @id @default(uuid()) @db.Uuid
+  projectId      String     @map("project_id") @db.Uuid
+  fullName       String     @map("full_name")
+  phone          String?
+  role           WorkerRole @default(tho)
+  idCardPhotoUrl String?    @map("id_card_photo_url")
+  status         String     @default("active") @db.VarChar(20)
+  sortRank       Float      @default(0) @map("sort_rank")
+  createdById    String     @map("created_by_id") @db.Uuid
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
+  attendances WorkerAttendance[]
+
+  @@index([projectId, status])
+  @@map("workers")
+}
+
+model WorkerAttendance {
+  id         String                  @id @default(uuid()) @db.Uuid
+  workerId   String                  @map("worker_id") @db.Uuid
+  projectId  String                  @map("project_id") @db.Uuid
+  date       DateTime                @map("date") @db.Date
+  session    WorkerAttendanceSession
+  present    Boolean                 @default(false)
+  markedById String                  @map("marked_by_id") @db.Uuid
+  markedAt   DateTime                @default(now()) @map("marked_at")
+
+  worker   Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  markedBy User    @relation("WorkerAttendanceMarkedBy", fields: [markedById], references: [id])
+
+  @@unique([workerId, date, session])
+  @@index([projectId, date, session])
+  @@map("worker_attendances")
 }
 
 model Task {

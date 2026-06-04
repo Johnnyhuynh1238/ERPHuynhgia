@@ -9,6 +9,7 @@ import {
   sortFlatAssignments,
   upsertPendingTptcAssignmentsForDay,
 } from "@/lib/reports-v3";
+import { buildWorkerAttendanceAssignments } from "@/lib/worker-attendance-assignments";
 import { isDefaultRestDay } from "@/lib/reporting";
 
 export async function GET(request: Request) {
@@ -151,7 +152,13 @@ export async function GET(request: Request) {
     };
   });
 
-  const sorted = sortFlatAssignments(assignments as any[]) as any[];
+  const workerAttendanceItems = await buildWorkerAttendanceAssignments({
+    ksUserId: user.id,
+    reportDate,
+    now,
+  });
+
+  const sorted = sortFlatAssignments([...assignments, ...workerAttendanceItems] as any[]) as any[];
 
   const stats = {
     total: sorted.length,

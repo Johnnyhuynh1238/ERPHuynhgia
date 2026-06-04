@@ -5,7 +5,13 @@ import { createPortal } from "react-dom";
 import { type TaskPhotoItem, TaskPhotoUploadStatus, useTaskPhotoUploader } from "../../tasks/[id]/_components/task-photo-tools";
 
 type AssignmentStatus = "pending" | "done" | "not_applicable";
-type AssignmentType = "template_item" | "progress_update" | "tptc_assignment" | "qc_checklist";
+type AssignmentType =
+  | "template_item"
+  | "progress_update"
+  | "tptc_assignment"
+  | "qc_checklist"
+  | "worker_attendance_morning"
+  | "worker_attendance_afternoon";
 type AssignmentPriority = "normal" | "important" | "urgent" | "critical";
 
 type FlatAssignment = {
@@ -550,6 +556,35 @@ export function ReportsHubClient() {
     const isQc = item.type === "qc_checklist";
     const displayTitle = item.type === "progress_update" && item.taskName ? `Cập nhật tiến độ · ${item.taskName}` : item.title;
     const metaLine = `${item.taskCode ? `${item.taskCode} · ` : ""}${item.projectName || "Không rõ dự án"}`;
+
+    if (item.type === "worker_attendance_morning" || item.type === "worker_attendance_afternoon") {
+      const sessionParam = item.type === "worker_attendance_afternoon" ? "afternoon" : "morning";
+      const sessionLabel = sessionParam === "afternoon" ? "Chấm công chiều" : "Chấm công sáng";
+      return (
+        <a
+          key={item.id}
+          href={`/cham-cong-tho/${item.projectId}?session=${sessionParam}`}
+          className={`block w-full rounded-2xl border p-4 text-left transition active:scale-[0.97] ${
+            isDone
+              ? "border-emerald-500/30 bg-emerald-500/10 opacity-80"
+              : "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className={`text-[10px] font-bold uppercase tracking-wide ${isDone ? "text-emerald-300" : "text-amber-300"}`}>
+                {sessionLabel} · Thợ
+              </div>
+              <div className="mt-1 text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
+              <div className="mt-1 text-xs leading-5 text-[#8892b0]">{metaLine}</div>
+            </div>
+            <div className={`shrink-0 text-xs font-semibold ${isDone ? "text-emerald-300" : "text-amber-300"}`}>
+              {isDone ? "Đã chấm ✓" : "Mở →"}
+            </div>
+          </div>
+        </a>
+      );
+    }
 
     if (isQc && item.taskId) {
       return (
