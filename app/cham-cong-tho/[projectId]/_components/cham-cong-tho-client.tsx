@@ -48,6 +48,10 @@ export function ChamCongThoClient({
   // workerId → timestamp tick gần nhất (để sort khối "đã tick" theo thứ tự tick mới nhất lên đầu)
   const [tickedAtMap, setTickedAtMap] = useState<Record<string, number>>({});
   const [addOpen, setAddOpen] = useState(false);
+  const [actionsFor, setActionsFor] = useState<Worker | null>(null);
+  const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
+  const [deletingWorker, setDeletingWorker] = useState<Worker | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +124,49 @@ export function ChamCongThoClient({
 
   const presentCount = data?.workers.filter((w) => w.present).length || 0;
   const totalCount = data?.workers.length || 0;
+
+  const handleUpdated = (updated: Worker) => {
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            workers: prev.workers.map((w) =>
+              w.id === updated.id ? { ...w, ...updated, present: w.present } : w,
+            ),
+          }
+        : prev,
+    );
+    setEditingWorker(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingWorker) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/cham-cong-tho/${projectId}/workers/${deletingWorker.id}`,
+        { method: "DELETE" },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "Xoá thất bại");
+      setData((prev) =>
+        prev
+          ? { ...prev, workers: prev.workers.filter((w) => w.id !== deletingWorker.id) }
+          : prev,
+      );
+      setTickedAtMap((prev) => {
+        const next = { ...prev };
+        delete next[deletingWorker.id];
+        return next;
+      });
+      setDeletingWorker(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lỗi xoá thợ");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const save = async () => {
     if (!data) return;
@@ -257,6 +304,21 @@ export function ChamCongThoClient({
                         {w.phone && <span>· {w.phone}</span>}
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActionsFor(w);
+                      }}
+                      aria-label="Tuỳ chọn thợ"
+                      className="shrink-0 rounded-lg p-2 text-[#8892b0] hover:bg-[#0f1118] hover:text-[#f0f2ff]"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                        <circle cx="5" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
+                      </svg>
+                    </button>
                   </li>
                 );
               })}
@@ -288,6 +350,39 @@ export function ChamCongThoClient({
             );
             setAddOpen(false);
           }}
+        />
+      )}
+
+      {actionsFor && (
+        <WorkerActionSheet
+          worker={actionsFor}
+          onClose={() => setActionsFor(null)}
+          onEdit={() => {
+            setEditingWorker(actionsFor);
+            setActionsFor(null);
+          }}
+          onDelete={() => {
+            setDeletingWorker(actionsFor);
+            setActionsFor(null);
+          }}
+        />
+      )}
+
+      {editingWorker && (
+        <EditWorkerModal
+          projectId={projectId}
+          worker={editingWorker}
+          onClose={() => setEditingWorker(null)}
+          onUpdated={handleUpdated}
+        />
+      )}
+
+      {deletingWorker && (
+        <DeleteWorkerDialog
+          worker={deletingWorker}
+          submitting={deleting}
+          onCancel={() => setDeletingWorker(null)}
+          onConfirm={handleDelete}
         />
       )}
     </div>
@@ -433,6 +528,259 @@ function AddWorkerModal({
           <Button onClick={submit} disabled={submitting} className="flex-1">
             {submitting ? "Đang lưu…" : "Thêm"}
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkerActionSheet({
+  worker,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  worker: Worker;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-t-2xl border border-[#252840] bg-[#0f1118] p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 px-1">
+          <div className="text-sm font-semibold text-[#f0f2ff]">{worker.fullName}</div>
+          <div className="text-xs text-[#8892b0]">
+            {ROLE_LABEL[worker.role]}
+            {worker.phone ? ` · ${worker.phone}` : ""}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="w-full rounded-xl border border-[#252840] bg-[#1a1d2e] px-4 py-3 text-left text-sm font-medium text-[#f0f2ff] hover:bg-[#252840]"
+        >
+          ✏️ Sửa thông tin
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="mt-2 w-full rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-left text-sm font-medium text-red-300 hover:bg-red-500/20"
+        >
+          🗑 Xoá thợ
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 w-full rounded-xl border border-[#252840] px-4 py-3 text-sm text-[#8892b0]"
+        >
+          Huỷ
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditWorkerModal({
+  projectId,
+  worker,
+  onClose,
+  onUpdated,
+}: {
+  projectId: string;
+  worker: Worker;
+  onClose: () => void;
+  onUpdated: (w: Worker) => void;
+}) {
+  const [fullName, setFullName] = useState(worker.fullName);
+  const [phone, setPhone] = useState(worker.phone || "");
+  const [role, setRole] = useState<"tho" | "phu">(worker.role);
+  const [idCardFile, setIdCardFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const idCardInputRef = useRef<HTMLInputElement | null>(null);
+
+  const submit = async () => {
+    if (!fullName.trim()) {
+      setError("Nhập họ tên");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("fullName", fullName.trim());
+      fd.append("phone", phone.trim());
+      fd.append("role", role);
+      if (idCardFile) fd.append("idCard", idCardFile);
+      const res = await fetch(`/api/cham-cong-tho/${projectId}/workers/${worker.id}`, {
+        method: "PATCH",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || "Cập nhật thất bại");
+      onUpdated(json.worker);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lỗi cập nhật");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center">
+      <div className="w-full max-w-lg rounded-t-2xl border border-[#252840] bg-[#0f1118] p-5 sm:rounded-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#f0f2ff]">Sửa thông tin thợ</h2>
+          <button onClick={onClose} className="text-[#8892b0]">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-[#8892b0]">Họ và tên *</label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#a78bfa]"
+              maxLength={100}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#8892b0]">Số điện thoại</label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              type="tel"
+              className="mt-1 w-full rounded-lg border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#a78bfa]"
+              placeholder="09xx..."
+              maxLength={20}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#8892b0]">Chức danh *</label>
+            <div className="mt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRole("tho")}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  role === "tho"
+                    ? "border-[#a78bfa] bg-[#1a1d2e] text-[#a78bfa]"
+                    : "border-[#252840] text-[#8892b0]"
+                }`}
+              >
+                Thợ
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("phu")}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  role === "phu"
+                    ? "border-[#a78bfa] bg-[#1a1d2e] text-[#a78bfa]"
+                    : "border-[#252840] text-[#8892b0]"
+                }`}
+              >
+                Phụ
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-[#8892b0]">
+              Ảnh CCCD {worker.hasIdCardPhoto && <span className="text-emerald-400">· đã có</span>}
+            </label>
+            <input
+              ref={idCardInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setIdCardFile(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => idCardInputRef.current?.click()}
+              className="mt-1 w-full rounded-lg border border-dashed border-[#252840] py-3 text-sm text-[#8892b0] hover:bg-[#1a1d2e]"
+            >
+              {idCardFile
+                ? `✓ ${idCardFile.name}`
+                : worker.hasIdCardPhoto
+                  ? "📷 Đổi ảnh CCCD"
+                  : "📷 Chụp / chọn ảnh CCCD"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-[#252840] py-2 text-sm text-[#8892b0]"
+          >
+            Huỷ
+          </button>
+          <Button onClick={submit} disabled={submitting} className="flex-1">
+            {submitting ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteWorkerDialog({
+  worker,
+  submitting,
+  onCancel,
+  onConfirm,
+}: {
+  worker: Worker;
+  submitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border border-[#252840] bg-[#0f1118] p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-bold text-[#f0f2ff]">Xoá thợ?</h2>
+        <p className="mt-2 text-sm text-[#8892b0]">
+          Xoá <span className="font-medium text-[#f0f2ff]">{worker.fullName}</span> khỏi danh sách
+          chấm công của dự án. Lịch sử chấm công cũ vẫn được giữ.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="flex-1 rounded-lg border border-[#252840] py-2 text-sm text-[#8892b0]"
+          >
+            Huỷ
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={submitting}
+            className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-60"
+          >
+            {submitting ? "Đang xoá…" : "Xoá"}
+          </button>
         </div>
       </div>
     </div>
