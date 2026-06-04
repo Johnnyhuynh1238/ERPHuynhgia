@@ -48,6 +48,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
     { label: "Lương KS", href: "/admin/engineers/salary" },
     { label: "Chấm công NV", href: "/admin/attendance" },
+    { label: "Bảng công thợ", href: "/admin/worker-attendance" },
     { label: "Ca làm việc", href: "/admin/shifts" },
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
@@ -79,6 +80,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Thanh toán", href: "/payments" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Chấm công NV", href: "/admin/attendance" },
+    { label: "Bảng công thợ", href: "/admin/worker-attendance" },
     { label: "Ca làm việc", href: "/admin/shifts" },
   ],
   construction_manager: [

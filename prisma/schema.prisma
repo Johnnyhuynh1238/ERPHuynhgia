@@ -801,6 +801,7 @@ model Worker {
   phone          String?
   role           WorkerRole @default(tho)
   idCardPhotoUrl String?    @map("id_card_photo_url")
+  dailyRate      Int?       @map("daily_rate")
   status         String     @default("active") @db.VarChar(20)
   sortRank       Float      @default(0) @map("sort_rank")
   createdById    String     @map("created_by_id") @db.Uuid
