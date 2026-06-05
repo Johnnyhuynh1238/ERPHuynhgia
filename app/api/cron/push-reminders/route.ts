@@ -194,13 +194,15 @@ export async function POST(request: Request) {
   // Sáng: từ 0h VN trở đi, không push. Chiều: từ 13h VN trở đi, push bell cho KS.
   // Chủ Nhật mặc định công trường nghỉ → bỏ qua cả 2.
   if (!isSundayDefaultRest) {
-    const hourVn = Number(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Ho_Chi_Minh",
-        hour: "2-digit",
-        hour12: false,
-      }).format(now),
-    );
+    // Alpine/musl Node trả về "24" lúc 00:00 VN với hour12:false → phải dùng hourCycle h23 + modulo
+    const hourVn =
+      Number(
+        new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          hour: "2-digit",
+          hourCycle: "h23",
+        }).format(now),
+      ) % 24;
 
     type SeedSession = "morning" | "afternoon";
     const seedRoutes: Array<{ session: SeedSession; type: DailyAssignmentType; gateHour: number; push: boolean }> = [
