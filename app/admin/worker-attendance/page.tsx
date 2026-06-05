@@ -3,7 +3,10 @@ import { ProjectStatus, UserRole } from "@prisma/client";
 import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { canViewAdminWorkerAttendance } from "@/lib/worker-attendance-summary";
+import {
+  canViewAdminWorkerAttendance,
+  getAccessibleProjectIdsForWorkerAttendance,
+} from "@/lib/worker-attendance-summary";
 import { WorkerAttendanceAdminClient } from "./_components/worker-attendance-client";
 
 export default async function AdminWorkerAttendancePage() {
@@ -15,9 +18,11 @@ export default async function AdminWorkerAttendancePage() {
     redirect("/?denied=1");
   }
 
+  const accessibleIds = await getAccessibleProjectIdsForWorkerAttendance(user.id, user.role);
   const projects = await prisma.project.findMany({
     where: {
       status: { in: [ProjectStatus.in_progress, ProjectStatus.planning, ProjectStatus.paused] },
+      ...(accessibleIds === null ? {} : { id: { in: accessibleIds } }),
     },
     select: { id: true, name: true, status: true },
     orderBy: [{ status: "asc" }, { name: "asc" }],

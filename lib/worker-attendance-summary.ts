@@ -9,6 +9,22 @@ export function canEditWorkerWage(role: string | null | undefined) {
   return role === UserRole.admin || role === UserRole.accountant;
 }
 
+/**
+ * Trả null nếu admin (truy cập mọi dự án), hoặc danh sách projectId mà user là
+ * member. Kế toán / TPTC chỉ thấy dự án mình có ProjectMemberAssignment.
+ */
+export async function getAccessibleProjectIdsForWorkerAttendance(
+  userId: string,
+  role: string | null | undefined,
+): Promise<string[] | null> {
+  if (role === UserRole.admin) return null;
+  const memberships = await prisma.projectMemberAssignment.findMany({
+    where: { userId },
+    select: { projectId: true },
+  });
+  return memberships.map((m) => m.projectId);
+}
+
 export function parseDateOnly(input: string | null) {
   if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input)) return null;
   const [y, m, d] = input.split("-").map(Number);

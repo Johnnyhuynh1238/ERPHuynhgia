@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import {
   canViewAdminWorkerAttendance,
+  getAccessibleProjectIdsForWorkerAttendance,
   getWorkerAttendanceForWeek,
   mondayOfWeekUtc,
   parseDateOnly,
@@ -18,6 +19,11 @@ export async function GET(request: Request) {
   const projectId = url.searchParams.get("projectId");
   if (!projectId) {
     return NextResponse.json({ message: "Thiếu projectId" }, { status: 400 });
+  }
+
+  const accessibleIds = await getAccessibleProjectIdsForWorkerAttendance(user.id, user.role);
+  if (accessibleIds !== null && !accessibleIds.includes(projectId)) {
+    return NextResponse.json({ message: "Không có quyền với dự án này" }, { status: 403 });
   }
 
   const project = await prisma.project.findUnique({

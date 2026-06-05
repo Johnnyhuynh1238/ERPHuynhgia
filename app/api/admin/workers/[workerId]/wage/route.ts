@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { canEditWorkerWage } from "@/lib/worker-attendance-summary";
+import {
+  canEditWorkerWage,
+  getAccessibleProjectIdsForWorkerAttendance,
+} from "@/lib/worker-attendance-summary";
 
 export async function PATCH(
   request: Request,
@@ -31,10 +34,15 @@ export async function PATCH(
 
   const worker = await prisma.worker.findUnique({
     where: { id: params.workerId },
-    select: { id: true },
+    select: { id: true, projectId: true },
   });
   if (!worker) {
     return NextResponse.json({ message: "Không tìm thấy thợ" }, { status: 404 });
+  }
+
+  const accessibleIds = await getAccessibleProjectIdsForWorkerAttendance(user.id, user.role);
+  if (accessibleIds !== null && !accessibleIds.includes(worker.projectId)) {
+    return NextResponse.json({ message: "Không có quyền với dự án này" }, { status: 403 });
   }
 
   const updated = await prisma.worker.update({

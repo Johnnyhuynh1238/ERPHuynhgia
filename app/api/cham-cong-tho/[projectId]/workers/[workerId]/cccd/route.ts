@@ -11,9 +11,8 @@ export async function GET(_request: Request, { params }: { params: { projectId: 
     return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
   }
 
-  // Chỉ admin/construction_manager/accountant + KS thành viên dự án mới được xem CCCD
-  const allowed = ["admin", "construction_manager", "accountant"].includes(user.role);
-  if (!allowed) {
+  // Admin xem mọi dự án. Các role khác (KS, TPTC, kế toán) phải là member của dự án.
+  if (user.role !== "admin") {
     const membership = await prisma.projectMemberAssignment.findFirst({
       where: { userId: user.id, projectId: params.projectId },
       select: { id: true },
