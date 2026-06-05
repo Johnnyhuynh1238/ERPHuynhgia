@@ -93,7 +93,7 @@ export function WorkerAttendanceAdminClient({
   const [error, setError] = useState<string | null>(null);
   const [savingRateId, setSavingRateId] = useState<string | null>(null);
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
-  const [cccdWorker, setCccdWorker] = useState<{ id: string; name: string } | null>(null);
+  const [detailWorker, setDetailWorker] = useState<Row | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!projectId) {
@@ -165,9 +165,9 @@ export function WorkerAttendanceAdminClient({
 
   const weekTitle = data ? `${formatDM(data.weekStart)} – ${formatDM(data.weekEnd)}` : "—";
 
-  const cccdImgUrl =
-    cccdWorker && projectId
-      ? `/api/cham-cong-tho/${projectId}/workers/${cccdWorker.id}/cccd`
+  const detailCccdUrl =
+    detailWorker && projectId && detailWorker.hasIdCardPhoto
+      ? `/api/cham-cong-tho/${projectId}/workers/${detailWorker.workerId}/cccd`
       : null;
 
   return (
@@ -175,7 +175,7 @@ export function WorkerAttendanceAdminClient({
       <header className="space-y-1">
         <h1 className="text-xl md:text-2xl font-semibold text-white">Bảng công thợ theo tuần</h1>
         <p className="text-xs md:text-sm text-white/60">
-          Chọn dự án + tuần. Nhập lương ngày cho từng thợ. Tổng = số công × lương ngày.
+          Chọn dự án + tuần. Nhập lương ngày cho từng thợ. Tổng = số công × lương ngày. Bấm tên thợ để xem chi tiết.
         </p>
       </header>
 
@@ -260,64 +260,47 @@ export function WorkerAttendanceAdminClient({
           {loading ? "Đang tải..." : "Dự án chưa có thợ nào."}
         </div>
       ) : (
-        <>
-          {/* Mobile: card layout */}
-          <div className="space-y-3 md:hidden">
-            {data.rows.map((r) => (
-              <div
-                key={r.workerId}
-                className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold leading-tight">{r.fullName}</div>
-                    <div className="mt-0.5 text-[12px] text-white/60">
-                      {r.role === "tho" ? "Thợ chính" : "Thợ phụ"}
-                      {r.phone ? (
-                        <>
-                          {" · "}
-                          <a href={`tel:${r.phone}`} className="text-sky-300 underline-offset-2 hover:underline">
-                            {r.phone}
-                          </a>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                  {r.hasIdCardPhoto ? (
+        <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/5">
+          <table className="min-w-full text-sm text-white">
+            <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/60">
+              <tr>
+                <th className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 text-left">Thợ</th>
+                {data.dates.map((d, i) => (
+                  <th key={d} className="px-2 py-2 text-center min-w-[3.5rem]">
+                    <div>{DOW_LABELS[i]}</div>
+                    <div className="text-[10px] font-normal text-white/40">{formatDM(d)}</div>
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-right">Công</th>
+                <th className="px-3 py-2 text-right">Lương ngày (₫)</th>
+                <th className="px-3 py-2 text-right">Tổng tuần (₫)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.workerId} className="border-t border-white/5">
+                  <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2">
                     <button
                       type="button"
-                      onClick={() => setCccdWorker({ id: r.workerId, name: r.fullName })}
-                      className="shrink-0 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/80 hover:bg-white/10"
+                      onClick={() => setDetailWorker(r)}
+                      className="text-left font-medium text-sky-200 hover:text-sky-100 hover:underline"
                     >
-                      📇 CCCD
+                      {r.fullName}
                     </button>
-                  ) : (
-                    <span className="shrink-0 rounded-md border border-white/5 px-2 py-1 text-[11px] text-white/30">
-                      Chưa có CCCD
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 grid grid-cols-7 gap-1 text-center">
-                  {data.dates.map((d, i) => (
-                    <div key={d} className="space-y-0.5">
-                      <div className="text-[10px] uppercase text-white/50">{DOW_LABELS[i]}</div>
-                      <div className="text-[9px] text-white/30">{formatDM(d)}</div>
-                      <div className="mt-1 flex items-center justify-center gap-0.5">
-                        <SessionPill on={!!r.days[d]?.morning} label="S" tone="morning" />
-                        <SessionPill on={!!r.days[d]?.afternoon} label="C" tone="afternoon" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2 rounded-md bg-slate-900/60 px-3 py-2 text-[12px]">
-                  <div>
-                    <div className="text-white/50">Số công</div>
-                    <div className="text-base font-semibold">{r.workDays}</div>
-                  </div>
-                  <div>
-                    <div className="text-white/50">Lương/ngày</div>
+                  </td>
+                  {data.dates.map((d) => {
+                    const cell = r.days[d];
+                    return (
+                      <td key={d} className="px-2 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <SessionPill on={!!cell?.morning} label="S" tone="morning" />
+                          <SessionPill on={!!cell?.afternoon} label="C" tone="afternoon" />
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right font-semibold">{r.workDays}</td>
+                  <td className="px-3 py-2 text-right">
                     {canEditWage ? (
                       <input
                         type="text"
@@ -333,165 +316,102 @@ export function WorkerAttendanceAdminClient({
                         }}
                         placeholder="—"
                         disabled={savingRateId === r.workerId}
-                        className="mt-0.5 w-full rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-sm text-white disabled:opacity-50"
+                        className="w-32 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-white disabled:opacity-50"
                       />
                     ) : (
-                      <div className="text-base font-semibold">{formatVnd(r.dailyRate)}</div>
+                      <span>{formatVnd(r.dailyRate)}</span>
                     )}
-                  </div>
-                  <div>
-                    <div className="text-white/50">Tổng tuần</div>
-                    <div className="text-base font-semibold text-emerald-300">
-                      {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-white">
-              <div className="flex items-center justify-between">
-                <span className="text-white/70">Tổng {data.rows.length} thợ</span>
-                <span className="font-semibold">{data.totals.workDays} công</span>
-              </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-white/70">Tổng lương tuần</span>
-                <span className="text-lg font-bold text-emerald-300">{formatVnd(data.totals.totalWage)} ₫</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop: table layout */}
-          <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-white/5">
-            <table className="min-w-full text-sm text-white">
-              <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/60">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 text-left">Thợ</th>
-                  {data.dates.map((d, i) => (
-                    <th key={d} className="px-2 py-2 text-center min-w-[3.5rem]">
-                      <div>{DOW_LABELS[i]}</div>
-                      <div className="text-[10px] font-normal text-white/40">{formatDM(d)}</div>
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 text-right">Công</th>
-                  <th className="px-3 py-2 text-right">Lương ngày (₫)</th>
-                  <th className="px-3 py-2 text-right">Tổng tuần (₫)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.workerId} className="border-t border-white/5">
-                    <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2">
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0">
-                          <div className="font-medium">{r.fullName}</div>
-                          <div className="text-[11px] text-white/40">
-                            {r.role === "tho" ? "Thợ" : "Phụ"}
-                            {r.phone ? (
-                              <>
-                                {" · "}
-                                <a href={`tel:${r.phone}`} className="text-sky-300 hover:underline">
-                                  {r.phone}
-                                </a>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                        {r.hasIdCardPhoto ? (
-                          <button
-                            type="button"
-                            onClick={() => setCccdWorker({ id: r.workerId, name: r.fullName })}
-                            className="shrink-0 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/80 hover:bg-white/10"
-                            title="Xem ảnh CCCD"
-                          >
-                            📇
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                    {data.dates.map((d) => {
-                      const cell = r.days[d];
-                      return (
-                        <td key={d} className="px-2 py-2 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <SessionPill on={!!cell?.morning} label="S" tone="morning" />
-                            <SessionPill on={!!cell?.afternoon} label="C" tone="afternoon" />
-                          </div>
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-2 text-right font-semibold">{r.workDays}</td>
-                    <td className="px-3 py-2 text-right">
-                      {canEditWage ? (
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={rateDraft[r.workerId] ?? ""}
-                          onChange={(e) =>
-                            setRateDraft((m) => ({ ...m, [r.workerId]: e.target.value }))
-                          }
-                          onBlur={() => {
-                            const draft = rateDraft[r.workerId] ?? "";
-                            const draftVal = parseVndInput(draft);
-                            if (draftVal !== r.dailyRate) saveRate(r.workerId);
-                          }}
-                          placeholder="—"
-                          disabled={savingRateId === r.workerId}
-                          className="w-32 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-white disabled:opacity-50"
-                        />
-                      ) : (
-                        <span>{formatVnd(r.dailyRate)}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold text-emerald-200">
-                      {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-white/5 text-sm">
-                <tr>
-                  <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
-                    Tổng {data.rows.length} thợ
                   </td>
-                  <td colSpan={7} />
-                  <td className="px-3 py-2 text-right font-semibold">{data.totals.workDays}</td>
-                  <td />
-                  <td className="px-3 py-2 text-right font-semibold text-emerald-300">
-                    {formatVnd(data.totals.totalWage)}
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-200">
+                    {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
                   </td>
                 </tr>
-              </tfoot>
-            </table>
-          </div>
-        </>
+              ))}
+            </tbody>
+            <tfoot className="bg-white/5 text-sm">
+              <tr>
+                <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
+                  Tổng {data.rows.length} thợ
+                </td>
+                <td colSpan={7} />
+                <td className="px-3 py-2 text-right font-semibold">{data.totals.workDays}</td>
+                <td />
+                <td className="px-3 py-2 text-right font-semibold text-emerald-300">
+                  {formatVnd(data.totals.totalWage)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
 
-      {cccdWorker && cccdImgUrl ? (
+      {detailWorker ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setCccdWorker(null)}
+          onClick={() => setDetailWorker(null)}
         >
           <div
-            className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-white/10 bg-slate-900 p-3"
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-white/10 bg-slate-900 p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-white">CCCD · {cccdWorker.name}</div>
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div>
+                <div className="text-lg font-semibold text-white">{detailWorker.fullName}</div>
+                <div className="text-xs text-white/50">
+                  {detailWorker.role === "tho" ? "Thợ chính" : "Thợ phụ"}
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setCccdWorker(null)}
+                onClick={() => setDetailWorker(null)}
                 className="rounded-md border border-white/15 bg-white/5 px-3 py-1 text-sm text-white/80 hover:bg-white/10"
               >
                 Đóng ✕
               </button>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={cccdImgUrl}
-              alt={`CCCD ${cccdWorker.name}`}
-              className="max-h-[75vh] w-full rounded-md object-contain"
-            />
+
+            <div className="space-y-2 text-sm text-white">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                <span className="text-white/60">Số điện thoại</span>
+                {detailWorker.phone ? (
+                  <a href={`tel:${detailWorker.phone}`} className="font-medium text-sky-300 hover:underline">
+                    {detailWorker.phone}
+                  </a>
+                ) : (
+                  <span className="text-white/40">—</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                <span className="text-white/60">Số công tuần này</span>
+                <span className="font-semibold">{detailWorker.workDays}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                <span className="text-white/60">Lương ngày</span>
+                <span className="font-semibold">{formatVnd(detailWorker.dailyRate)} ₫</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                <span className="text-white/60">Tổng lương tuần</span>
+                <span className="font-semibold text-emerald-300">
+                  {detailWorker.totalWage != null ? `${formatVnd(detailWorker.totalWage)} ₫` : "—"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 text-xs uppercase tracking-wide text-white/50">CCCD</div>
+              {detailCccdUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={detailCccdUrl}
+                  alt={`CCCD ${detailWorker.fullName}`}
+                  className="max-h-[50vh] w-full rounded-md border border-white/10 object-contain"
+                />
+              ) : (
+                <div className="rounded-md border border-dashed border-white/15 bg-white/5 px-4 py-6 text-center text-sm text-white/40">
+                  Chưa có ảnh CCCD
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
