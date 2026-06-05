@@ -2242,6 +2242,14 @@ enum StaffNotificationKind {
   task_awaiting_internal_approval
   project_site_rest
   ks_worker_attendance
+  baogia_lead
+}
+
+enum BaogiaLeadStatus {
+  new
+  contacted
+  signed
+  spam
 }
 
 enum CustomerNotificationKind {
@@ -2364,4 +2372,26 @@ model ProjectActivityLog {
   @@index([projectId, entity, createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
   @@map("project_activity_logs")
+}
+
+model BaogiaLead {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  phone       String
+  source      String           @default("baogia_web")
+  sessionId   String?          @map("session_id")
+  ipAddress   String?          @map("ip_address")
+  userAgent   String?          @map("user_agent") @db.Text
+  referer     String?          @db.Text
+  feeTotal    Int?             @map("fee_total")
+  payload     Json             @default("{}")
+  status      BaogiaLeadStatus @default(new)
+  adminNotes  String?          @map("admin_notes") @db.Text
+  contactedAt DateTime?        @map("contacted_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([phone])
+  @@map("baogia_leads")
 }
