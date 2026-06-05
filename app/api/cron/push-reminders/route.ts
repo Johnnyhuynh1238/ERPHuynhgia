@@ -246,6 +246,29 @@ export async function POST(request: Request) {
           skipDuplicates: true,
         });
 
+        // Nếu KS đã kịp chấm trước seed → đánh dấu done luôn cho khớp UI
+        const savedByKsBeforeSeed = await prisma.workerAttendance.findMany({
+          where: {
+            projectId: { in: projects.map((p) => p.id) },
+            date: today,
+            session: route.session,
+            markedById: ks.id,
+          },
+          select: { projectId: true },
+        });
+        const seededDoneProjectIds = Array.from(new Set(savedByKsBeforeSeed.map((s) => s.projectId)));
+        if (seededDoneProjectIds.length) {
+          await prisma.taskDailyAssignment.updateMany({
+            where: {
+              ksUserId: ks.id,
+              reportDate: today,
+              type: route.type,
+              projectId: { in: seededDoneProjectIds },
+            },
+            data: { status: "done", doneAt: new Date() },
+          });
+        }
+
         if (!route.push) continue;
 
         // Loại các project KS đã kịp chấm trước thời điểm seed

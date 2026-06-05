@@ -1,4 +1,4 @@
-import { WorkerAttendanceSession } from "@prisma/client";
+import { DailyAssignmentStatus, DailyAssignmentType, WorkerAttendanceSession } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
@@ -135,6 +135,21 @@ export async function POST(request: Request, { params }: { params: { projectId: 
         data: { sortRank: { increment: 1 } },
       });
     }
+
+    // Đánh dấu TaskDailyAssignment.status=done cho session vừa chấm
+    const assignmentType =
+      session === "morning"
+        ? DailyAssignmentType.worker_attendance_morning
+        : DailyAssignmentType.worker_attendance_afternoon;
+    await tx.taskDailyAssignment.updateMany({
+      where: {
+        ksUserId: user.id,
+        reportDate: date,
+        projectId: params.projectId,
+        type: assignmentType,
+      },
+      data: { status: DailyAssignmentStatus.done, doneAt: new Date() },
+    });
   });
 
   if (presentSet.size > 0) {
