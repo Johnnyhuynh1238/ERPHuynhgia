@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getWorkDateVn } from "@/lib/attendance";
+import { fireAndForget, notifyKsWorkerAttendance } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -135,6 +136,27 @@ export async function POST(request: Request, { params }: { params: { projectId: 
       });
     }
   });
+
+  if (presentSet.size > 0) {
+    const presentWorkers = await prisma.worker.findMany({
+      where: { id: { in: Array.from(presentSet) } },
+      select: { fullName: true },
+      orderBy: { sortRank: "desc" },
+      take: 4,
+    });
+    fireAndForget(
+      notifyKsWorkerAttendance({
+        projectId: params.projectId,
+        actorUserId: user.id,
+        actorName: user.name || user.email || "KS",
+        session,
+        date: date.toISOString().slice(0, 10),
+        presentCount: presentSet.size,
+        totalCount: activeIds.size,
+        sampleWorkerNames: presentWorkers.map((w) => w.fullName),
+      }),
+    );
+  }
 
   return NextResponse.json({ ok: true, savedCount: activeIds.size, presentCount: presentSet.size });
 }

@@ -522,6 +522,99 @@ export async function notifyCustomerComment(input: {
   await createStaffNotifications(recipients, base, "customer_comment", title, body, link);
 }
 
+const WORKER_ATTENDANCE_DEDUPE_MS = 30 * 60 * 1000;
+
+/**
+ * Event — KS chấm công thợ (sáng/chiều). Recipients: TPTC.
+ * Dedupe theo (project × ks × ngày × buổi) trong 30 phút để KS save lại nhiều
+ * lần không spam, notif cũ được update với số liệu mới nhất.
+ */
+export async function notifyKsWorkerAttendance(input: {
+  projectId: string;
+  actorUserId: string;
+  actorName: string;
+  session: "morning" | "afternoon";
+  date: string;
+  presentCount: number;
+  totalCount: number;
+  sampleWorkerNames: string[];
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const tptcIds = await getTptcUserIds();
+  const recipients = Array.from(new Set(tptcIds.filter((id) => id !== input.actorUserId)));
+  if (!recipients.length) return;
+
+  const projectInfo = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: { code: true, name: true },
+  });
+  const projectLabel = projectInfo ? `${projectInfo.code} · ${projectInfo.name}` : "";
+
+  const sessionLabel = input.session === "morning" ? "buổi sáng" : "buổi chiều";
+  const title = `${input.actorName} đã chấm công ${input.presentCount}/${input.totalCount} thợ ${sessionLabel}${projectLabel ? ` — ${projectLabel}` : ""}`;
+  const sample = input.sampleWorkerNames.slice(0, 3).join(", ");
+  const extra = input.sampleWorkerNames.length > 3 ? `, +${input.sampleWorkerNames.length - 3}` : "";
+  const body = sample ? `${sample}${extra}` : null;
+
+  const refId = `${input.date}-${input.session}`;
+  const link = `/admin/worker-attendance?projectId=${input.projectId}&date=${input.date}`;
+  const cutoff = new Date(Date.now() - WORKER_ATTENDANCE_DEDUPE_MS);
+  const now = new Date();
+  const freshRecipients: string[] = [];
+
+  for (const recipientId of recipients) {
+    const existing = await prisma.staffNotification.findFirst({
+      where: {
+        recipientId,
+        kind: "ks_worker_attendance",
+        projectId: input.projectId,
+        refType: "worker_attendance",
+        refId,
+        actorUserId: input.actorUserId,
+        createdAt: { gte: cutoff },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.staffNotification.update({
+        where: { id: existing.id },
+        data: { title, body, link, isRead: false, readAt: null, createdAt: now },
+      });
+    } else {
+      await prisma.staffNotification.create({
+        data: {
+          recipientId,
+          projectId: input.projectId,
+          kind: "ks_worker_attendance",
+          title,
+          body,
+          link,
+          actorUserId: input.actorUserId,
+          actorName: input.actorName,
+          refType: "worker_attendance",
+          refId,
+        },
+      });
+      freshRecipients.push(recipientId);
+    }
+  }
+
+  if (freshRecipients.length) {
+    await pushStaffNotification({
+      recipientIds: freshRecipients,
+      actorUserId: input.actorUserId,
+      title,
+      body,
+      link,
+      tag: `ks-worker-att-${input.projectId}-${input.session}`,
+    });
+  }
+}
+
 /**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.

@@ -2236,6 +2236,7 @@ enum StaffNotificationKind {
   ks_task_update
   task_awaiting_internal_approval
   project_site_rest
+  ks_worker_attendance
 }
 
 enum CustomerNotificationKind {
