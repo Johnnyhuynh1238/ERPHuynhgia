@@ -158,7 +158,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   return (
     <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
       <div className="bg-glow" />
-      {user.role === "engineer" || user.role === "construction_manager" ? (
+      {user.role === "engineer" || user.role === "construction_manager" || user.role === "admin" ? (
         <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       ) : null}
       {(user.role === "engineer" || user.role === "accountant") && pathname !== "/cham-cong" ? (
