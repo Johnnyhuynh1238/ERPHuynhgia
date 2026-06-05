@@ -43,6 +43,7 @@ export type WorkerWeekRow = {
   fullName: string;
   role: WorkerRole;
   phone: string | null;
+  hasIdCardPhoto: boolean;
   dailyRate: number | null;
   days: Record<string, WorkerWeekDayCell>;
   sessionCount: number;
@@ -132,6 +133,7 @@ export async function getWorkerAttendanceForWeek(args: {
       fullName: w.fullName,
       role: w.role,
       phone: w.phone,
+      hasIdCardPhoto: Boolean(w.idCardPhotoUrl),
       dailyRate: w.dailyRate,
       days,
       sessionCount,

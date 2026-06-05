@@ -12,6 +12,7 @@ type Row = {
   fullName: string;
   role: "tho" | "phu";
   phone: string | null;
+  hasIdCardPhoto: boolean;
   dailyRate: number | null;
   days: Record<string, DayCell>;
   sessionCount: number;
@@ -63,6 +64,21 @@ function parseVndInput(s: string) {
   return Number.isFinite(n) ? n : null;
 }
 
+function SessionPill({ on, label, tone }: { on: boolean; label: string; tone: "morning" | "afternoon" }) {
+  const onCls =
+    tone === "morning"
+      ? "bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400/40"
+      : "bg-sky-500/30 text-sky-200 ring-1 ring-sky-400/40";
+  return (
+    <span
+      className={`inline-flex h-5 w-5 items-center justify-center rounded text-[11px] ${on ? onCls : "bg-white/5 text-white/30"}`}
+      title={tone === "morning" ? "Sáng" : "Chiều"}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function WorkerAttendanceAdminClient({
   projects,
   canEditWage,
@@ -77,6 +93,7 @@ export function WorkerAttendanceAdminClient({
   const [error, setError] = useState<string | null>(null);
   const [savingRateId, setSavingRateId] = useState<string | null>(null);
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
+  const [cccdWorker, setCccdWorker] = useState<{ id: string; name: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!projectId) {
@@ -148,22 +165,27 @@ export function WorkerAttendanceAdminClient({
 
   const weekTitle = data ? `${formatDM(data.weekStart)} – ${formatDM(data.weekEnd)}` : "—";
 
+  const cccdImgUrl =
+    cccdWorker && projectId
+      ? `/api/cham-cong-tho/${projectId}/workers/${cccdWorker.id}/cccd`
+      : null;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-white">Bảng công thợ theo tuần</h1>
-        <p className="text-sm text-white/60">
-          Chọn dự án + tuần, nhập lương ngày cho từng thợ. Tổng lương = số công × lương ngày. Xuất Excel kèm bảng lương.
+        <h1 className="text-xl md:text-2xl font-semibold text-white">Bảng công thợ theo tuần</h1>
+        <p className="text-xs md:text-sm text-white/60">
+          Chọn dự án + tuần. Nhập lương ngày cho từng thợ. Tổng = số công × lương ngày.
         </p>
       </header>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
-        <label className="space-y-1 text-sm">
+      <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-3 md:p-4">
+        <label className="block space-y-1 text-sm">
           <span className="block text-white/70">Dự án</span>
           <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="min-w-[16rem] rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white"
+            className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white md:min-w-[16rem] md:w-auto"
           >
             <option value="">— Chọn dự án —</option>
             {projects.map((p) => (
@@ -176,42 +198,51 @@ export function WorkerAttendanceAdminClient({
 
         <div className="space-y-1 text-sm">
           <span className="block text-white/70">Tuần</span>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 md:flex md:items-center">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setRefDate((d) => addDaysYmd(d, -7))}
               disabled={!projectId || loading}
             >
-              ← Tuần trước
+              ← Trước
             </Button>
-            <div className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white min-w-[10rem] text-center">
+            <div className="rounded-md border border-white/10 bg-slate-900 px-2 py-2 text-center text-sm text-white md:min-w-[10rem] md:px-3">
               {weekTitle}
             </div>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setRefDate((d) => addDaysYmd(d, 7))}
               disabled={!projectId || loading}
             >
-              Tuần sau →
+              Sau →
             </Button>
-            <Button variant="ghost" onClick={() => setRefDate(todayYmd())} disabled={!projectId || loading}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="col-span-3 md:col-auto"
+              onClick={() => setRefDate(todayYmd())}
+              disabled={!projectId || loading}
+            >
               Hôm nay
             </Button>
           </div>
         </div>
 
-        <Button onClick={fetchData} disabled={!projectId || loading}>
-          {loading ? "Đang tải..." : "Tải lại"}
-        </Button>
-
-        {exportUrl ? (
-          <a
-            href={exportUrl}
-            className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
-          >
-            📥 Xuất Excel bảng lương
-          </a>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={fetchData} disabled={!projectId || loading}>
+            {loading ? "Đang tải..." : "Tải lại"}
+          </Button>
+          {exportUrl ? (
+            <a
+              href={exportUrl}
+              className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500"
+            >
+              📥 Xuất Excel
+            </a>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -229,62 +260,64 @@ export function WorkerAttendanceAdminClient({
           {loading ? "Đang tải..." : "Dự án chưa có thợ nào."}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/5">
-          <table className="min-w-full text-sm text-white">
-            <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/60">
-              <tr>
-                <th className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 text-left">Thợ</th>
-                {data.dates.map((d, i) => (
-                  <th key={d} className="px-2 py-2 text-center min-w-[3.5rem]">
-                    <div>{DOW_LABELS[i]}</div>
-                    <div className="text-[10px] font-normal text-white/40">{formatDM(d)}</div>
-                  </th>
-                ))}
-                <th className="px-3 py-2 text-right">Công</th>
-                <th className="px-3 py-2 text-right">Lương ngày (₫)</th>
-                <th className="px-3 py-2 text-right">Tổng tuần (₫)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.workerId} className="border-t border-white/5">
-                  <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2">
-                    <div className="font-medium">{r.fullName}</div>
-                    <div className="text-[11px] text-white/40">
-                      {r.role === "tho" ? "Thợ" : "Phụ"} {r.phone ? `· ${r.phone}` : ""}
+        <>
+          {/* Mobile: card layout */}
+          <div className="space-y-3 md:hidden">
+            {data.rows.map((r) => (
+              <div
+                key={r.workerId}
+                className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold leading-tight">{r.fullName}</div>
+                    <div className="mt-0.5 text-[12px] text-white/60">
+                      {r.role === "tho" ? "Thợ chính" : "Thợ phụ"}
+                      {r.phone ? (
+                        <>
+                          {" · "}
+                          <a href={`tel:${r.phone}`} className="text-sky-300 underline-offset-2 hover:underline">
+                            {r.phone}
+                          </a>
+                        </>
+                      ) : null}
                     </div>
-                  </td>
-                  {data.dates.map((d) => {
-                    const cell = r.days[d];
-                    return (
-                      <td key={d} className="px-2 py-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-[11px]">
-                          <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded ${
-                              cell?.morning
-                                ? "bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400/40"
-                                : "bg-white/5 text-white/30"
-                            }`}
-                            title="Sáng"
-                          >
-                            S
-                          </span>
-                          <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded ${
-                              cell?.afternoon
-                                ? "bg-sky-500/30 text-sky-200 ring-1 ring-sky-400/40"
-                                : "bg-white/5 text-white/30"
-                            }`}
-                            title="Chiều"
-                          >
-                            C
-                          </span>
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right font-semibold">{r.workDays}</td>
-                  <td className="px-3 py-2 text-right">
+                  </div>
+                  {r.hasIdCardPhoto ? (
+                    <button
+                      type="button"
+                      onClick={() => setCccdWorker({ id: r.workerId, name: r.fullName })}
+                      className="shrink-0 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/80 hover:bg-white/10"
+                    >
+                      📇 CCCD
+                    </button>
+                  ) : (
+                    <span className="shrink-0 rounded-md border border-white/5 px-2 py-1 text-[11px] text-white/30">
+                      Chưa có CCCD
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+                  {data.dates.map((d, i) => (
+                    <div key={d} className="space-y-0.5">
+                      <div className="text-[10px] uppercase text-white/50">{DOW_LABELS[i]}</div>
+                      <div className="text-[9px] text-white/30">{formatDM(d)}</div>
+                      <div className="mt-1 flex items-center justify-center gap-0.5">
+                        <SessionPill on={!!r.days[d]?.morning} label="S" tone="morning" />
+                        <SessionPill on={!!r.days[d]?.afternoon} label="C" tone="afternoon" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2 rounded-md bg-slate-900/60 px-3 py-2 text-[12px]">
+                  <div>
+                    <div className="text-white/50">Số công</div>
+                    <div className="text-base font-semibold">{r.workDays}</div>
+                  </div>
+                  <div>
+                    <div className="text-white/50">Lương/ngày</div>
                     {canEditWage ? (
                       <input
                         type="text"
@@ -300,34 +333,168 @@ export function WorkerAttendanceAdminClient({
                         }}
                         placeholder="—"
                         disabled={savingRateId === r.workerId}
-                        className="w-32 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-white disabled:opacity-50"
+                        className="mt-0.5 w-full rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-sm text-white disabled:opacity-50"
                       />
                     ) : (
-                      <span>{formatVnd(r.dailyRate)}</span>
+                      <div className="text-base font-semibold">{formatVnd(r.dailyRate)}</div>
                     )}
+                  </div>
+                  <div>
+                    <div className="text-white/50">Tổng tuần</div>
+                    <div className="text-base font-semibold text-emerald-300">
+                      {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-white/70">Tổng {data.rows.length} thợ</span>
+                <span className="font-semibold">{data.totals.workDays} công</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-white/70">Tổng lương tuần</span>
+                <span className="text-lg font-bold text-emerald-300">{formatVnd(data.totals.totalWage)} ₫</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop: table layout */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-white/5">
+            <table className="min-w-full text-sm text-white">
+              <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/60">
+                <tr>
+                  <th className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 text-left">Thợ</th>
+                  {data.dates.map((d, i) => (
+                    <th key={d} className="px-2 py-2 text-center min-w-[3.5rem]">
+                      <div>{DOW_LABELS[i]}</div>
+                      <div className="text-[10px] font-normal text-white/40">{formatDM(d)}</div>
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-right">Công</th>
+                  <th className="px-3 py-2 text-right">Lương ngày (₫)</th>
+                  <th className="px-3 py-2 text-right">Tổng tuần (₫)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r.workerId} className="border-t border-white/5">
+                    <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2">
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium">{r.fullName}</div>
+                          <div className="text-[11px] text-white/40">
+                            {r.role === "tho" ? "Thợ" : "Phụ"}
+                            {r.phone ? (
+                              <>
+                                {" · "}
+                                <a href={`tel:${r.phone}`} className="text-sky-300 hover:underline">
+                                  {r.phone}
+                                </a>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                        {r.hasIdCardPhoto ? (
+                          <button
+                            type="button"
+                            onClick={() => setCccdWorker({ id: r.workerId, name: r.fullName })}
+                            className="shrink-0 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/80 hover:bg-white/10"
+                            title="Xem ảnh CCCD"
+                          >
+                            📇
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                    {data.dates.map((d) => {
+                      const cell = r.days[d];
+                      return (
+                        <td key={d} className="px-2 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <SessionPill on={!!cell?.morning} label="S" tone="morning" />
+                            <SessionPill on={!!cell?.afternoon} label="C" tone="afternoon" />
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2 text-right font-semibold">{r.workDays}</td>
+                    <td className="px-3 py-2 text-right">
+                      {canEditWage ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={rateDraft[r.workerId] ?? ""}
+                          onChange={(e) =>
+                            setRateDraft((m) => ({ ...m, [r.workerId]: e.target.value }))
+                          }
+                          onBlur={() => {
+                            const draft = rateDraft[r.workerId] ?? "";
+                            const draftVal = parseVndInput(draft);
+                            if (draftVal !== r.dailyRate) saveRate(r.workerId);
+                          }}
+                          placeholder="—"
+                          disabled={savingRateId === r.workerId}
+                          className="w-32 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-white disabled:opacity-50"
+                        />
+                      ) : (
+                        <span>{formatVnd(r.dailyRate)}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-emerald-200">
+                      {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-white/5 text-sm">
+                <tr>
+                  <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
+                    Tổng {data.rows.length} thợ
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold text-emerald-200">
-                    {r.totalWage != null ? formatVnd(r.totalWage) : "—"}
+                  <td colSpan={7} />
+                  <td className="px-3 py-2 text-right font-semibold">{data.totals.workDays}</td>
+                  <td />
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-300">
+                    {formatVnd(data.totals.totalWage)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-white/5 text-sm">
-              <tr>
-                <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
-                  Tổng {data.rows.length} thợ
-                </td>
-                <td colSpan={7} />
-                <td className="px-3 py-2 text-right font-semibold">{data.totals.workDays}</td>
-                <td />
-                <td className="px-3 py-2 text-right font-semibold text-emerald-300">
-                  {formatVnd(data.totals.totalWage)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
+
+      {cccdWorker && cccdImgUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setCccdWorker(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-white/10 bg-slate-900 p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-white">CCCD · {cccdWorker.name}</div>
+              <button
+                type="button"
+                onClick={() => setCccdWorker(null)}
+                className="rounded-md border border-white/15 bg-white/5 px-3 py-1 text-sm text-white/80 hover:bg-white/10"
+              >
+                Đóng ✕
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={cccdImgUrl}
+              alt={`CCCD ${cccdWorker.name}`}
+              className="max-h-[75vh] w-full rounded-md object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
