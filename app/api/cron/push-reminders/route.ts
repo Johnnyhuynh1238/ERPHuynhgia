@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, UserRole } from "@prisma/client";
+import { AssignmentPriority, DailyAssignmentType, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 import { getTodayDateVn } from "@/lib/task-centric";
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     morning: { fired: 0, dedup: 0 },
     tptc: { fired: 0, dedup: 0 },
     eod: { fired: 0, dedup: 0 },
+    worker_attendance_pm: { fired: 0, dedup: 0 },
   };
 
   const isSundayDefaultRest = isDefaultRestDay(today);
@@ -185,6 +186,98 @@ export async function POST(request: Request) {
         });
         if (r.dedup) results.eod.dedup += 1;
         else results.eod.fired += 1;
+      }
+    }
+  }
+
+  // 4) Seed nhiệm vụ chấm công thợ vào TaskDailyAssignment (sáng & chiều).
+  // Sáng: từ 0h VN trở đi, không push. Chiều: từ 13h VN trở đi, push bell cho KS.
+  // Chủ Nhật mặc định công trường nghỉ → bỏ qua cả 2.
+  if (!isSundayDefaultRest) {
+    const hourVn = Number(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        hour: "2-digit",
+        hour12: false,
+      }).format(now),
+    );
+
+    type SeedSession = "morning" | "afternoon";
+    const seedRoutes: Array<{ session: SeedSession; type: DailyAssignmentType; gateHour: number; push: boolean }> = [
+      { session: "morning", type: DailyAssignmentType.worker_attendance_morning, gateHour: 0, push: false },
+      { session: "afternoon", type: DailyAssignmentType.worker_attendance_afternoon, gateHour: 13, push: true },
+    ];
+
+    for (const route of seedRoutes) {
+      if (hourVn < route.gateHour) continue;
+
+      const alreadySeeded = await prisma.taskDailyAssignment.findFirst({
+        where: { reportDate: today, type: route.type },
+        select: { id: true },
+      });
+      if (alreadySeeded) continue;
+
+      const ksUsers = await prisma.user.findMany({
+        where: { role: UserRole.engineer, isActive: true },
+        select: { id: true },
+      });
+
+      for (const ks of ksUsers) {
+        const projects = await prisma.project.findMany({
+          where: {
+            memberAssignments: { some: { userId: ks.id } },
+            status: { not: "completed" },
+          },
+          select: { id: true, code: true, name: true },
+        });
+        if (!projects.length) continue;
+
+        const sessionLabel = route.session === "morning" ? "buổi sáng" : "buổi chiều";
+        await prisma.taskDailyAssignment.createMany({
+          data: projects.map((p) => ({
+            ksUserId: ks.id,
+            reportDate: today,
+            type: route.type,
+            projectId: p.id,
+            title: `Chấm công thợ ${sessionLabel} — ${p.name}`,
+            priority: AssignmentPriority.important,
+            requirePhoto: false,
+          })),
+          skipDuplicates: true,
+        });
+
+        if (!route.push) continue;
+
+        // Loại các project KS đã kịp chấm trước thời điểm seed
+        const saved = await prisma.workerAttendance.findMany({
+          where: {
+            projectId: { in: projects.map((p) => p.id) },
+            date: today,
+            session: route.session,
+            markedById: ks.id,
+          },
+          select: { projectId: true },
+        });
+        const doneSet = new Set(saved.map((s) => s.projectId));
+        const pending = projects.filter((p) => !doneSet.has(p.id));
+        if (!pending.length) continue;
+
+        const sample = pending.slice(0, 2).map((p) => `${p.code} · ${p.name}`).join(", ");
+        const extra = pending.length > 2 ? `, +${pending.length - 2}` : "";
+        const title = `🕐 13:00 — chấm công thợ buổi chiều (${pending.length} dự án)`;
+        const body = `${sample}${extra}`;
+        const r = await tryDedupAndSend({
+          userId: ks.id,
+          refType: "worker_attendance_pm_due",
+          refId: refDateStr,
+          stage: "overdue",
+          title,
+          body,
+          url: "/reports",
+          tag: `wa-pm-${refDateStr}`,
+        });
+        if (r.dedup) results.worker_attendance_pm.dedup += 1;
+        else results.worker_attendance_pm.fired += 1;
       }
     }
   }

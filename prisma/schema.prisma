@@ -603,6 +603,7 @@ model Project {
   customerPushSubscriptions CustomerPushSubscription[]
   workers                   Worker[]
   workerAttendances         WorkerAttendance[]
+  taskDailyAssignments      TaskDailyAssignment[]
 
   @@index([status])
   @@map("projects")
@@ -756,6 +757,7 @@ model TaskDailyAssignment {
   reportDate       DateTime              @map("report_date") @db.Date
   taskId           String?               @map("task_id") @db.Uuid
   tptcAssignmentId String?               @map("tptc_assignment_id") @db.Uuid
+  projectId        String?               @map("project_id") @db.Uuid
   type             DailyAssignmentType
   templateItemId   String?               @map("template_item_id") @db.Uuid
   title            String
@@ -772,9 +774,12 @@ model TaskDailyAssignment {
   task           Task?                       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   tptcAssignment TptcAssignment?             @relation(fields: [tptcAssignmentId], references: [id])
   templateItem   TaskAssignmentTemplateItem? @relation(fields: [templateItemId], references: [id])
+  project        Project?                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@unique([ksUserId, reportDate, type, projectId])
   @@index([ksUserId, reportDate])
   @@index([taskId, reportDate])
+  @@index([reportDate, type])
   @@map("task_daily_assignments")
 }
 

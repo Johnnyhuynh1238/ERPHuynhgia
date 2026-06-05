@@ -2,105 +2,70 @@ import { DailyAssignmentType, DailyAssignmentStatus, AssignmentPriority } from "
 import { prisma } from "@/lib/prisma";
 
 /**
- * Sinh "virtual" nhiệm vụ chấm công thợ cho mỗi dự án KS là thành viên.
- * Sáng: luôn hiện. Chiều: chỉ hiện sau 13:00 (giờ VN).
- * Status `done` khi đã có WorkerAttendance lưu cho (project, date, session).
+ * Trả về danh sách nhiệm vụ chấm công thợ đã được seed cho ngày `reportDate`
+ * (cron seed sáng từ 0h, chiều từ 13h). Status `done` khi đã có WorkerAttendance
+ * lưu cho (project, date, session) bởi chính KS đó.
  */
 export async function buildWorkerAttendanceAssignments(args: {
   ksUserId: string;
   reportDate: Date;
   now: Date;
 }) {
-  const { ksUserId, reportDate, now } = args;
+  const { ksUserId, reportDate } = args;
 
-  const projects = await prisma.project.findMany({
+  const rows = await prisma.taskDailyAssignment.findMany({
     where: {
-      memberAssignments: {
-        some: { userId: ksUserId },
-      },
-      status: { not: "completed" },
+      ksUserId,
+      reportDate,
+      type: { in: [DailyAssignmentType.worker_attendance_morning, DailyAssignmentType.worker_attendance_afternoon] },
+      project: { status: { not: "completed" } },
     },
-    select: { id: true, code: true, name: true },
+    select: {
+      id: true,
+      type: true,
+      title: true,
+      priority: true,
+      requirePhoto: true,
+      guideContent: true,
+      photoUrl: true,
+      note: true,
+      doneAt: true,
+      projectId: true,
+      project: { select: { id: true, code: true, name: true } },
+    },
+    orderBy: [{ project: { code: "asc" } }, { type: "asc" }],
   });
 
-  if (!projects.length) return [];
+  if (!rows.length) return [];
 
-  const projectIds = projects.map((p) => p.id);
+  const projectIds = Array.from(new Set(rows.map((r) => r.projectId).filter((v): v is string => Boolean(v))));
   const savedSessions = await prisma.workerAttendance.findMany({
-    where: {
-      projectId: { in: projectIds },
-      date: reportDate,
-      markedById: ksUserId,
-    },
+    where: { projectId: { in: projectIds }, date: reportDate, markedById: ksUserId },
     select: { projectId: true, session: true },
   });
-
   const doneKey = new Set(savedSessions.map((s) => `${s.projectId}:${s.session}`));
 
-  const hourVn = Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      hour: "2-digit",
-      hour12: false,
-    }).format(now),
-  );
-  const showAfternoon = hourVn >= 13;
-
-  const items: Array<{
-    id: string;
-    type: DailyAssignmentType;
-    title: string;
-    status: DailyAssignmentStatus;
-    priority: AssignmentPriority;
-    requirePhoto: boolean;
-    guideContent: string | null;
-    photoUrl: string | null;
-    note: string | null;
-    doneAt: Date | null;
-    dueAt: Date | null;
-    projectId: string;
-    projectName: string;
-    workerAttendanceSession: "morning" | "afternoon";
-  }> = [];
-
-  for (const p of projects) {
-    const projectLabel = `${p.code} · ${p.name}`;
-    items.push({
-      id: `worker-attendance-${p.id}-morning`,
-      type: DailyAssignmentType.worker_attendance_morning,
-      title: `Chấm công thợ buổi sáng — ${p.name}`,
-      status: doneKey.has(`${p.id}:morning`) ? DailyAssignmentStatus.done : DailyAssignmentStatus.pending,
-      priority: AssignmentPriority.important,
-      requirePhoto: false,
-      guideContent: null,
-      photoUrl: null,
-      note: null,
-      doneAt: null,
-      dueAt: null,
-      projectId: p.id,
-      projectName: projectLabel,
-      workerAttendanceSession: "morning",
+  return rows
+    .filter((r) => r.project)
+    .map((r) => {
+      const session: "morning" | "afternoon" =
+        r.type === DailyAssignmentType.worker_attendance_morning ? "morning" : "afternoon";
+      const project = r.project!;
+      return {
+        id: `worker-attendance-${project.id}-${session}`,
+        type: r.type,
+        title: r.title,
+        status: doneKey.has(`${project.id}:${session}`) ? DailyAssignmentStatus.done : DailyAssignmentStatus.pending,
+        priority: r.priority ?? AssignmentPriority.important,
+        requirePhoto: r.requirePhoto,
+        guideContent: r.guideContent,
+        photoUrl: r.photoUrl,
+        note: r.note,
+        doneAt: r.doneAt,
+        dueAt: null as Date | null,
+        projectId: project.id,
+        projectName: `${project.code} · ${project.name}`,
+        workerAttendanceSession: session,
+      };
     });
-
-    if (showAfternoon) {
-      items.push({
-        id: `worker-attendance-${p.id}-afternoon`,
-        type: DailyAssignmentType.worker_attendance_afternoon,
-        title: `Chấm công thợ buổi chiều — ${p.name}`,
-        status: doneKey.has(`${p.id}:afternoon`) ? DailyAssignmentStatus.done : DailyAssignmentStatus.pending,
-        priority: AssignmentPriority.important,
-        requirePhoto: false,
-        guideContent: null,
-        photoUrl: null,
-        note: null,
-        doneAt: null,
-        dueAt: null,
-        projectId: p.id,
-        projectName: projectLabel,
-        workerAttendanceSession: "afternoon",
-      });
-    }
-  }
-
-  return items;
 }
