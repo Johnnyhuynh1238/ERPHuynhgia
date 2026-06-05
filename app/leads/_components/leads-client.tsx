@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -78,7 +79,27 @@ export function LeadsClient() {
   const [tab, setTab] = useState<"all" | LeadStatus>("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const initialLeadId = searchParams?.get("lead") ?? null;
+  const [selectedId, setSelectedId] = useState<string | null>(initialLeadId);
+
+  // Khi click bell với URL /leads?lead=<id>, auto-mở drawer chi tiết. Đồng bộ
+  // khi user copy-paste URL hoặc back/forward giữ nguyên trạng thái mở.
+  useEffect(() => {
+    const id = searchParams?.get("lead") ?? null;
+    setSelectedId(id);
+  }, [searchParams]);
+
+  const closeDrawer = useCallback(() => {
+    setSelectedId(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("lead")) {
+        url.searchParams.delete("lead");
+        window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+      }
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -231,7 +252,7 @@ export function LeadsClient() {
       {selectedId && (
         <LeadDetailDrawer
           leadId={selectedId}
-          onClose={() => setSelectedId(null)}
+          onClose={closeDrawer}
           onChanged={load}
         />
       )}

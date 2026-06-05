@@ -101,7 +101,9 @@ async function notifyAdmins(lead: { id: string; name: string; phone: string; fee
   const feeLabel = lead.feeTotal ? ` · phí TK ${formatVnd(lead.feeTotal)}` : "";
   const title = `Lead báo giá mới: ${lead.name}`;
   const body = `${lead.phone}${feeLabel}`;
-  const link = `/leads/${lead.id}`;
+  // Trỏ về danh sách + auto-mở drawer chi tiết qua ?lead=<id>; tránh phải tạo
+  // route /leads/[id] vì UI đã dùng drawer trên cùng trang.
+  const link = `/leads?lead=${lead.id}`;
 
   await prisma.staffNotification.createMany({
     data: admins.map((a) => ({

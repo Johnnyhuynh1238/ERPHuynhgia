@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
@@ -10,7 +11,9 @@ export default async function LeadsPage() {
 
   return (
     <ProtectedLayout>
-      <LeadsClient />
+      <Suspense fallback={null}>
+        <LeadsClient />
+      </Suspense>
     </ProtectedLayout>
   );
 }
