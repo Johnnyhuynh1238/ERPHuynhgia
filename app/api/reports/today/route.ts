@@ -72,22 +72,24 @@ export async function GET(request: Request) {
 
   let rows = await readRows();
 
-  if (!rows.length) {
-    const morningCheckin = await prisma.morningCheckin.findFirst({
-      where: {
-        userId: user.id,
-        reportDate,
-      },
-      select: {
-        tasks: {
-          select: {
-            taskId: true,
-          },
+  const morningCheckin = await prisma.morningCheckin.findFirst({
+    where: {
+      userId: user.id,
+      reportDate,
+    },
+    select: {
+      id: true,
+      tasks: {
+        select: {
+          taskId: true,
         },
       },
-    });
+    },
+  });
+  const hasCheckedIn = Boolean(morningCheckin);
 
-    const checkinTaskIds = Array.from(new Set((morningCheckin?.tasks || []).map((item) => item.taskId).filter(Boolean)));
+  if (!rows.length && morningCheckin) {
+    const checkinTaskIds = Array.from(new Set(morningCheckin.tasks.map((item) => item.taskId).filter(Boolean)));
 
     if (checkinTaskIds.length) {
       await generateAssignmentsAfterCheckin({
@@ -152,11 +154,13 @@ export async function GET(request: Request) {
     };
   });
 
-  const workerAttendanceItems = await buildWorkerAttendanceAssignments({
-    ksUserId: user.id,
-    reportDate,
-    now,
-  });
+  const workerAttendanceItems = hasCheckedIn
+    ? await buildWorkerAttendanceAssignments({
+        ksUserId: user.id,
+        reportDate,
+        now,
+      })
+    : [];
 
   const sorted = sortFlatAssignments([...assignments, ...workerAttendanceItems] as any[]) as any[];
 
