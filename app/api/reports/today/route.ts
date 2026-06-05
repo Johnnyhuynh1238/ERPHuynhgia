@@ -35,6 +35,12 @@ export async function GET(request: Request) {
       where: {
         ksUserId: user.id,
         reportDate,
+        type: {
+          notIn: [
+            DailyAssignmentType.worker_attendance_morning,
+            DailyAssignmentType.worker_attendance_afternoon,
+          ],
+        },
       },
       include: {
         task: {
