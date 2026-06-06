@@ -64,6 +64,11 @@ function parseVndInput(s: string) {
   return Number.isFinite(n) ? n : null;
 }
 
+function formatVndInput(n: number | null) {
+  if (n == null) return "";
+  return new Intl.NumberFormat("vi-VN").format(n);
+}
+
 function SessionPill({ on, label, tone }: { on: boolean; label: string; tone: "morning" | "afternoon" }) {
   const onCls =
     tone === "morning"
@@ -110,7 +115,7 @@ export function WorkerAttendanceAdminClient({
       setData(json);
       const draft: Record<string, string> = {};
       for (const r of json.rows as Row[]) {
-        draft[r.workerId] = r.dailyRate != null ? String(r.dailyRate) : "";
+        draft[r.workerId] = formatVndInput(r.dailyRate);
       }
       setRateDraft(draft);
     } catch (err) {
@@ -307,7 +312,10 @@ export function WorkerAttendanceAdminClient({
                         inputMode="numeric"
                         value={rateDraft[r.workerId] ?? ""}
                         onChange={(e) =>
-                          setRateDraft((m) => ({ ...m, [r.workerId]: e.target.value }))
+                          setRateDraft((m) => ({
+                            ...m,
+                            [r.workerId]: formatVndInput(parseVndInput(e.target.value)),
+                          }))
                         }
                         onBlur={() => {
                           const draft = rateDraft[r.workerId] ?? "";
@@ -333,9 +341,11 @@ export function WorkerAttendanceAdminClient({
                 <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
                   Tổng {data.rows.length} thợ
                 </td>
-                <td colSpan={7} />
+                <td colSpan={data.dates.length} />
                 <td className="px-3 py-2 text-right font-semibold">{data.totals.workDays}</td>
-                <td />
+                <td className="px-3 py-2 text-right font-semibold text-amber-200">
+                  {formatVnd(data.rows.reduce((s, r) => s + (r.dailyRate ?? 0), 0))}
+                </td>
                 <td className="px-3 py-2 text-right font-semibold text-emerald-300">
                   {formatVnd(data.totals.totalWage)}
                 </td>
@@ -344,6 +354,19 @@ export function WorkerAttendanceAdminClient({
           </table>
         </div>
       )}
+
+      {data && data.rows.length > 0 ? (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-sm text-amber-100/80">
+              Lương 1 ngày công trường (nếu toàn bộ {data.rows.length} thợ đi làm)
+            </div>
+            <div className="text-2xl font-semibold text-amber-200">
+              {formatVnd(data.rows.reduce((s, r) => s + (r.dailyRate ?? 0), 0))} ₫
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {detailWorker ? (
         <div
