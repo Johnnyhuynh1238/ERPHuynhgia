@@ -8,6 +8,7 @@ import {
 } from "@/lib/attendance";
 import { resolveCheckInShift } from "@/lib/shift-resolver";
 import { reverseGeocodeVn } from "@/lib/reverse-geocode";
+import { fireAndForget, notifyKsAttendance } from "@/lib/notifications";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -98,6 +99,16 @@ export async function POST(request: Request) {
     },
     select: { id: true, checkInAt: true },
   });
+
+  fireAndForget(
+    notifyKsAttendance({
+      actorUserId: user.id,
+      actorName: user.name || user.email || "KS",
+      kind: "check_in",
+      at: row.checkInAt,
+      lateMinutes,
+    }),
+  );
 
   const message =
     autoClosedCount > 0

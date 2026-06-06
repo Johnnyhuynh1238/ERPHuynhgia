@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parseLatLng, uploadAttendanceSelfie } from "@/lib/attendance";
 import { resolveCheckOutShift } from "@/lib/shift-resolver";
 import { reverseGeocodeVn } from "@/lib/reverse-geocode";
+import { fireAndForget, notifyKsAttendance } from "@/lib/notifications";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -83,6 +84,17 @@ export async function POST(request: Request) {
     },
     select: { id: true, checkOutAt: true, durationMinutes: true },
   });
+
+  fireAndForget(
+    notifyKsAttendance({
+      actorUserId: user.id,
+      actorName: user.name || user.email || "KS",
+      kind: "check_out",
+      at: row.checkOutAt ?? now,
+      earlyLeaveMinutes,
+      durationMinutes: row.durationMinutes,
+    }),
+  );
 
   return NextResponse.json({
     id: row.id,

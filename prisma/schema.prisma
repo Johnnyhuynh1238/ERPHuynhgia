@@ -2242,6 +2242,7 @@ enum StaffNotificationKind {
   task_awaiting_internal_approval
   project_site_rest
   ks_worker_attendance
+  ks_attendance
   baogia_lead
 }
 

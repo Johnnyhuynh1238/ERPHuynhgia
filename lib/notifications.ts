@@ -616,6 +616,78 @@ export async function notifyKsWorkerAttendance(input: {
 }
 
 /**
+ * Event — KS (hoặc kế toán) chấm công vào/ra. Recipients: TPTC.
+ * Không dedupe — mỗi event là 1 hành động riêng.
+ */
+export async function notifyKsAttendance(input: {
+  actorUserId: string;
+  actorName: string;
+  kind: "check_in" | "check_out";
+  at: Date;
+  lateMinutes?: number | null;
+  earlyLeaveMinutes?: number | null;
+  durationMinutes?: number | null;
+}) {
+  const tptcIds = await getTptcUserIds();
+  const recipients = tptcIds.filter((id) => id !== input.actorUserId);
+  if (!recipients.length) return;
+
+  const timeLabel = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(input.at);
+
+  const isCheckIn = input.kind === "check_in";
+  const verb = isCheckIn ? "đã chấm vào" : "đã chấm ra";
+  const lateSuffix =
+    isCheckIn && typeof input.lateMinutes === "number" && input.lateMinutes > 0
+      ? ` (trễ ${input.lateMinutes}p)`
+      : "";
+  const earlySuffix =
+    !isCheckIn && typeof input.earlyLeaveMinutes === "number" && input.earlyLeaveMinutes > 0
+      ? ` (về sớm ${input.earlyLeaveMinutes}p)`
+      : "";
+  const title = `${input.actorName} ${verb} lúc ${timeLabel}${lateSuffix}${earlySuffix}`;
+
+  const body =
+    !isCheckIn && typeof input.durationMinutes === "number" && input.durationMinutes > 0
+      ? `Tổng thời gian: ${Math.floor(input.durationMinutes / 60)}h${String(input.durationMinutes % 60).padStart(2, "0")}p`
+      : null;
+
+  const dateLabel = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(input.at);
+  const link = `/admin/attendance?date=${dateLabel}`;
+  const refId = `${dateLabel}-${input.kind}-${input.actorUserId}`;
+
+  await prisma.staffNotification.createMany({
+    data: recipients.map((recipientId) => ({
+      recipientId,
+      projectId: null,
+      kind: "ks_attendance" as StaffNotificationKind,
+      title,
+      body,
+      link,
+      actorUserId: input.actorUserId,
+      actorName: input.actorName,
+      refType: "ks_attendance",
+      refId,
+    })),
+  });
+
+  await pushStaffNotification({
+    recipientIds: recipients,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `ks-attendance-${input.actorUserId}-${input.kind}-${dateLabel}`,
+  });
+}
+
+/**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.
  */
