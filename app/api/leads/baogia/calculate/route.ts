@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { checkRate } from "@/lib/baogia-ratelimit";
+import { verifyBaogiaToken } from "@/lib/baogia-session";
 
 const ALLOWED_ORIGINS = new Set([
   "https://huynhgia6.com",
@@ -11,12 +13,20 @@ function corsHeaders(origin: string | null) {
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-BG-Token",
     "Access-Control-Max-Age": "86400",
     "Cache-Control": "no-store",
     "X-Robots-Tag": "noindex, nofollow",
     Vary: "Origin",
   };
+}
+
+function clientIp(request: Request): string {
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]!.trim();
+  const xri = request.headers.get("x-real-ip");
+  if (xri) return xri.trim();
+  return "0.0.0.0";
 }
 
 export async function OPTIONS(request: Request) {
@@ -72,11 +82,26 @@ const inputSchema = z.object({
     .array(z.string().refine((v) => v in CONDITION_FACTORS, "condition invalid"))
     .max(10)
     .default([]),
+  // Honeypot — phải rỗng. Bot tự fill mọi field → bị reject.
+  _hp: z.string().max(0).optional().default(""),
 });
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   const headers = corsHeaders(origin);
+  const ip = clientIp(request);
+
+  // Đợt 4 — session token gating. Frontend phải gọi /api/leads/baogia/session
+  // lấy token (HMAC, TTL 30 phút) rồi đính kèm header X-BG-Token. Bot bruteforce
+  // không có token → 401 ngay, không cần parse body.
+  const token = request.headers.get("x-bg-token") || "";
+  const tokenCheck = verifyBaogiaToken(token, ip);
+  if (!tokenCheck.ok) {
+    return NextResponse.json(
+      { ok: false, message: "Phiên không hợp lệ", reason: tokenCheck.reason },
+      { status: 401, headers },
+    );
+  }
 
   let body: unknown;
   try {
@@ -90,6 +115,29 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { ok: false, message: "Dữ liệu không hợp lệ", errors: parsed.error.flatten() },
       { status: 400, headers },
+    );
+  }
+
+  // Đợt 3 — rate limit + soft-alert. comboKey = JSON snapshot của input đã validate
+  // (đã drop _hp) → đo cả tốc độ lẫn số biến thể distinct (formula sweep detector).
+  const comboKey = JSON.stringify({
+    m: parsed.data.mongType,
+    fa: parsed.data.floorArea,
+    nf: parsed.data.numFloors,
+    t: parsed.data.hasTumSanThuong,
+    ta: parsed.data.tumArea,
+    st: parsed.data.sanThuongCoLam,
+    mt: parsed.data.maiType,
+    c: [...parsed.data.conditions].sort(),
+  });
+  const rate = checkRate(ip, comboKey);
+  if (!rate.allow) {
+    return NextResponse.json(
+      { ok: false, message: "Quá nhiều yêu cầu, vui lòng thử lại sau", reason: rate.reason },
+      {
+        status: 429,
+        headers: { ...headers, "Retry-After": String(rate.retryAfterSec) },
+      },
     );
   }
 

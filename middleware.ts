@@ -68,8 +68,15 @@ export async function middleware(req: NextRequest) {
   // Public lead capture + pricing API từ huynhgia6.com (form báo giá). Route tự
   // xử lý CORS + validation. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị
   // redirect 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
-  // Bao gồm: /api/leads/baogia (POST lead) và /api/leads/baogia/calculate (POST pricing).
-  if (pathname === "/api/leads/baogia" || pathname === "/api/leads/baogia/calculate") {
+  // Bao gồm:
+  // - /api/leads/baogia (POST lead)
+  // - /api/leads/baogia/calculate (POST pricing)
+  // - /api/leads/baogia/session (POST issue HMAC token để gating /calculate — Đợt 4)
+  if (
+    pathname === "/api/leads/baogia" ||
+    pathname === "/api/leads/baogia/calculate" ||
+    pathname === "/api/leads/baogia/session"
+  ) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
