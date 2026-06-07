@@ -87,6 +87,8 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
     currentRole === "accountant" ||
     currentRole === "construction_manager";
 
+  const canProposeMaterials = currentRole === "engineer" || currentRole === "admin";
+
   async function loadProjects() {
     setLoading(true);
 
@@ -212,6 +214,15 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
                   <span>📓 Nhật ký</span>
                   <span>›</span>
                 </Link>
+                {canProposeMaterials && (
+                  <Link
+                    href={`/projects/${project.id}/material-proposals`}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
+                  >
+                    <span>📦 Đề xuất vật tư</span>
+                    <span>›</span>
+                  </Link>
+                )}
               </div>
 
               <div className="mt-2 flex items-center justify-between text-[11px] text-[#8892b0]">

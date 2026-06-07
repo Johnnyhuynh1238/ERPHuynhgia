@@ -461,6 +461,8 @@ model User {
   shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
   workersCreated                Worker[]                  @relation("WorkerCreatedBy")
   workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
+  materialProposalsCreated      MaterialProposal[]        @relation("MatProposalKs")
+  materialProposalsProcessed    MaterialProposal[]        @relation("MatProposalProcessor")
 
   @@map("users")
 }
@@ -604,6 +606,7 @@ model Project {
   workers                   Worker[]
   workerAttendances         WorkerAttendance[]
   taskDailyAssignments      TaskDailyAssignment[]
+  materialProposals         MaterialProposal[]
 
   @@index([status])
   @@map("projects")
@@ -2244,6 +2247,12 @@ enum StaffNotificationKind {
   ks_worker_attendance
   ks_attendance
   baogia_lead
+  material_proposal_new
+}
+
+enum MaterialProposalStatus {
+  new
+  processed
 }
 
 enum BaogiaLeadStatus {
@@ -2373,6 +2382,26 @@ model ProjectActivityLog {
   @@index([projectId, entity, createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
   @@map("project_activity_logs")
+}
+
+model MaterialProposal {
+  id          String                 @id @default(uuid()) @db.Uuid
+  ksId        String                 @map("ks_id") @db.Uuid
+  projectId   String                 @map("project_id") @db.Uuid
+  description String                 @db.Text
+  status      MaterialProposalStatus @default(new)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  processedAt DateTime?              @map("processed_at")
+  processedBy String?                @map("processed_by") @db.Uuid
+
+  ks        User    @relation("MatProposalKs", fields: [ksId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processor User?   @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([ksId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("material_proposals")
 }
 
 model BaogiaLead {
