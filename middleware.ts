@@ -65,10 +65,11 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
-  // Public lead capture từ huynhgia6.com (form báo giá). Route tự xử lý CORS +
-  // rate-limit theo SĐT. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị redirect
-  // 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
-  if (pathname === "/api/leads/baogia") {
+  // Public lead capture + pricing API từ huynhgia6.com (form báo giá). Route tự
+  // xử lý CORS + validation. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị
+  // redirect 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
+  // Bao gồm: /api/leads/baogia (POST lead) và /api/leads/baogia/calculate (POST pricing).
+  if (pathname === "/api/leads/baogia" || pathname === "/api/leads/baogia/calculate") {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
