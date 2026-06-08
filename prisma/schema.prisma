@@ -2248,11 +2248,21 @@ enum StaffNotificationKind {
   ks_attendance
   baogia_lead
   material_proposal_new
+  material_proposal_update
+  material_proposal_reminder
 }
 
 enum MaterialProposalStatus {
-  new
-  processed
+  pending
+  accepted
+  declined
+}
+
+enum MaterialOrderStatus {
+  not_ordered
+  ordered
+  received
+  paid
 }
 
 enum BaogiaLeadStatus {
@@ -2385,14 +2395,24 @@ model ProjectActivityLog {
 }
 
 model MaterialProposal {
-  id          String                 @id @default(uuid()) @db.Uuid
-  ksId        String                 @map("ks_id") @db.Uuid
-  projectId   String                 @map("project_id") @db.Uuid
-  description String                 @db.Text
-  status      MaterialProposalStatus @default(new)
-  createdAt   DateTime               @default(now()) @map("created_at")
-  processedAt DateTime?              @map("processed_at")
-  processedBy String?                @map("processed_by") @db.Uuid
+  id             String                 @id @default(uuid()) @db.Uuid
+  ksId           String                 @map("ks_id") @db.Uuid
+  projectId      String                 @map("project_id") @db.Uuid
+  description    String                 @db.Text
+  status         MaterialProposalStatus @default(pending)
+  orderStatus    MaterialOrderStatus    @default(not_ordered) @map("order_status")
+  parsedItems    Json?                  @map("parsed_items")
+  processedNote  String?                @map("processed_note") @db.Text
+  paymentMethod  String?                @map("payment_method")
+  paymentNote    String?                @map("payment_note") @db.Text
+  createdAt      DateTime               @default(now()) @map("created_at")
+  acceptedAt     DateTime?              @map("accepted_at")
+  orderedAt      DateTime?              @map("ordered_at")
+  receivedAt     DateTime?              @map("received_at")
+  paidAt         DateTime?              @map("paid_at")
+  reminderDueAt  DateTime?              @map("reminder_due_at")
+  processedAt    DateTime?              @map("processed_at")
+  processedBy    String?                @map("processed_by") @db.Uuid
 
   ks        User    @relation("MatProposalKs", fields: [ksId], references: [id])
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -2401,6 +2421,8 @@ model MaterialProposal {
   @@index([projectId, status])
   @@index([ksId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([orderStatus])
+  @@index([reminderDueAt])
   @@map("material_proposals")
 }
 
