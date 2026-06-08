@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { prisma } from "@/lib/prisma";
 import { ProposalChat } from "./_components/proposal-chat";
+import { ProposalsClient } from "@/app/proposals/_components/proposals-client";
 
 export default async function ProjectMaterialProposalsPage({
   params,
@@ -38,6 +39,7 @@ export default async function ProjectMaterialProposalsPage({
         </p>
       </div>
       <ProposalChat projectId={project.id} projectName={project.name} />
+      <ProposalsClient currentRole={user.role} projectId={project.id} />
     </div>
   );
 }

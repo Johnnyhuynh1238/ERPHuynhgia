@@ -64,8 +64,15 @@ const ORDER_CHIP: Record<ProposalRow["orderStatus"], string> = {
   paid: "bg-emerald-600/25 text-emerald-200",
 };
 
-export function ProposalsClient({ currentRole }: { currentRole: string }) {
+export function ProposalsClient({
+  currentRole,
+  projectId,
+}: {
+  currentRole: string;
+  projectId?: string;
+}) {
   const isAccountantView = currentRole === "accountant" || currentRole === "admin";
+  const scopedToProject = Boolean(projectId);
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ProposalRow[]>([]);
@@ -87,6 +94,7 @@ export function ProposalsClient({ currentRole }: { currentRole: string }) {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (status !== "all") params.set("status", status);
       if (orderStatus !== "all") params.set("orderStatus", orderStatus);
+      if (projectId) params.set("projectId", projectId);
       const res = await fetch(`/api/proposals?${params.toString()}`, { cache: "no-store" });
       const data = (await res.json().catch(() => ({}))) as ListResponse;
       if (cancelled) return;
@@ -103,14 +111,18 @@ export function ProposalsClient({ currentRole }: { currentRole: string }) {
     return () => {
       cancelled = true;
     };
-  }, [page, status, orderStatus]);
+  }, [page, status, orderStatus, projectId]);
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <h1 className="text-xl font-bold text-[#f0f2ff]">Nhật ký đề xuất vật tư</h1>
+        <h1 className="text-xl font-bold text-[#f0f2ff]">
+          {scopedToProject ? "Nhật ký đề xuất của dự án" : "Nhật ký đề xuất vật tư"}
+        </h1>
         <p className="mt-1 text-xs text-[#8892b0]">
-          {isAccountantView
+          {scopedToProject
+            ? "Lịch sử đề xuất vật tư của dự án này. Bấm vào dòng để xem chi tiết."
+            : isAccountantView
             ? "Tất cả đề xuất từ kỹ sư công trình. Bấm vào dòng để xử lý."
             : "Đề xuất anh đã gửi cho kế toán. Bấm vào dòng để xem chi tiết."}
         </p>
@@ -156,7 +168,7 @@ export function ProposalsClient({ currentRole }: { currentRole: string }) {
               <tr>
                 <th className="px-3 py-2 text-left">Thời gian</th>
                 {isAccountantView && <th className="px-3 py-2 text-left">KS</th>}
-                <th className="px-3 py-2 text-left">Công trình</th>
+                {!scopedToProject && <th className="px-3 py-2 text-left">Công trình</th>}
                 <th className="px-3 py-2 text-left">Đề xuất</th>
                 <th className="px-3 py-2 text-left">Duyệt</th>
                 <th className="px-3 py-2 text-left">Đơn hàng</th>
@@ -172,10 +184,12 @@ export function ProposalsClient({ currentRole }: { currentRole: string }) {
                   {isAccountantView && (
                     <td className="px-3 py-2 align-top text-xs text-[#f0f2ff]">{p.ks.fullName}</td>
                   )}
-                  <td className="px-3 py-2 align-top">
-                    <div className="text-xs text-[#8892b0]">{p.project.code}</div>
-                    <div className="text-[13px] font-medium">{p.project.name}</div>
-                  </td>
+                  {!scopedToProject && (
+                    <td className="px-3 py-2 align-top">
+                      <div className="text-xs text-[#8892b0]">{p.project.code}</div>
+                      <div className="text-[13px] font-medium">{p.project.name}</div>
+                    </td>
+                  )}
                   <td className="px-3 py-2 align-top">
                     <Link href={`/proposals/${p.id}`} className="block">
                       <div className="text-[13px] text-[#f0f2ff] hover:text-[#fb923c]">
