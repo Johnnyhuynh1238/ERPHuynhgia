@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { prisma } from "@/lib/prisma";
+import { checkChatRate } from "@/lib/proposals-chat-ratelimit";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,18 @@ export async function POST(request: Request) {
   }
   if (!ALLOWED_ROLES.has(user.role)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const rate = checkChatRate(user.id);
+  if (!rate.allow) {
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        message: `Anh đã đạt giới hạn ${rate.limit} lượt/${rate.window}. Thử lại sau ${rate.retryAfterSec}s nhé.`,
+        retryAfterSec: rate.retryAfterSec,
+      },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
