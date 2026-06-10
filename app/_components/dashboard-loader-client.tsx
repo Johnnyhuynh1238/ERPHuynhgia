@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardClient } from "./dashboard-client";
+import { AdminDashboard } from "./admin-dashboard";
 
 export function DashboardLoaderClient() {
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,10 @@ export function DashboardLoaderClient() {
 
   if (!data) {
     return <div className="rounded-lg border bg-white p-4 text-sm text-slate-600">Không tải được dashboard. Vui lòng thử lại.</div>;
+  }
+
+  if (data.role === "admin") {
+    return <AdminDashboard />;
   }
 
   return <DashboardClient data={data} />;
