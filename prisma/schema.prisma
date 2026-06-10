@@ -607,6 +607,7 @@ model Project {
   workerAttendances         WorkerAttendance[]
   taskDailyAssignments      TaskDailyAssignment[]
   materialProposals         MaterialProposal[]
+  designContract            DesignContract?
 
   @@index([status])
   @@map("projects")
@@ -2443,7 +2444,68 @@ model BaogiaLead {
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
+  designContracts DesignContract[]
+
   @@index([status, createdAt(sort: Desc)])
   @@index([phone])
   @@map("baogia_leads")
+}
+
+enum DesignContractStatus {
+  active
+  done
+  cancelled
+}
+
+enum DesignContractStepKind {
+  mat_bang
+  mat_tien_3d
+  noi_that
+  shop_drawing
+}
+
+enum DesignContractStepStatus {
+  pending
+  in_progress
+  customer_review
+  approved
+}
+
+model DesignContract {
+  id            String               @id @default(uuid()) @db.Uuid
+  customerName  String               @map("customer_name")
+  customerPhone String               @map("customer_phone")
+  leadId        String?              @map("lead_id") @db.Uuid
+  projectId     String?              @unique @map("project_id") @db.Uuid
+  signedAt      DateTime             @map("signed_at") @db.Date
+  totalValue    Decimal?             @map("total_value") @db.Decimal(15, 2)
+  status        DesignContractStatus @default(active)
+  notes         String?              @db.Text
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  lead    BaogiaLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  project Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  steps   DesignContractStep[]
+
+  @@index([status, signedAt(sort: Desc)])
+  @@index([customerPhone])
+  @@map("design_contracts")
+}
+
+model DesignContractStep {
+  id         String                   @id @default(uuid()) @db.Uuid
+  contractId String                   @map("contract_id") @db.Uuid
+  kind       DesignContractStepKind
+  status     DesignContractStepStatus @default(pending)
+  approvedAt DateTime?                @map("approved_at")
+  notes      String?                  @db.Text
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  updatedAt  DateTime                 @updatedAt @map("updated_at")
+
+  contract DesignContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, kind])
+  @@index([contractId])
+  @@map("design_contract_steps")
 }

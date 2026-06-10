@@ -41,6 +41,7 @@ type MenuItem = {
 const ROLE_MENUS: Record<string, MenuItem[]> = {
   admin: [
     { label: "Dashboard", href: "/" },
+    { label: "Pipeline KH", href: "/customer-pipeline" },
     { label: "Lead báo giá", href: "/leads" },
     { label: "Dự án", href: "/projects" },
     { label: "Đề xuất vật tư", href: "/proposals" },
