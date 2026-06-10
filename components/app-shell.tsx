@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { KsInstallPushModal } from "@/components/ks-install-push-modal";
 import { PushEnableButton } from "@/components/push-enable-button";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { AttendanceReminder } from "@/components/attendance-reminder";
 
 type AppUser = {
@@ -162,6 +163,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
       <div className="bg-glow" />
       <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+      <PullToRefresh />
       {(user.role === "engineer" || user.role === "accountant") && pathname !== "/cham-cong" ? (
         <AttendanceReminder />
       ) : null}
