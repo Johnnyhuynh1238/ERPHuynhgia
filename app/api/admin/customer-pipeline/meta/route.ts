@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { logAdminAudit } from "@/lib/admin-audit-log";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/customer-pipeline";
 
@@ -45,6 +46,7 @@ export async function PATCH(req: Request) {
   if (nextActionDue !== undefined) data.nextActionDue = nextActionDue ? new Date(nextActionDue) : null;
   if (touchLastContact) data.lastContactAt = new Date();
 
+  const before = await prisma.customerPipelineMeta.findUnique({ where: { customerKey: key } });
   const meta = await prisma.customerPipelineMeta.upsert({
     where: { customerKey: key },
     update: data,
@@ -57,5 +59,27 @@ export async function PATCH(req: Request) {
       lastContactAt: touchLastContact ? new Date() : null,
     },
   });
+
+  const dueLabel = nextActionDue
+    ? new Date(nextActionDue).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : null;
+  const summaryParts: string[] = [];
+  if (nextAction !== undefined) summaryParts.push(nextAction ? `nextAction="${nextAction}"` : "xoá nextAction");
+  if (nextActionDue !== undefined) summaryParts.push(dueLabel ? `due=${dueLabel}` : "xoá due");
+  if (touchLastContact) summaryParts.push("vừa liên hệ");
+  await logAdminAudit(prisma, {
+    actorId: user.id,
+    entity: "customer_pipeline_meta",
+    entityId: key,
+    action: before ? "update" : "create",
+    summary: `${customerName || customerPhone}: ${summaryParts.join(", ") || "cập nhật"}`,
+    metadata: {
+      customerPhone,
+      nextAction: nextAction ?? null,
+      nextActionDue: nextActionDue ?? null,
+      touchLastContact: !!touchLastContact,
+    },
+  });
+
   return NextResponse.json({ meta });
 }

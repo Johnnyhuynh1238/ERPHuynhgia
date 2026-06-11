@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { logAdminAudit } from "@/lib/admin-audit-log";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,14 @@ export async function POST(req: Request) {
   if (content.length > 500) return NextResponse.json({ message: "Quá 500 ký tự" }, { status: 400 });
   const item = await prisma.inboxItem.create({
     data: { content, source: "manual" },
+  });
+  await logAdminAudit(prisma, {
+    actorId: user.id,
+    entity: "inbox_item",
+    entityId: item.id,
+    action: "create",
+    summary: `Tạo inbox: ${content.slice(0, 120)}`,
+    metadata: { source: "manual" },
   });
   return NextResponse.json({ item }, { status: 201 });
 }

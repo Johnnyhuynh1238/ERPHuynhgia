@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAudit } from "@/lib/admin-audit-log";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,14 @@ export async function POST(req: Request) {
   if (content.length > 500) return NextResponse.json({ message: "Quá 500 ký tự" }, { status: 400 });
   const item = await prisma.inboxItem.create({
     data: { content, source: "openclaw" },
+  });
+  await logAdminAudit(prisma, {
+    actorId: null,
+    entity: "inbox_item",
+    entityId: item.id,
+    action: "create",
+    summary: `OpenClaw đẩy inbox: ${content.slice(0, 120)}`,
+    metadata: { source: "openclaw", ip },
   });
   return NextResponse.json({ id: item.id, content: item.content, createdAt: item.createdAt }, { status: 201 });
 }

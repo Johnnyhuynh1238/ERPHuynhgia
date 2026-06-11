@@ -2548,6 +2548,21 @@ model InboxItem {
   @@map("inbox_items")
 }
 
+model AdminAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  entity    String
+  entityId  String?  @map("entity_id")
+  action    String
+  summary   String   @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entity, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@map("admin_audit_logs")
+}
+
 model WebEvent {
   id        BigInt   @id @default(autoincrement())
   sessionId String   @map("session_id")

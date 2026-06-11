@@ -202,9 +202,176 @@ function DesignCard({ data }: { data: Dashboard5["cards"]["design"] }) {
   );
 }
 
+type CustomerHit = {
+  customerKey: string;
+  customerName: string;
+  customerPhone: string;
+  stage: number;
+  stageLabel: string;
+};
+
+function ConvertModal({
+  item,
+  onClose,
+  onDone,
+}: {
+  item: InboxRow;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<CustomerHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<CustomerHit | null>(null);
+  const [nextAction, setNextAction] = useState(item.content.slice(0, 200));
+  const [due, setDue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setHits([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/customer-pipeline?q=${encodeURIComponent(term)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("search failed");
+        const json = await res.json();
+        if (!cancelled) setHits((json.items ?? []).slice(0, 8));
+      } catch {
+        if (!cancelled) setHits([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [q]);
+
+  async function submit() {
+    if (!picked) {
+      toast.error("Chưa chọn khách");
+      return;
+    }
+    if (!nextAction.trim() || !due) {
+      toast.error("Nhập nextAction + ngày hạn");
+      return;
+    }
+    setSaving(true);
+    try {
+      const r1 = await fetch("/api/admin/customer-pipeline/meta", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customerName: picked.customerName,
+          customerPhone: picked.customerPhone,
+          nextAction: nextAction.trim(),
+          nextActionDue: due,
+        }),
+      });
+      if (!r1.ok) throw new Error(await r1.text());
+      const r2 = await fetch(`/api/admin/inbox/${item.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "done", convertedTo: `${picked.customerName} (${picked.customerPhone})` }),
+      });
+      if (!r2.ok) throw new Error(await r2.text());
+      onDone();
+      onClose();
+    } catch (e) {
+      toast.error("Lỗi: " + (e instanceof Error ? e.message : "unknown"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-[#252840] bg-[#13151f] p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h3 className="text-base font-semibold text-white">Chuyển inbox thành việc cần làm</h3>
+          <button onClick={onClose} className="text-[#8892b0] hover:text-white">✕</button>
+        </div>
+        <div className="mb-3 rounded-lg bg-[#0f1117] px-3 py-2 text-sm text-[#cdd3e1]">{item.content}</div>
+
+        <label className="mb-1 block text-xs text-[#8892b0]">Chọn khách (tên hoặc SĐT)</label>
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setPicked(null); }}
+          placeholder="Gõ tên hoặc số điện thoại..."
+          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white placeholder:text-[#5b6478]"
+        />
+        {picked ? (
+          <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            ✓ {picked.customerName} — {picked.customerPhone} · {picked.stageLabel}
+            <button onClick={() => setPicked(null)} className="ml-2 text-xs text-[#8892b0] hover:text-white">đổi</button>
+          </div>
+        ) : (
+          <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-[#252840]">
+            {searching ? (
+              <div className="px-3 py-2 text-xs text-[#8892b0]">Đang tìm...</div>
+            ) : hits.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-[#5b6478]">{q.trim().length < 2 ? "Gõ ≥ 2 ký tự" : "Không tìm thấy"}</div>
+            ) : (
+              hits.map((h) => (
+                <button
+                  key={h.customerKey}
+                  onClick={() => setPicked(h)}
+                  className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-[#1a1d2a]"
+                >
+                  <div>{h.customerName}</div>
+                  <div className="text-[11px] text-[#8892b0]">{h.customerPhone} · {h.stageLabel}</div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+
+        <label className="mt-3 mb-1 block text-xs text-[#8892b0]">Việc kế tiếp</label>
+        <input
+          type="text"
+          value={nextAction}
+          onChange={(e) => setNextAction(e.target.value)}
+          maxLength={300}
+          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white"
+        />
+
+        <label className="mt-3 mb-1 block text-xs text-[#8892b0]">Hạn</label>
+        <input
+          type="date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white"
+        />
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Huỷ</Button>
+          <Button
+            onClick={submit}
+            disabled={saving || !picked || !nextAction.trim() || !due}
+            className="bg-amber-500 text-black hover:bg-amber-400"
+          >
+            {saving ? "Đang lưu..." : "Chuyển + DONE"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InboxCard({ data, onChange }: { data: Dashboard5["cards"]["inbox"]; onChange: () => void }) {
   const [adding, setAdding] = useState("");
   const [saving, setSaving] = useState(false);
+  const [convertItem, setConvertItem] = useState<InboxRow | null>(null);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -270,6 +437,13 @@ function InboxCard({ data, onChange }: { data: Dashboard5["cards"]["inbox"]; onC
                 </div>
               </div>
               <button
+                onClick={() => setConvertItem(it)}
+                className="rounded p-1 text-[#8892b0] hover:bg-amber-500/20 hover:text-amber-300"
+                title="Chuyển thành việc cần làm"
+              >
+                →
+              </button>
+              <button
                 onClick={() => markDone(it.id)}
                 className="rounded p-1 text-[#8892b0] hover:bg-emerald-500/20 hover:text-emerald-300"
                 title="Đánh dấu xong"
@@ -279,6 +453,13 @@ function InboxCard({ data, onChange }: { data: Dashboard5["cards"]["inbox"]; onC
             </li>
           ))}
         </ul>
+      )}
+      {convertItem && (
+        <ConvertModal
+          item={convertItem}
+          onClose={() => setConvertItem(null)}
+          onDone={onChange}
+        />
       )}
     </Card>
   );

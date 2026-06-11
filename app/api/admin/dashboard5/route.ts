@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PaymentStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { getWorkDateVn } from "@/lib/attendance";
 import { prisma } from "@/lib/prisma";
 import {
   computeDesignContractStage,
@@ -40,9 +41,10 @@ export async function GET() {
   if (user.role !== "admin") return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
   const now = new Date();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today.getTime() + DAY_MS);
+  // today/yesterday/in3/in7 dùng UTC-midnight tương ứng ngày VN (Asia/Ho_Chi_Minh)
+  // để khớp với cột Date của Prisma (vốn là UTC-midnight) và tránh lệch khi
+  // container chạy timezone UTC.
+  const today = getWorkDateVn(now);
   const yesterday = new Date(today.getTime() - DAY_MS);
   const in3 = new Date(today.getTime() + 3 * DAY_MS);
   const in7 = new Date(today.getTime() + 7 * DAY_MS);
