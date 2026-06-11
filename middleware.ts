@@ -86,6 +86,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // Public web analytics ingest từ huynhgia6.com (pageview/scroll/cta/exit).
+  // Route tự xử lý CORS + validation. Không gắn user-id → an toàn để mở public.
+  if (pathname === "/api/analytics/web-event") {
+    return applySecurityHeaders(NextResponse.next(), false);
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);

@@ -43,6 +43,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Dashboard", href: "/" },
     { label: "Pipeline KH", href: "/customer-pipeline" },
     { label: "Lead báo giá", href: "/leads" },
+    { label: "Analytics", href: "/admin/analytics" },
     { label: "Dự án", href: "/projects" },
     { label: "Đề xuất vật tư", href: "/proposals" },
     { label: "Thầu phụ", href: "/subcontractors" },
