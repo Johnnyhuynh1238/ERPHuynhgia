@@ -497,7 +497,6 @@ function AddWorkerModal({
               ref={idCardInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={(e) => setIdCardFile(e.target.files?.[0] || null)}
               className="hidden"
             />
@@ -698,7 +697,6 @@ function EditWorkerModal({
               ref={idCardInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={(e) => setIdCardFile(e.target.files?.[0] || null)}
               className="hidden"
             />
