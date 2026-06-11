@@ -2547,3 +2547,20 @@ model InboxItem {
   @@index([status, createdAt(sort: Desc)])
   @@map("inbox_items")
 }
+
+model WebEvent {
+  id        BigInt   @id @default(autoincrement())
+  sessionId String   @map("session_id")
+  pageType  String   @map("page_type")
+  eventType String   @map("event_type")
+  payload   Json     @default("{}")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent") @db.Text
+  referer   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([pageType, createdAt(sort: Desc)])
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@map("web_events")
+}
