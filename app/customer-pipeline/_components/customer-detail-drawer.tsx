@@ -66,6 +66,12 @@ function formatDate(iso: string | null) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+type Meta = {
+  nextAction: string | null;
+  nextActionDue: string | null;
+  lastContactAt: string | null;
+};
+
 export function CustomerDetailDrawer({
   row,
   onClose,
@@ -79,6 +85,9 @@ export function CustomerDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [savingStepId, setSavingStepId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [meta, setMeta] = useState<Meta>({ nextAction: null, nextActionDue: null, lastContactAt: null });
+  const [metaInput, setMetaInput] = useState({ action: "", due: "" });
+  const [savingMeta, setSavingMeta] = useState(false);
 
   useEffect(() => {
     if (!row.designContractId) {
@@ -92,6 +101,59 @@ export function CustomerDetailDrawer({
       .catch(() => toast.error("Không tải được HĐ Thiết kế"))
       .finally(() => setLoading(false));
   }, [row.designContractId]);
+
+  useEffect(() => {
+    fetch(`/api/admin/customer-pipeline/meta?phone=${encodeURIComponent(row.customerPhone)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { meta: null }))
+      .then((d) => {
+        if (d.meta) {
+          setMeta({
+            nextAction: d.meta.nextAction,
+            nextActionDue: d.meta.nextActionDue,
+            lastContactAt: d.meta.lastContactAt,
+          });
+          setMetaInput({
+            action: d.meta.nextAction ?? "",
+            due: d.meta.nextActionDue ? String(d.meta.nextActionDue).slice(0, 10) : "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, [row.customerPhone]);
+
+  async function saveMeta(touchContact: boolean) {
+    if (row.stage <= 6 && (!metaInput.action.trim() || !metaInput.due)) {
+      toast.error("Cần nhập 'Việc kế tiếp' + 'Hạn'");
+      return;
+    }
+    setSavingMeta(true);
+    try {
+      const res = await fetch("/api/admin/customer-pipeline/meta", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customerName: row.customerName,
+          customerPhone: row.customerPhone,
+          nextAction: metaInput.action.trim() || null,
+          nextActionDue: metaInput.due || null,
+          touchLastContact: touchContact,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const d = await res.json();
+      setMeta({
+        nextAction: d.meta.nextAction,
+        nextActionDue: d.meta.nextActionDue,
+        lastContactAt: d.meta.lastContactAt,
+      });
+      toast.success(touchContact ? "Đã lưu + đánh dấu vừa liên hệ" : "Đã lưu");
+      onChanged();
+    } catch (e) {
+      toast.error("Lỗi: " + (e instanceof Error ? e.message : "unknown"));
+    } finally {
+      setSavingMeta(false);
+    }
+  }
 
   async function createContract() {
     setCreating(true);
@@ -180,8 +242,65 @@ export function CustomerDetailDrawer({
               </div>
             )}
             <div className="mt-2 rounded-lg border border-[#252840] bg-[#13151f] px-3 py-2 text-sm">
-              <div className="text-xs text-[#8892b0]">Cần làm tiếp</div>
-              <div>{row.nextAction}</div>
+              <div className="text-xs text-[#8892b0]">Gợi ý từ hệ thống</div>
+              <div className="text-[#cdd3e1]">{row.nextAction}</div>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold text-amber-200">Việc kế tiếp</div>
+              {meta.lastContactAt && (
+                <div className="text-[11px] text-[#8892b0]">
+                  Liên hệ gần nhất: {formatDate(meta.lastContactAt)}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={metaInput.action}
+                onChange={(e) => setMetaInput((v) => ({ ...v, action: e.target.value }))}
+                placeholder="VD: Gọi chốt lịch gặp, gửi báo giá sơ bộ..."
+                maxLength={200}
+                className="block w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white placeholder:text-[#5b6478]"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-[#8892b0]">
+                  Hạn:
+                  <input
+                    type="date"
+                    value={metaInput.due}
+                    onChange={(e) => setMetaInput((v) => ({ ...v, due: e.target.value }))}
+                    className="rounded-lg border border-[#2d3249] bg-[#0f1117] px-2 py-1 text-sm text-white"
+                  />
+                </label>
+                <div className="ml-auto flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => saveMeta(true)}
+                    disabled={savingMeta}
+                  >
+                    Vừa liên hệ + lưu
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => saveMeta(false)}
+                    disabled={savingMeta}
+                    className="bg-amber-500 text-black hover:bg-amber-400"
+                  >
+                    {savingMeta ? "Đang lưu…" : "Lưu"}
+                  </Button>
+                </div>
+              </div>
+              {row.stage <= 6 && (
+                <p className="text-[11px] text-[#8892b0]">
+                  Khách active bắt buộc có việc kế tiếp + hạn (dùng cho card Sale / Thiết kế trên Dashboard GĐ).
+                </p>
+              )}
             </div>
           </section>
 

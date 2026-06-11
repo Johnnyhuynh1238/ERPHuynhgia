@@ -2509,3 +2509,41 @@ model DesignContractStep {
   @@index([contractId])
   @@map("design_contract_steps")
 }
+
+model CustomerPipelineMeta {
+  customerKey   String    @id @map("customer_key")
+  customerName  String    @map("customer_name")
+  customerPhone String    @map("customer_phone")
+  nextAction    String?   @map("next_action") @db.Text
+  nextActionDue DateTime? @map("next_action_due") @db.Date
+  lastContactAt DateTime? @map("last_contact_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([nextActionDue])
+  @@map("customer_pipeline_meta")
+}
+
+enum InboxSource {
+  manual
+  openclaw
+}
+
+enum InboxStatus {
+  open
+  done
+}
+
+model InboxItem {
+  id            String      @id @default(uuid()) @db.Uuid
+  content       String      @db.Text
+  source        InboxSource @default(manual)
+  status        InboxStatus @default(open)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  processedAt   DateTime?   @map("processed_at")
+  processedBy   String?     @map("processed_by") @db.Uuid
+  convertedTo   String?     @map("converted_to") @db.Text
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("inbox_items")
+}

@@ -65,6 +65,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // OpenClaw đẩy item vào Inbox của GĐ — tự auth bằng Bearer token
+  // (INBOX_API_TOKEN env). Không đi qua NextAuth.
+  if (pathname === "/api/inbox") {
+    return applySecurityHeaders(NextResponse.next(), false);
+  }
+
   // Public lead capture + pricing API từ huynhgia6.com (form báo giá). Route tự
   // xử lý CORS + validation. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị
   // redirect 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
