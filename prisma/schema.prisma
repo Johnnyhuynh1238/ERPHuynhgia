@@ -475,6 +475,7 @@ model User {
   shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
   workersCreated                Worker[]                  @relation("WorkerCreatedBy")
   workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
+  workOrdersCreated             WorkOrder[]               @relation("WorkOrderCreatedBy")
   gradeRatesCreated             GradeRate[]               @relation("GradeRateCreatedBy")
   gradeHistoryProposed          GradeHistory[]            @relation("GradeHistoryProposer")
   gradeHistoryApproved          GradeHistory[]            @relation("GradeHistoryApprover")
@@ -631,6 +632,7 @@ model Project {
   materialProposals         MaterialProposal[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
+  workOrders                WorkOrder[]
 
   @@index([status])
   @@map("projects")
@@ -853,6 +855,7 @@ model Worker {
   attendances  WorkerAttendance[]
   docs         WorkerDoc[]
   gradeHistory GradeHistory[]
+  workOrderWorkers WorkOrderWorker[]
 
   @@index([projectId, status])
   @@index([workerStatus, grade])
@@ -2734,7 +2737,8 @@ model ProjectBudgetItem {
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
 
-  budget ProjectBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budget     ProjectBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  workOrders WorkOrder[]
 
   @@index([budgetId, category, phase])
   @@map("project_budget_items")
@@ -2782,4 +2786,53 @@ model ProjectBudgetAmendmentItem {
 
   @@index([amendmentId, category, phase])
   @@map("project_budget_amendment_items")
+}
+
+// ──────────────────────────── M3: Phiếu giao việc hàng ngày ────────────────────────────
+
+enum WorkOrderStatus {
+  open
+  done
+  carried
+}
+
+model WorkOrder {
+  id           String          @id @default(uuid()) @db.Uuid
+  projectId    String          @map("project_id") @db.Uuid
+  date         DateTime        @db.Date
+  groupNo      Int             @map("group_no")
+  budgetItemId String          @map("budget_item_id") @db.Uuid
+  workItem     String          @map("work_item")
+  unit         String          @db.VarChar(20)
+  unitPrice    BigInt          @map("unit_price")
+  targetQty    Decimal         @map("target_qty") @db.Decimal(14, 3)
+  techNote     String?         @map("tech_note")
+  status       WorkOrderStatus @default(open)
+  createdById  String          @map("created_by_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budgetItem ProjectBudgetItem @relation(fields: [budgetItemId], references: [id])
+  createdBy  User              @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
+  workers    WorkOrderWorker[]
+
+  @@unique([projectId, date, groupNo])
+  @@index([projectId, date])
+  @@index([budgetItemId])
+  @@map("work_orders")
+}
+
+model WorkOrderWorker {
+  id          String   @id @default(uuid()) @db.Uuid
+  workOrderId String   @map("work_order_id") @db.Uuid
+  workerId    String   @map("worker_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workOrderId, workerId])
+  @@index([workerId])
+  @@map("work_order_workers")
 }

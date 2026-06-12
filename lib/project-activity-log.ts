@@ -81,6 +81,7 @@ export type LogEntity =
   | "customer_comment"
   | "project_budget"
   | "project_budget_amendment"
+  | "work_order"
   | "other";
 
 type LogInput = {
