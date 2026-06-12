@@ -393,103 +393,105 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  managedProjects               Project[]                 @relation("ProjectManager")
-  engineeredProjects            Project[]                 @relation("MainEngineer")
-  assignedEngineerFor           Task[]                    @relation("AssignedEngineer")
-  assignedForemanFor            Task[]                    @relation("AssignedForeman")
-  taskLogs                      TaskLog[]
-  taskPhotos                    TaskPhoto[]
-  qcItems                       QcItem[]
-  qcProgressUpdates             QcProgress[]              @relation("QcProgressUpdatedBy")
-  qcPhotos                      QcPhoto[]
-  qcLogs                        QcLog[]
-  qcReviews                     QcReview[]
-  taskQcLogs                    TaskQcLog[]               @relation("TaskQcLogChecker")
-  taskProgressHistories         TaskProgressHistory[]     @relation("TaskProgressUpdatedBy")
-  taskQcResultsChecked          TaskQcResult[]            @relation("TaskQcResultCheckedBy")
-  taskActivityLogs              TaskActivityLog[]         @relation("TaskActivityActor")
-  internalApprovedTasks         Task[]                    @relation("TaskInternalApprover")
-  projectMembers                ProjectMember[]
-  addedProjectMembers           ProjectMember[]           @relation("ProjectMemberAddedBy")
-  projectAssignments            ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
-  projectAssignmentsAssigned    ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
-  declaredSiteRestDays          SiteRestDay[]
-  morningCheckins               MorningCheckin[]          @relation("MorningCheckinUser")
-  morningReports                MorningReport[]
-  eveningReports                EveningReport[]
-  technicalReportCreator        TaskTechnicalReport[]     @relation("TechReportCreator")
-  technicalReportUpdater        TaskTechnicalReport[]     @relation("TechReportUpdater")
-  materialReportCreator         TaskMaterialReport[]      @relation("MatReportCreator")
-  materialReportUpdater         TaskMaterialReport[]      @relation("MatReportUpdater")
-  laborReportCreator            TaskLaborReport[]         @relation("LaborReportCreator")
-  laborReportUpdater            TaskLaborReport[]         @relation("LaborReportUpdater")
-  equipmentReportCreator        TaskEquipmentReport[]     @relation("EquipReportCreator")
-  equipmentReportUpdater        TaskEquipmentReport[]     @relation("EquipReportUpdater")
-  technicalAttachmentsUploaded  TaskTechnicalAttachment[]
-  reportPhotosUploaded          TaskReportPhoto[]
-  kpiSnapshots                  KpiSnapshot[]
-  engineerSalaryConfig          EngineerSalaryConfig?     @relation("EngineerSalary")
-  engineerSalaryUpdated         EngineerSalaryConfig[]    @relation("EngineerSalaryUpdater")
-  engineerSalaryHistory         EngineerSalaryHistory[]   @relation("EngineerSalaryChanger")
-  engineerKpiMonthly            EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyUser")
-  engineerKpiMonthlyRated       EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyRater")
-  engineerKpiMonthlyFinalized   EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyFinalizer")
-  kpiSettingsChanged            KpiSettings[]             @relation("KpiSettingsChanger")
-  customerTaskRatings           CustomerTaskRating[]      @relation("KsRatedTask")
-  customerKsRatings             CustomerKsRating[]        @relation("KsRatedDirectly")
-  customerCommentsAuthored      CustomerComment[]         @relation("CustomerCommentAuthor")
-  customerCommentReplies        CustomerCommentReply[]
-  projectDrawingsUploaded       ProjectDrawing[]          @relation("ProjectDrawingUploader")
-  projectDocumentsUploaded      ProjectDocument[]         @relation("ProjectDocumentUploader")
-  projectDocumentAccessGranted  ProjectDocumentAccess[]   @relation("ProjectDocumentAccessGrantor")
-  projectDocumentAccessUser     ProjectDocumentAccess[]   @relation("ProjectDocumentAccessUser")
-  paymentSchedulesCreated       PaymentSchedule[]         @relation("PaymentScheduleCreator")
-  projectChangeDraftsCreated    ProjectChangeDraft[]      @relation("ProjectChangeDraftCreator")
-  projectChangeDraftsUpdated    ProjectChangeDraft[]      @relation("ProjectChangeDraftUpdater")
-  projectDraftFilesUploaded     ProjectDraftFile[]        @relation("ProjectDraftFileUploader")
-  projectAiAudits               ProjectAiAudit[]          @relation("ProjectAiAuditActor")
-  subcontractorsCreated         Subcontractor[]           @relation("SubcontractorCreator")
-  subContractsCreated           SubContract[]             @relation("SubContractCreator")
-  subContractFiles              SubContractFile[]
-  subPaymentsRequested          SubPayment[]              @relation("SubPaymentRequester")
-  subPaymentsApproved           SubPayment[]              @relation("SubPaymentApprover")
-  subPaymentsPaid               SubPayment[]              @relation("SubPaymentPayer")
-  subEvaluations                SubEvaluation[]
-  createdProjectPhases          ProjectPhase[]
-  createdQcChecklistTemplates   QcChecklistTemplate[]
-  assignedTptcAssignments       TptcAssignment[]          @relation("TptcAssignmentAssignee")
-  createdTptcAssignments        TptcAssignment[]          @relation("TptcAssignmentAssigner")
-  taskDailyAssignments          TaskDailyAssignment[]
-  dailyReportSubmissions        DailyReportSubmission[]
-  designPhotoGroupsCreated      DesignPhotoGroup[]        @relation("DesignPhotoGroupCreator")
-  designPhotoGroupAccess        DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessUser")
-  designPhotoGroupAccessGranted DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessGrantor")
-  designPhotosUploaded          DesignPhoto[]             @relation("DesignPhotoUploader")
-  staffNotifications            StaffNotification[]       @relation("StaffNotificationRecipient")
-  staffNotificationsActed       StaffNotification[]       @relation("StaffNotificationActor")
-  customerNotificationsActed    CustomerNotification[]    @relation("CustomerNotificationActor")
-  pushSubscriptions             PushSubscription[]
-  pushSendLogs                  PushSendLog[]
-  projectActivityLogs           ProjectActivityLog[]      @relation("ProjectActivityActor")
-  ksAttendances                 KsAttendance[]            @relation("KsAttendanceUser")
-  shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
-  workersCreated                Worker[]                  @relation("WorkerCreatedBy")
-  workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
-  workOrdersCreated             WorkOrder[]               @relation("WorkOrderCreatedBy")
-  workerTimesheetsCreated       WorkerTimesheet[]         @relation("WorkerTimesheetCreatedBy")
-  workOrderOutputsCreated       WorkOrderOutput[]         @relation("WorkOrderOutputCreatedBy")
-  workOrderOutputsApproved      WorkOrderOutput[]         @relation("WorkOrderOutputApprovedBy")
-  workOrderOutputPhotosUploaded WorkOrderOutputPhoto[]    @relation("WorkOrderOutputPhotoUploadedBy")
-  gradeRatesCreated             GradeRate[]               @relation("GradeRateCreatedBy")
-  gradeHistoryProposed          GradeHistory[]            @relation("GradeHistoryProposer")
-  gradeHistoryApproved          GradeHistory[]            @relation("GradeHistoryApprover")
-  workerDocsUploaded            WorkerDoc[]               @relation("WorkerDocUploader")
-  materialProposalsCreated      MaterialProposal[]        @relation("MatProposalKs")
-  materialProposalsProcessed    MaterialProposal[]        @relation("MatProposalProcessor")
-  projectBudgetsCreated         ProjectBudget[]           @relation("ProjectBudgetCreator")
-  projectBudgetsLocked          ProjectBudget[]           @relation("ProjectBudgetLocker")
-  projectBudgetAmendmentsProposed ProjectBudgetAmendment[] @relation("ProjectBudgetAmendmentProposer")
-  projectBudgetAmendmentsApproved ProjectBudgetAmendment[] @relation("ProjectBudgetAmendmentApprover")
+  managedProjects                 Project[]                 @relation("ProjectManager")
+  engineeredProjects              Project[]                 @relation("MainEngineer")
+  assignedEngineerFor             Task[]                    @relation("AssignedEngineer")
+  assignedForemanFor              Task[]                    @relation("AssignedForeman")
+  taskLogs                        TaskLog[]
+  taskPhotos                      TaskPhoto[]
+  qcItems                         QcItem[]
+  qcProgressUpdates               QcProgress[]              @relation("QcProgressUpdatedBy")
+  qcPhotos                        QcPhoto[]
+  qcLogs                          QcLog[]
+  qcReviews                       QcReview[]
+  taskQcLogs                      TaskQcLog[]               @relation("TaskQcLogChecker")
+  taskProgressHistories           TaskProgressHistory[]     @relation("TaskProgressUpdatedBy")
+  taskQcResultsChecked            TaskQcResult[]            @relation("TaskQcResultCheckedBy")
+  taskActivityLogs                TaskActivityLog[]         @relation("TaskActivityActor")
+  internalApprovedTasks           Task[]                    @relation("TaskInternalApprover")
+  projectMembers                  ProjectMember[]
+  addedProjectMembers             ProjectMember[]           @relation("ProjectMemberAddedBy")
+  projectAssignments              ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
+  projectAssignmentsAssigned      ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
+  declaredSiteRestDays            SiteRestDay[]
+  morningCheckins                 MorningCheckin[]          @relation("MorningCheckinUser")
+  morningReports                  MorningReport[]
+  eveningReports                  EveningReport[]
+  technicalReportCreator          TaskTechnicalReport[]     @relation("TechReportCreator")
+  technicalReportUpdater          TaskTechnicalReport[]     @relation("TechReportUpdater")
+  materialReportCreator           TaskMaterialReport[]      @relation("MatReportCreator")
+  materialReportUpdater           TaskMaterialReport[]      @relation("MatReportUpdater")
+  laborReportCreator              TaskLaborReport[]         @relation("LaborReportCreator")
+  laborReportUpdater              TaskLaborReport[]         @relation("LaborReportUpdater")
+  equipmentReportCreator          TaskEquipmentReport[]     @relation("EquipReportCreator")
+  equipmentReportUpdater          TaskEquipmentReport[]     @relation("EquipReportUpdater")
+  technicalAttachmentsUploaded    TaskTechnicalAttachment[]
+  reportPhotosUploaded            TaskReportPhoto[]
+  kpiSnapshots                    KpiSnapshot[]
+  engineerSalaryConfig            EngineerSalaryConfig?     @relation("EngineerSalary")
+  engineerSalaryUpdated           EngineerSalaryConfig[]    @relation("EngineerSalaryUpdater")
+  engineerSalaryHistory           EngineerSalaryHistory[]   @relation("EngineerSalaryChanger")
+  engineerKpiMonthly              EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyUser")
+  engineerKpiMonthlyRated         EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyRater")
+  engineerKpiMonthlyFinalized     EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyFinalizer")
+  kpiSettingsChanged              KpiSettings[]             @relation("KpiSettingsChanger")
+  customerTaskRatings             CustomerTaskRating[]      @relation("KsRatedTask")
+  customerKsRatings               CustomerKsRating[]        @relation("KsRatedDirectly")
+  customerCommentsAuthored        CustomerComment[]         @relation("CustomerCommentAuthor")
+  customerCommentReplies          CustomerCommentReply[]
+  projectDrawingsUploaded         ProjectDrawing[]          @relation("ProjectDrawingUploader")
+  projectDocumentsUploaded        ProjectDocument[]         @relation("ProjectDocumentUploader")
+  projectDocumentAccessGranted    ProjectDocumentAccess[]   @relation("ProjectDocumentAccessGrantor")
+  projectDocumentAccessUser       ProjectDocumentAccess[]   @relation("ProjectDocumentAccessUser")
+  paymentSchedulesCreated         PaymentSchedule[]         @relation("PaymentScheduleCreator")
+  projectChangeDraftsCreated      ProjectChangeDraft[]      @relation("ProjectChangeDraftCreator")
+  projectChangeDraftsUpdated      ProjectChangeDraft[]      @relation("ProjectChangeDraftUpdater")
+  projectDraftFilesUploaded       ProjectDraftFile[]        @relation("ProjectDraftFileUploader")
+  projectAiAudits                 ProjectAiAudit[]          @relation("ProjectAiAuditActor")
+  subcontractorsCreated           Subcontractor[]           @relation("SubcontractorCreator")
+  subContractsCreated             SubContract[]             @relation("SubContractCreator")
+  subContractFiles                SubContractFile[]
+  subPaymentsRequested            SubPayment[]              @relation("SubPaymentRequester")
+  subPaymentsApproved             SubPayment[]              @relation("SubPaymentApprover")
+  subPaymentsPaid                 SubPayment[]              @relation("SubPaymentPayer")
+  subEvaluations                  SubEvaluation[]
+  createdProjectPhases            ProjectPhase[]
+  createdQcChecklistTemplates     QcChecklistTemplate[]
+  assignedTptcAssignments         TptcAssignment[]          @relation("TptcAssignmentAssignee")
+  createdTptcAssignments          TptcAssignment[]          @relation("TptcAssignmentAssigner")
+  taskDailyAssignments            TaskDailyAssignment[]
+  dailyReportSubmissions          DailyReportSubmission[]
+  designPhotoGroupsCreated        DesignPhotoGroup[]        @relation("DesignPhotoGroupCreator")
+  designPhotoGroupAccess          DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessUser")
+  designPhotoGroupAccessGranted   DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessGrantor")
+  designPhotosUploaded            DesignPhoto[]             @relation("DesignPhotoUploader")
+  staffNotifications              StaffNotification[]       @relation("StaffNotificationRecipient")
+  staffNotificationsActed         StaffNotification[]       @relation("StaffNotificationActor")
+  customerNotificationsActed      CustomerNotification[]    @relation("CustomerNotificationActor")
+  pushSubscriptions               PushSubscription[]
+  pushSendLogs                    PushSendLog[]
+  projectActivityLogs             ProjectActivityLog[]      @relation("ProjectActivityActor")
+  ksAttendances                   KsAttendance[]            @relation("KsAttendanceUser")
+  shiftAssignments                UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
+  workersCreated                  Worker[]                  @relation("WorkerCreatedBy")
+  workerAttendancesMarked         WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
+  workOrdersCreated               WorkOrder[]               @relation("WorkOrderCreatedBy")
+  workerTimesheetsCreated         WorkerTimesheet[]         @relation("WorkerTimesheetCreatedBy")
+  workOrderOutputsCreated         WorkOrderOutput[]         @relation("WorkOrderOutputCreatedBy")
+  workOrderOutputsApproved        WorkOrderOutput[]         @relation("WorkOrderOutputApprovedBy")
+  workOrderOutputPhotosUploaded   WorkOrderOutputPhoto[]    @relation("WorkOrderOutputPhotoUploadedBy")
+  workOrderOutputQcChecksDone     WorkOrderOutputQcCheck[]  @relation("WorkOrderOutputQcCheckCheckedBy")
+  workerQcIssuesCreated           WorkerQcIssue[]           @relation("WorkerQcIssueCreatedBy")
+  gradeRatesCreated               GradeRate[]               @relation("GradeRateCreatedBy")
+  gradeHistoryProposed            GradeHistory[]            @relation("GradeHistoryProposer")
+  gradeHistoryApproved            GradeHistory[]            @relation("GradeHistoryApprover")
+  workerDocsUploaded              WorkerDoc[]               @relation("WorkerDocUploader")
+  materialProposalsCreated        MaterialProposal[]        @relation("MatProposalKs")
+  materialProposalsProcessed      MaterialProposal[]        @relation("MatProposalProcessor")
+  projectBudgetsCreated           ProjectBudget[]           @relation("ProjectBudgetCreator")
+  projectBudgetsLocked            ProjectBudget[]           @relation("ProjectBudgetLocker")
+  projectBudgetAmendmentsProposed ProjectBudgetAmendment[]  @relation("ProjectBudgetAmendmentProposer")
+  projectBudgetAmendmentsApproved ProjectBudgetAmendment[]  @relation("ProjectBudgetAmendmentApprover")
 
   @@map("users")
 }
@@ -639,6 +641,7 @@ model Project {
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
   workOrderOutputs          WorkOrderOutput[]
+  workerQcIssues            WorkerQcIssue[]
 
   @@index([status])
   @@map("projects")
@@ -856,13 +859,14 @@ model Worker {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  project      Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
-  attendances  WorkerAttendance[]
-  docs         WorkerDoc[]
-  gradeHistory GradeHistory[]
+  project          Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy        User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
+  attendances      WorkerAttendance[]
+  docs             WorkerDoc[]
+  gradeHistory     GradeHistory[]
   workOrderWorkers WorkOrderWorker[]
   timesheets       WorkerTimesheet[]
+  qcIssues         WorkerQcIssue[]
 
   @@index([projectId, status])
   @@index([workerStatus, grade])
@@ -2495,24 +2499,24 @@ model ProjectActivityLog {
 }
 
 model MaterialProposal {
-  id             String                 @id @default(uuid()) @db.Uuid
-  ksId           String                 @map("ks_id") @db.Uuid
-  projectId      String                 @map("project_id") @db.Uuid
-  description    String                 @db.Text
-  status         MaterialProposalStatus @default(pending)
-  orderStatus    MaterialOrderStatus    @default(not_ordered) @map("order_status")
-  parsedItems    Json?                  @map("parsed_items")
-  processedNote  String?                @map("processed_note") @db.Text
-  paymentMethod  String?                @map("payment_method")
-  paymentNote    String?                @map("payment_note") @db.Text
-  createdAt      DateTime               @default(now()) @map("created_at")
-  acceptedAt     DateTime?              @map("accepted_at")
-  orderedAt      DateTime?              @map("ordered_at")
-  receivedAt     DateTime?              @map("received_at")
-  paidAt         DateTime?              @map("paid_at")
-  reminderDueAt  DateTime?              @map("reminder_due_at")
-  processedAt    DateTime?              @map("processed_at")
-  processedBy    String?                @map("processed_by") @db.Uuid
+  id            String                 @id @default(uuid()) @db.Uuid
+  ksId          String                 @map("ks_id") @db.Uuid
+  projectId     String                 @map("project_id") @db.Uuid
+  description   String                 @db.Text
+  status        MaterialProposalStatus @default(pending)
+  orderStatus   MaterialOrderStatus    @default(not_ordered) @map("order_status")
+  parsedItems   Json?                  @map("parsed_items")
+  processedNote String?                @map("processed_note") @db.Text
+  paymentMethod String?                @map("payment_method")
+  paymentNote   String?                @map("payment_note") @db.Text
+  createdAt     DateTime               @default(now()) @map("created_at")
+  acceptedAt    DateTime?              @map("accepted_at")
+  orderedAt     DateTime?              @map("ordered_at")
+  receivedAt    DateTime?              @map("received_at")
+  paidAt        DateTime?              @map("paid_at")
+  reminderDueAt DateTime?              @map("reminder_due_at")
+  processedAt   DateTime?              @map("processed_at")
+  processedBy   String?                @map("processed_by") @db.Uuid
 
   ks        User    @relation("MatProposalKs", fields: [ksId], references: [id])
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -2634,14 +2638,14 @@ enum InboxStatus {
 }
 
 model InboxItem {
-  id            String      @id @default(uuid()) @db.Uuid
-  content       String      @db.Text
-  source        InboxSource @default(manual)
-  status        InboxStatus @default(open)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  processedAt   DateTime?   @map("processed_at")
-  processedBy   String?     @map("processed_by") @db.Uuid
-  convertedTo   String?     @map("converted_to") @db.Text
+  id          String      @id @default(uuid()) @db.Uuid
+  content     String      @db.Text
+  source      InboxSource @default(manual)
+  status      InboxStatus @default(open)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  processedAt DateTime?   @map("processed_at")
+  processedBy String?     @map("processed_by") @db.Uuid
+  convertedTo String?     @map("converted_to") @db.Text
 
   @@index([status, createdAt(sort: Desc)])
   @@map("inbox_items")
@@ -2730,19 +2734,20 @@ model ProjectBudget {
 }
 
 model ProjectBudgetItem {
-  id        String         @id @default(uuid()) @db.Uuid
-  budgetId  String         @map("budget_id") @db.Uuid
-  category  BudgetCategory
-  phase     BudgetPhase
-  name      String
-  unit      String         @db.VarChar(20)
-  quantity  Decimal        @db.Decimal(14, 3)
-  unitPrice BigInt         @map("unit_price")
-  amount    BigInt
-  note      String?
-  sortRank  Float          @default(0) @map("sort_rank")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  id          String         @id @default(uuid()) @db.Uuid
+  budgetId    String         @map("budget_id") @db.Uuid
+  category    BudgetCategory
+  phase       BudgetPhase
+  name        String
+  unit        String         @db.VarChar(20)
+  quantity    Decimal        @db.Decimal(14, 3)
+  unitPrice   BigInt         @map("unit_price")
+  amount      BigInt
+  note        String?
+  sortRank    Float          @default(0) @map("sort_rank")
+  qcChecklist Json?          @map("qc_checklist")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
 
   budget     ProjectBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   workOrders WorkOrder[]
@@ -2767,9 +2772,9 @@ model ProjectBudgetAmendment {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  budget     ProjectBudget                  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  proposedBy User                           @relation("ProjectBudgetAmendmentProposer", fields: [proposedById], references: [id])
-  approvedBy User?                          @relation("ProjectBudgetAmendmentApprover", fields: [approvedById], references: [id])
+  budget     ProjectBudget                @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  proposedBy User                         @relation("ProjectBudgetAmendmentProposer", fields: [proposedById], references: [id])
+  approvedBy User?                        @relation("ProjectBudgetAmendmentApprover", fields: [approvedById], references: [id])
   items      ProjectBudgetAmendmentItem[]
 
   @@index([budgetId, status])
@@ -2848,10 +2853,10 @@ model WorkOrderWorker {
 // ──────────────────────────── M4: Chấm công cuối ngày + sản lượng ────────────────────────────
 
 enum TimesheetAbsentReason {
-  P    // có phép
-  KP   // không phép
-  MUA  // mưa - lỗi công ty, loại khỏi mẫu số đánh giá
-  CHO  // chờ việc - lỗi công ty, loại khỏi mẫu số
+  P // có phép
+  KP // không phép
+  MUA // mưa - lỗi công ty, loại khỏi mẫu số đánh giá
+  CHO // chờ việc - lỗi công ty, loại khỏi mẫu số
 }
 
 enum WorkOrderOutputQcStatus {
@@ -2885,27 +2890,28 @@ model WorkerTimesheet {
 }
 
 model WorkOrderOutput {
-  id            String                  @id @default(uuid()) @db.Uuid
-  workOrderId   String                  @unique @map("work_order_id") @db.Uuid
-  projectId     String                  @map("project_id") @db.Uuid
-  date          DateTime                @db.Date
-  actualQty     Decimal                 @map("actual_qty") @db.Decimal(14, 3)
-  approvedQty   Decimal?                @map("approved_qty") @db.Decimal(14, 3)
-  qcStatus      WorkOrderOutputQcStatus @default(pending) @map("qc_status")
-  qcChecklistId String?                 @map("qc_checklist_id") @db.Uuid
-  weekKey       String                  @map("week_key") @db.VarChar(10)
-  note          String?
-  createdById   String                  @map("created_by_id") @db.Uuid
-  approvedById  String?                 @map("approved_by_id") @db.Uuid
-  approvedAt    DateTime?               @map("approved_at")
-  createdAt     DateTime                @default(now()) @map("created_at")
-  updatedAt     DateTime                @updatedAt @map("updated_at")
+  id           String                  @id @default(uuid()) @db.Uuid
+  workOrderId  String                  @unique @map("work_order_id") @db.Uuid
+  projectId    String                  @map("project_id") @db.Uuid
+  date         DateTime                @db.Date
+  actualQty    Decimal                 @map("actual_qty") @db.Decimal(14, 3)
+  approvedQty  Decimal?                @map("approved_qty") @db.Decimal(14, 3)
+  qcStatus     WorkOrderOutputQcStatus @default(pending) @map("qc_status")
+  weekKey      String                  @map("week_key") @db.VarChar(10)
+  note         String?
+  createdById  String                  @map("created_by_id") @db.Uuid
+  approvedById String?                 @map("approved_by_id") @db.Uuid
+  approvedAt   DateTime?               @map("approved_at")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
 
-  workOrder  WorkOrder              @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  project    Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy  User                   @relation("WorkOrderOutputCreatedBy", fields: [createdById], references: [id])
-  approvedBy User?                  @relation("WorkOrderOutputApprovedBy", fields: [approvedById], references: [id])
+  workOrder  WorkOrder                @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  project    Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User                     @relation("WorkOrderOutputCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?                    @relation("WorkOrderOutputApprovedBy", fields: [approvedById], references: [id])
   photos     WorkOrderOutputPhoto[]
+  qcChecks   WorkOrderOutputQcCheck[]
+  qcIssues   WorkerQcIssue[]
 
   @@index([projectId, date])
   @@index([projectId, weekKey])
@@ -2914,20 +2920,74 @@ model WorkOrderOutput {
 }
 
 model WorkOrderOutputPhoto {
-  id             String   @id @default(uuid()) @db.Uuid
-  outputId       String   @map("output_id") @db.Uuid
-  storageKey     String   @map("storage_key")
-  width          Int?
-  height         Int?
-  sizeBytes      Int?     @map("size_bytes")
-  contentType    String?  @map("content_type") @db.VarChar(60)
-  sortRank       Float    @default(0) @map("sort_rank")
-  uploadedById   String   @map("uploaded_by_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  outputId     String   @map("output_id") @db.Uuid
+  storageKey   String   @map("storage_key")
+  width        Int?
+  height       Int?
+  sizeBytes    Int?     @map("size_bytes")
+  contentType  String?  @map("content_type") @db.VarChar(60)
+  sortRank     Float    @default(0) @map("sort_rank")
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
 
   output     WorkOrderOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
   uploadedBy User            @relation("WorkOrderOutputPhotoUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([outputId, sortRank])
   @@map("work_order_output_photos")
+}
+
+enum WorkOrderOutputQcCheckStatus {
+  pending
+  passed
+  failed
+}
+
+enum WorkerQcIssueSeverity {
+  minor
+  major
+  critical
+}
+
+model WorkOrderOutputQcCheck {
+  id          String                       @id @default(uuid()) @db.Uuid
+  outputId    String                       @map("output_id") @db.Uuid
+  itemIndex   Int                          @map("item_index")
+  itemTitle   String                       @map("item_title")
+  status      WorkOrderOutputQcCheckStatus @default(pending)
+  photoKey    String?                      @map("photo_key")
+  note        String?
+  checkedById String?                      @map("checked_by_id") @db.Uuid
+  checkedAt   DateTime?                    @map("checked_at")
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  updatedAt   DateTime                     @updatedAt @map("updated_at")
+
+  output    WorkOrderOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  checkedBy User?           @relation("WorkOrderOutputQcCheckCheckedBy", fields: [checkedById], references: [id])
+
+  @@unique([outputId, itemIndex])
+  @@index([outputId, status])
+  @@map("work_order_output_qc_checks")
+}
+
+model WorkerQcIssue {
+  id          String                @id @default(uuid()) @db.Uuid
+  workerId    String                @map("worker_id") @db.Uuid
+  outputId    String?               @map("output_id") @db.Uuid
+  projectId   String                @map("project_id") @db.Uuid
+  severity    WorkerQcIssueSeverity
+  reason      String
+  occurredAt  DateTime              @map("occurred_at") @db.Date
+  createdById String                @map("created_by_id") @db.Uuid
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  worker    Worker           @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  output    WorkOrderOutput? @relation(fields: [outputId], references: [id], onDelete: SetNull)
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User             @relation("WorkerQcIssueCreatedBy", fields: [createdById], references: [id])
+
+  @@index([workerId, occurredAt])
+  @@index([projectId, occurredAt])
+  @@map("worker_qc_issues")
 }

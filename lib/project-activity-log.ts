@@ -84,6 +84,9 @@ export type LogEntity =
   | "work_order"
   | "work_order_output"
   | "worker_timesheet"
+  | "work_order_output_qc_check"
+  | "worker_qc_issue"
+  | "budget_item_qc"
   | "other";
 
 type LogInput = {

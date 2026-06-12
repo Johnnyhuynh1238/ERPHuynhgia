@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { canEditEod, canViewEod, deriveDayValue, weekKeyForDate } from "@/lib/eod";
+import { parseQcChecklist } from "@/lib/qc-mapping";
 import { logProjectActivity } from "@/lib/project-activity-log";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -64,7 +65,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
       orderBy: { groupNo: "asc" },
       include: {
         workers: { include: { worker: { select: { id: true, fullName: true, grade: true } } } },
-        output: { include: { photos: { orderBy: { sortRank: "asc" } } } },
+        budgetItem: { select: { qcChecklist: true } },
+        output: {
+          include: {
+            photos: { orderBy: { sortRank: "asc" } },
+            qcChecks: { orderBy: { itemIndex: "asc" } },
+          },
+        },
       },
     }),
     prisma.workerAttendance.findMany({
@@ -139,6 +146,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       unitPrice: Number(o.unitPrice),
       targetQty: Number(o.targetQty),
       workerCount: o.workers.length,
+      workerIds: o.workers.map((w) => w.workerId),
+      qcChecklist: parseQcChecklist(o.budgetItem.qcChecklist),
       output: o.output
         ? {
             id: o.output.id,
@@ -147,6 +156,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
             qcStatus: o.output.qcStatus,
             note: o.output.note,
             photos: o.output.photos.map((p) => ({ id: p.id, storageKey: p.storageKey, sortRank: p.sortRank })),
+            qcChecks: o.output.qcChecks.map((c) => ({
+              id: c.id,
+              itemIndex: c.itemIndex,
+              itemTitle: c.itemTitle,
+              status: c.status,
+              hasPhoto: Boolean(c.photoKey),
+              note: c.note,
+              checkedAt: c.checkedAt,
+            })),
           }
         : null,
     })),

@@ -219,21 +219,37 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           },
         });
 
+    // Preserve qcChecklist across save by (category|phase|name) fingerprint
+    const existingItems = await tx.projectBudgetItem.findMany({
+      where: { budgetId: budget.id },
+      select: { category: true, phase: true, name: true, qcChecklist: true },
+    });
+    const qcByKey = new Map<string, Prisma.JsonValue>();
+    for (const ex of existingItems) {
+      if (ex.qcChecklist != null) {
+        qcByKey.set(`${ex.category}|${ex.phase}|${ex.name}`, ex.qcChecklist);
+      }
+    }
+
     await tx.projectBudgetItem.deleteMany({ where: { budgetId: budget.id } });
     if (items.length > 0) {
       await tx.projectBudgetItem.createMany({
-        data: items.map((it) => ({
-          budgetId: budget.id,
-          category: it.category,
-          phase: it.phase,
-          name: it.name,
-          unit: it.unit,
-          quantity: new Prisma.Decimal(it.quantity),
-          unitPrice: BigInt(it.unitPrice),
-          amount: BigInt(it.amount),
-          note: it.note ?? null,
-          sortRank: it.sortRank,
-        })),
+        data: items.map((it) => {
+          const preservedQc = qcByKey.get(`${it.category}|${it.phase}|${it.name}`);
+          return {
+            budgetId: budget.id,
+            category: it.category,
+            phase: it.phase,
+            name: it.name,
+            unit: it.unit,
+            quantity: new Prisma.Decimal(it.quantity),
+            unitPrice: BigInt(it.unitPrice),
+            amount: BigInt(it.amount),
+            note: it.note ?? null,
+            sortRank: it.sortRank,
+            qcChecklist: preservedQc == null ? Prisma.JsonNull : (preservedQc as Prisma.InputJsonValue),
+          };
+        }),
       });
     }
 

@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { canEditEod, canViewEod } from "@/lib/eod";
+import { canApproveOutput, canEditEod, canViewEod } from "@/lib/eod";
+import { canTickQcCheck } from "@/lib/qc-mapping";
 import { EodClient } from "./_components/eod-client";
 
 export const metadata = { title: "Cuối ngày" };
@@ -26,5 +27,12 @@ export default async function EodPage({ params }: { params: { id: string } }) {
     redirect("/projects?denied=1");
   }
 
-  return <EodClient projectId={project.id} canEdit={canEditEod({ id: user.id, role: user.role })} />;
+  return (
+    <EodClient
+      projectId={project.id}
+      canEdit={canEditEod({ id: user.id, role: user.role })}
+      canTickQc={canTickQcCheck({ id: user.id, role: user.role })}
+      canApproveOutput={canApproveOutput({ id: user.id, role: user.role })}
+    />
+  );
 }

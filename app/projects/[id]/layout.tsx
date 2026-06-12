@@ -73,6 +73,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   const canViewBudgetTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
   const canViewWorkOrdersTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
   const canViewEodTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
+  const canViewQcMappingTab = ["admin", "construction_manager"].includes(user.role);
 
   const tabs = [
     { label: "Thông tin chung", href: `/projects/${params.id}` },
@@ -80,6 +81,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
     ...(canViewBudgetTab ? [{ label: "Dự toán", href: `/projects/${params.id}/budget` }] : []),
     ...(canViewWorkOrdersTab ? [{ label: "Giao việc", href: `/projects/${params.id}/work-orders` }] : []),
     ...(canViewEodTab ? [{ label: "Cuối ngày", href: `/projects/${params.id}/eod` }] : []),
+    ...(canViewQcMappingTab ? [{ label: "QC Mapping", href: `/projects/${params.id}/qc-mapping` }] : []),
     ...(canProposeMaterials ? [{ label: "Đề xuất vật tư", href: `/projects/${params.id}/material-proposals` }] : []),
     ...(canViewSubContracts ? [{ label: "Thầu phụ", href: `/projects/${params.id}/sub-contracts` }] : []),
     ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),
