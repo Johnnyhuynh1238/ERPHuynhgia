@@ -41,8 +41,10 @@ export async function PATCH(
   }
 
   const accessibleIds = await getAccessibleProjectIdsForWorkerAttendance(user.id, user.role);
-  if (accessibleIds !== null && !accessibleIds.includes(worker.projectId)) {
-    return NextResponse.json({ message: "Không có quyền với dự án này" }, { status: 403 });
+  if (accessibleIds !== null) {
+    if (!worker.projectId || !accessibleIds.includes(worker.projectId)) {
+      return NextResponse.json({ message: "Không có quyền với dự án này" }, { status: 403 });
+    }
   }
 
   const updated = await prisma.worker.update({

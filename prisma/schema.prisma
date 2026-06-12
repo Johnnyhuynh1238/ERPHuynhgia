@@ -355,6 +355,20 @@ enum WorkerRole {
   phu
 }
 
+enum WorkerStatus {
+  trial
+  active
+  standby
+  inactive
+  blacklist
+}
+
+enum GradeHistoryStatus {
+  pending
+  approved
+  rejected
+}
+
 enum WorkerAttendanceSession {
   morning
   afternoon
@@ -461,6 +475,10 @@ model User {
   shiftAssignments              UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
   workersCreated                Worker[]                  @relation("WorkerCreatedBy")
   workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
+  gradeRatesCreated             GradeRate[]               @relation("GradeRateCreatedBy")
+  gradeHistoryProposed          GradeHistory[]            @relation("GradeHistoryProposer")
+  gradeHistoryApproved          GradeHistory[]            @relation("GradeHistoryApprover")
+  workerDocsUploaded            WorkerDoc[]               @relation("WorkerDocUploader")
   materialProposalsCreated      MaterialProposal[]        @relation("MatProposalKs")
   materialProposalsProcessed    MaterialProposal[]        @relation("MatProposalProcessor")
 
@@ -804,25 +822,91 @@ model DailyReportSubmission {
 }
 
 model Worker {
-  id             String     @id @default(uuid()) @db.Uuid
-  projectId      String     @map("project_id") @db.Uuid
-  fullName       String     @map("full_name")
+  id             String       @id @default(uuid()) @db.Uuid
+  projectId      String?      @map("project_id") @db.Uuid
+  fullName       String       @map("full_name")
   phone          String?
-  role           WorkerRole @default(tho)
-  idCardPhotoUrl String?    @map("id_card_photo_url")
-  dailyRate      Int?       @map("daily_rate")
-  status         String     @default("active") @db.VarChar(20)
-  sortRank       Float      @default(0) @map("sort_rank")
-  createdById    String     @map("created_by_id") @db.Uuid
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  cccd           String?      @db.VarChar(20)
+  bankAccount    String?      @map("bank_account") @db.VarChar(30)
+  bankName       String?      @map("bank_name")
+  role           WorkerRole   @default(tho)
+  grade          Int?
+  idCardPhotoUrl String?      @map("id_card_photo_url")
+  dailyRate      Int?         @map("daily_rate")
+  status         String       @default("active") @db.VarChar(20)
+  workerStatus   WorkerStatus @default(active) @map("worker_status")
+  onboardedAt    DateTime?    @map("onboarded_at")
+  rating         Float?
+  notes          String?
+  sortRank       Float        @default(0) @map("sort_rank")
+  createdById    String       @map("created_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy   User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
-  attendances WorkerAttendance[]
+  project      Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
+  attendances  WorkerAttendance[]
+  docs         WorkerDoc[]
+  gradeHistory GradeHistory[]
 
   @@index([projectId, status])
+  @@index([workerStatus, grade])
   @@map("workers")
+}
+
+model WorkerDoc {
+  id           String   @id @default(uuid()) @db.Uuid
+  workerId     String   @map("worker_id") @db.Uuid
+  kind         String   @db.VarChar(30)
+  url          String
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  worker     Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation("WorkerDocUploader", fields: [uploadedById], references: [id])
+
+  @@index([workerId, kind])
+  @@map("worker_docs")
+}
+
+model GradeRate {
+  id          String   @id @default(uuid()) @db.Uuid
+  grade       Int
+  dailyRate   Int      @map("daily_rate")
+  effectiveAt DateTime @default(now()) @map("effective_at")
+  version     Int      @default(1)
+  isCurrent   Boolean  @default(true) @map("is_current")
+  note        String?
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy User @relation("GradeRateCreatedBy", fields: [createdById], references: [id])
+
+  @@index([grade, isCurrent])
+  @@map("grade_rates")
+}
+
+model GradeHistory {
+  id           String             @id @default(uuid()) @db.Uuid
+  workerId     String             @map("worker_id") @db.Uuid
+  fromGrade    Int?               @map("from_grade")
+  toGrade      Int                @map("to_grade")
+  reason       String
+  evidenceUrl  String?            @map("evidence_url")
+  status       GradeHistoryStatus @default(pending)
+  proposedById String             @map("proposed_by_id") @db.Uuid
+  approvedById String?            @map("approved_by_id") @db.Uuid
+  approvedAt   DateTime?          @map("approved_at")
+  rejectReason String?            @map("reject_reason")
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  worker     Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  proposedBy User   @relation("GradeHistoryProposer", fields: [proposedById], references: [id])
+  approvedBy User?  @relation("GradeHistoryApprover", fields: [approvedById], references: [id])
+
+  @@index([workerId, createdAt])
+  @@index([status])
+  @@map("grade_history")
 }
 
 model WorkerAttendance {
