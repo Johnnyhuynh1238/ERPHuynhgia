@@ -23,7 +23,7 @@ export async function OPTIONS(request: Request) {
 }
 
 const PAGE_TYPES = ["homepage", "baogia", "tieuchuan", "other"] as const;
-const EVENT_TYPES = ["pageview", "scroll", "engagement", "cta_click", "exit"] as const;
+const EVENT_TYPES = ["pageview", "scroll", "engagement", "cta_click", "exit", "quote_saved"] as const;
 
 const eventSchema = z.object({
   sessionId: z.string().trim().min(8).max(64),

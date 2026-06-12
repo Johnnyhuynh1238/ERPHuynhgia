@@ -14,12 +14,12 @@ type ApiData = {
   ok: boolean;
   range: Range;
   since: string;
-  summary: { pageviews: number; sessions: number; ctaClicks: number; leads: number };
+  summary: { pageviews: number; sessions: number; ctaClicks: number; quoteSaved: number; leads: number };
   timeseries: { bucket: string; pageviews: number; sessions: number }[];
   cta: { kind: string; count: number }[];
   scrollFunnel: { depth: number; sessions: number }[];
   topReferrers: { ref: string | null; sessions: number }[];
-  funnel: { pageviews: number; sessions: number; scroll75: number; cta: number; leads: number };
+  funnel: { pageviews: number; sessions: number; scroll75: number; cta: number; quoteSaved: number; leads: number };
   recent: {
     id: string;
     sessionId: string;
@@ -153,6 +153,7 @@ export function AnalyticsClient() {
     { name: "Session", count: data.funnel.sessions },
     { name: "Scroll ≥75%", count: data.funnel.scroll75 },
     { name: "Click CTA", count: data.funnel.cta },
+    { name: "Quote saved", count: data.funnel.quoteSaved },
     { name: "Lead có SĐT", count: data.funnel.leads },
   ] : [];
 
@@ -181,8 +182,8 @@ export function AnalyticsClient() {
       </div>
 
       {loading && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-2xl border border-[#252840] bg-[#13151f]" />
           ))}
         </div>
@@ -193,10 +194,11 @@ export function AnalyticsClient() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <KpiCard label="Pageviews" value={data.summary.pageviews.toLocaleString("vi-VN")} hint="Lượt xem trang" />
             <KpiCard label="Sessions" value={data.summary.sessions.toLocaleString("vi-VN")} hint="Khách (unique sessionId)" />
             <KpiCard label="Click CTA" value={data.summary.ctaClicks.toLocaleString("vi-VN")} hint="Báo giá / gọi / Zalo" />
+            <KpiCard label="Quote saved" value={data.summary.quoteSaved.toLocaleString("vi-VN")} hint="Khách tạo link báo giá riêng" />
             <KpiCard label="Lead có SĐT" value={data.summary.leads.toLocaleString("vi-VN")} hint="Submit form báo giá" />
           </div>
 

@@ -101,6 +101,12 @@ export async function GET(request: Request) {
      WHERE created_at >= $1 AND event_type = 'cta_click'`,
     since,
   );
+  const sessionsQuoteSaved = await prisma.$queryRawUnsafe<{ c: bigint }[]>(
+    `SELECT COUNT(DISTINCT session_id)::bigint AS c
+     FROM web_events
+     WHERE created_at >= $1 AND event_type = 'quote_saved'`,
+    since,
+  );
   const leadsCount = await prisma.baogiaLead.count({ where: { createdAt: { gte: since } } });
 
   /* Recent events */
@@ -130,6 +136,7 @@ export async function GET(request: Request) {
       pageviews: counts.pageview ?? 0,
       sessions: totalSessions,
       ctaClicks: counts.cta_click ?? 0,
+      quoteSaved: counts.quote_saved ?? 0,
       leads: leadsCount,
     },
     timeseries: timeseries.map((t) => ({
@@ -145,6 +152,7 @@ export async function GET(request: Request) {
       sessions: totalSessions,
       scroll75: Number(sessionsScroll75[0]?.c ?? BigInt(0)),
       cta: Number(sessionsCta[0]?.c ?? BigInt(0)),
+      quoteSaved: Number(sessionsQuoteSaved[0]?.c ?? BigInt(0)),
       leads: leadsCount,
     },
     recent: recent.map((r) => ({
