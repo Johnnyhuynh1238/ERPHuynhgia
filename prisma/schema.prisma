@@ -476,6 +476,10 @@ model User {
   workersCreated                Worker[]                  @relation("WorkerCreatedBy")
   workerAttendancesMarked       WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
   workOrdersCreated             WorkOrder[]               @relation("WorkOrderCreatedBy")
+  workerTimesheetsCreated       WorkerTimesheet[]         @relation("WorkerTimesheetCreatedBy")
+  workOrderOutputsCreated       WorkOrderOutput[]         @relation("WorkOrderOutputCreatedBy")
+  workOrderOutputsApproved      WorkOrderOutput[]         @relation("WorkOrderOutputApprovedBy")
+  workOrderOutputPhotosUploaded WorkOrderOutputPhoto[]    @relation("WorkOrderOutputPhotoUploadedBy")
   gradeRatesCreated             GradeRate[]               @relation("GradeRateCreatedBy")
   gradeHistoryProposed          GradeHistory[]            @relation("GradeHistoryProposer")
   gradeHistoryApproved          GradeHistory[]            @relation("GradeHistoryApprover")
@@ -633,6 +637,8 @@ model Project {
   designContract            DesignContract?
   projectBudget             ProjectBudget?
   workOrders                WorkOrder[]
+  workerTimesheets          WorkerTimesheet[]
+  workOrderOutputs          WorkOrderOutput[]
 
   @@index([status])
   @@map("projects")
@@ -856,6 +862,7 @@ model Worker {
   docs         WorkerDoc[]
   gradeHistory GradeHistory[]
   workOrderWorkers WorkOrderWorker[]
+  timesheets       WorkerTimesheet[]
 
   @@index([projectId, status])
   @@index([workerStatus, grade])
@@ -2816,6 +2823,7 @@ model WorkOrder {
   budgetItem ProjectBudgetItem @relation(fields: [budgetItemId], references: [id])
   createdBy  User              @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
   workers    WorkOrderWorker[]
+  output     WorkOrderOutput?
 
   @@unique([projectId, date, groupNo])
   @@index([projectId, date])
@@ -2835,4 +2843,91 @@ model WorkOrderWorker {
   @@unique([workOrderId, workerId])
   @@index([workerId])
   @@map("work_order_workers")
+}
+
+// ──────────────────────────── M4: Chấm công cuối ngày + sản lượng ────────────────────────────
+
+enum TimesheetAbsentReason {
+  P    // có phép
+  KP   // không phép
+  MUA  // mưa - lỗi công ty, loại khỏi mẫu số đánh giá
+  CHO  // chờ việc - lỗi công ty, loại khỏi mẫu số
+}
+
+enum WorkOrderOutputQcStatus {
+  pending
+  passed
+  failed
+  rework
+}
+
+model WorkerTimesheet {
+  id           String                 @id @default(uuid()) @db.Uuid
+  projectId    String                 @map("project_id") @db.Uuid
+  workerId     String                 @map("worker_id") @db.Uuid
+  date         DateTime               @db.Date
+  dayValue     Decimal                @map("day_value") @db.Decimal(3, 2)
+  absentReason TimesheetAbsentReason? @map("absent_reason")
+  weekKey      String                 @map("week_key") @db.VarChar(10)
+  note         String?
+  createdById  String                 @map("created_by_id") @db.Uuid
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  worker    Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("WorkerTimesheetCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([workerId, date])
+  @@index([projectId, date])
+  @@index([projectId, weekKey])
+  @@map("worker_timesheets")
+}
+
+model WorkOrderOutput {
+  id            String                  @id @default(uuid()) @db.Uuid
+  workOrderId   String                  @unique @map("work_order_id") @db.Uuid
+  projectId     String                  @map("project_id") @db.Uuid
+  date          DateTime                @db.Date
+  actualQty     Decimal                 @map("actual_qty") @db.Decimal(14, 3)
+  approvedQty   Decimal?                @map("approved_qty") @db.Decimal(14, 3)
+  qcStatus      WorkOrderOutputQcStatus @default(pending) @map("qc_status")
+  qcChecklistId String?                 @map("qc_checklist_id") @db.Uuid
+  weekKey       String                  @map("week_key") @db.VarChar(10)
+  note          String?
+  createdById   String                  @map("created_by_id") @db.Uuid
+  approvedById  String?                 @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime?               @map("approved_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  workOrder  WorkOrder              @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  project    Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User                   @relation("WorkOrderOutputCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?                  @relation("WorkOrderOutputApprovedBy", fields: [approvedById], references: [id])
+  photos     WorkOrderOutputPhoto[]
+
+  @@index([projectId, date])
+  @@index([projectId, weekKey])
+  @@index([qcStatus])
+  @@map("work_order_outputs")
+}
+
+model WorkOrderOutputPhoto {
+  id             String   @id @default(uuid()) @db.Uuid
+  outputId       String   @map("output_id") @db.Uuid
+  storageKey     String   @map("storage_key")
+  width          Int?
+  height         Int?
+  sizeBytes      Int?     @map("size_bytes")
+  contentType    String?  @map("content_type") @db.VarChar(60)
+  sortRank       Float    @default(0) @map("sort_rank")
+  uploadedById   String   @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  output     WorkOrderOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  uploadedBy User            @relation("WorkOrderOutputPhotoUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([outputId, sortRank])
+  @@map("work_order_output_photos")
 }

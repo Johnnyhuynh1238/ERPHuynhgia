@@ -82,6 +82,8 @@ export type LogEntity =
   | "project_budget"
   | "project_budget_amendment"
   | "work_order"
+  | "work_order_output"
+  | "worker_timesheet"
   | "other";
 
 type LogInput = {
