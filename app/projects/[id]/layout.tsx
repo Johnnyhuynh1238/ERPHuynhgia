@@ -70,12 +70,12 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   const canViewConstructionLog = user.role !== UserRole.accountant;
   const canViewSubContracts = await canUserAccessProjectSubContracts(params.id, { id: user.id, role: user.role });
   const canProposeMaterials = user.role === UserRole.engineer || user.role === UserRole.admin;
-  const canViewLaborBudgetTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
+  const canViewBudgetTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
 
   const tabs = [
     { label: "Thông tin chung", href: `/projects/${params.id}` },
     { label: "Tiến độ", href: `/projects/${params.id}/tasks` },
-    ...(canViewLaborBudgetTab ? [{ label: "Dự toán NC", href: `/projects/${params.id}/labor-budget` }] : []),
+    ...(canViewBudgetTab ? [{ label: "Dự toán", href: `/projects/${params.id}/budget` }] : []),
     ...(canProposeMaterials ? [{ label: "Đề xuất vật tư", href: `/projects/${params.id}/material-proposals` }] : []),
     ...(canViewSubContracts ? [{ label: "Thầu phụ", href: `/projects/${params.id}/sub-contracts` }] : []),
     ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),

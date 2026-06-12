@@ -44,6 +44,7 @@ export type LogAction =
   | "note"
   | "grant_access"
   | "revoke_access"
+  | "lock"
   | "other";
 
 export type LogEntity =
@@ -78,6 +79,8 @@ export type LogEntity =
   | "design_photo"
   | "site_rest_day"
   | "customer_comment"
+  | "project_budget"
+  | "project_budget_amendment"
   | "other";
 
 type LogInput = {
