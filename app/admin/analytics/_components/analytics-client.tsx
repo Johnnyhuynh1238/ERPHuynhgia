@@ -142,22 +142,32 @@ const EVENT_COLOR: Record<string, string> = {
 function fmtPayload(eventType: string, payload: Record<string, unknown>): string {
   switch (eventType) {
     case "pageview": {
-      const url = String(payload.url ?? "");
-      let path = "/";
-      try { path = new URL(url).pathname; } catch { /* keep "/" */ }
-      const ref = String(payload.referrer ?? "");
+      const path = (typeof payload.path === "string" && payload.path) ? payload.path : "/";
+      const ref = typeof payload.referrer === "string" ? payload.referrer : "";
       return ref ? `${path} ← ${fmtRef(ref)}` : path;
     }
-    case "scroll":
-      return `tới ${payload.depth}%`;
-    case "engagement":
-      return `${payload.seconds}s ở trang`;
+    case "scroll": {
+      const d = Number(payload.depth);
+      return Number.isFinite(d) ? `tới ${d}%` : "";
+    }
+    case "engagement": {
+      const s = Number(payload.sec);
+      return Number.isFinite(s) ? `đọc ${s}s` : "";
+    }
     case "cta_click": {
       const kind = String(payload.kind ?? "unknown");
-      return CTA_LABELS[kind] || kind;
+      const label = CTA_LABELS[kind] || kind;
+      const s = Number(payload.sec);
+      return Number.isFinite(s) ? `${label} (sau ${s}s)` : label;
     }
-    case "exit":
-      return `sau ${fmtDuration(Number(payload.duration_ms ?? 0))}`;
+    case "exit": {
+      const s = Number(payload.sec);
+      const max = Number(payload.maxScrollPct);
+      const parts: string[] = [];
+      if (Number.isFinite(s)) parts.push(`sau ${fmtDuration(s * 1000)}`);
+      if (Number.isFinite(max) && max > 0) parts.push(`cuộn max ${max}%`);
+      return parts.join(" · ") || "—";
+    }
     case "quote_saved": {
       const flags: string[] = [];
       if (payload.hasName) flags.push("có tên");
