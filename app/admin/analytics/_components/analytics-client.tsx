@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ResponsiveContainer,
@@ -627,12 +627,31 @@ function EmptyState({ text }: { text: string }) {
 
 function InfoTip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent | TouchEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <span className="relative inline-block">
+    <span ref={ref} className="relative inline-block">
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#3a3f55] text-[10px] font-semibold text-[#5b6478] transition hover:border-amber-500/60 hover:text-amber-300"
         aria-label="Giải thích"
       >

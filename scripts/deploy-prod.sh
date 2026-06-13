@@ -16,13 +16,21 @@ if [ ! -f "$ROOT_DIR/.env.production" ]; then
   exit 1
 fi
 
-DISK_USE_PCT=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+disk_pct() { df / --output=pcent | tail -1 | tr -dc '0-9'; }
+
+DISK_USE_PCT=$(disk_pct)
+if [ "${DISK_USE_PCT:-0}" -ge 85 ]; then
+  echo "[Deploy] Disk at ${DISK_USE_PCT}% (>=85%). Auto-pruning Docker build cache + dangling images..."
+  docker builder prune -af >/dev/null 2>&1 || true
+  docker image prune -f >/dev/null 2>&1 || true
+  DISK_USE_PCT=$(disk_pct)
+  echo "[Deploy] Disk after prune: ${DISK_USE_PCT}%"
+fi
+
 if [ "${DISK_USE_PCT:-0}" -ge 90 ]; then
-  echo "[Deploy] ABORT: disk usage is ${DISK_USE_PCT}% (>=90%). Free space before deploying." >&2
+  echo "[Deploy] ABORT: disk still at ${DISK_USE_PCT}% after prune. Free space before deploying." >&2
   df -h /
   exit 1
-elif [ "${DISK_USE_PCT:-0}" -ge 80 ]; then
-  echo "[Deploy] WARN: disk usage is ${DISK_USE_PCT}% (>=80%). Consider pruning soon." >&2
 fi
 
 if [ ! -x "$PRE_DEPLOY_SCRIPT" ]; then
