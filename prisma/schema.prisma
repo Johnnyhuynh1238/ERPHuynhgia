@@ -482,6 +482,10 @@ model User {
   workOrderOutputPhotosUploaded   WorkOrderOutputPhoto[]    @relation("WorkOrderOutputPhotoUploadedBy")
   workOrderOutputQcChecksDone     WorkOrderOutputQcCheck[]  @relation("WorkOrderOutputQcCheckCheckedBy")
   workerQcIssuesCreated           WorkerQcIssue[]           @relation("WorkerQcIssueCreatedBy")
+  weeklyPayrollsClosed            WeeklyPayroll[]           @relation("WeeklyPayrollClosedBy")
+  weeklyPayrollsReadied           WeeklyPayroll[]           @relation("WeeklyPayrollReadiedBy")
+  weeklyPayrollsPaid              WeeklyPayroll[]           @relation("WeeklyPayrollPaidBy")
+  weeklyPayrollAdjustmentsCreated WeeklyPayrollAdjustment[] @relation("WeeklyPayrollAdjustmentCreatedBy")
   gradeRatesCreated               GradeRate[]               @relation("GradeRateCreatedBy")
   gradeHistoryProposed            GradeHistory[]            @relation("GradeHistoryProposer")
   gradeHistoryApproved            GradeHistory[]            @relation("GradeHistoryApprover")
@@ -642,6 +646,8 @@ model Project {
   workerTimesheets          WorkerTimesheet[]
   workOrderOutputs          WorkOrderOutput[]
   workerQcIssues            WorkerQcIssue[]
+  weeklyPayrolls            WeeklyPayroll[]
+  weeklyPayrollAdjustments  WeeklyPayrollAdjustment[]
 
   @@index([status])
   @@map("projects")
@@ -859,14 +865,16 @@ model Worker {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  project          Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy        User               @relation("WorkerCreatedBy", fields: [createdById], references: [id])
-  attendances      WorkerAttendance[]
-  docs             WorkerDoc[]
-  gradeHistory     GradeHistory[]
-  workOrderWorkers WorkOrderWorker[]
-  timesheets       WorkerTimesheet[]
-  qcIssues         WorkerQcIssue[]
+  project            Project?                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy          User                      @relation("WorkerCreatedBy", fields: [createdById], references: [id])
+  attendances        WorkerAttendance[]
+  docs               WorkerDoc[]
+  gradeHistory       GradeHistory[]
+  workOrderWorkers   WorkOrderWorker[]
+  timesheets         WorkerTimesheet[]
+  qcIssues           WorkerQcIssue[]
+  payrollLines       WeeklyPayrollLine[]
+  payrollAdjustments WeeklyPayrollAdjustment[]
 
   @@index([projectId, status])
   @@index([workerStatus, grade])
@@ -2990,4 +2998,119 @@ model WorkerQcIssue {
   @@index([workerId, occurredAt])
   @@index([projectId, occurredAt])
   @@map("worker_qc_issues")
+}
+
+// ─── M6 Bảng lương tuần tự động ──────────────────────────────────────────────
+
+enum WeeklyPayrollStatus {
+  draft
+  ready_to_pay
+  paid
+}
+
+model WeeklyPayroll {
+  id        String              @id @default(uuid()) @db.Uuid
+  projectId String              @map("project_id") @db.Uuid
+  weekKey   String              @map("week_key") // ISO YYYY-Www
+  weekStart DateTime            @map("week_start") @db.Date
+  weekEnd   DateTime            @map("week_end") @db.Date
+  status    WeeklyPayrollStatus @default(draft)
+
+  // Snapshot tổng tại thời điểm Chốt tuần. Lưu cứng để KETOAN ko bị ảnh hưởng
+  // khi ai đó sửa lại Timesheet/Output sau khi chốt.
+  totalDays        Decimal @map("total_days") @db.Decimal(10, 2)
+  totalDailyWage   BigInt  @map("total_daily_wage")
+  totalOutputValue BigInt  @map("total_output_value")
+  weekDelta        BigInt  @map("week_delta") // có thể âm
+  carryoverPrev    BigInt  @map("carryover_prev") // sau khi cộng dồn từ tuần trước
+  carryoverNew     BigInt  @map("carryover_new") // còn lại sau khi chia thưởng (≥0)
+  bonusPool        BigInt  @map("bonus_pool")
+  shareRate        Decimal @map("share_rate") @db.Decimal(5, 4)
+  totalBonus       BigInt  @map("total_bonus")
+  totalPayable     BigInt  @map("total_payable") // lương + thưởng
+
+  // Cảnh báo: số tuần âm liên tiếp (đã trừ tuần MUA/CHO đa số)
+  negStreak Int @default(0) @map("neg_streak")
+
+  note        String?
+  closedById  String    @map("closed_by_id") @db.Uuid
+  closedAt    DateTime  @default(now()) @map("closed_at")
+  readiedById String?   @map("readied_by_id") @db.Uuid
+  readiedAt   DateTime? @map("readied_at")
+  paidById    String?   @map("paid_by_id") @db.Uuid
+  paidAt      DateTime? @map("paid_at")
+  paidNote    String?   @map("paid_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project     Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  closedBy    User                      @relation("WeeklyPayrollClosedBy", fields: [closedById], references: [id])
+  readiedBy   User?                     @relation("WeeklyPayrollReadiedBy", fields: [readiedById], references: [id])
+  paidBy      User?                     @relation("WeeklyPayrollPaidBy", fields: [paidById], references: [id])
+  lines       WeeklyPayrollLine[]
+  adjustments WeeklyPayrollAdjustment[]
+
+  @@unique([projectId, weekKey])
+  @@index([projectId, status])
+  @@map("weekly_payrolls")
+}
+
+model WeeklyPayrollLine {
+  id        String @id @default(uuid()) @db.Uuid
+  payrollId String @map("payroll_id") @db.Uuid
+  workerId  String @map("worker_id") @db.Uuid
+
+  // Snapshot lúc chốt
+  fullName    String  @map("full_name")
+  grade       Int?
+  bankAccount String? @map("bank_account")
+  bankName    String? @map("bank_name")
+  phone       String?
+
+  totalDays  Decimal @map("total_days") @db.Decimal(10, 2)
+  dailyRate  BigInt  @map("daily_rate")
+  dailyWage  BigInt  @map("daily_wage")
+  bonus      BigInt
+  adjustment BigInt  @default(0) // điều chỉnh tay tuần này (âm/dương)
+  payable    BigInt // dailyWage + bonus + adjustment
+
+  // Breakdown vắng (chỉ để hiển thị phiếu lương cho minh bạch)
+  absentDaysP   Int @default(0) @map("absent_p")
+  absentDaysKp  Int @default(0) @map("absent_kp")
+  absentDaysMua Int @default(0) @map("absent_mua")
+  absentDaysCho Int @default(0) @map("absent_cho")
+
+  note String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  payroll WeeklyPayroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  worker  Worker        @relation(fields: [workerId], references: [id], onDelete: Restrict)
+
+  @@unique([payrollId, workerId])
+  @@index([workerId])
+  @@map("weekly_payroll_lines")
+}
+
+// Sửa-sau-duyệt: tuần đã PAID không hủy được — điều chỉnh bù vào tuần sau.
+model WeeklyPayrollAdjustment {
+  id               String  @id @default(uuid()) @db.Uuid
+  projectId        String  @map("project_id") @db.Uuid
+  workerId         String  @map("worker_id") @db.Uuid
+  appliedPayrollId String? @map("applied_payroll_id") @db.Uuid // null = chưa áp vào tuần nào
+
+  amount      BigInt // âm/dương
+  reason      String
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  worker         Worker         @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  appliedPayroll WeeklyPayroll? @relation(fields: [appliedPayrollId], references: [id], onDelete: SetNull)
+  createdBy      User           @relation("WeeklyPayrollAdjustmentCreatedBy", fields: [createdById], references: [id])
+
+  @@index([projectId, workerId])
+  @@index([appliedPayrollId])
+  @@map("weekly_payroll_adjustments")
 }

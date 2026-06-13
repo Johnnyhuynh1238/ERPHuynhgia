@@ -87,6 +87,8 @@ export type LogEntity =
   | "work_order_output_qc_check"
   | "worker_qc_issue"
   | "budget_item_qc"
+  | "weekly_payroll"
+  | "weekly_payroll_adjustment"
   | "other";
 
 type LogInput = {
