@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ResponsiveContainer,
@@ -91,6 +91,126 @@ function fmtDateTime(iso: string) {
   });
 }
 
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function fmtDuration(ms: number) {
+  if (ms < 1000) return "0s";
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  return remSec ? `${min}m${remSec}s` : `${min} phút`;
+}
+
+function fmtRef(ref: string | null | undefined): string {
+  if (!ref) return "direct";
+  try {
+    const u = new URL(ref);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return ref.slice(0, 24);
+  }
+}
+
+const PAGE_LABEL: Record<string, string> = {
+  homepage: "Trang chủ",
+  baogia: "Báo giá",
+  tieuchuan: "Tiêu chuẩn",
+  other: "Khác",
+};
+
+const EVENT_LABEL: Record<string, string> = {
+  pageview: "Vào trang",
+  scroll: "Cuộn",
+  engagement: "Đọc",
+  cta_click: "Bấm CTA",
+  exit: "Rời trang",
+  quote_saved: "Lưu báo giá",
+};
+
+const EVENT_COLOR: Record<string, string> = {
+  pageview: "#60a5fa",
+  scroll: "#22d3ee",
+  engagement: "#94a3b8",
+  cta_click: "#f59e0b",
+  exit: "#fb7185",
+  quote_saved: "#34d399",
+};
+
+function fmtPayload(eventType: string, payload: Record<string, unknown>): string {
+  switch (eventType) {
+    case "pageview": {
+      const url = String(payload.url ?? "");
+      let path = "/";
+      try { path = new URL(url).pathname; } catch { /* keep "/" */ }
+      const ref = String(payload.referrer ?? "");
+      return ref ? `${path} ← ${fmtRef(ref)}` : path;
+    }
+    case "scroll":
+      return `tới ${payload.depth}%`;
+    case "engagement":
+      return `${payload.seconds}s ở trang`;
+    case "cta_click": {
+      const kind = String(payload.kind ?? "unknown");
+      return CTA_LABELS[kind] || kind;
+    }
+    case "exit":
+      return `sau ${fmtDuration(Number(payload.duration_ms ?? 0))}`;
+    case "quote_saved": {
+      const flags: string[] = [];
+      if (payload.hasName) flags.push("có tên");
+      if (payload.hasPhone) flags.push("có SĐT");
+      const token = String(payload.token ?? "").slice(0, 8);
+      const info = flags.length ? flags.join(" + ") : "ẩn danh";
+      return token ? `${info} · token ${token}` : info;
+    }
+    default:
+      try { return JSON.stringify(payload); } catch { return ""; }
+  }
+}
+
+type RecentEvent = ApiData["recent"][number];
+type SessionGroup = {
+  sessionId: string;
+  events: RecentEvent[];
+  firstTime: string;
+  lastTime: string;
+  pageTypes: string[];
+  hasCta: boolean;
+  hasQuoteSaved: boolean;
+  referer: string | null;
+};
+
+function groupBySession(events: RecentEvent[]): SessionGroup[] {
+  const map = new Map<string, RecentEvent[]>();
+  for (const e of events) {
+    const list = map.get(e.sessionId) ?? [];
+    list.push(e);
+    map.set(e.sessionId, list);
+  }
+  const groups: SessionGroup[] = [];
+  for (const [sessionId, list] of Array.from(map.entries())) {
+    list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const pageSet = new Set<string>();
+    for (const e of list) pageSet.add(e.pageType);
+    const referer = list.find((e) => e.referer)?.referer ?? null;
+    groups.push({
+      sessionId,
+      events: list,
+      firstTime: list[0]!.createdAt,
+      lastTime: list[list.length - 1]!.createdAt,
+      pageTypes: Array.from(pageSet),
+      hasCta: list.some((e) => e.eventType === "cta_click"),
+      hasQuoteSaved: list.some((e) => e.eventType === "quote_saved"),
+      referer,
+    });
+  }
+  groups.sort((a, b) => b.lastTime.localeCompare(a.lastTime));
+  return groups;
+}
+
 const AXIS = { stroke: "#3a3f55", tick: { fill: "#8892b0", fontSize: 11 } };
 const GRID_STROKE = "#252840";
 const TOOLTIP_STYLE = {
@@ -147,6 +267,11 @@ export function AnalyticsClient() {
     name: CTA_LABELS[c.kind] || c.kind,
     count: c.count,
   }));
+
+  const sessionGroups = useMemo(
+    () => (data ? groupBySession(data.recent) : []),
+    [data],
+  );
 
   const funnelSteps = data ? [
     { name: "Pageview", count: data.funnel.pageviews },
@@ -353,37 +478,73 @@ export function AnalyticsClient() {
             )}
           </Card>
 
-          <Card title="50 event mới nhất">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-[#252840] uppercase tracking-wide text-[#8892b0]">
-                    <th className="px-1 py-2 text-left font-medium">Time</th>
-                    <th className="px-1 py-2 text-left font-medium">Event</th>
-                    <th className="px-1 py-2 text-left font-medium">Session</th>
-                    <th className="px-1 py-2 text-left font-medium">Payload</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recent.map((e) => (
-                    <tr key={e.id} className="border-b border-[#1a1d2a] last:border-0">
-                      <td className="whitespace-nowrap px-1 py-1.5 text-[#8892b0]">{fmtDateTime(e.createdAt)}</td>
-                      <td
-                        className={`whitespace-nowrap px-1 py-1.5 ${
-                          e.eventType === "cta_click" ? "font-semibold text-amber-300" : "text-[#cdd3e1]"
-                        }`}
-                      >
-                        {e.eventType}
-                      </td>
-                      <td className="px-1 py-1.5 font-mono text-[11px] text-[#5b6478]">{e.sessionId.slice(0, 8)}…</td>
-                      <td className="max-w-[420px] truncate px-1 py-1.5 font-mono text-[11px] text-[#8892b0]">
-                        {JSON.stringify(e.payload)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <Card title={`Hành trình khách — ${sessionGroups.length} session, ${data.recent.length} event mới nhất`}>
+            {sessionGroups.length === 0 ? (
+              <EmptyState text="Chưa có event nào trong khoảng thời gian này" />
+            ) : (
+              <div className="space-y-3">
+                {sessionGroups.map((g) => {
+                  const durMs = new Date(g.lastTime).getTime() - new Date(g.firstTime).getTime();
+                  return (
+                    <div key={g.sessionId} className="overflow-hidden rounded-xl border border-[#252840] bg-[#0f1117]">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[#1a1d2a] bg-[#13151f] px-3 py-2 text-xs">
+                        <span className="font-mono text-[#cdd3e1]">{g.sessionId.slice(0, 10)}…</span>
+                        <span className="text-[#3a3f55]">·</span>
+                        <span className="text-[#8892b0]">
+                          {fmtDateTime(g.firstTime)}
+                          {durMs >= 1000 && (
+                            <span className="text-[#5b6478]"> · kéo dài {fmtDuration(durMs)}</span>
+                          )}
+                        </span>
+                        <span className="text-[#3a3f55]">·</span>
+                        <span className="text-[#8892b0]">
+                          {g.pageTypes.map((p) => PAGE_LABEL[p] || p).join(" → ")}
+                        </span>
+                        <span className="text-[#3a3f55]">·</span>
+                        <span className="text-[#8892b0]">từ {fmtRef(g.referer)}</span>
+                        <div className="ml-auto flex items-center gap-1">
+                          <span className="rounded-full border border-[#252840] bg-[#1a1d2a] px-2 py-0.5 text-[10px] text-[#8892b0]">
+                            {g.events.length} event
+                          </span>
+                          {g.hasCta && (
+                            <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-300">
+                              Có CTA
+                            </span>
+                          )}
+                          {g.hasQuoteSaved && (
+                            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">
+                              Lưu báo giá
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ul className="divide-y divide-[#1a1d2a]">
+                        {g.events.map((e) => (
+                          <li key={e.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+                            <span
+                              className="inline-block h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: EVENT_COLOR[e.eventType] || "#5b6478" }}
+                            />
+                            <span className="w-20 shrink-0 font-mono text-[11px] text-[#5b6478]">
+                              {fmtTime(e.createdAt)}
+                            </span>
+                            <span
+                              className="w-24 shrink-0 font-medium"
+                              style={{ color: EVENT_COLOR[e.eventType] || "#cdd3e1" }}
+                            >
+                              {EVENT_LABEL[e.eventType] || e.eventType}
+                            </span>
+                            <span className="truncate text-[#8892b0]">
+                              {fmtPayload(e.eventType, e.payload)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </>
       )}
