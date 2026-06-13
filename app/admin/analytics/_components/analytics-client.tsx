@@ -284,12 +284,36 @@ export function AnalyticsClient() {
   );
 
   const funnelSteps = data ? [
-    { name: "Pageview", count: data.funnel.pageviews },
-    { name: "Session", count: data.funnel.sessions },
-    { name: "Scroll ≥75%", count: data.funnel.scroll75 },
-    { name: "Click CTA", count: data.funnel.cta },
-    { name: "Quote saved", count: data.funnel.quoteSaved },
-    { name: "Lead có SĐT", count: data.funnel.leads },
+    {
+      name: "Pageview",
+      count: data.funnel.pageviews,
+      explain: "Tổng số lượt trang được tải. 1 khách xem 3 trang = 3 pageviews. F5 cũng tính thêm. Đây là chỉ số đo lưu lượng tổng, lớn nhất trong funnel.",
+    },
+    {
+      name: "Session",
+      count: data.funnel.sessions,
+      explain: "Số khách duy nhất, định danh bằng sessionId (mỗi tab 1 session, lưu trong sessionStorage). Cùng tab F5 hay xem nhiều trang vẫn = 1 session. Tỉ lệ pageview/session > 2 nghĩa là khách lướt nhiều khu.",
+    },
+    {
+      name: "Scroll ≥75%",
+      count: data.funnel.scroll75,
+      explain: "Số session đã cuộn xuống ít nhất 75% chiều dài trang chủ. Mỗi khách chỉ đếm 1 lần. Đây là mốc \"đọc kỹ\" — khách bỏ thời gian xem nội dung chứ không lướt ngang rồi thoát.",
+    },
+    {
+      name: "Click CTA",
+      count: data.funnel.cta,
+      explain: "Số session bấm vào nút Báo giá / Gọi / Zalo trên trang chủ. Mỗi khách chỉ đếm 1 lần dù bấm nhiều nút khác nhau. Đây là bước hành động đầu tiên — khách chuyển từ đọc sang làm.",
+    },
+    {
+      name: "Quote saved",
+      count: data.funnel.quoteSaved,
+      explain: "Số session đã tạo link báo giá riêng — bấm \"Lưu báo giá\" trên trang /bao-gia. Khách điền form rồi lưu lại để gửi cho người khác hoặc xem lại sau. Khách hot — đã bỏ công nhập liệu.",
+    },
+    {
+      name: "Lead có SĐT",
+      count: data.funnel.leads,
+      explain: "Số khách điền số điện thoại và submit form báo giá. Đây là khách thật mình có thể gọi lại — chuyển đổi cuối cùng của funnel, dữ liệu nằm trong bảng /leads.",
+    },
   ] : [];
 
   return (
@@ -380,7 +404,12 @@ export function AnalyticsClient() {
                 <tbody>
                   {funnelSteps.map((s) => (
                     <tr key={s.name} className="border-b border-[#1a1d2a] last:border-0">
-                      <td className="px-1 py-2 text-[#cdd3e1]">{s.name}</td>
+                      <td className="px-1 py-2 text-[#cdd3e1]">
+                        <span className="inline-flex items-center gap-1">
+                          {s.name}
+                          <InfoTip text={s.explain} />
+                        </span>
+                      </td>
                       <td className="px-1 py-2 text-right font-semibold text-white">{s.count.toLocaleString("vi-VN")}</td>
                       <td className="px-1 py-2 text-right text-[#8892b0]">{pct(s.count, data.funnel.sessions)}</td>
                     </tr>
@@ -594,4 +623,26 @@ function Card({
 
 function EmptyState({ text }: { text: string }) {
   return <div className="py-6 text-center text-sm text-[#8892b0]">{text}</div>;
+}
+
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#3a3f55] text-[10px] font-semibold text-[#5b6478] transition hover:border-amber-500/60 hover:text-amber-300"
+        aria-label="Giải thích"
+      >
+        ?
+      </button>
+      {open && (
+        <div className="absolute left-5 top-1/2 z-20 w-64 -translate-y-1/2 rounded-lg border border-[#3a3f55] bg-[#0f1117] p-3 text-xs leading-relaxed font-normal normal-case tracking-normal text-[#cdd3e1] shadow-xl">
+          {text}
+        </div>
+      )}
+    </span>
+  );
 }
