@@ -77,6 +77,8 @@ const inputSchema = z.object({
   hasTumSanThuong: z.boolean(),
   tumArea: z.number().nonnegative().max(2000).default(0),
   sanThuongCoLam: z.boolean().default(false),
+  hasGacLung: z.boolean().default(false),
+  gacLungArea: z.number().nonnegative().max(2000).default(0),
   maiType: z.string().refine((v) => v in MAI_HE_SO, "maiType invalid"),
   conditions: z
     .array(z.string().refine((v) => v in CONDITION_FACTORS, "condition invalid"))
@@ -127,6 +129,8 @@ export async function POST(request: Request) {
     t: parsed.data.hasTumSanThuong,
     ta: parsed.data.tumArea,
     st: parsed.data.sanThuongCoLam,
+    gl: parsed.data.hasGacLung,
+    gla: parsed.data.gacLungArea,
     mt: parsed.data.maiType,
     c: [...parsed.data.conditions].sort(),
   });
@@ -146,9 +150,11 @@ export async function POST(request: Request) {
   const numFloors = d.numFloors;
 
   // Raw construction breakdown (m² quy đổi)
+  const gacLungArea = d.hasGacLung ? d.gacLungArea : 0;
   const b = {
     mong: floorArea * (MONG_HE_SO[d.mongType] ?? 0),
     tang: floorArea * numFloors,
+    gacLung: gacLungArea, // hệ số 1.0 — tính như 1 sàn thường
     tum: 0,
     sanThuong: 0,
     mai: floorArea * (MAI_HE_SO[d.maiType] ?? 0),
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
     b.tum = tumArea * 0.5;
     b.sanThuong = stArea * (d.sanThuongCoLam ? 0.7 : 0.5);
   }
-  const totalArea = b.mong + b.tang + b.tum + b.sanThuong + b.mai;
+  const totalArea = b.mong + b.tang + b.gacLung + b.tum + b.sanThuong + b.mai;
 
   let conditionFactor = 1;
   for (const c of d.conditions) {
@@ -169,9 +175,9 @@ export async function POST(request: Request) {
   const giaLow = totalArea * PRICES.rawLow * conditionFactor;
   const giaHigh = totalArea * PRICES.rawHigh * conditionFactor;
 
-  // Design fee — m² sàn = floorArea × numFloors + tum (hệ số 1)
+  // Design fee — m² sàn = floorArea × numFloors + tum + gác lửng (hệ số 1)
   const tumSan = d.hasTumSanThuong ? d.tumArea : 0;
-  const totalSan = Math.round(floorArea * numFloors + tumSan);
+  const totalSan = Math.round(floorArea * numFloors + tumSan + gacLungArea);
 
   return NextResponse.json(
     {
