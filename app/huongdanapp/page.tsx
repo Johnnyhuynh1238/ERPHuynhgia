@@ -216,6 +216,9 @@ export default function AppGuidePage() {
                 {role.label}
               </a>
             ))}
+            <a href="/huongdanapp/ks" className="rounded-full border border-[#f97316]/40 bg-[#1a1d2e] px-4 py-2 text-sm font-semibold text-[#fb923c] transition hover:bg-[#f97316]/10">
+              Sổ tay Kỹ sư (chi tiết)
+            </a>
             <a href="/login" className="rounded-full border border-[#f97316]/40 bg-[#f97316] px-4 py-2 text-sm font-bold text-black transition hover:bg-[#fb923c]">
               Mở app
             </a>
