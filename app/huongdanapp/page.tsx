@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth-helpers";
 
 export const metadata: Metadata = {
   title: "Hướng dẫn dùng app | ERP Huỳnh Gia",
@@ -198,7 +200,12 @@ const quickRules = [
   "Khi thay đổi nhân sự dự án, Admin cần cập nhật lại phân quyền ngay.",
 ];
 
-export default function AppGuidePage() {
+export default async function AppGuidePage() {
+  const user = await getCurrentUser();
+  if (user?.role === "engineer") {
+    redirect("/huongdanapp/ks");
+  }
+
   return (
     <main className="min-h-screen bg-[#0f1015] text-[#f0f2ff]">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
