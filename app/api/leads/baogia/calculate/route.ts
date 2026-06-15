@@ -151,10 +151,12 @@ export async function POST(request: Request) {
 
   // Raw construction breakdown (m² quy đổi)
   const gacLungArea = d.hasGacLung ? d.gacLungArea : 0;
+  const thongTangArea = d.hasGacLung ? Math.max(0, floorArea - gacLungArea) : 0;
   const b = {
     mong: floorArea * (MONG_HE_SO[d.mongType] ?? 0),
     tang: floorArea * numFloors,
-    gacLung: gacLungArea, // hệ số 1.0 — tính như 1 sàn thường
+    gacLung: gacLungArea,            // hệ số 1.0 — sàn lửng tính 100%
+    thongTang: thongTangArea * 0.5,  // hệ số 0.5 — phần trệt không có lửng phía trên
     tum: 0,
     sanThuong: 0,
     mai: floorArea * (MAI_HE_SO[d.maiType] ?? 0),
@@ -165,7 +167,7 @@ export async function POST(request: Request) {
     b.tum = tumArea * 0.5;
     b.sanThuong = stArea * (d.sanThuongCoLam ? 0.7 : 0.5);
   }
-  const totalArea = b.mong + b.tang + b.gacLung + b.tum + b.sanThuong + b.mai;
+  const totalArea = b.mong + b.tang + b.gacLung + b.thongTang + b.tum + b.sanThuong + b.mai;
 
   let conditionFactor = 1;
   for (const c of d.conditions) {
@@ -175,9 +177,9 @@ export async function POST(request: Request) {
   const giaLow = totalArea * PRICES.rawLow * conditionFactor;
   const giaHigh = totalArea * PRICES.rawHigh * conditionFactor;
 
-  // Design fee — m² sàn = floorArea × numFloors + tum + gác lửng (hệ số 1)
+  // Design fee — m² sàn quy đổi: trệt + lửng (100%) + thông tầng (50%) + tum
   const tumSan = d.hasTumSanThuong ? d.tumArea : 0;
-  const totalSan = Math.round(floorArea * numFloors + tumSan + gacLungArea);
+  const totalSan = Math.round(floorArea * numFloors + tumSan + gacLungArea + thongTangArea * 0.5);
 
   return NextResponse.json(
     {
