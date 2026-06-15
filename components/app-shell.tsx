@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   BarChart3,
+  BookOpen,
   Clock,
   FolderKanban,
   GraduationCap,
@@ -59,6 +60,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Ca làm việc", href: "/admin/shifts" },
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
+    { label: "Hướng dẫn", href: "/huongdanapp" },
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/admin/templates" },
     { label: "Chuyên môn", href: "/admin/specialties" },
@@ -72,6 +74,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ thợ", href: "/admin/workers" },
     { label: "KPI/Lương", href: "/me/kpi" },
     { label: "Đào tạo", href: "/dao-tao" },
+    { label: "Sổ tay", href: "/huongdanapp/ks" },
   ],
   foreman: [
     { label: "Dashboard", href: "/" },
@@ -106,6 +109,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ thợ", href: "/admin/workers" },
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
+    { label: "Hướng dẫn", href: "/huongdanapp" },
   ],
 };
 
@@ -137,6 +141,7 @@ function navIcon(href: string, label: string) {
   if (href === "/") return Home;
   if (href.includes("cham-cong") || href.includes("attendance") || href.includes("/shifts")) return Clock;
   if (href.includes("dao-tao")) return GraduationCap;
+  if (href.includes("huongdanapp")) return BookOpen;
   if (href.includes("projects")) return FolderKanban;
   if (href.includes("reports")) return BarChart3;
   if (href.includes("tasks")) return ListChecks;
