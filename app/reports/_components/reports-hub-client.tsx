@@ -37,6 +37,7 @@ type FlatAssignment = {
   tptcDescription?: string | null;
   tptcAssignerName?: string | null;
   tptcReviewNote?: string | null;
+  tptcAcknowledgedAt?: string | null;
 };
 
 type TaskGroup = {
@@ -200,6 +201,8 @@ export function ReportsHubClient() {
   const [notApplicableItem, setNotApplicableItem] = useState<FlatAssignment | null>(null);
   const [actionItem, setActionItem] = useState<FlatAssignment | null>(null);
   const [tptcActionItem, setTptcActionItem] = useState<FlatAssignment | null>(null);
+  const [ackTptcItem, setAckTptcItem] = useState<FlatAssignment | null>(null);
+  const ackedDeepLinkRef = useRef<string | null>(null);
   const [progressModalItem, setProgressModalItem] = useState<FlatAssignment | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressPhotos, setProgressPhotos] = useState<TaskPhotoItem[]>([]);
@@ -340,7 +343,30 @@ export function ReportsHubClient() {
   }, [needCheckin, loadCheckinOptions]);
 
   useEffect(() => {
-    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || tptcActionItem || progressModalItem || guideItem || submitConfirmOpen);
+    if (!today || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ackTptcId = params.get("ackTptc");
+    if (!ackTptcId || ackedDeepLinkRef.current === ackTptcId) return;
+
+    const target = today.assignments.find(
+      (item) => item.type === "tptc_assignment" && item.tptcAssignmentId === ackTptcId,
+    );
+    if (!target) return;
+
+    ackedDeepLinkRef.current = ackTptcId;
+    if (target.tptcAcknowledgedAt) {
+      setTptcActionItem(target);
+    } else {
+      setAckTptcItem(target);
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ackTptc");
+    window.history.replaceState({}, "", url.toString());
+  }, [today]);
+
+  useEffect(() => {
+    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || tptcActionItem || ackTptcItem || progressModalItem || guideItem || submitConfirmOpen);
     if (!hasOpenModal || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
@@ -349,7 +375,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [actionItem, tptcActionItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
+  }, [actionItem, tptcActionItem, ackTptcItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -440,6 +466,20 @@ export function ReportsHubClient() {
       await loadToday(mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể đánh dấu hoàn thành");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmAck() {
+    if (!ackTptcItem || !ackTptcItem.tptcAssignmentId) return;
+    setBusyId(ackTptcItem.id);
+    try {
+      await postAction(`/api/tptc-assignments/${ackTptcItem.tptcAssignmentId}/acknowledge`, {});
+      setAckTptcItem(null);
+      await loadToday(mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể xác nhận nhận việc");
     } finally {
       setBusyId(null);
     }
@@ -645,11 +685,18 @@ export function ReportsHubClient() {
         return;
       }
       if (item.type === "tptc_assignment") {
-        setTptcActionItem(item);
+        if (!item.tptcAcknowledgedAt) {
+          setAckTptcItem(item);
+        } else {
+          setTptcActionItem(item);
+        }
         return;
       }
       setActionItem(item);
     }
+
+    const isTptc = item.type === "tptc_assignment";
+    const isNewTptc = isTptc && !item.tptcAcknowledgedAt && item.status === "pending";
 
     return (
       <button
@@ -657,10 +704,22 @@ export function ReportsHubClient() {
         type="button"
         disabled={busyId === item.id}
         onClick={handleCardClick}
-        className={`block w-full rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-left transition hover:bg-[#1f2436] active:scale-[0.97] disabled:opacity-60 ${
-          isDone ? "opacity-80" : isNa ? "opacity-70" : ""
-        } ${item.type === "progress_update" ? "bg-[#13151f]" : ""}`}
+        className={`block w-full rounded-2xl border p-4 text-left transition hover:bg-[#1f2436] active:scale-[0.97] disabled:opacity-60 ${
+          isTptc ? "border-orange-500/40 bg-orange-500/5" : "border-[#252840] bg-[#1a1d2e]"
+        } ${isDone ? "opacity-80" : isNa ? "opacity-70" : ""} ${item.type === "progress_update" ? "bg-[#13151f]" : ""}`}
       >
+        {isTptc ? (
+          <div className="mb-1 flex items-center gap-1.5">
+            <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-300">
+              ⚡ TPTC giao
+            </span>
+            {isNewTptc ? (
+              <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300">
+                📥 MỚI
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="text-sm font-bold leading-5 text-[#f0f2ff]">{displayTitle}</div>
         <div className="mt-1 text-xs leading-5 text-[#8892b0]">{metaLine}</div>
       </button>
@@ -1250,6 +1309,78 @@ export function ReportsHubClient() {
                 <div className="mt-4 flex justify-end">
                   <button type="button" onClick={() => setTptcActionItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
                     Đóng
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {ackTptcItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-orange-500/40 bg-[#1a1d2e] p-4 shadow-2xl">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-orange-300">📥 Việc TPTC mới giao</div>
+                  {ackTptcItem.priority !== "normal" ? (
+                    <div
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                        ackTptcItem.priority === "critical"
+                          ? "bg-red-500/15 text-red-300"
+                          : ackTptcItem.priority === "urgent"
+                          ? "bg-orange-500/15 text-orange-300"
+                          : "bg-blue-500/15 text-blue-300"
+                      }`}
+                    >
+                      {ackTptcItem.priority === "critical"
+                        ? "🔴 CỰC KHẨN"
+                        : ackTptcItem.priority === "urgent"
+                        ? "🟧 KHẨN"
+                        : "🟦 QUAN TRỌNG"}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-1 text-[11px] text-[#8892b0]">Đọc kỹ trước khi thực hiện</div>
+
+                <div className="mt-3 text-base font-bold leading-6 text-[#f0f2ff]">{ackTptcItem.title}</div>
+
+                <div className="mt-2 space-y-1 text-xs leading-5 text-[#b6c0e0]">
+                  <div>🏠 {ackTptcItem.projectName || "Không rõ dự án"}</div>
+                  {ackTptcItem.tptcAssignerName ? (
+                    <div>👤 Giao bởi: {ackTptcItem.tptcAssignerName}</div>
+                  ) : null}
+                  {ackTptcItem.dueAt ? (
+                    <div>⏰ Hạn: {formatDueWithCountdown(ackTptcItem.dueAt)}</div>
+                  ) : null}
+                </div>
+
+                {ackTptcItem.tptcDescription ? (
+                  <div className="mt-3 rounded-xl border border-[#252840] bg-[#13151f] p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8892b0]">📝 Mô tả từ TPTC</div>
+                    <div className="mt-1 whitespace-pre-wrap text-sm leading-5 text-[#f0f2ff]">{ackTptcItem.tptcDescription}</div>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs leading-5 text-blue-100">
+                  💡 Nhiệm vụ này sẽ nằm trong <b>Danh sách nhiệm vụ</b> với nhãn <b>⚡ TPTC giao</b>. Khi hoàn thành, hãy mở lại và bấm <b>Đánh dấu xong</b> để báo cáo cho TPTC.
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    disabled={busyId === ackTptcItem.id}
+                    onClick={confirmAck}
+                    className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-emerald-500/40 bg-emerald-500/15 px-[14px] py-[11px] text-[13px] font-bold text-emerald-200 transition active:scale-[0.97] disabled:opacity-50"
+                  >
+                    {busyId === ackTptcItem.id ? "Đang xác nhận..." : "✓ Đã hiểu, sẽ thực hiện"}
+                  </button>
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <button type="button" onClick={() => setAckTptcItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
+                    Để sau
                   </button>
                 </div>
               </div>

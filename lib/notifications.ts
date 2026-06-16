@@ -714,7 +714,7 @@ export async function notifyTptcAssignment(input: {
 
   const title = `${priorityPrefix[input.priority]}${input.actorName} giao việc: ${input.title}`;
   const body = `Hạn ${dueText}`;
-  const link = "/reports";
+  const link = `/reports?ackTptc=${input.assignmentId}`;
 
   const base: NotifyInput = {
     projectId: input.projectId,
@@ -733,6 +733,48 @@ export async function notifyTptcAssignment(input: {
     body,
     link,
     tag: `tptc-assignment-${input.assignmentId}`,
+  });
+}
+
+/**
+ * Event — KS xác nhận đã đọc + sẽ thực hiện việc TPTC giao.
+ * Recipients: assigner gốc + tất cả TPTC khác (dedupe).
+ */
+export async function notifyTptcAssignmentAcknowledged(input: {
+  projectId: string;
+  assignmentId: string;
+  assignerUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const tptcIds = await getTptcUserIds();
+  const recipients = Array.from(new Set([input.assignerUserId, ...tptcIds]));
+
+  const title = `KS ${input.actorName} đã nhận việc: ${input.title}`;
+  const body = "Đã xác nhận sẽ thực hiện";
+  const link = "/tptc/assignments";
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications(recipients, base, "ks_tptc_acknowledged", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: recipients,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-ack-${input.assignmentId}`,
   });
 }
 

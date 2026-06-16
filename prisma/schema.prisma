@@ -777,6 +777,7 @@ model TptcAssignment {
   dueAt            DateTime             @map("due_at")
   status           TptcAssignmentStatus @default(pending)
   startedAt        DateTime?            @map("started_at")
+  acknowledgedAt   DateTime?            @map("acknowledged_at")
   completedAt      DateTime?            @map("completed_at")
   approvedAt       DateTime?            @map("approved_at")
   ksNote           String?              @map("ks_note") @db.Text
@@ -2363,6 +2364,7 @@ enum StaffNotificationKind {
   material_proposal_update
   material_proposal_reminder
   tptc_assignment
+  ks_tptc_acknowledged
 }
 
 enum MaterialProposalStatus {

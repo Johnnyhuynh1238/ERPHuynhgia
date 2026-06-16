@@ -66,6 +66,7 @@ export async function GET(request: Request) {
             priority: true,
             status: true,
             reviewNote: true,
+            acknowledgedAt: true,
             assigner: {
               select: { fullName: true },
             },
@@ -165,6 +166,7 @@ export async function GET(request: Request) {
       tptcDescription: row.tptcAssignment?.description || null,
       tptcAssignerName: row.tptcAssignment?.assigner?.fullName || null,
       tptcReviewNote: row.tptcAssignment?.reviewNote || null,
+      tptcAcknowledgedAt: row.tptcAssignment?.acknowledgedAt ? row.tptcAssignment.acknowledgedAt.toISOString() : null,
     };
   });
 
