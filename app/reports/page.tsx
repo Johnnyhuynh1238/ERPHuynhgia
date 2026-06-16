@@ -13,9 +13,5 @@ export default async function ReportsPage() {
     redirect("/");
   }
 
-  return (
-    <main className="space-y-4 px-4 py-4">
-      <ReportsHubClient />
-    </main>
-  );
+  return <ReportsHubClient />;
 }
