@@ -459,6 +459,7 @@ model User {
   createdQcChecklistTemplates     QcChecklistTemplate[]
   assignedTptcAssignments         TptcAssignment[]          @relation("TptcAssignmentAssignee")
   createdTptcAssignments          TptcAssignment[]          @relation("TptcAssignmentAssigner")
+  tptcDailyStatuses               TptcAssignmentDailyStatus[]
   taskDailyAssignments            TaskDailyAssignment[]
   dailyReportSubmissions          DailyReportSubmission[]
   designPhotoGroupsCreated        DesignPhotoGroup[]        @relation("DesignPhotoGroupCreator")
@@ -786,17 +787,42 @@ model TptcAssignment {
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
-  project    Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task       Task?                 @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  assignee   User                  @relation("TptcAssignmentAssignee", fields: [assignedToUserId], references: [id])
-  assigner   User                  @relation("TptcAssignmentAssigner", fields: [assignedByUserId], references: [id])
-  dailyItems TaskDailyAssignment[]
+  project        Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task           Task?                         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  assignee       User                          @relation("TptcAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assigner       User                          @relation("TptcAssignmentAssigner", fields: [assignedByUserId], references: [id])
+  dailyItems     TaskDailyAssignment[]
+  dailyStatuses  TptcAssignmentDailyStatus[]
 
   @@index([assignedToUserId, status, dueAt])
   @@index([assignedByUserId])
   @@index([projectId])
   @@index([taskId])
   @@map("tptc_assignments")
+}
+
+enum TptcDailyStatusKind {
+  working_on_today
+  not_today
+}
+
+model TptcAssignmentDailyStatus {
+  id                String              @id @default(uuid()) @db.Uuid
+  tptcAssignmentId  String              @map("tptc_assignment_id") @db.Uuid
+  ksUserId          String              @map("ks_user_id") @db.Uuid
+  reportDate        DateTime            @map("report_date") @db.Date
+  status            TptcDailyStatusKind
+  note              String?             @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  tptcAssignment TptcAssignment @relation(fields: [tptcAssignmentId], references: [id], onDelete: Cascade)
+  ksUser         User           @relation(fields: [ksUserId], references: [id])
+
+  @@unique([tptcAssignmentId, reportDate])
+  @@index([ksUserId, reportDate])
+  @@index([reportDate])
+  @@map("tptc_assignment_daily_statuses")
 }
 
 model TaskDailyAssignment {

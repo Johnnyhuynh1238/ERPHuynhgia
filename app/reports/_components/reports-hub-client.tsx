@@ -38,6 +38,8 @@ type FlatAssignment = {
   tptcAssignerName?: string | null;
   tptcReviewNote?: string | null;
   tptcAcknowledgedAt?: string | null;
+  tptcDailyStatus?: "working_on_today" | "not_today" | null;
+  tptcDailyNote?: string | null;
 };
 
 type TaskGroup = {
@@ -201,6 +203,8 @@ export function ReportsHubClient() {
   const [notApplicableItem, setNotApplicableItem] = useState<FlatAssignment | null>(null);
   const [actionItem, setActionItem] = useState<FlatAssignment | null>(null);
   const [tptcActionItem, setTptcActionItem] = useState<FlatAssignment | null>(null);
+  const [notTodayItem, setNotTodayItem] = useState<FlatAssignment | null>(null);
+  const [notTodayNote, setNotTodayNote] = useState("");
   const [ackTptcItem, setAckTptcItem] = useState<FlatAssignment | null>(null);
   const ackedDeepLinkRef = useRef<string | null>(null);
   const [progressModalItem, setProgressModalItem] = useState<FlatAssignment | null>(null);
@@ -367,7 +371,7 @@ export function ReportsHubClient() {
   }, [today]);
 
   useEffect(() => {
-    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || tptcActionItem || ackTptcItem || progressModalItem || guideItem || submitConfirmOpen);
+    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || tptcActionItem || notTodayItem || ackTptcItem || progressModalItem || guideItem || submitConfirmOpen);
     if (!hasOpenModal || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
@@ -376,7 +380,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [actionItem, tptcActionItem, ackTptcItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
+  }, [actionItem, tptcActionItem, notTodayItem, ackTptcItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -528,6 +532,51 @@ export function ReportsHubClient() {
       await loadToday(mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể xác nhận nhận việc");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markWorkingOnToday(item: FlatAssignment) {
+    if (!item.tptcAssignmentId) return;
+    setBusyId(item.id);
+    try {
+      await postAction(`/api/tptc-assignments/${item.tptcAssignmentId}/daily-status`, {
+        status: "working_on_today",
+      });
+      setTptcActionItem(null);
+      await loadToday(mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể cập nhật trạng thái hôm nay");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function openNotTodayModal(item: FlatAssignment) {
+    setNotTodayItem(item);
+    setNotTodayNote(item.tptcDailyNote || "");
+    setTptcActionItem(null);
+  }
+
+  async function confirmNotToday() {
+    if (!notTodayItem || !notTodayItem.tptcAssignmentId) return;
+    const note = notTodayNote.trim();
+    if (!note) {
+      setError("Vui lòng nhập lý do chưa làm hôm nay");
+      return;
+    }
+    setBusyId(notTodayItem.id);
+    try {
+      await postAction(`/api/tptc-assignments/${notTodayItem.tptcAssignmentId}/daily-status`, {
+        status: "not_today",
+        note,
+      });
+      setNotTodayItem(null);
+      setNotTodayNote("");
+      await loadToday(mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể cập nhật trạng thái hôm nay");
     } finally {
       setBusyId(null);
     }
@@ -757,13 +806,26 @@ export function ReportsHubClient() {
         } ${isDone ? "opacity-80" : isNa ? "opacity-70" : ""} ${item.type === "progress_update" ? "bg-[#13151f]" : ""}`}
       >
         {isTptc ? (
-          <div className="mb-1 flex items-center gap-1.5">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-300">
               ⚡ TPTC giao
             </span>
             {isNewTptc ? (
               <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300">
                 📥 MỚI
+              </span>
+            ) : null}
+            {item.tptcDailyStatus === "working_on_today" ? (
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+                ✓ Hôm nay
+              </span>
+            ) : item.tptcDailyStatus === "not_today" ? (
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                ⏸ Chưa hôm nay
+              </span>
+            ) : item.status === "pending" && item.tptcAcknowledgedAt ? (
+              <span className="rounded bg-zinc-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-300">
+                ⚠ Chưa cập nhật
               </span>
             ) : null}
           </div>
@@ -1338,7 +1400,42 @@ export function ReportsHubClient() {
                   </div>
                 ) : null}
 
+                {tptcActionItem.tptcDailyStatus === "working_on_today" ? (
+                  <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs leading-5 text-emerald-200">
+                    ✓ Hôm nay: <b>Đang làm</b>
+                  </div>
+                ) : tptcActionItem.tptcDailyStatus === "not_today" ? (
+                  <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100">
+                    ⏸ Hôm nay: <b>Chưa làm</b>
+                    {tptcActionItem.tptcDailyNote ? (
+                      <div className="mt-1 whitespace-pre-wrap text-amber-100/90">Lý do: {tptcActionItem.tptcDailyNote}</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs leading-5 text-blue-100">
+                    💡 Cập nhật trạng thái <b>hôm nay</b> để TPTC biết bạn không quên việc này.
+                  </div>
+                )}
+
                 <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    disabled={busyId === tptcActionItem.id}
+                    onClick={() => markWorkingOnToday(tptcActionItem)}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-blue-500/30 bg-blue-500/10 px-[14px] py-[10px] text-[13px] font-semibold text-blue-200 transition active:scale-[0.97] disabled:opacity-50"
+                  >
+                    <span>🔨 Đang làm hôm nay</span>
+                    <span>›</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === tptcActionItem.id}
+                    onClick={() => openNotTodayModal(tptcActionItem)}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-amber-500/30 bg-amber-500/10 px-[14px] py-[10px] text-[13px] font-semibold text-amber-200 transition active:scale-[0.97] disabled:opacity-50"
+                  >
+                    <span>⏸ Chưa làm hôm nay vì...</span>
+                    <span>›</span>
+                  </button>
                   <button
                     type="button"
                     disabled={busyId === tptcActionItem.id}
@@ -1349,7 +1446,7 @@ export function ReportsHubClient() {
                     }}
                     className="flex w-full items-center justify-between rounded-[10px] border border-emerald-500/30 bg-emerald-500/10 px-[14px] py-[10px] text-[13px] font-semibold text-emerald-300 transition active:scale-[0.97] disabled:opacity-50"
                   >
-                    <span>✅ Đánh dấu xong</span>
+                    <span>✅ Báo xong</span>
                     <span>›</span>
                   </button>
                 </div>
@@ -1357,6 +1454,47 @@ export function ReportsHubClient() {
                 <div className="mt-4 flex justify-end">
                   <button type="button" onClick={() => setTptcActionItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
                     Đóng
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {notTodayItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-amber-500/40 bg-[#1a1d2e] p-4 shadow-2xl">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-300">⏸ Chưa làm hôm nay</div>
+                <div className="mt-1 text-sm font-bold leading-5 text-[#f0f2ff]">{notTodayItem.title}</div>
+                <div className="mt-3 text-xs text-[#8892b0]">Nhập lý do để TPTC biết bạn không quên việc này.</div>
+                <textarea
+                  value={notTodayNote}
+                  onChange={(e) => setNotTodayNote(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Ví dụ: chờ vật tư, bận task khác cao hơn, mưa..."
+                  className="mt-2 w-full rounded-[10px] border border-[#252840] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] placeholder:text-[#5a627a]"
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotTodayItem(null);
+                      setNotTodayNote("");
+                    }}
+                    className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === notTodayItem.id}
+                    onClick={confirmNotToday}
+                    className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-xs font-bold text-amber-200 transition active:scale-[0.97] disabled:opacity-50"
+                  >
+                    {busyId === notTodayItem.id ? "Đang lưu..." : "Lưu lý do"}
                   </button>
                 </div>
               </div>

@@ -6,6 +6,10 @@ import { fireAndForget, notifyTptcAssignment } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getReportDateVn, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
 
+function startOfDayUtc(d = new Date()) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
 const querySchema = z.object({
   ksId: z.string().uuid().optional(),
   status: z.nativeEnum(TptcAssignmentStatus).optional(),
@@ -45,6 +49,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Query không hợp lệ" }, { status: 400 });
   }
 
+  const today = startOfDayUtc();
+
   const rows = await prisma.tptcAssignment.findMany({
     where: {
       ...(parsed.data.ksId ? { assignedToUserId: parsed.data.ksId } : {}),
@@ -77,12 +83,28 @@ export async function GET(request: Request) {
           fullName: true,
         },
       },
+      dailyStatuses: {
+        where: { reportDate: today },
+        select: { status: true, note: true, updatedAt: true },
+        take: 1,
+      },
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
   });
 
+  const enriched = rows.map((row) => {
+    const today = row.dailyStatuses?.[0] || null;
+    const { dailyStatuses, ...rest } = row as typeof row & { dailyStatuses?: unknown };
+    return {
+      ...rest,
+      todayStatus: today?.status || null,
+      todayNote: today?.note || null,
+      todayUpdatedAt: today?.updatedAt || null,
+    };
+  });
+
   return NextResponse.json({
-    rows,
+    rows: enriched,
   });
 }
 

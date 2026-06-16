@@ -27,6 +27,9 @@ type AssignmentRow = {
   task: { id: string; code: string; name: string } | null;
   assignee: { id: string; fullName: string };
   assigner: { id: string; fullName: string };
+  todayStatus: "working_on_today" | "not_today" | null;
+  todayNote: string | null;
+  todayUpdatedAt: string | null;
 };
 
 type TaskOption = { id: string; code: string; name: string };
@@ -453,6 +456,24 @@ export function TptcAssignmentsClient({
                   {row.reviewNote ? <div className="mt-1 break-words text-xs text-[#f7c58a]">Review: {row.reviewNote}</div> : null}
 
                   <div className="mt-2 break-words text-xs text-[#98a0c2]">Giao bởi {row.assigner.fullName} · Tạo lúc {fmtDateTime(row.createdAt)}</div>
+
+                  {row.status === "pending" || row.status === "in_progress" ? (
+                    <div className="mt-2 text-xs">
+                      {row.todayStatus === "working_on_today" ? (
+                        <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-200">
+                          ✓ Hôm nay: Đang làm
+                        </span>
+                      ) : row.todayStatus === "not_today" ? (
+                        <span className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-200">
+                          ⏸ Hôm nay: Chưa làm{row.todayNote ? ` · ${row.todayNote}` : ""}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded border border-zinc-500/40 bg-zinc-500/10 px-2 py-0.5 font-semibold text-zinc-300">
+                          ⚠ Chưa cập nhật hôm nay
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
 
                   <div className="mt-2 flex flex-wrap gap-2">
                     {row.status === "pending" || row.status === "in_progress" ? (

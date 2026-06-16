@@ -77,6 +77,15 @@ export async function GET(request: Request) {
                 name: true,
               },
             },
+            dailyStatuses: {
+              where: { reportDate },
+              select: {
+                status: true,
+                note: true,
+                updatedAt: true,
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -159,6 +168,7 @@ export async function GET(request: Request) {
       };
     }
 
+    const dailyStatusRow = row.tptcAssignment?.dailyStatuses?.[0] || null;
     return {
       ...base,
       tptcAssignmentId: row.tptcAssignment?.id || null,
@@ -167,6 +177,8 @@ export async function GET(request: Request) {
       tptcAssignerName: row.tptcAssignment?.assigner?.fullName || null,
       tptcReviewNote: row.tptcAssignment?.reviewNote || null,
       tptcAcknowledgedAt: row.tptcAssignment?.acknowledgedAt ? row.tptcAssignment.acknowledgedAt.toISOString() : null,
+      tptcDailyStatus: dailyStatusRow?.status || null,
+      tptcDailyNote: dailyStatusRow?.note || null,
     };
   });
 
