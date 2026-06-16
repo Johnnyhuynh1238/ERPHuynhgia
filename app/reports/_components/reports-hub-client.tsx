@@ -1453,7 +1453,6 @@ export function ReportsHubClient() {
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
                       disabled={donePhotoBusy}
                       onChange={async (event) => {
                         await uploadDonePhotoFile(event.currentTarget.files);
@@ -1461,7 +1460,7 @@ export function ReportsHubClient() {
                       }}
                       className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black disabled:opacity-50"
                     />
-                    <div className="mt-1 text-[11px] text-[#8892b0]">Chụp mới tại hiện trường — ảnh cũ sẽ bị từ chối</div>
+                    <div className="mt-1 text-[11px] text-[#8892b0]">Chụp mới hoặc chọn ảnh từ thư viện. Ảnh chụp trong vòng 30 phút.</div>
                     {donePhotoBusy ? (
                       <div className="mt-2 text-[11px] text-[#8892b0]">⏳ Đang upload...</div>
                     ) : null}
