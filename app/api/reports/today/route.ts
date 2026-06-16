@@ -196,7 +196,11 @@ export async function GET(request: Request) {
     total: sorted.length,
     done: sorted.filter((item) => item.status === "done").length,
     notApplicable: sorted.filter((item) => item.status === "not_applicable").length,
-    pending: sorted.filter((item) => item.status === "pending").length,
+    pending: sorted.filter((item) => {
+      if (item.status !== "pending") return false;
+      if (item.type === "tptc_assignment" && item.tptcDailyStatus) return false;
+      return true;
+    }).length,
   };
 
   const submission = await prisma.dailyReportSubmission.findUnique({

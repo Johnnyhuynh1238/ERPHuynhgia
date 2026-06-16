@@ -27,6 +27,17 @@ export async function POST() {
       title: true,
       status: true,
       taskId: true,
+      type: true,
+      tptcAssignmentId: true,
+      tptcAssignment: {
+        select: {
+          dailyStatuses: {
+            where: { reportDate },
+            select: { status: true },
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -34,7 +45,13 @@ export async function POST() {
     return NextResponse.json({ message: "Bạn chưa có nhiệm vụ nào để gửi báo cáo" }, { status: 400 });
   }
 
-  const pending = assignments.filter((item) => item.status === "pending");
+  const pending = assignments.filter((item) => {
+    if (item.status !== "pending") return false;
+    if (item.type === "tptc_assignment" && item.tptcAssignment?.dailyStatuses?.length) {
+      return false;
+    }
+    return true;
+  });
   if (pending.length > 0) {
     return NextResponse.json(
       {
