@@ -445,23 +445,48 @@ export function ReportsHubClient() {
     clearDoneUploads();
   }
 
+  const [donePhotoBusy, setDonePhotoBusy] = useState(false);
+
   async function uploadDonePhotoFile(files: FileList | null) {
     const arr = Array.from(files || []).filter(Boolean);
-    if (!arr.length) return;
-    if (!doneModalItem?.taskId) {
-      setError("Nhiệm vụ này không gắn task — không upload ảnh trực tiếp được");
+    if (!arr.length || !doneModalItem) return;
+
+    if (doneModalItem.taskId) {
+      try {
+        const { uploaded, failed } = await uploadDonePhotos([arr[0]]);
+        if (failed.length) {
+          setError(failed[0].message || "Upload ảnh thất bại");
+          return;
+        }
+        const url = uploaded[0]?.photoUrl;
+        if (url) setDonePhotoUrl(url);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Upload ảnh thất bại");
+      }
       return;
     }
+
+    setDonePhotoBusy(true);
     try {
-      const { uploaded, failed } = await uploadDonePhotos([arr[0]]);
-      if (failed.length) {
-        setError(failed[0].message || "Upload ảnh thất bại");
+      const fd = new FormData();
+      fd.append("file", arr[0]);
+      if (arr[0].lastModified > 0) {
+        fd.append("originalLastModified", String(arr[0].lastModified));
+      }
+      const res = await fetch(`/api/reports/assignments/${doneModalItem.id}/photo`, {
+        method: "POST",
+        body: fd,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body?.message || `Upload thất bại (${res.status})`);
         return;
       }
-      const url = uploaded[0]?.photoUrl;
-      if (url) setDonePhotoUrl(url);
+      if (body?.photoUrl) setDonePhotoUrl(body.photoUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload ảnh thất bại");
+    } finally {
+      setDonePhotoBusy(false);
     }
   }
 
@@ -1425,42 +1450,35 @@ export function ReportsHubClient() {
                     <label className="text-xs font-semibold text-[#8892b0]">
                       📷 {doneModalItem.requirePhoto ? "Ảnh minh chứng (bắt buộc)" : "Ảnh minh chứng (khuyến nghị)"}
                     </label>
-                    {doneModalItem.taskId ? (
-                      <>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          capture="environment"
-                          onChange={async (event) => {
-                            await uploadDonePhotoFile(event.currentTarget.files);
-                            event.currentTarget.value = "";
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black"
-                        />
-                        <div className="mt-1 text-[11px] text-[#8892b0]">Chụp mới tại hiện trường — ảnh cũ sẽ bị từ chối</div>
-                        {doneUploadItems.length ? (
-                          <TaskPhotoUploadStatus
-                            items={doneUploadItems}
-                            onClear={() => {
-                              clearDoneUploads();
-                              setDonePhotoUrl("");
-                            }}
-                          />
-                        ) : donePhotoUrl ? (
-                          <div className="mt-2 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
-                            <span>✓ Đã đính kèm ảnh</span>
-                            <button type="button" onClick={() => setDonePhotoUrl("")} className="text-emerald-300 underline">Bỏ</button>
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <input
-                        value={donePhotoUrl}
-                        onChange={(e) => setDonePhotoUrl(e.target.value)}
-                        placeholder="Link ảnh"
-                        className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      disabled={donePhotoBusy}
+                      onChange={async (event) => {
+                        await uploadDonePhotoFile(event.currentTarget.files);
+                        event.currentTarget.value = "";
+                      }}
+                      className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black disabled:opacity-50"
+                    />
+                    <div className="mt-1 text-[11px] text-[#8892b0]">Chụp mới tại hiện trường — ảnh cũ sẽ bị từ chối</div>
+                    {donePhotoBusy ? (
+                      <div className="mt-2 text-[11px] text-[#8892b0]">⏳ Đang upload...</div>
+                    ) : null}
+                    {doneModalItem.taskId && doneUploadItems.length ? (
+                      <TaskPhotoUploadStatus
+                        items={doneUploadItems}
+                        onClear={() => {
+                          clearDoneUploads();
+                          setDonePhotoUrl("");
+                        }}
                       />
-                    )}
+                    ) : donePhotoUrl && !donePhotoBusy ? (
+                      <div className="mt-2 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
+                        <span>✓ Đã đính kèm ảnh</span>
+                        <button type="button" onClick={() => setDonePhotoUrl("")} className="text-emerald-300 underline">Bỏ</button>
+                      </div>
+                    ) : null}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#8892b0]">
