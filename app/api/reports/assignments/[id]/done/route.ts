@@ -5,7 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { requireEngineerForTodayAssignment } from "../../_helpers";
 
 const bodySchema = z.object({
-  photoUrl: z.string().trim().url().optional().nullable(),
+  photoUrl: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), {
+      message: "URL ảnh không hợp lệ",
+    })
+    .optional()
+    .nullable(),
   note: z.string().trim().optional().nullable(),
 });
 
