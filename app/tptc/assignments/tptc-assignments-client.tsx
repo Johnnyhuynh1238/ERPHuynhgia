@@ -300,10 +300,10 @@ export function TptcAssignmentsClient({
           <div className="text-sm font-semibold text-[#f0f2ff]">+ Giao việc mới</div>
 
           <div className="grid gap-2 md:grid-cols-2">
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Dự án</span>
               <select
-                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
                 value={draft.projectId}
                 onChange={(e) => setDraft((prev) => ({ ...prev, projectId: e.target.value, taskId: "" }))}
               >
@@ -313,12 +313,12 @@ export function TptcAssignmentsClient({
               </select>
             </label>
 
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">
                 Task (tuỳ chọn){tasksLoading ? " · đang tải..." : ""}
               </span>
               <select
-                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] disabled:opacity-60"
+                className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] disabled:opacity-60"
                 value={draft.taskId}
                 onChange={(e) => setDraft((prev) => ({ ...prev, taskId: e.target.value }))}
                 disabled={!draft.projectId || tasksLoading}
@@ -332,10 +332,10 @@ export function TptcAssignmentsClient({
           </div>
 
           <div className="grid gap-2 md:grid-cols-3">
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Giao cho KS</span>
               <select
-                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
                 value={draft.assignedToUserId}
                 onChange={(e) => setDraft((prev) => ({ ...prev, assignedToUserId: e.target.value }))}
               >
@@ -345,10 +345,10 @@ export function TptcAssignmentsClient({
               </select>
             </label>
 
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Mức ưu tiên</span>
               <select
-                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
                 value={draft.priority}
                 onChange={(e) => setDraft((prev) => ({ ...prev, priority: e.target.value as Priority }))}
               >
@@ -358,31 +358,31 @@ export function TptcAssignmentsClient({
               </select>
             </label>
 
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Hạn chót</span>
               <input
                 type="datetime-local"
-                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
                 value={draft.dueAt}
                 onChange={(e) => setDraft((prev) => ({ ...prev, dueAt: e.target.value }))}
               />
             </label>
           </div>
 
-          <label className="flex flex-col gap-1">
+          <label className="flex min-w-0 flex-col gap-1">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Tiêu đề</span>
             <input
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+              className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
               placeholder="Tiêu đề việc giao"
               value={draft.title}
               onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))}
             />
           </label>
 
-          <label className="flex flex-col gap-1">
+          <label className="flex min-w-0 flex-col gap-1">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Mô tả</span>
             <textarea
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+              className="w-full min-w-0 rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
               rows={3}
               placeholder="Mô tả chi tiết"
               value={draft.description}
@@ -404,7 +404,7 @@ export function TptcAssignmentsClient({
       <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <select
-            className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
+            className="min-w-0 flex-1 rounded border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | TptcStatus)}
           >
@@ -415,7 +415,7 @@ export function TptcAssignmentsClient({
           </select>
 
           <select
-            className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
+            className="min-w-0 flex-1 rounded border border-[#2f3555] bg-[#11182d] px-2 py-1.5 text-sm text-[#d9def3]"
             value={ksFilter}
             onChange={(e) => setKsFilter(e.target.value)}
           >
@@ -434,25 +434,25 @@ export function TptcAssignmentsClient({
             <div className="text-sm font-semibold text-[#f0f2ff]">{group.ksName}</div>
             <div className="mt-2 space-y-2">
               {group.items.map((row) => (
-                <div key={row.id} className="rounded border border-[#2f3555] bg-[#11182d] p-3 text-sm text-[#d9def3]">
+                <div key={row.id} className="overflow-hidden rounded border border-[#2f3555] bg-[#11182d] p-3 text-sm text-[#d9def3]">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold">{row.title}</div>
-                      <div className="text-xs text-[#98a0c2]">
+                    <div className="min-w-0 flex-1">
+                      <div className="break-words font-semibold">{row.title}</div>
+                      <div className="break-words text-xs text-[#98a0c2]">
                         {row.project.code} · {row.project.name} · {PRIORITY_LABEL[row.priority]} · Hạn {fmtDateTime(row.dueAt)}
                       </div>
                       {row.task ? (
-                        <div className="mt-0.5 text-[11px] text-[#9eb5f7]">📌 Task: {row.task.code} · {row.task.name}</div>
+                        <div className="mt-0.5 break-words text-[11px] text-[#9eb5f7]">📌 Task: {row.task.code} · {row.task.name}</div>
                       ) : null}
                     </div>
-                    <div className="text-xs text-[#98a0c2]">{STATUS_LABEL[row.status]}</div>
+                    <div className="shrink-0 whitespace-nowrap text-xs text-[#98a0c2]">{STATUS_LABEL[row.status]}</div>
                   </div>
 
-                  <div className="mt-2 text-xs text-[#b6c0e0]">{row.description}</div>
-                  {row.ksNote ? <div className="mt-1 text-xs text-[#9ed7b7]">KS note: {row.ksNote}</div> : null}
-                  {row.reviewNote ? <div className="mt-1 text-xs text-[#f7c58a]">Review: {row.reviewNote}</div> : null}
+                  <div className="mt-2 whitespace-pre-wrap break-words text-xs text-[#b6c0e0]">{row.description}</div>
+                  {row.ksNote ? <div className="mt-1 break-words text-xs text-[#9ed7b7]">KS note: {row.ksNote}</div> : null}
+                  {row.reviewNote ? <div className="mt-1 break-words text-xs text-[#f7c58a]">Review: {row.reviewNote}</div> : null}
 
-                  <div className="mt-2 text-xs text-[#98a0c2]">Giao bởi {row.assigner.fullName} · Tạo lúc {fmtDateTime(row.createdAt)}</div>
+                  <div className="mt-2 break-words text-xs text-[#98a0c2]">Giao bởi {row.assigner.fullName} · Tạo lúc {fmtDateTime(row.createdAt)}</div>
 
                   <div className="mt-2 flex flex-wrap gap-2">
                     {row.status === "pending" || row.status === "in_progress" ? (
