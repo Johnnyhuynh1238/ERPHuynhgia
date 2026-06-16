@@ -1,6 +1,7 @@
 import { DailyAssignmentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { fireAndForget, notifyTptcAssignmentCompleted } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireEngineerForTodayAssignment } from "../../_helpers";
 
@@ -52,6 +53,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
     }
   });
+
+  if (auth.assignment.type === DailyAssignmentType.tptc_assignment && auth.assignment.tptcAssignment) {
+    const tptc = auth.assignment.tptcAssignment;
+    fireAndForget(
+      notifyTptcAssignmentCompleted({
+        projectId: tptc.projectId,
+        assignmentId: tptc.id,
+        assignerUserId: tptc.assignedByUserId,
+        actorUserId: auth.user.id,
+        actorName: auth.user.name ?? "KS",
+        title: tptc.title,
+        ksNote: parsed.data.note || null,
+      }),
+    );
+  }
 
   return NextResponse.json({ message: "Đã đánh dấu hoàn thành" });
 }

@@ -2,6 +2,7 @@ import { TptcAssignmentStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyTptcAssignmentReviewed } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -27,6 +28,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     select: {
       id: true,
       status: true,
+      projectId: true,
+      assignedToUserId: true,
+      title: true,
     },
   });
 
@@ -51,6 +55,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
       reviewNote: parsed.data.reviewNote || null,
     },
   });
+
+  fireAndForget(
+    notifyTptcAssignmentReviewed({
+      projectId: assignment.projectId,
+      assignmentId: assignment.id,
+      assigneeUserId: assignment.assignedToUserId,
+      actorUserId: actor.id,
+      actorName: actor.name ?? "TPTC",
+      title: assignment.title,
+      decision: "approved",
+      reviewNote: parsed.data.reviewNote || null,
+    }),
+  );
 
   return NextResponse.json({
     message: "Đã duyệt việc TPTC",

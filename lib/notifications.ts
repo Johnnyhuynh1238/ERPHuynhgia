@@ -779,6 +779,93 @@ export async function notifyTptcAssignmentAcknowledged(input: {
 }
 
 /**
+ * Event — KS báo cáo xong việc TPTC giao.
+ * Recipients: assigner gốc + tất cả TPTC khác (dedupe).
+ */
+export async function notifyTptcAssignmentCompleted(input: {
+  projectId: string;
+  assignmentId: string;
+  assignerUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+  ksNote: string | null;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const tptcIds = await getTptcUserIds();
+  const recipients = Array.from(new Set([input.assignerUserId, ...tptcIds]));
+
+  const title = `KS ${input.actorName} báo xong: ${input.title}`;
+  const body = input.ksNote || "Đã hoàn thành, chờ TPTC duyệt";
+  const link = "/tptc/assignments";
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications(recipients, base, "tptc_assignment", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: recipients,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-done-${input.assignmentId}`,
+  });
+}
+
+/**
+ * Event — TPTC duyệt hoặc reject việc giao cho KS.
+ * Recipient: KS assignee.
+ */
+export async function notifyTptcAssignmentReviewed(input: {
+  projectId: string;
+  assignmentId: string;
+  assigneeUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+  decision: "approved" | "rejected";
+  reviewNote: string | null;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const title =
+    input.decision === "approved"
+      ? `TPTC ${input.actorName} đã duyệt: ${input.title}`
+      : `TPTC ${input.actorName} yêu cầu làm lại: ${input.title}`;
+  const body = input.reviewNote || (input.decision === "approved" ? "Việc đã được duyệt" : "Cần làm lại theo phản hồi");
+  const link = `/reports?ackTptc=${input.assignmentId}`;
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications([input.assigneeUserId], base, "tptc_assignment", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: [input.assigneeUserId],
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-review-${input.assignmentId}-${input.decision}`,
+  });
+}
+
+/**
  * Event — TPTC nhắc KS làm việc gấp.
  * Recipient: assignee KS. Push tag distinct theo timestamp để OS không dedupe các lần nhắc liên tiếp.
  */
