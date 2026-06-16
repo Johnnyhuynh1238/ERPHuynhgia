@@ -2362,6 +2362,7 @@ enum StaffNotificationKind {
   material_proposal_new
   material_proposal_update
   material_proposal_reminder
+  tptc_assignment
 }
 
 enum MaterialProposalStatus {

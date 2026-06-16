@@ -688,6 +688,55 @@ export async function notifyKsAttendance(input: {
 }
 
 /**
+ * Event — TPTC giao việc đột xuất cho KS. Recipients: KS được giao (assignee).
+ */
+export async function notifyTptcAssignment(input: {
+  projectId: string;
+  assignmentId: string;
+  assigneeUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+  priority: "normal" | "important" | "urgent" | "critical";
+  dueAt: Date;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const priorityPrefix: Record<typeof input.priority, string> = {
+    normal: "",
+    important: "[Quan trọng] ",
+    urgent: "[Khẩn] ",
+    critical: "[Cực khẩn] ",
+  };
+  const due = input.dueAt;
+  const dueText = `${String(due.getDate()).padStart(2, "0")}/${String(due.getMonth() + 1).padStart(2, "0")} ${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")}`;
+
+  const title = `${priorityPrefix[input.priority]}${input.actorName} giao việc: ${input.title}`;
+  const body = `Hạn ${dueText}`;
+  const link = "/reports";
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications([input.assigneeUserId], base, "tptc_assignment", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: [input.assigneeUserId],
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-assignment-${input.assignmentId}`,
+  });
+}
+
+/**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.
  */

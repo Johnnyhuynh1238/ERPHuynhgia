@@ -2,6 +2,7 @@ import { AssignmentPriority, TptcAssignmentStatus, UserRole } from "@prisma/clie
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyTptcAssignment } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getReportDateVn, upsertPendingTptcAssignmentsForDay } from "@/lib/reports-v3";
 
@@ -127,6 +128,19 @@ export async function POST(request: Request) {
     ksUserId: created.assignedToUserId,
     reportDate: getReportDateVn(),
   });
+
+  fireAndForget(
+    notifyTptcAssignment({
+      projectId: created.projectId,
+      assignmentId: created.id,
+      assigneeUserId: created.assignedToUserId,
+      actorUserId: actor.id,
+      actorName: actor.name ?? "TPTC",
+      title: created.title,
+      priority: created.priority,
+      dueAt: created.dueAt,
+    }),
+  );
 
   return NextResponse.json({
     message: "Đã giao việc TPTC",
