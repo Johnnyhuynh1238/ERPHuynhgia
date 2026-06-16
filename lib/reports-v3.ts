@@ -181,14 +181,10 @@ export async function upsertPendingTptcAssignmentsForDay({
   reportDate: Date;
   selectedIds?: string[];
 }) {
-  const eod = new Date(reportDate);
-  eod.setUTCHours(16, 59, 59, 999);
-
   const pending = await prisma.tptcAssignment.findMany({
     where: {
       assignedToUserId: ksUserId,
       status: "pending",
-      dueAt: { lte: eod },
       project: buildProjectAccessWhere({ id: ksUserId, role: UserRole.engineer }),
       ...(selectedIds && selectedIds.length ? { id: { in: selectedIds } } : {}),
     },
