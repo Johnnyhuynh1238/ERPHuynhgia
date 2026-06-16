@@ -61,9 +61,14 @@ export async function GET(request: Request) {
         tptcAssignment: {
           select: {
             id: true,
+            description: true,
             dueAt: true,
             priority: true,
             status: true,
+            reviewNote: true,
+            assigner: {
+              select: { fullName: true },
+            },
             project: {
               select: {
                 id: true,
@@ -157,6 +162,9 @@ export async function GET(request: Request) {
       ...base,
       tptcAssignmentId: row.tptcAssignment?.id || null,
       tptcStatus: row.tptcAssignment?.status || null,
+      tptcDescription: row.tptcAssignment?.description || null,
+      tptcAssignerName: row.tptcAssignment?.assigner?.fullName || null,
+      tptcReviewNote: row.tptcAssignment?.reviewNote || null,
     };
   });
 

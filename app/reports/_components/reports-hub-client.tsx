@@ -32,6 +32,11 @@ type FlatAssignment = {
   projectId: string | null;
   projectName: string | null;
   currentProgress?: number;
+  tptcAssignmentId?: string | null;
+  tptcStatus?: string | null;
+  tptcDescription?: string | null;
+  tptcAssignerName?: string | null;
+  tptcReviewNote?: string | null;
 };
 
 type TaskGroup = {
@@ -149,6 +154,22 @@ function formatDateTime(iso: string | null) {
   });
 }
 
+function formatDueWithCountdown(iso: string) {
+  const due = new Date(iso);
+  const now = new Date();
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((dueDay.getTime() - today.getTime()) / 86400000);
+  const ddmm = `${String(due.getDate()).padStart(2, "0")}/${String(due.getMonth() + 1).padStart(2, "0")}`;
+  const hhmm = `${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")}`;
+  let suffix = "";
+  if (diffDays === 0) suffix = " (HÔM NAY)";
+  else if (diffDays === 1) suffix = " (ngày mai)";
+  else if (diffDays > 1) suffix = ` (còn ${diffDays} ngày)`;
+  else suffix = ` (TRỄ ${Math.abs(diffDays)} ngày)`;
+  return `${ddmm} ${hhmm}${suffix}`;
+}
+
 function remainLabel(deadlineIso: string, nowIso: string) {
   const diffMs = new Date(deadlineIso).getTime() - new Date(nowIso).getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -178,6 +199,7 @@ export function ReportsHubClient() {
   const [doneNote, setDoneNote] = useState("");
   const [notApplicableItem, setNotApplicableItem] = useState<FlatAssignment | null>(null);
   const [actionItem, setActionItem] = useState<FlatAssignment | null>(null);
+  const [tptcActionItem, setTptcActionItem] = useState<FlatAssignment | null>(null);
   const [progressModalItem, setProgressModalItem] = useState<FlatAssignment | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressPhotos, setProgressPhotos] = useState<TaskPhotoItem[]>([]);
@@ -318,7 +340,7 @@ export function ReportsHubClient() {
   }, [needCheckin, loadCheckinOptions]);
 
   useEffect(() => {
-    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || progressModalItem || guideItem || submitConfirmOpen);
+    const hasOpenModal = Boolean(checkinTaskPickerOpen || doneModalItem || notApplicableItem || actionItem || tptcActionItem || progressModalItem || guideItem || submitConfirmOpen);
     if (!hasOpenModal || typeof document === "undefined") return;
 
     const previousOverflow = document.body.style.overflow;
@@ -327,7 +349,7 @@ export function ReportsHubClient() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [actionItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
+  }, [actionItem, tptcActionItem, checkinTaskPickerOpen, doneModalItem, guideItem, notApplicableItem, progressModalItem, submitConfirmOpen]);
 
   async function postAction(path: string, body: unknown) {
     const response = await fetch(path, {
@@ -399,6 +421,10 @@ export function ReportsHubClient() {
     if (!doneModalItem) return;
     if (doneModalItem.requirePhoto && !donePhotoUrl.trim()) {
       setError("Nhiệm vụ này bắt buộc có ảnh minh chứng");
+      return;
+    }
+    if (doneModalItem.type === "tptc_assignment" && !doneNote.trim()) {
+      setError("Vui lòng nhập báo cáo cho TPTC");
       return;
     }
 
@@ -616,6 +642,10 @@ export function ReportsHubClient() {
       }
       if (item.type === "progress_update") {
         openProgressModal(item);
+        return;
+      }
+      if (item.type === "tptc_assignment") {
+        setTptcActionItem(item);
         return;
       }
       setActionItem(item);
@@ -1150,26 +1180,116 @@ export function ReportsHubClient() {
           )
         : null}
 
+      {tptcActionItem && typeof document !== "undefined"
+        ? createPortal(
+            <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
+              <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 shadow-2xl">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-orange-300">⚡ Việc TPTC giao</div>
+                  {tptcActionItem.priority !== "normal" ? (
+                    <div
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                        tptcActionItem.priority === "critical"
+                          ? "bg-red-500/15 text-red-300"
+                          : tptcActionItem.priority === "urgent"
+                          ? "bg-orange-500/15 text-orange-300"
+                          : "bg-blue-500/15 text-blue-300"
+                      }`}
+                    >
+                      {tptcActionItem.priority === "critical"
+                        ? "🔴 CỰC KHẨN"
+                        : tptcActionItem.priority === "urgent"
+                        ? "🟧 KHẨN"
+                        : "🟦 QUAN TRỌNG"}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 text-base font-bold leading-6 text-[#f0f2ff]">{tptcActionItem.title}</div>
+
+                <div className="mt-3 space-y-1 text-xs leading-5 text-[#b6c0e0]">
+                  <div>🏠 {tptcActionItem.projectName || "Không rõ dự án"}</div>
+                  {tptcActionItem.tptcAssignerName ? (
+                    <div>👤 Giao bởi: {tptcActionItem.tptcAssignerName}</div>
+                  ) : null}
+                  {tptcActionItem.dueAt ? (
+                    <div>⏰ Hạn: {formatDueWithCountdown(tptcActionItem.dueAt)}</div>
+                  ) : null}
+                </div>
+
+                {tptcActionItem.tptcDescription ? (
+                  <div className="mt-3 rounded-xl border border-[#252840] bg-[#13151f] p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8892b0]">📝 Mô tả từ TPTC</div>
+                    <div className="mt-1 whitespace-pre-wrap text-sm leading-5 text-[#f0f2ff]">{tptcActionItem.tptcDescription}</div>
+                  </div>
+                ) : null}
+
+                {tptcActionItem.tptcStatus === "rejected" && tptcActionItem.tptcReviewNote ? (
+                  <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">⚠ TPTC yêu cầu làm lại</div>
+                    <div className="mt-1 whitespace-pre-wrap text-sm leading-5 text-amber-100">{tptcActionItem.tptcReviewNote}</div>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    disabled={busyId === tptcActionItem.id}
+                    onClick={() => {
+                      const item = tptcActionItem;
+                      setTptcActionItem(null);
+                      openDoneModal(item);
+                    }}
+                    className="flex w-full items-center justify-between rounded-[10px] border border-emerald-500/30 bg-emerald-500/10 px-[14px] py-[10px] text-[13px] font-semibold text-emerald-300 transition active:scale-[0.97] disabled:opacity-50"
+                  >
+                    <span>✅ Đánh dấu xong</span>
+                    <span>›</span>
+                  </button>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={() => setTptcActionItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
       {doneModalItem && typeof document !== "undefined"
         ? createPortal(
             <div className="modal-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3">
               <div className="modal-panel-in w-full max-w-md rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 shadow-2xl">
-                <div className="text-base font-bold text-[#f0f2ff]">✅ Đánh dấu hoàn thành</div>
+                <div className="text-base font-bold text-[#f0f2ff]">
+                  {doneModalItem.type === "tptc_assignment" ? "✅ Hoàn thành & báo cáo TPTC" : "✅ Đánh dấu hoàn thành"}
+                </div>
                 <div className="mt-1 text-sm text-[#8892b0]">{doneModalItem.title}</div>
                 <div className="mt-4 space-y-3">
-                  <input
-                    value={donePhotoUrl}
-                    onChange={(e) => setDonePhotoUrl(e.target.value)}
-                    placeholder={doneModalItem.requirePhoto ? "Link ảnh minh chứng (bắt buộc)" : "Link ảnh minh chứng (tuỳ chọn)"}
-                    className="w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
-                  />
-                  <textarea
-                    value={doneNote}
-                    onChange={(e) => setDoneNote(e.target.value)}
-                    placeholder="Ghi chú (tuỳ chọn)"
-                    rows={3}
-                    className="w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
-                  />
+                  <div>
+                    <label className="text-xs font-semibold text-[#8892b0]">
+                      📷 {doneModalItem.requirePhoto ? "Ảnh minh chứng (bắt buộc)" : "Ảnh minh chứng (khuyến nghị)"}
+                    </label>
+                    <input
+                      value={donePhotoUrl}
+                      onChange={(e) => setDonePhotoUrl(e.target.value)}
+                      placeholder="Link ảnh"
+                      className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#8892b0]">
+                      {doneModalItem.type === "tptc_assignment" ? "📝 Báo cáo cho TPTC *" : "📝 Ghi chú (tuỳ chọn)"}
+                    </label>
+                    <textarea
+                      value={doneNote}
+                      onChange={(e) => setDoneNote(e.target.value)}
+                      placeholder={doneModalItem.type === "tptc_assignment" ? "Mô tả ngắn việc đã làm, kết quả, vấn đề (nếu có)..." : "Ghi chú (tuỳ chọn)"}
+                      rows={3}
+                      className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
                   <button type="button" onClick={() => setDoneModalItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
