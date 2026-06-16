@@ -7,6 +7,20 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const auth = await requireEngineerForTodayAssignment(params.id);
   if ("error" in auth) return auth.error;
 
+  if (auth.assignment.type === DailyAssignmentType.tptc_assignment && auth.assignment.tptcAssignment) {
+    const tptcStatus = auth.assignment.tptcAssignment.status;
+    if (
+      tptcStatus === TptcAssignmentStatus.approved ||
+      tptcStatus === TptcAssignmentStatus.rejected ||
+      tptcStatus === TptcAssignmentStatus.cancelled
+    ) {
+      return NextResponse.json(
+        { message: "TPTC đã chốt trạng thái (duyệt/reject/hủy), không thể bỏ đánh dấu" },
+        { status: 400 },
+      );
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.taskDailyAssignment.update({
       where: { id: auth.assignment.id },
