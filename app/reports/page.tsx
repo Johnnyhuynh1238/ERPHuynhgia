@@ -14,7 +14,7 @@ export default async function ReportsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 px-4 py-4">
+    <main className="space-y-4 px-4 py-4">
       <ReportsHubClient />
     </main>
   );
