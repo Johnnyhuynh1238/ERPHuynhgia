@@ -817,15 +817,15 @@ export function ReportsHubClient() {
             ) : null}
             {item.tptcDailyStatus === "working_on_today" ? (
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
-                ✓ Hôm nay
+                ✓ Đang làm hôm nay
               </span>
             ) : item.tptcDailyStatus === "not_today" ? (
               <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-                ⏸ Chưa hôm nay
+                ⏸ Chưa làm hôm nay
               </span>
             ) : item.status === "pending" && item.tptcAcknowledgedAt ? (
               <span className="rounded bg-zinc-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-300">
-                ⚠ Chưa cập nhật
+                ⚠ Chưa cập nhật trạng thái
               </span>
             ) : null}
           </div>
@@ -1413,7 +1413,7 @@ export function ReportsHubClient() {
                   </div>
                 ) : (
                   <div className="mt-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs leading-5 text-blue-100">
-                    💡 Cập nhật trạng thái <b>hôm nay</b> để TPTC biết bạn không quên việc này.
+                    💡 Cập nhật trạng thái nhiệm vụ
                   </div>
                 )}
 
