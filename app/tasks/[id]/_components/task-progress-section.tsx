@@ -36,6 +36,39 @@ type ProgressPayload = {
   history: ProgressHistory[];
 };
 
+type SubAssignment = {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: "critical" | "urgent" | "important" | "normal";
+  status: "pending" | "in_progress" | "done" | "approved" | "rejected" | "cancelled";
+  dueAt: string | null;
+  acknowledgedAt: string | null;
+  completedAt: string | null;
+  approvedAt: string | null;
+  ksNote: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  assignee: { id: string; fullName: string } | null;
+  assigner: { id: string; fullName: string } | null;
+};
+
+const PRIORITY_LABELS: Record<SubAssignment["priority"], { label: string; cls: string }> = {
+  critical: { label: "Khẩn cấp", cls: "border-rose-500/40 bg-rose-500/15 text-rose-200" },
+  urgent: { label: "Gấp", cls: "border-orange-500/40 bg-orange-500/15 text-orange-200" },
+  important: { label: "Quan trọng", cls: "border-amber-500/40 bg-amber-500/15 text-amber-200" },
+  normal: { label: "Thường", cls: "border-[#2e3347] bg-[#222637] text-[#c8d0e8]" },
+};
+
+const SUB_STATUS_LABELS: Record<SubAssignment["status"], { label: string; cls: string }> = {
+  pending: { label: "Chờ KS xác nhận", cls: "border-amber-500/40 bg-amber-500/15 text-amber-200" },
+  in_progress: { label: "KS đang làm", cls: "border-sky-500/40 bg-sky-500/15 text-sky-200" },
+  done: { label: "Đã báo cáo xong", cls: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200" },
+  approved: { label: "TPTC duyệt", cls: "border-emerald-500/40 bg-emerald-500/20 text-emerald-100" },
+  rejected: { label: "TPTC từ chối", cls: "border-rose-500/40 bg-rose-500/15 text-rose-200" },
+  cancelled: { label: "Đã huỷ", cls: "border-[#2e3347] bg-[#222637] text-[#8891aa]" },
+};
+
 function fmtDateTime(input: string | null) {
   if (!input) return "-";
   return new Date(input).toLocaleString("vi-VN");
@@ -95,6 +128,8 @@ export function TaskProgressSection({
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [history, setHistory] = useState<ProgressHistory[]>([]);
   const [hasInteractedWithProgress, setHasInteractedWithProgress] = useState(false);
+  const [subAssignments, setSubAssignments] = useState<SubAssignment[]>([]);
+  const [subLoading, setSubLoading] = useState(false);
   const photoUploader = useTaskPhotoUploader(taskId);
 
   const uploadedPhotos = useMemo<TaskPhotoItem[]>(
@@ -288,8 +323,26 @@ export function TaskProgressSection({
     );
   }
 
+  async function loadSubAssignments() {
+    setSubLoading(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/tptc-assignments`, { cache: "no-store" });
+      if (!res.ok) {
+        setSubAssignments([]);
+        return;
+      }
+      const json = (await res.json().catch(() => ({}))) as { rows?: SubAssignment[] };
+      setSubAssignments(json.rows || []);
+    } catch {
+      setSubAssignments([]);
+    } finally {
+      setSubLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadData();
+    void loadSubAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
@@ -455,6 +508,86 @@ export function TaskProgressSection({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="mt-3 space-y-2 rounded-2xl border border-[#2e3347] bg-[#1a1d27] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-[#8891aa]">Công tác con</div>
+            <div className="mt-0.5 text-xs text-[#8891aa]">TPTC giao thêm việc gắn vào task này</div>
+          </div>
+          <div className="rounded-full border border-[#2e3347] bg-[#222637] px-2.5 py-1 text-xs font-semibold text-[#c8d0e8]">
+            {subLoading ? "..." : subAssignments.length}
+          </div>
+        </div>
+
+        {subLoading ? (
+          <div className="text-sm text-[#8891aa]">Đang tải...</div>
+        ) : subAssignments.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#2e3347] bg-[#11131b]/60 px-3 py-4 text-center text-xs text-[#8891aa]">
+            Chưa có công tác con. Vào trang TPTC để giao việc gắn vào task này.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {subAssignments.map((row) => {
+              const prio = PRIORITY_LABELS[row.priority];
+              const st = SUB_STATUS_LABELS[row.status];
+              return (
+                <div key={row.id} className="rounded-xl border border-[#2e3347] bg-[#11131b]/60 p-3 text-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                          TPTC
+                        </span>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${prio.cls}`}>
+                          {prio.label}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${st.cls}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-semibold text-[#f0f2f8]">{row.title}</div>
+                      {row.description ? (
+                        <div className="mt-1 whitespace-pre-wrap text-xs text-[#c8d0e8]">{row.description}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#8891aa] md:grid-cols-4">
+                    <div>
+                      <div className="font-semibold text-[#8891aa]">KS phụ trách</div>
+                      <div className="text-[#c8d0e8]">{row.assignee?.fullName || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#8891aa]">Người giao</div>
+                      <div className="text-[#c8d0e8]">{row.assigner?.fullName || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#8891aa]">Hạn chót</div>
+                      <div className="text-[#c8d0e8]">{fmtDateTime(row.dueAt)}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#8891aa]">KS nhận lúc</div>
+                      <div className="text-[#c8d0e8]">{fmtDateTime(row.acknowledgedAt)}</div>
+                    </div>
+                  </div>
+                  {row.ksNote ? (
+                    <div className="mt-2 rounded-lg bg-[#1a1d27] px-2.5 py-2 text-xs">
+                      <div className="font-semibold text-[#8891aa]">Ghi chú KS</div>
+                      <div className="mt-0.5 whitespace-pre-wrap text-[#c8d0e8]">{row.ksNote}</div>
+                    </div>
+                  ) : null}
+                  {row.reviewNote ? (
+                    <div className="mt-2 rounded-lg bg-[#1a1d27] px-2.5 py-2 text-xs">
+                      <div className="font-semibold text-[#8891aa]">TPTC phản hồi</div>
+                      <div className="mt-0.5 whitespace-pre-wrap text-[#c8d0e8]">{row.reviewNote}</div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-auto shrink-0 pt-3">

@@ -13,6 +13,7 @@ const querySchema = z.object({
 
 const createSchema = z.object({
   projectId: z.string().uuid("projectId không hợp lệ"),
+  taskId: z.string().uuid().optional().nullable(),
   assignedToUserId: z.string().uuid("assignedToUserId không hợp lệ"),
   title: z.string().trim().min(1, "Tiêu đề là bắt buộc"),
   description: z.string().trim().min(1, "Mô tả là bắt buộc"),
@@ -51,6 +52,13 @@ export async function GET(request: Request) {
     },
     include: {
       project: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+      },
+      task: {
         select: {
           id: true,
           code: true,
@@ -111,9 +119,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
 
+  if (parsed.data.taskId) {
+    const task = await prisma.task.findFirst({
+      where: { id: parsed.data.taskId, projectId: parsed.data.projectId },
+      select: { id: true },
+    });
+    if (!task) {
+      return NextResponse.json({ message: "Task không thuộc dự án đã chọn" }, { status: 400 });
+    }
+  }
+
   const created = await prisma.tptcAssignment.create({
     data: {
       projectId: parsed.data.projectId,
+      taskId: parsed.data.taskId || null,
       assignedToUserId: parsed.data.assignedToUserId,
       assignedByUserId: actor.id,
       title: parsed.data.title,

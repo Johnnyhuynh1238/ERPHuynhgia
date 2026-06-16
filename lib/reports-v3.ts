@@ -192,6 +192,8 @@ export async function upsertPendingTptcAssignmentsForDay({
       id: true,
       title: true,
       priority: true,
+      projectId: true,
+      taskId: true,
     },
   });
 
@@ -215,6 +217,7 @@ export async function upsertPendingTptcAssignmentsForDay({
       ksUserId,
       reportDate,
       tptcAssignmentId: item.id,
+      taskId: item.taskId || null,
       type: DailyAssignmentType.tptc_assignment,
       title: item.title,
       priority: item.priority,

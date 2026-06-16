@@ -8,6 +8,7 @@ type TptcStatus = "pending" | "in_progress" | "done" | "approved" | "rejected" |
 type AssignmentRow = {
   id: string;
   projectId: string;
+  taskId: string | null;
   assignedToUserId: string;
   assignedByUserId: string;
   title: string;
@@ -23,9 +24,12 @@ type AssignmentRow = {
   createdAt: string;
   updatedAt: string;
   project: { id: string; code: string; name: string };
+  task: { id: string; code: string; name: string } | null;
   assignee: { id: string; fullName: string };
   assigner: { id: string; fullName: string };
 };
+
+type TaskOption = { id: string; code: string; name: string };
 
 type UserOption = { id: string; fullName: string; role: string; isActive: boolean };
 type ProjectOption = { id: string; code: string; name: string; isActive: boolean };
@@ -80,12 +84,15 @@ export function TptcAssignmentsClient({
   const [ksFilter, setKsFilter] = useState<string>("all");
   const [draft, setDraft] = useState({
     projectId: "",
+    taskId: "",
     assignedToUserId: "",
     title: "",
     description: "",
     priority: "normal" as Priority,
     dueAt: "",
   });
+  const [tasksByProject, setTasksByProject] = useState<Record<string, TaskOption[]>>({});
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -138,6 +145,34 @@ export function TptcAssignmentsClient({
     loadLookups();
   }, [loadLookups]);
 
+  useEffect(() => {
+    if (!draft.projectId || tasksByProject[draft.projectId]) return;
+    let cancelled = false;
+    setTasksLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${draft.projectId}/tasks`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const rows = ((json.tasks as Array<{ id: string; code: string; name: string }> | undefined) || []).map((t) => ({
+          id: t.id,
+          code: t.code,
+          name: t.name,
+        }));
+        setTasksByProject((prev) => ({ ...prev, [draft.projectId]: rows }));
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setTasksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.projectId, tasksByProject]);
+
+  const currentTasks = tasksByProject[draft.projectId] || [];
+
   const groupedByKs = useMemo(() => {
     return rows.reduce<Record<string, { ksName: string; items: AssignmentRow[] }>>((acc, row) => {
       if (!acc[row.assignee.id]) {
@@ -166,6 +201,7 @@ export function TptcAssignmentsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: draft.projectId,
+          taskId: draft.taskId || null,
           assignedToUserId: draft.assignedToUserId,
           title: draft.title.trim(),
           description: draft.description.trim(),
@@ -182,6 +218,7 @@ export function TptcAssignmentsClient({
         ...prev,
         title: "",
         description: "",
+        taskId: "",
       }));
       await loadRows();
     } catch (e) {
@@ -250,7 +287,7 @@ export function TptcAssignmentsClient({
             <select
               className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
               value={draft.projectId}
-              onChange={(e) => setDraft((prev) => ({ ...prev, projectId: e.target.value }))}
+              onChange={(e) => setDraft((prev) => ({ ...prev, projectId: e.target.value, taskId: "" }))}
             >
               {lookups.projects.map((project) => (
                 <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
@@ -264,6 +301,18 @@ export function TptcAssignmentsClient({
             >
               {lookups.users.map((user) => (
                 <option key={user.id} value={user.id}>{user.fullName}</option>
+              ))}
+            </select>
+
+            <select
+              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] md:col-span-2"
+              value={draft.taskId}
+              onChange={(e) => setDraft((prev) => ({ ...prev, taskId: e.target.value }))}
+              disabled={!draft.projectId || tasksLoading}
+            >
+              <option value="">— Không gắn task (tuỳ chọn) —</option>
+              {currentTasks.map((task) => (
+                <option key={task.id} value={task.id}>{task.code} · {task.name}</option>
               ))}
             </select>
 
@@ -351,6 +400,9 @@ export function TptcAssignmentsClient({
                       <div className="text-xs text-[#98a0c2]">
                         {row.project.code} · {row.project.name} · {PRIORITY_LABEL[row.priority]} · Hạn {fmtDateTime(row.dueAt)}
                       </div>
+                      {row.task ? (
+                        <div className="mt-0.5 text-[11px] text-[#9eb5f7]">📌 Task: {row.task.code} · {row.task.name}</div>
+                      ) : null}
                     </div>
                     <div className="text-xs text-[#98a0c2]">{STATUS_LABEL[row.status]}</div>
                   </div>
