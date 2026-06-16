@@ -93,6 +93,8 @@ export function TptcAssignmentsClient({
   });
   const [tasksByProject, setTasksByProject] = useState<Record<string, TaskOption[]>>({});
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -263,6 +265,19 @@ export function TptcAssignmentsClient({
     }
   }
 
+  async function remind(id: string) {
+    setRemindingId(id);
+    try {
+      await callAction(`/api/tptc-assignments/${id}/remind`, {});
+      setToast("Đã gửi nhắc tới KS");
+      window.setTimeout(() => setToast((current) => (current === "Đã gửi nhắc tới KS" ? null : current)), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gửi nhắc thất bại");
+    } finally {
+      setRemindingId(null);
+    }
+  }
+
   async function cancel(id: string) {
     if (!window.confirm("Xác nhận hủy việc này?")) return;
     try {
@@ -283,71 +298,97 @@ export function TptcAssignmentsClient({
       {canCreate ? (
         <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4 space-y-3">
           <div className="text-sm font-semibold text-[#f0f2ff]">+ Giao việc mới</div>
+
           <div className="grid gap-2 md:grid-cols-2">
-            <select
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
-              value={draft.projectId}
-              onChange={(e) => setDraft((prev) => ({ ...prev, projectId: e.target.value, taskId: "" }))}
-            >
-              {lookups.projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
-              ))}
-            </select>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Dự án</span>
+              <select
+                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                value={draft.projectId}
+                onChange={(e) => setDraft((prev) => ({ ...prev, projectId: e.target.value, taskId: "" }))}
+              >
+                {lookups.projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                ))}
+              </select>
+            </label>
 
-            <select
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
-              value={draft.assignedToUserId}
-              onChange={(e) => setDraft((prev) => ({ ...prev, assignedToUserId: e.target.value }))}
-            >
-              {lookups.users.map((user) => (
-                <option key={user.id} value={user.id}>{user.fullName}</option>
-              ))}
-            </select>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">
+                Task (tuỳ chọn){tasksLoading ? " · đang tải..." : ""}
+              </span>
+              <select
+                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] disabled:opacity-60"
+                value={draft.taskId}
+                onChange={(e) => setDraft((prev) => ({ ...prev, taskId: e.target.value }))}
+                disabled={!draft.projectId || tasksLoading}
+              >
+                <option value="">— Không gắn task —</option>
+                {currentTasks.map((task) => (
+                  <option key={task.id} value={task.id}>{task.code} · {task.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-            <select
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] md:col-span-2"
-              value={draft.taskId}
-              onChange={(e) => setDraft((prev) => ({ ...prev, taskId: e.target.value }))}
-              disabled={!draft.projectId || tasksLoading}
-            >
-              <option value="">— Không gắn task (tuỳ chọn) —</option>
-              {currentTasks.map((task) => (
-                <option key={task.id} value={task.id}>{task.code} · {task.name}</option>
-              ))}
-            </select>
+          <div className="grid gap-2 md:grid-cols-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Giao cho KS</span>
+              <select
+                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                value={draft.assignedToUserId}
+                onChange={(e) => setDraft((prev) => ({ ...prev, assignedToUserId: e.target.value }))}
+              >
+                {lookups.users.map((user) => (
+                  <option key={user.id} value={user.id}>{user.fullName}</option>
+                ))}
+              </select>
+            </label>
 
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Mức ưu tiên</span>
+              <select
+                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                value={draft.priority}
+                onChange={(e) => setDraft((prev) => ({ ...prev, priority: e.target.value as Priority }))}
+              >
+                {(Object.keys(PRIORITY_LABEL) as Priority[]).map((priority) => (
+                  <option key={priority} value={priority}>{PRIORITY_LABEL[priority]}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Hạn chót</span>
+              <input
+                type="datetime-local"
+                className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
+                value={draft.dueAt}
+                onChange={(e) => setDraft((prev) => ({ ...prev, dueAt: e.target.value }))}
+              />
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Tiêu đề</span>
             <input
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] md:col-span-2"
+              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
               placeholder="Tiêu đề việc giao"
               value={draft.title}
               onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))}
             />
+          </label>
 
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#98a0c2]">Mô tả</span>
             <textarea
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3] md:col-span-2"
+              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
               rows={3}
               placeholder="Mô tả chi tiết"
               value={draft.description}
               onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
             />
-
-            <select
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
-              value={draft.priority}
-              onChange={(e) => setDraft((prev) => ({ ...prev, priority: e.target.value as Priority }))}
-            >
-              {(Object.keys(PRIORITY_LABEL) as Priority[]).map((priority) => (
-                <option key={priority} value={priority}>{PRIORITY_LABEL[priority]}</option>
-              ))}
-            </select>
-
-            <input
-              type="datetime-local"
-              className="rounded border border-[#2f3555] bg-[#11182d] px-2 py-2 text-sm text-[#d9def3]"
-              value={draft.dueAt}
-              onChange={(e) => setDraft((prev) => ({ ...prev, dueAt: e.target.value }))}
-            />
-          </div>
+          </label>
 
           <button
             type="button"
@@ -414,6 +455,17 @@ export function TptcAssignmentsClient({
                   <div className="mt-2 text-xs text-[#98a0c2]">Giao bởi {row.assigner.fullName} · Tạo lúc {fmtDateTime(row.createdAt)}</div>
 
                   <div className="mt-2 flex flex-wrap gap-2">
+                    {row.status === "pending" || row.status === "in_progress" ? (
+                      <button
+                        type="button"
+                        onClick={() => remind(row.id)}
+                        disabled={remindingId === row.id}
+                        className="rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs font-semibold text-sky-200 disabled:opacity-60"
+                      >
+                        {remindingId === row.id ? "Đang nhắc..." : "🔔 Nhắc KS"}
+                      </button>
+                    ) : null}
+
                     {row.status === "done" && canApprove ? (
                       <>
                         <button type="button" onClick={() => approve(row.id)} className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200">
@@ -439,6 +491,14 @@ export function TptcAssignmentsClient({
 
         {!loading && rows.length === 0 ? <div className="text-sm text-[#98a0c2]">Không có việc phù hợp bộ lọc.</div> : null}
       </div>
+
+      {toast ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center">
+          <div className="pointer-events-auto rounded-full border border-sky-500/40 bg-[#0b1224]/95 px-4 py-2 text-sm font-semibold text-sky-100 shadow-lg">
+            {toast}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

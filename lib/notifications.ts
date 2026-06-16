@@ -779,6 +779,45 @@ export async function notifyTptcAssignmentAcknowledged(input: {
 }
 
 /**
+ * Event — TPTC nhắc KS làm việc gấp.
+ * Recipient: assignee KS. Push tag distinct theo timestamp để OS không dedupe các lần nhắc liên tiếp.
+ */
+export async function notifyTptcRemind(input: {
+  projectId: string;
+  assignmentId: string;
+  assigneeUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const title = `Đã làm nhiệm vụ "${input.title}" chưa, báo cáo ngay`;
+  const body = `${input.actorName} nhắc bạn`;
+  const link = `/reports?ackTptc=${input.assignmentId}`;
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications([input.assigneeUserId], base, "tptc_assignment", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: [input.assigneeUserId],
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-remind-${input.assignmentId}-${Date.now()}`,
+  });
+}
+
+/**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.
  */
