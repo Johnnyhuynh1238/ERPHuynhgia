@@ -212,6 +212,7 @@ export function ReportsHubClient() {
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const removedProgressUploadIdsRef = useRef(new Set<string>());
   const { items: progressUploadItems, upload: uploadProgressPhotos, clear: clearProgressUploads, remove: removeProgressUploadItem } = useTaskPhotoUploader(progressModalItem?.taskId || "");
+  const { items: doneUploadItems, upload: uploadDonePhotos, clear: clearDoneUploads } = useTaskPhotoUploader(doneModalItem?.taskId || "");
 
   const totalPicked = useMemo(() => {
     const taskCount = Object.values(pickedTaskIds).filter(Boolean).length;
@@ -441,6 +442,27 @@ export function ReportsHubClient() {
     setDoneModalItem(item);
     setDonePhotoUrl(item.photoUrl || "");
     setDoneNote(item.note || "");
+    clearDoneUploads();
+  }
+
+  async function uploadDonePhotoFile(files: FileList | null) {
+    const arr = Array.from(files || []).filter(Boolean);
+    if (!arr.length) return;
+    if (!doneModalItem?.taskId) {
+      setError("Nhiệm vụ này không gắn task — không upload ảnh trực tiếp được");
+      return;
+    }
+    try {
+      const { uploaded, failed } = await uploadDonePhotos([arr[0]]);
+      if (failed.length) {
+        setError(failed[0].message || "Upload ảnh thất bại");
+        return;
+      }
+      const url = uploaded[0]?.photoUrl;
+      if (url) setDonePhotoUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload ảnh thất bại");
+    }
   }
 
   async function confirmDone() {
@@ -463,6 +485,7 @@ export function ReportsHubClient() {
       setDoneModalItem(null);
       setDonePhotoUrl("");
       setDoneNote("");
+      clearDoneUploads();
       await loadToday(mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể đánh dấu hoàn thành");
@@ -1402,12 +1425,42 @@ export function ReportsHubClient() {
                     <label className="text-xs font-semibold text-[#8892b0]">
                       📷 {doneModalItem.requirePhoto ? "Ảnh minh chứng (bắt buộc)" : "Ảnh minh chứng (khuyến nghị)"}
                     </label>
-                    <input
-                      value={donePhotoUrl}
-                      onChange={(e) => setDonePhotoUrl(e.target.value)}
-                      placeholder="Link ảnh"
-                      className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
-                    />
+                    {doneModalItem.taskId ? (
+                      <>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          capture="environment"
+                          onChange={async (event) => {
+                            await uploadDonePhotoFile(event.currentTarget.files);
+                            event.currentTarget.value = "";
+                          }}
+                          className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] file:mr-3 file:rounded-md file:border-0 file:bg-[#f97316] file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-black"
+                        />
+                        <div className="mt-1 text-[11px] text-[#8892b0]">Chụp mới tại hiện trường — ảnh cũ sẽ bị từ chối</div>
+                        {doneUploadItems.length ? (
+                          <TaskPhotoUploadStatus
+                            items={doneUploadItems}
+                            onClear={() => {
+                              clearDoneUploads();
+                              setDonePhotoUrl("");
+                            }}
+                          />
+                        ) : donePhotoUrl ? (
+                          <div className="mt-2 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
+                            <span>✓ Đã đính kèm ảnh</span>
+                            <button type="button" onClick={() => setDonePhotoUrl("")} className="text-emerald-300 underline">Bỏ</button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <input
+                        value={donePhotoUrl}
+                        onChange={(e) => setDonePhotoUrl(e.target.value)}
+                        placeholder="Link ảnh"
+                        className="mt-1 w-full rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-sm text-[#f0f2ff]"
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#8892b0]">
@@ -1423,7 +1476,14 @@ export function ReportsHubClient() {
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
-                  <button type="button" onClick={() => setDoneModalItem(null)} className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDoneModalItem(null);
+                      clearDoneUploads();
+                    }}
+                    className="rounded-lg border border-[#252840] px-3 py-2 text-xs font-semibold text-[#f0f2ff]"
+                  >
                     Hủy
                   </button>
                   <button
