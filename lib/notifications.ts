@@ -929,7 +929,7 @@ export async function notifyTptcRemind(input: {
   const project = await getProjectContext(input.projectId);
   if (!project) return;
 
-  const title = `Đã làm nhiệm vụ "${input.title}" chưa, báo cáo ngay`;
+  const title = `[Nhắc Việc từ TPTC] cần báo cáo nhiệm vụ "${input.title}"`;
   const body = `${input.actorName} nhắc bạn`;
   const link = `/reports?ackTptc=${input.assignmentId}`;
 
