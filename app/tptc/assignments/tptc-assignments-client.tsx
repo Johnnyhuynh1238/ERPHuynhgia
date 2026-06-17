@@ -632,7 +632,7 @@ export function TptcAssignmentsClient({
                         </div>
                         {event.note ? (
                           <div className="mt-2 break-words rounded border border-[#2d3249] bg-[#0f1015] px-2 py-1.5 text-xs text-[#d9def3]">
-                            "{event.note}"
+                            &ldquo;{event.note}&rdquo;
                           </div>
                         ) : null}
                       </li>
