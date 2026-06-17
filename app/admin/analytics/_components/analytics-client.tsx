@@ -232,7 +232,26 @@ const TOOLTIP_STYLE = {
 };
 const COLORS = { amber: "#f59e0b", blue: "#3b82f6", cyan: "#06b6d4" };
 
-export function AnalyticsClient() {
+type AnalyticsClientProps = {
+  hdtkPassword: string;
+  hdtkRotateAt: string;
+};
+
+export function AnalyticsClient({ hdtkPassword, hdtkRotateAt }: AnalyticsClientProps) {
+  const [pwRevealed, setPwRevealed] = useState(false);
+  const [pwCopied, setPwCopied] = useState(false);
+  const onCopyPw = async () => {
+    try {
+      await navigator.clipboard.writeText(hdtkPassword);
+      setPwCopied(true);
+      setTimeout(() => setPwCopied(false), 1800);
+    } catch {
+      // ignore
+    }
+  };
+  const rotateAt = new Date(hdtkRotateAt);
+  const daysToRotate = Math.max(0, Math.ceil((rotateAt.getTime() - Date.now()) / 86400000));
+
   const [range, setRange] = useState<Range>("7d");
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -323,6 +342,36 @@ export function AnalyticsClient() {
           <h1 className="text-2xl font-semibold text-white">Analytics — Homepage huynhgia6.com</h1>
           <p className="text-xs text-[#5b6478]">Theo dõi traffic, hành vi & chuyển đổi báo giá</p>
         </div>
+
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 flex items-center gap-3">
+          <div className="flex flex-col">
+            <div className="text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">
+              Mật khẩu HDTK tháng này
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <code className="font-mono text-base text-amber-200 tracking-wider select-all">
+                {pwRevealed ? hdtkPassword : "•".repeat(hdtkPassword.length)}
+              </code>
+              <button
+                onClick={() => setPwRevealed((v) => !v)}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                title={pwRevealed ? "Ẩn" : "Hiện"}
+              >
+                {pwRevealed ? "Ẩn" : "Hiện"}
+              </button>
+              <button
+                onClick={onCopyPw}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              >
+                {pwCopied ? "✓ Đã copy" : "Copy"}
+              </button>
+            </div>
+            <div className="text-[10px] text-[#8892b0] mt-1">
+              Đổi sau {daysToRotate} ngày · dùng cho nút PDF báo giá
+            </div>
+          </div>
+        </div>
+
         <div className="inline-flex rounded-lg border border-[#252840] bg-[#13151f] p-1">
           {(["24h", "7d", "30d"] as Range[]).map((r) => (
             <button
