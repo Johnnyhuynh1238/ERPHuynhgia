@@ -267,6 +267,7 @@ export async function GET(request: Request) {
     submission,
     mode,
     stats,
+    hasCheckedIn,
     defaultRest,
     assignments: mode === "flat" ? sorted : assignments,
     taskGroups,

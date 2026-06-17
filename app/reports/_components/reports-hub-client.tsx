@@ -64,6 +64,7 @@ type TodayResponse = {
   mode: "flat" | "task" | "project";
   submission: { id: string; submittedAt: string; isLate: boolean } | null;
   stats: { total: number; done: number; notApplicable: number; pending: number };
+  hasCheckedIn: boolean;
   defaultRest: { isSunday: boolean; message: string } | null;
   assignments: FlatAssignment[];
   taskGroups: TaskGroup[];
@@ -226,7 +227,7 @@ export function ReportsHubClient() {
 
   const needCheckin = useMemo(() => {
     if (!today) return false;
-    return !today.submitted && today.stats.total === 0;
+    return !today.submitted && !today.hasCheckedIn;
   }, [today]);
 
   const taskModeGroups = useMemo(() => {
