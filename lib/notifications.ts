@@ -822,6 +822,55 @@ export async function notifyTptcAssignmentCompleted(input: {
 }
 
 /**
+ * Event — KS cập nhật trạng thái hôm nay cho TPTC assignment (working_on_today / not_today).
+ * Recipient: assigner + tất cả TPTC users. Dedupe push tag per assignment+date+status.
+ */
+export async function notifyTptcAssignmentDailyStatus(input: {
+  projectId: string;
+  assignmentId: string;
+  assignerUserId: string;
+  actorUserId: string;
+  actorName: string;
+  title: string;
+  status: "working_on_today" | "not_today";
+  note: string | null;
+  reportDateIso: string;
+}) {
+  const project = await getProjectContext(input.projectId);
+  if (!project) return;
+
+  const tptcIds = await getTptcUserIds();
+  const recipients = Array.from(new Set([input.assignerUserId, ...tptcIds]));
+
+  const verb = input.status === "working_on_today" ? "đang làm" : "chưa làm";
+  const title = `KS ${input.actorName} ${verb} hôm nay: ${input.title}`;
+  const body =
+    input.status === "not_today"
+      ? input.note || "KS chưa làm hôm nay (không có lý do)"
+      : input.note || "KS đang làm hôm nay";
+  const link = "/tptc/assignments";
+
+  const base: NotifyInput = {
+    projectId: input.projectId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    refType: "tptc_assignment",
+    refId: input.assignmentId,
+  };
+
+  await createStaffNotifications(recipients, base, "tptc_assignment", title, body, link);
+
+  await pushStaffNotification({
+    recipientIds: recipients,
+    actorUserId: input.actorUserId,
+    title,
+    body,
+    link,
+    tag: `tptc-daily-${input.assignmentId}-${input.reportDateIso}-${input.status}`,
+  });
+}
+
+/**
  * Event — TPTC duyệt hoặc reject việc giao cho KS.
  * Recipient: KS assignee.
  */

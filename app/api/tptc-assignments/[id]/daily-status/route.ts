@@ -2,6 +2,7 @@ import { TptcAssignmentStatus, TptcDailyStatusKind } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { fireAndForget, notifyTptcAssignmentDailyStatus } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -30,6 +31,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       id: true,
       status: true,
       assignedToUserId: true,
+      assignedByUserId: true,
+      projectId: true,
+      title: true,
     },
   });
 
@@ -91,6 +95,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
       data: { status: TptcAssignmentStatus.in_progress },
     });
   }
+
+  fireAndForget(
+    notifyTptcAssignmentDailyStatus({
+      projectId: assignment.projectId,
+      assignmentId: assignment.id,
+      assignerUserId: assignment.assignedByUserId,
+      actorUserId: actor.id,
+      actorName: actor.name ?? "KS",
+      title: assignment.title,
+      status: parsed.data.status,
+      note,
+      reportDateIso: reportDate.toISOString().slice(0, 10),
+    }),
+  );
 
   return NextResponse.json({
     message: "Đã cập nhật trạng thái hôm nay",
