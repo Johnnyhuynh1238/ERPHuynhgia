@@ -112,6 +112,31 @@ export function TptcAssignmentsClient({
   const [tasksLoading, setTasksLoading] = useState(false);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [historyState, setHistoryState] = useState<{
+    open: boolean;
+    loading: boolean;
+    title: string;
+    events: Array<{
+      type: "created" | "acknowledged" | "daily_status" | "completed" | "approved" | "rejected" | "cancelled";
+      at: string;
+      actorName: string | null;
+      status?: "working_on_today" | "not_today";
+      note?: string | null;
+    }>;
+  }>({ open: false, loading: false, title: "", events: [] });
+
+  async function openHistory(id: string, title: string) {
+    setHistoryState({ open: true, loading: true, title, events: [] });
+    try {
+      const res = await fetch(`/api/tptc-assignments/${id}/history`);
+      if (!res.ok) throw new Error("Tải lịch sử thất bại");
+      const json = await res.json();
+      setHistoryState({ open: true, loading: false, title, events: json.events || [] });
+    } catch (e) {
+      setHistoryState({ open: true, loading: false, title, events: [] });
+      setToast(e instanceof Error ? e.message : "Lỗi tải lịch sử");
+    }
+  }
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -499,6 +524,14 @@ export function TptcAssignmentsClient({
                   ) : null}
 
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openHistory(row.id, row.title)}
+                      className="rounded border border-[#3a4060] bg-[#1f2436] px-2 py-1 text-xs font-semibold text-[#d9def3]"
+                    >
+                      📋 Lịch sử
+                    </button>
+
                     {row.status === "pending" || row.status === "in_progress" ? (
                       <button
                         type="button"
@@ -535,6 +568,82 @@ export function TptcAssignmentsClient({
 
         {!loading && rows.length === 0 ? <div className="text-sm text-[#98a0c2]">Không có việc phù hợp bộ lọc.</div> : null}
       </div>
+
+      {historyState.open ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center"
+          onClick={() => setHistoryState({ open: false, loading: false, title: "", events: [] })}
+        >
+          <div
+            className="modal-sheet-in flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl sm:max-h-[80dvh] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2 border-b border-[#252840] p-4">
+              <div className="flex-1">
+                <div className="text-sm font-bold text-[#f0f2ff]">📋 Lịch sử trạng thái</div>
+                <div className="mt-1 text-xs text-[#98a0c2] break-words">{historyState.title}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryState({ open: false, loading: false, title: "", events: [] })}
+                className="rounded border border-[#2d3249] bg-[#13151f] px-2 py-1 text-xs text-[#d9def3]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {historyState.loading ? (
+                <div className="text-sm text-[#98a0c2]">Đang tải...</div>
+              ) : historyState.events.length === 0 ? (
+                <div className="text-sm text-[#98a0c2]">Chưa có lịch sử.</div>
+              ) : (
+                <ol className="space-y-3">
+                  {historyState.events.map((event, idx) => {
+                    const meta = (() => {
+                      switch (event.type) {
+                        case "created":
+                          return { icon: "📥", label: "Giao việc", color: "text-sky-200" };
+                        case "acknowledged":
+                          return { icon: "👁", label: "KS nhận việc", color: "text-cyan-200" };
+                        case "daily_status":
+                          return event.status === "working_on_today"
+                            ? { icon: "🔨", label: "KS: Đang làm hôm nay", color: "text-emerald-200" }
+                            : { icon: "⏸", label: "KS: Chưa làm hôm nay", color: "text-amber-200" };
+                        case "completed":
+                          return { icon: "✅", label: "KS báo xong", color: "text-emerald-300" };
+                        case "approved":
+                          return { icon: "✔", label: "TPTC duyệt OK", color: "text-emerald-300" };
+                        case "rejected":
+                          return { icon: "↩", label: "TPTC yêu cầu làm lại", color: "text-amber-300" };
+                        case "cancelled":
+                          return { icon: "✕", label: "Đã hủy", color: "text-red-300" };
+                      }
+                    })();
+                    return (
+                      <li key={idx} className="rounded-lg border border-[#252840] bg-[#13151f] p-3">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-base">{meta.icon}</span>
+                          <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-[#98a0c2]">
+                          {fmtDateTime(event.at)}
+                          {event.actorName ? ` · ${event.actorName}` : ""}
+                        </div>
+                        {event.note ? (
+                          <div className="mt-2 break-words rounded border border-[#2d3249] bg-[#0f1015] px-2 py-1.5 text-xs text-[#d9def3]">
+                            "{event.note}"
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toast ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center">
