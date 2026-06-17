@@ -30,6 +30,12 @@ type AssignmentRow = {
   todayStatus: "working_on_today" | "not_today" | null;
   todayNote: string | null;
   todayUpdatedAt: string | null;
+  latestDailyStatus: {
+    status: "working_on_today" | "not_today";
+    note: string | null;
+    reportDate: string;
+    updatedAt: string;
+  } | null;
 };
 
 type TaskOption = { id: string; code: string; name: string };
@@ -59,6 +65,14 @@ const STATUS_LABEL: Record<TptcStatus, string> = {
 };
 
 const STATUS_OPTIONS: TptcStatus[] = ["pending", "in_progress", "done", "approved", "rejected", "cancelled"];
+
+function fmtDate(iso: string | null) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
 
 function fmtDateTime(iso: string | null) {
   if (!iso) return "-";
@@ -472,6 +486,15 @@ export function TptcAssignmentsClient({
                           ⚠ Chưa cập nhật hôm nay
                         </span>
                       )}
+                      {!row.todayStatus && row.latestDailyStatus ? (
+                        <div className="mt-1 break-words text-[11px] text-[#98a0c2]">
+                          📅 {fmtDate(row.latestDailyStatus.reportDate)} — KS ghi:{" "}
+                          <span className="text-[#d9def3]">
+                            {row.latestDailyStatus.status === "working_on_today" ? "Đang làm" : "Chưa làm"}
+                          </span>
+                          {row.latestDailyStatus.note ? ` · "${row.latestDailyStatus.note}"` : ""}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 

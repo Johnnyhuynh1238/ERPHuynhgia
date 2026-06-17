@@ -84,22 +84,34 @@ export async function GET(request: Request) {
         },
       },
       dailyStatuses: {
-        where: { reportDate: today },
-        select: { status: true, note: true, updatedAt: true },
-        take: 1,
+        orderBy: { reportDate: "desc" },
+        select: { status: true, note: true, reportDate: true, updatedAt: true },
+        take: 5,
       },
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
   });
 
   const enriched = rows.map((row) => {
-    const today = row.dailyStatuses?.[0] || null;
+    const allStatuses = row.dailyStatuses || [];
+    const todayRow = allStatuses.find(
+      (item) => item.reportDate.getTime() === today.getTime(),
+    ) || null;
+    const latestRow = allStatuses[0] || null;
     const { dailyStatuses, ...rest } = row as typeof row & { dailyStatuses?: unknown };
     return {
       ...rest,
-      todayStatus: today?.status || null,
-      todayNote: today?.note || null,
-      todayUpdatedAt: today?.updatedAt || null,
+      todayStatus: todayRow?.status || null,
+      todayNote: todayRow?.note || null,
+      todayUpdatedAt: todayRow?.updatedAt || null,
+      latestDailyStatus: latestRow
+        ? {
+            status: latestRow.status,
+            note: latestRow.note,
+            reportDate: latestRow.reportDate,
+            updatedAt: latestRow.updatedAt,
+          }
+        : null,
     };
   });
 
