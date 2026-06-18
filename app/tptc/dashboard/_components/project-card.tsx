@@ -45,6 +45,18 @@ export type ProjectMetrics = {
   materialProposals: {
     pendingToday: number;
   };
+  ksOps: {
+    ksId: string | null;
+    ksName: string | null;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    morningCheckin: boolean;
+    workersMarked: number;
+    workersActive: number;
+    tasksDone: number;
+    tasksTotal: number;
+    eveningReportSubmitted: boolean;
+  };
   payroll: {
     weekKey: string;
     status: "draft" | "ready_to_pay" | "paid" | "missing";
@@ -104,6 +116,14 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
   const eqPct = pctOf(p.budget.equipment.planned, p.budget.equipment.used);
 
   const absentTotal = p.attendance.absentP + p.attendance.absentKP + p.attendance.absentMUA + p.attendance.absentCHO;
+  const ks = p.ksOps;
+  const fmtTime = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  const attendanceText = ks.checkInAt || ks.checkOutAt ? `Vào ${fmtTime(ks.checkInAt)} · Ra ${fmtTime(ks.checkOutAt)}` : "Chưa chấm công";
+  const attendanceTone: "good" | "warn" | "danger" | "muted" = ks.checkInAt && ks.checkOutAt ? "good" : ks.checkInAt ? "warn" : "danger";
 
   return (
     <Card className="border-[#252840] bg-[#1a1d2e]">
@@ -134,6 +154,41 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
             Chi tiết dự án <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
+
+        {ks.ksId && (
+          <Section title={`Kỹ sư ${ks.ksName ?? ""}`.trim()}>
+            <MetricLine
+              href={`/admin/attendance?userId=${ks.ksId}`}
+              label="Chấm công"
+              value={attendanceText}
+              tone={attendanceTone}
+            />
+            <MetricLine
+              href={`/reports`}
+              label="Checkin sáng"
+              value={ks.morningCheckin ? "Đã checkin" : "Chưa checkin"}
+              tone={ks.morningCheckin ? "good" : "danger"}
+            />
+            <MetricLine
+              href={`/projects/${p.id}/eod`}
+              label="Chấm công thợ"
+              value={ks.workersActive > 0 ? `${ks.workersMarked}/${ks.workersActive} thợ` : ks.workersMarked > 0 ? `${ks.workersMarked} thợ` : "Chưa chấm"}
+              tone={ks.workersActive === 0 ? "muted" : ks.workersMarked >= ks.workersActive ? "good" : ks.workersMarked > 0 ? "warn" : "danger"}
+            />
+            <MetricLine
+              href={`/reports`}
+              label="Nhiệm vụ hoàn thành"
+              value={ks.tasksTotal > 0 ? `${ks.tasksDone}/${ks.tasksTotal}` : "Chưa có"}
+              tone={ks.tasksTotal === 0 ? "muted" : ks.tasksDone >= ks.tasksTotal ? "good" : "warn"}
+            />
+            <MetricLine
+              href={`/reports`}
+              label="Báo cáo chiều"
+              value={ks.eveningReportSubmitted ? "Đã nộp" : "Chưa nộp"}
+              tone={ks.eveningReportSubmitted ? "good" : "danger"}
+            />
+          </Section>
+        )}
 
         <Section title="Hôm nay">
           <MetricLine

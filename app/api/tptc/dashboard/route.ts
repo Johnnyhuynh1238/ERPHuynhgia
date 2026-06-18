@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BudgetCategory, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
+import { BudgetCategory, DailyAssignmentStatus, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkerStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
@@ -60,6 +60,19 @@ type ProjectMetrics = {
 
   materialProposals: {
     pendingToday: number; // đề xuất hôm nay chưa duyệt
+  };
+
+  ksOps: {
+    ksId: string | null;
+    ksName: string | null;
+    checkInAt: string | null; // KsAttendance
+    checkOutAt: string | null;
+    morningCheckin: boolean; // MorningCheckin của KS cho dự án này hôm nay
+    workersMarked: number; // số timesheet KS này đã chấm hôm nay
+    workersActive: number; // tổng thợ đang active của dự án
+    tasksDone: number;
+    tasksTotal: number;
+    eveningReportSubmitted: boolean;
   };
 
   payroll: {
@@ -155,7 +168,9 @@ export async function GET() {
     return NextResponse.json(empty);
   }
 
-  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed, attendanceTodayRows, materialProposalsPending] = await Promise.all([
+  const ksIds = Array.from(new Set(projects.map((p) => p.mainEngineer?.id).filter((v): v is string => !!v)));
+
+  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed, attendanceTodayRows, materialProposalsPending, ksAttendanceToday, morningCheckinsToday, workerTimesheetsByKs, workersActiveByProject, taskAssignmentsToday, eveningReportsToday] = await Promise.all([
     prisma.projectBudget.findMany({
       where: { projectId: { in: projectIds } },
       select: { projectId: true, totalLabor: true, totalMaterial: true, totalEquipment: true, totalAmount: true },
@@ -229,6 +244,44 @@ export async function GET() {
         createdAt: { gte: today, lte: new Date(today.getTime() + 24 * 3600 * 1000 - 1) },
       },
       _count: { _all: true },
+    }),
+    // KS chấm công vào/ra hôm nay
+    ksIds.length > 0
+      ? prisma.ksAttendance.findMany({
+          where: { userId: { in: ksIds }, workDate: today },
+          select: { userId: true, checkInAt: true, checkOutAt: true },
+        })
+      : Promise.resolve([] as { userId: string; checkInAt: Date | null; checkOutAt: Date | null }[]),
+    // KS checkin sáng cho mỗi dự án hôm nay
+    ksIds.length > 0
+      ? prisma.morningCheckin.findMany({
+          where: { userId: { in: ksIds }, projectId: { in: projectIds }, reportDate: today },
+          select: { userId: true, projectId: true, submittedAt: true },
+        })
+      : Promise.resolve([] as { userId: string; projectId: string; submittedAt: Date }[]),
+    // Số timesheet KS đã chấm cho thợ hôm nay (group theo project + người chấm)
+    prisma.workerTimesheet.groupBy({
+      by: ["projectId", "createdById"],
+      where: { projectId: { in: projectIds }, date: today },
+      _count: { _all: true },
+    }),
+    // Tổng thợ đang active mỗi dự án
+    prisma.worker.groupBy({
+      by: ["projectId"],
+      where: { projectId: { in: projectIds }, workerStatus: WorkerStatus.active },
+      _count: { _all: true },
+    }),
+    // Nhiệm vụ hôm nay của KS theo dự án
+    ksIds.length > 0
+      ? prisma.taskDailyAssignment.findMany({
+          where: { ksUserId: { in: ksIds }, projectId: { in: projectIds }, reportDate: today },
+          select: { ksUserId: true, projectId: true, status: true },
+        })
+      : Promise.resolve([] as { ksUserId: string; projectId: string; status: string }[]),
+    // Báo cáo chiều hôm nay
+    prisma.eveningReport.findMany({
+      where: { projectId: { in: projectIds }, reportDate: today, submittedAt: { not: null } },
+      select: { projectId: true, reporterId: true, submittedAt: true },
     }),
   ]);
 
@@ -313,6 +366,30 @@ export async function GET() {
 
   const materialProposalsMap = new Map(materialProposalsPending.map((r) => [r.projectId, r._count._all]));
 
+  const ksAttendanceMap = new Map(ksAttendanceToday.map((r) => [r.userId, r]));
+  const morningCheckinKey = (ksId: string, projectId: string) => `${ksId}|${projectId}`;
+  const morningCheckinSet = new Set(morningCheckinsToday.map((r) => morningCheckinKey(r.userId, r.projectId)));
+  const workersActiveMap = new Map(workersActiveByProject.map((r) => [r.projectId, r._count._all]));
+  // KS đã chấm bao nhiêu thợ cho dự án này hôm nay
+  const ksWorkerMarkedKey = (ksId: string, projectId: string) => `${ksId}|${projectId}`;
+  const ksWorkerMarkedMap = new Map<string, number>();
+  for (const row of workerTimesheetsByKs) {
+    ksWorkerMarkedMap.set(ksWorkerMarkedKey(row.createdById, row.projectId), row._count._all);
+  }
+  // Nhiệm vụ KS cho dự án hôm nay
+  const tasksKey = (ksId: string, projectId: string) => `${ksId}|${projectId}`;
+  const tasksAggMap = new Map<string, { done: number; total: number }>();
+  for (const a of taskAssignmentsToday) {
+    if (!a.projectId) continue;
+    const k = tasksKey(a.ksUserId, a.projectId);
+    const agg = tasksAggMap.get(k) ?? { done: 0, total: 0 };
+    agg.total += 1;
+    if (a.status === DailyAssignmentStatus.done) agg.done += 1;
+    tasksAggMap.set(k, agg);
+  }
+  const eveningKey = (ksId: string, projectId: string) => `${ksId}|${projectId}`;
+  const eveningSet = new Set(eveningReportsToday.map((r) => eveningKey(r.reporterId, r.projectId)));
+
   const projectMetrics: ProjectMetrics[] = projects.map((p) => {
     const planned = plannedByCat.get(p.id) ?? { labor: 0, material: 0, equipment: 0 };
     const used = usedByCat.get(p.id) ?? { labor: 0, material: 0, equipment: 0 };
@@ -375,6 +452,24 @@ export async function GET() {
       },
       attendance: attendanceMap.get(p.id) ?? { present: 0, absentP: 0, absentKP: 0, absentMUA: 0, absentCHO: 0, total: 0 },
       materialProposals: { pendingToday: materialProposalsMap.get(p.id) ?? 0 },
+      ksOps: (() => {
+        const ksId = p.mainEngineer?.id ?? null;
+        const ksName = p.mainEngineer?.fullName ?? null;
+        const att = ksId ? ksAttendanceMap.get(ksId) : null;
+        const tasks = ksId ? tasksAggMap.get(tasksKey(ksId, p.id)) : null;
+        return {
+          ksId,
+          ksName,
+          checkInAt: att?.checkInAt ? att.checkInAt.toISOString() : null,
+          checkOutAt: att?.checkOutAt ? att.checkOutAt.toISOString() : null,
+          morningCheckin: ksId ? morningCheckinSet.has(morningCheckinKey(ksId, p.id)) : false,
+          workersMarked: ksId ? (ksWorkerMarkedMap.get(ksWorkerMarkedKey(ksId, p.id)) ?? 0) : 0,
+          workersActive: workersActiveMap.get(p.id) ?? 0,
+          tasksDone: tasks?.done ?? 0,
+          tasksTotal: tasks?.total ?? 0,
+          eveningReportSubmitted: ksId ? eveningSet.has(eveningKey(ksId, p.id)) : false,
+        };
+      })(),
       payroll: {
         weekKey,
         status: payroll?.status ?? "missing",
