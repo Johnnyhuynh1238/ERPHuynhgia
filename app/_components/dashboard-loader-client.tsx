@@ -26,6 +26,11 @@ export function DashboardLoaderClient() {
         return;
       }
 
+      if (json.role === "construction_manager") {
+        router.replace("/tptc/dashboard");
+        return;
+      }
+
       setLoading(false);
       setData(json);
     }

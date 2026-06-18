@@ -96,7 +96,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Ca làm việc", href: "/admin/shifts" },
   ],
   construction_manager: [
-    { label: "Dashboard", href: "/" },
+    { label: "Dashboard", href: "/tptc/dashboard" },
     { label: "Dự án", href: "/projects" },
     { label: "Thầu phụ", href: "/subcontractors" },
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
