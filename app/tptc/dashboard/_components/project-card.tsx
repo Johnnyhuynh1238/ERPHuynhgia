@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CalendarDays } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 export type ProjectMetrics = {
@@ -33,6 +33,17 @@ export type ProjectMetrics = {
   qc: {
     pendingReview: number;
     failedThisWeek: number;
+  };
+  attendance: {
+    present: number;
+    absentP: number;
+    absentKP: number;
+    absentMUA: number;
+    absentCHO: number;
+    total: number;
+  };
+  materialProposals: {
+    pendingToday: number;
   };
   payroll: {
     weekKey: string;
@@ -66,91 +77,155 @@ function payrollLabel(s: ProjectMetrics["payroll"]["status"]): string {
   return "Đã chi";
 }
 
+function daysUntil(targetIso: string): number {
+  const target = new Date(targetIso + "T00:00:00Z").getTime();
+  const now = Date.now();
+  return Math.ceil((target - now) / (24 * 3600 * 1000));
+}
+
+function pctTone(pct: number) {
+  if (pct >= 90) return "text-red-300";
+  if (pct >= 75) return "text-amber-300";
+  return "text-emerald-300";
+}
+
 function pctOf(planned: number, used: number) {
   return planned > 0 ? Math.round((used / planned) * 100) : 0;
 }
 
-function ProgressRow({ href, label, planned, used }: { href: string; label: string; planned: number; used: number }) {
-  const pct = pctOf(planned, used);
-  const cap = Math.min(100, pct);
-  const bar = pct >= 90 ? "bg-red-500/70" : pct >= 75 ? "bg-amber-500/70" : "bg-emerald-500/60";
-  const text = pct >= 90 ? "text-red-300" : pct >= 75 ? "text-amber-300" : "text-emerald-300";
-  return (
-    <Link href={href} className="block rounded-md px-2 py-1.5 hover:bg-[#22263a]">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-[#cdd6f4]">{label}</span>
-        <span className={`font-medium ${text}`}>
-          {pct}% <span className="text-[10px] text-[#8892b0]">· {fmtMoney(used)} / {fmtMoney(planned)}</span>
-        </span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#0f1220]">
-        <div className={`h-full ${bar}`} style={{ width: `${cap}%` }} />
-      </div>
-    </Link>
-  );
-}
-
-export function ProjectCard({ project }: { project: ProjectMetrics; expanded?: boolean }) {
+export function ProjectCard({ project }: { project: ProjectMetrics }) {
   const p = project;
-  const totalPct = pctOf(p.budget.total.planned, p.budget.total.used);
+  const remainDays = daysUntil(p.expectedEndDate);
+  const remainText = remainDays >= 0 ? `còn ${remainDays} ngày tới hạn` : `trễ ${Math.abs(remainDays)} ngày`;
+  const remainTone = remainDays < 0 ? "text-red-300" : remainDays <= 7 ? "text-amber-300" : "text-[#cdd6f4]";
+
+  const laborPct = pctOf(p.budget.labor.planned, p.budget.labor.used);
+  const matPct = pctOf(p.budget.material.planned, p.budget.material.used);
+  const eqPct = pctOf(p.budget.equipment.planned, p.budget.equipment.used);
+
+  const absentTotal = p.attendance.absentP + p.attendance.absentKP + p.attendance.absentMUA + p.attendance.absentCHO;
 
   return (
     <Card className="border-[#252840] bg-[#1a1d2e]">
       <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#252840] pb-2">
           <div className="min-w-0">
             <Link href={`/projects/${p.id}`} className="text-base font-semibold text-orange-200 hover:underline">
               {p.code} — {p.name}
             </Link>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#8892b0]">
-              <span className="inline-flex items-center gap-1">
-                <CalendarDays className="h-3 w-3" /> {p.startDate} → {p.expectedEndDate}
-              </span>
-              <span>•</span>
-              <span>{statusLabel(p.status)}</span>
-              {p.mainEngineer && (
-                <>
-                  <span>•</span>
-                  <span>
-                    Kỹ sư phụ trách:{" "}
-                    <Link href={`/projects/${p.id}/members`} className="text-[#cdd6f4] hover:underline">{p.mainEngineer.name}</Link>
-                  </span>
-                </>
+            <div className="mt-0.5 text-xs text-[#8892b0]">
+              {p.mainEngineer ? (
+                <Link href={`/projects/${p.id}/members`} className="hover:underline">
+                  Kỹ sư {p.mainEngineer.name}
+                </Link>
+              ) : (
+                <span>Chưa có kỹ sư</span>
               )}
+              {" · "}
+              {statusLabel(p.status)}
+              {" · "}
+              <span className={remainTone}>{remainText}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wide text-[#8892b0]">Đã dùng dự toán</div>
-            <div className={`text-2xl font-bold leading-none ${totalPct >= 90 ? "text-red-300" : totalPct >= 75 ? "text-amber-300" : "text-emerald-300"}`}>
-              {totalPct}%
-            </div>
-          </div>
+          <Link
+            href={`/projects/${p.id}`}
+            className="inline-flex items-center gap-1 rounded-md border border-[#2d3249] px-2.5 py-1 text-xs text-[#cdd6f4] hover:bg-[#22263a] hover:text-orange-200"
+          >
+            Chi tiết dự án <ChevronRight className="h-3 w-3" />
+          </Link>
         </div>
 
-        <div className="rounded-lg border border-[#2d3249] bg-[#171a27] p-2">
-          <div className="mb-1 px-2 text-[10px] uppercase tracking-wide text-[#8892b0]">Tiến độ dự toán</div>
-          <ProgressRow href={`/projects/${p.id}/budget?cat=labor`} label="Nhân công" planned={p.budget.labor.planned} used={p.budget.labor.used} />
-          <ProgressRow href={`/projects/${p.id}/budget?cat=material`} label="Vật tư" planned={p.budget.material.planned} used={p.budget.material.used} />
-          <ProgressRow href={`/projects/${p.id}/budget?cat=equipment`} label="Máy móc" planned={p.budget.equipment.planned} used={p.budget.equipment.used} />
-        </div>
+        <Section title="Hôm nay">
+          <MetricLine
+            href={`/projects/${p.id}/work-orders`}
+            label="Phiếu giao việc"
+            value={p.workOrders.todayTotal === 0 ? "Chưa giao" : `${p.workOrders.todayDone}/${p.workOrders.todayTotal} xong`}
+            sub={p.workOrders.todayOpen > 0 ? `${p.workOrders.todayOpen} chưa xong` : ""}
+            tone={p.workOrders.todayOpen > 0 ? "warn" : p.workOrders.todayTotal === 0 ? "muted" : "good"}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/work-orders?status=carried`}
+            label="Phiếu chuyển ngày"
+            value={p.workOrders.carried}
+            sub={p.workOrders.stuckDays >= 2 ? `tắc ${p.workOrders.stuckDays} ngày liên tiếp` : ""}
+            tone={p.workOrders.carried > 0 ? "warn" : "muted"}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/eod`}
+            label="Thợ có mặt"
+            value={`${p.attendance.present}/${p.attendance.total}`}
+            sub={
+              absentTotal > 0
+                ? [
+                    p.attendance.absentP > 0 ? `${p.attendance.absentP} phép` : "",
+                    p.attendance.absentKP > 0 ? `${p.attendance.absentKP} không phép` : "",
+                    p.attendance.absentMUA > 0 ? `${p.attendance.absentMUA} mưa` : "",
+                    p.attendance.absentCHO > 0 ? `${p.attendance.absentCHO} chờ việc` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : p.attendance.total === 0
+                  ? "chưa chấm công"
+                  : "đầy đủ"
+            }
+            tone={p.attendance.absentKP > 0 ? "danger" : absentTotal > 0 ? "warn" : p.attendance.total === 0 ? "muted" : "good"}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/eod`}
+            label="Báo cáo cuối ngày"
+            value={p.eod.submittedToday ? "Đã nộp" : "Chưa nộp"}
+            tone={p.eod.submittedToday ? "good" : "danger"}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/eod`}
+            label="Sản lượng chờ nghiệm thu"
+            value={p.qc.pendingReview}
+            sub={p.qc.failedThisWeek > 0 ? `${p.qc.failedThisWeek} fail tuần này` : ""}
+            tone={p.qc.pendingReview > 0 ? "warn" : "muted"}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/material-proposals`}
+            label="Đề xuất mua vật tư mới"
+            value={p.materialProposals.pendingToday}
+            tone={p.materialProposals.pendingToday > 0 ? "warn" : "muted"}
+          />
+        </Section>
 
-        <TodayLine project={p} />
-
-        <Link href={`/projects/${p.id}/payroll?week=${p.payroll.weekKey}`} className="flex items-center justify-between rounded-lg border border-[#2d3249] bg-[#171a27] px-3 py-2 hover:bg-[#22263a]">
-          <div>
-            <div className="text-xs text-[#8892b0]">Lương tuần {p.payroll.weekKey} • {payrollLabel(p.payroll.status)}</div>
-            <div className="mt-0.5 text-lg font-bold text-emerald-300">{fmtMoney(p.payroll.totalPayable)}</div>
-          </div>
-          <div className="text-right text-[10px] text-[#8892b0]">
-            Quỹ thưởng: {fmtMoney(p.payroll.bonusPool)}
-            {p.payroll.negStreak > 0 && <div className="text-amber-300">âm {p.payroll.negStreak} tuần liên tiếp</div>}
-          </div>
-        </Link>
+        <Section title="Tuần & dự toán">
+          <MetricLine
+            href={`/projects/${p.id}/budget?cat=labor`}
+            label="Nhân công đã dùng"
+            value={`${laborPct}%`}
+            sub={p.budget.labor.planned > 0 ? `${fmtMoney(p.budget.labor.used)} / ${fmtMoney(p.budget.labor.planned)}` : "chưa lập dự toán"}
+            valueClass={pctTone(laborPct)}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/budget?cat=material`}
+            label="Vật tư đã dùng"
+            value={`${matPct}%`}
+            sub={p.budget.material.planned > 0 ? `${fmtMoney(p.budget.material.used)} / ${fmtMoney(p.budget.material.planned)}` : "chưa lập dự toán"}
+            valueClass={pctTone(matPct)}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/budget?cat=equipment`}
+            label="Máy móc đã dùng"
+            value={`${eqPct}%`}
+            sub={p.budget.equipment.planned > 0 ? `${fmtMoney(p.budget.equipment.used)} / ${fmtMoney(p.budget.equipment.planned)}` : "chưa lập dự toán"}
+            valueClass={pctTone(eqPct)}
+          />
+          <MetricLine
+            href={`/projects/${p.id}/payroll?week=${p.payroll.weekKey}`}
+            label={`Lương tuần ${p.payroll.weekKey}`}
+            value={fmtMoney(p.payroll.totalPayable)}
+            sub={`${payrollLabel(p.payroll.status)}${p.payroll.negStreak > 0 ? ` · âm ${p.payroll.negStreak} tuần` : ""}`}
+            tone={p.payroll.negStreak >= 2 ? "danger" : p.payroll.status === "draft" ? "warn" : "good"}
+          />
+        </Section>
 
         {p.alerts.length > 0 && (
           <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2.5">
             <div className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-red-300">
-              <AlertTriangle className="h-3 w-3" /> Cảnh báo
+              <AlertTriangle className="h-3 w-3" /> Cảnh báo cần xử lý
             </div>
             <ul className="space-y-0.5 text-xs text-[#cdd6f4]">
               {p.alerts.map((a, idx) => (
@@ -167,37 +242,50 @@ export function ProjectCard({ project }: { project: ProjectMetrics; expanded?: b
   );
 }
 
-function TodayLine({ project: p }: { project: ProjectMetrics }) {
-  const woTone = p.workOrders.todayOpen > 0 ? "text-amber-300" : "text-emerald-300";
-  const eodTone = p.eod.submittedToday ? "text-emerald-300" : "text-red-300";
-  const qcTone = p.qc.pendingReview > 0 ? "text-amber-300" : "text-[#cdd6f4]";
-
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <Link href={`/projects/${p.id}/work-orders`} className="rounded-lg border border-[#2d3249] bg-[#171a27] px-3 py-2 hover:bg-[#22263a]">
-        <div className="text-[10px] uppercase tracking-wide text-[#8892b0]">Phiếu giao việc hôm nay</div>
-        <div className={`mt-0.5 text-lg font-bold ${woTone}`}>
-          {p.workOrders.todayDone}/{p.workOrders.todayTotal} <span className="text-xs font-normal text-[#8892b0]">hoàn thành</span>
-        </div>
-        {p.workOrders.carried > 0 && (
-          <div className="mt-0.5 text-[11px] text-amber-300">
-            {p.workOrders.carried} phiếu chuyển sang ngày sau
-            {p.workOrders.stuckDays >= 2 && ` · tắc ${p.workOrders.stuckDays} ngày`}
-          </div>
-        )}
-      </Link>
-      <Link href={`/projects/${p.id}/eod`} className="rounded-lg border border-[#2d3249] bg-[#171a27] px-3 py-2 hover:bg-[#22263a]">
-        <div className="text-[10px] uppercase tracking-wide text-[#8892b0]">Báo cáo cuối ngày</div>
-        <div className={`mt-0.5 text-lg font-bold ${eodTone}`}>
-          {p.eod.submittedToday ? "Đã nộp" : "Chưa nộp"}
-        </div>
-        <div className={`mt-0.5 text-[11px] ${qcTone}`}>
-          {p.qc.pendingReview > 0
-            ? `${p.qc.pendingReview} sản lượng chờ nghiệm thu`
-            : "Không có sản lượng chờ"}
-          {p.qc.failedThisWeek > 0 && <span className="ml-1 text-red-300">· {p.qc.failedThisWeek} fail tuần này</span>}
-        </div>
-      </Link>
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#8892b0]">{title}</div>
+      <div className="divide-y divide-[#252840] rounded-lg border border-[#2d3249] bg-[#171a27]">
+        {children}
+      </div>
     </div>
+  );
+}
+
+function MetricLine({
+  href,
+  label,
+  value,
+  sub,
+  tone = "default",
+  valueClass,
+}: {
+  href: string;
+  label: string;
+  value: string | number;
+  sub?: string;
+  tone?: "good" | "warn" | "danger" | "muted" | "default";
+  valueClass?: string;
+}) {
+  const cls =
+    valueClass ??
+    (tone === "danger"
+      ? "text-red-300"
+      : tone === "warn"
+        ? "text-amber-300"
+        : tone === "good"
+          ? "text-emerald-300"
+          : tone === "muted"
+            ? "text-[#8892b0]"
+            : "text-[#cdd6f4]");
+  return (
+    <Link href={href} className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm hover:bg-[#22263a]">
+      <span className="text-[#cdd6f4]">{label}</span>
+      <span className="flex items-baseline gap-2 text-right">
+        {sub && <span className="text-[11px] text-[#8892b0]">{sub}</span>}
+        <span className={`font-semibold ${cls}`}>{value}</span>
+      </span>
+    </Link>
   );
 }

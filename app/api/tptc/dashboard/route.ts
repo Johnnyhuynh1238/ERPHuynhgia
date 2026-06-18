@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BudgetCategory, ProjectStatus, UserRole, WeeklyPayrollStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
+import { BudgetCategory, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
@@ -47,6 +47,19 @@ type ProjectMetrics = {
   qc: {
     pendingReview: number; // outputs qcStatus=pending
     failedThisWeek: number; // outputs qcStatus=failed in current week
+  };
+
+  attendance: {
+    present: number; // dayValue 1 hoặc 0.5
+    absentP: number;
+    absentKP: number;
+    absentMUA: number;
+    absentCHO: number;
+    total: number;
+  };
+
+  materialProposals: {
+    pendingToday: number; // đề xuất hôm nay chưa duyệt
   };
 
   payroll: {
@@ -142,7 +155,7 @@ export async function GET() {
     return NextResponse.json(empty);
   }
 
-  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed] = await Promise.all([
+  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed, attendanceTodayRows, materialProposalsPending] = await Promise.all([
     prisma.projectBudget.findMany({
       where: { projectId: { in: projectIds } },
       select: { projectId: true, totalLabor: true, totalMaterial: true, totalEquipment: true, totalAmount: true },
@@ -201,6 +214,21 @@ export async function GET() {
           },
         },
       },
+    }),
+    // Chấm công thợ hôm nay: phân loại theo dayValue + absentReason
+    prisma.workerTimesheet.findMany({
+      where: { projectId: { in: projectIds }, date: today },
+      select: { projectId: true, dayValue: true, absentReason: true },
+    }),
+    // Đề xuất vật tư hôm nay chưa duyệt
+    prisma.materialProposal.groupBy({
+      by: ["projectId"],
+      where: {
+        projectId: { in: projectIds },
+        status: MaterialProposalStatus.pending,
+        createdAt: { gte: today, lte: new Date(today.getTime() + 24 * 3600 * 1000 - 1) },
+      },
+      _count: { _all: true },
     }),
   ]);
 
@@ -269,6 +297,22 @@ export async function GET() {
 
   const payrollMap = new Map(payrolls.map((p) => [p.projectId, p]));
 
+  const attendanceMap = new Map<string, ProjectMetrics["attendance"]>();
+  for (const t of attendanceTodayRows) {
+    const agg = attendanceMap.get(t.projectId) ?? { present: 0, absentP: 0, absentKP: 0, absentMUA: 0, absentCHO: 0, total: 0 };
+    const dv = decimalToNumber(t.dayValue);
+    agg.total += 1;
+    if (dv > 0) {
+      agg.present += 1;
+    } else if (t.absentReason === TimesheetAbsentReason.P) agg.absentP += 1;
+    else if (t.absentReason === TimesheetAbsentReason.KP) agg.absentKP += 1;
+    else if (t.absentReason === TimesheetAbsentReason.MUA) agg.absentMUA += 1;
+    else if (t.absentReason === TimesheetAbsentReason.CHO) agg.absentCHO += 1;
+    attendanceMap.set(t.projectId, agg);
+  }
+
+  const materialProposalsMap = new Map(materialProposalsPending.map((r) => [r.projectId, r._count._all]));
+
   const projectMetrics: ProjectMetrics[] = projects.map((p) => {
     const planned = plannedByCat.get(p.id) ?? { labor: 0, material: 0, equipment: 0 };
     const used = usedByCat.get(p.id) ?? { labor: 0, material: 0, equipment: 0 };
@@ -290,12 +334,12 @@ export async function GET() {
     const equipPct = planned.equipment > 0 ? Math.round((used.equipment / planned.equipment) * 100) : 0;
 
     const alerts: string[] = [];
-    if (laborPct >= 90) alerts.push(`NC đã dùng ${laborPct}% dự toán`);
-    if (materialPct >= 90) alerts.push(`VT đã dùng ${materialPct}% dự toán`);
-    if (equipPct >= 90) alerts.push(`MM đã dùng ${equipPct}% dự toán`);
-    if (stuckDays >= 2) alerts.push(`WO tắc ${stuckDays} ngày liên tiếp`);
-    if (!submittedToday) alerts.push("KS chưa nộp EOD hôm nay");
-    if ((qcPendingMap.get(p.id) ?? 0) >= 5) alerts.push(`${qcPendingMap.get(p.id)} sản lượng chờ duyệt QC`);
+    if (laborPct >= 90) alerts.push(`Nhân công đã dùng ${laborPct}% dự toán`);
+    if (materialPct >= 90) alerts.push(`Vật tư đã dùng ${materialPct}% dự toán`);
+    if (equipPct >= 90) alerts.push(`Máy móc đã dùng ${equipPct}% dự toán`);
+    if (stuckDays >= 2) alerts.push(`Phiếu giao việc tắc ${stuckDays} ngày liên tiếp`);
+    if (!submittedToday) alerts.push("Kỹ sư chưa nộp báo cáo cuối ngày");
+    if ((qcPendingMap.get(p.id) ?? 0) >= 5) alerts.push(`${qcPendingMap.get(p.id)} sản lượng chờ TPTC nghiệm thu`);
     if (payroll && payroll.negStreak >= 2) alerts.push(`Lương tuần âm ${payroll.negStreak} tuần liên tiếp`);
 
     return {
@@ -328,6 +372,8 @@ export async function GET() {
         pendingReview: qcPendingMap.get(p.id) ?? 0,
         failedThisWeek: qcFailedWeekMap.get(p.id) ?? 0,
       },
+      attendance: attendanceMap.get(p.id) ?? { present: 0, absentP: 0, absentKP: 0, absentMUA: 0, absentCHO: 0, total: 0 },
+      materialProposals: { pendingToday: materialProposalsMap.get(p.id) ?? 0 },
       payroll: {
         weekKey,
         status: payroll?.status ?? "missing",
