@@ -185,8 +185,9 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
           />
           <MetricLine
             href={`/projects/${p.id}/material-proposals`}
-            label="Đề xuất mua vật tư mới"
+            label="Vật tư mua bất thường"
             value={p.materialProposals.pendingToday}
+            sub={p.materialProposals.pendingToday > 0 ? "đề xuất hôm nay" : ""}
             tone={p.materialProposals.pendingToday > 0 ? "warn" : "muted"}
           />
         </Section>
