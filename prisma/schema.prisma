@@ -393,110 +393,110 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  managedProjects                 Project[]                 @relation("ProjectManager")
-  engineeredProjects              Project[]                 @relation("MainEngineer")
-  assignedEngineerFor             Task[]                    @relation("AssignedEngineer")
-  assignedForemanFor              Task[]                    @relation("AssignedForeman")
+  managedProjects                 Project[]                   @relation("ProjectManager")
+  engineeredProjects              Project[]                   @relation("MainEngineer")
+  assignedEngineerFor             Task[]                      @relation("AssignedEngineer")
+  assignedForemanFor              Task[]                      @relation("AssignedForeman")
   taskLogs                        TaskLog[]
   taskPhotos                      TaskPhoto[]
   qcItems                         QcItem[]
-  qcProgressUpdates               QcProgress[]              @relation("QcProgressUpdatedBy")
+  qcProgressUpdates               QcProgress[]                @relation("QcProgressUpdatedBy")
   qcPhotos                        QcPhoto[]
   qcLogs                          QcLog[]
   qcReviews                       QcReview[]
-  taskQcLogs                      TaskQcLog[]               @relation("TaskQcLogChecker")
-  taskProgressHistories           TaskProgressHistory[]     @relation("TaskProgressUpdatedBy")
-  taskQcResultsChecked            TaskQcResult[]            @relation("TaskQcResultCheckedBy")
-  taskActivityLogs                TaskActivityLog[]         @relation("TaskActivityActor")
-  internalApprovedTasks           Task[]                    @relation("TaskInternalApprover")
+  taskQcLogs                      TaskQcLog[]                 @relation("TaskQcLogChecker")
+  taskProgressHistories           TaskProgressHistory[]       @relation("TaskProgressUpdatedBy")
+  taskQcResultsChecked            TaskQcResult[]              @relation("TaskQcResultCheckedBy")
+  taskActivityLogs                TaskActivityLog[]           @relation("TaskActivityActor")
+  internalApprovedTasks           Task[]                      @relation("TaskInternalApprover")
   projectMembers                  ProjectMember[]
-  addedProjectMembers             ProjectMember[]           @relation("ProjectMemberAddedBy")
-  projectAssignments              ProjectMemberAssignment[] @relation("ProjectAssignmentUser")
-  projectAssignmentsAssigned      ProjectMemberAssignment[] @relation("ProjectAssignmentAssigner")
+  addedProjectMembers             ProjectMember[]             @relation("ProjectMemberAddedBy")
+  projectAssignments              ProjectMemberAssignment[]   @relation("ProjectAssignmentUser")
+  projectAssignmentsAssigned      ProjectMemberAssignment[]   @relation("ProjectAssignmentAssigner")
   declaredSiteRestDays            SiteRestDay[]
-  morningCheckins                 MorningCheckin[]          @relation("MorningCheckinUser")
+  morningCheckins                 MorningCheckin[]            @relation("MorningCheckinUser")
   morningReports                  MorningReport[]
   eveningReports                  EveningReport[]
-  technicalReportCreator          TaskTechnicalReport[]     @relation("TechReportCreator")
-  technicalReportUpdater          TaskTechnicalReport[]     @relation("TechReportUpdater")
-  materialReportCreator           TaskMaterialReport[]      @relation("MatReportCreator")
-  materialReportUpdater           TaskMaterialReport[]      @relation("MatReportUpdater")
-  laborReportCreator              TaskLaborReport[]         @relation("LaborReportCreator")
-  laborReportUpdater              TaskLaborReport[]         @relation("LaborReportUpdater")
-  equipmentReportCreator          TaskEquipmentReport[]     @relation("EquipReportCreator")
-  equipmentReportUpdater          TaskEquipmentReport[]     @relation("EquipReportUpdater")
+  technicalReportCreator          TaskTechnicalReport[]       @relation("TechReportCreator")
+  technicalReportUpdater          TaskTechnicalReport[]       @relation("TechReportUpdater")
+  materialReportCreator           TaskMaterialReport[]        @relation("MatReportCreator")
+  materialReportUpdater           TaskMaterialReport[]        @relation("MatReportUpdater")
+  laborReportCreator              TaskLaborReport[]           @relation("LaborReportCreator")
+  laborReportUpdater              TaskLaborReport[]           @relation("LaborReportUpdater")
+  equipmentReportCreator          TaskEquipmentReport[]       @relation("EquipReportCreator")
+  equipmentReportUpdater          TaskEquipmentReport[]       @relation("EquipReportUpdater")
   technicalAttachmentsUploaded    TaskTechnicalAttachment[]
   reportPhotosUploaded            TaskReportPhoto[]
   kpiSnapshots                    KpiSnapshot[]
-  engineerSalaryConfig            EngineerSalaryConfig?     @relation("EngineerSalary")
-  engineerSalaryUpdated           EngineerSalaryConfig[]    @relation("EngineerSalaryUpdater")
-  engineerSalaryHistory           EngineerSalaryHistory[]   @relation("EngineerSalaryChanger")
-  engineerKpiMonthly              EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyUser")
-  engineerKpiMonthlyRated         EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyRater")
-  engineerKpiMonthlyFinalized     EngineerKpiMonthly[]      @relation("EngineerKpiMonthlyFinalizer")
-  kpiSettingsChanged              KpiSettings[]             @relation("KpiSettingsChanger")
-  customerTaskRatings             CustomerTaskRating[]      @relation("KsRatedTask")
-  customerKsRatings               CustomerKsRating[]        @relation("KsRatedDirectly")
-  customerCommentsAuthored        CustomerComment[]         @relation("CustomerCommentAuthor")
+  engineerSalaryConfig            EngineerSalaryConfig?       @relation("EngineerSalary")
+  engineerSalaryUpdated           EngineerSalaryConfig[]      @relation("EngineerSalaryUpdater")
+  engineerSalaryHistory           EngineerSalaryHistory[]     @relation("EngineerSalaryChanger")
+  engineerKpiMonthly              EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyUser")
+  engineerKpiMonthlyRated         EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyRater")
+  engineerKpiMonthlyFinalized     EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyFinalizer")
+  kpiSettingsChanged              KpiSettings[]               @relation("KpiSettingsChanger")
+  customerTaskRatings             CustomerTaskRating[]        @relation("KsRatedTask")
+  customerKsRatings               CustomerKsRating[]          @relation("KsRatedDirectly")
+  customerCommentsAuthored        CustomerComment[]           @relation("CustomerCommentAuthor")
   customerCommentReplies          CustomerCommentReply[]
-  projectDrawingsUploaded         ProjectDrawing[]          @relation("ProjectDrawingUploader")
-  projectDocumentsUploaded        ProjectDocument[]         @relation("ProjectDocumentUploader")
-  projectDocumentAccessGranted    ProjectDocumentAccess[]   @relation("ProjectDocumentAccessGrantor")
-  projectDocumentAccessUser       ProjectDocumentAccess[]   @relation("ProjectDocumentAccessUser")
-  paymentSchedulesCreated         PaymentSchedule[]         @relation("PaymentScheduleCreator")
-  projectChangeDraftsCreated      ProjectChangeDraft[]      @relation("ProjectChangeDraftCreator")
-  projectChangeDraftsUpdated      ProjectChangeDraft[]      @relation("ProjectChangeDraftUpdater")
-  projectDraftFilesUploaded       ProjectDraftFile[]        @relation("ProjectDraftFileUploader")
-  projectAiAudits                 ProjectAiAudit[]          @relation("ProjectAiAuditActor")
-  subcontractorsCreated           Subcontractor[]           @relation("SubcontractorCreator")
-  subContractsCreated             SubContract[]             @relation("SubContractCreator")
+  projectDrawingsUploaded         ProjectDrawing[]            @relation("ProjectDrawingUploader")
+  projectDocumentsUploaded        ProjectDocument[]           @relation("ProjectDocumentUploader")
+  projectDocumentAccessGranted    ProjectDocumentAccess[]     @relation("ProjectDocumentAccessGrantor")
+  projectDocumentAccessUser       ProjectDocumentAccess[]     @relation("ProjectDocumentAccessUser")
+  paymentSchedulesCreated         PaymentSchedule[]           @relation("PaymentScheduleCreator")
+  projectChangeDraftsCreated      ProjectChangeDraft[]        @relation("ProjectChangeDraftCreator")
+  projectChangeDraftsUpdated      ProjectChangeDraft[]        @relation("ProjectChangeDraftUpdater")
+  projectDraftFilesUploaded       ProjectDraftFile[]          @relation("ProjectDraftFileUploader")
+  projectAiAudits                 ProjectAiAudit[]            @relation("ProjectAiAuditActor")
+  subcontractorsCreated           Subcontractor[]             @relation("SubcontractorCreator")
+  subContractsCreated             SubContract[]               @relation("SubContractCreator")
   subContractFiles                SubContractFile[]
-  subPaymentsRequested            SubPayment[]              @relation("SubPaymentRequester")
-  subPaymentsApproved             SubPayment[]              @relation("SubPaymentApprover")
-  subPaymentsPaid                 SubPayment[]              @relation("SubPaymentPayer")
+  subPaymentsRequested            SubPayment[]                @relation("SubPaymentRequester")
+  subPaymentsApproved             SubPayment[]                @relation("SubPaymentApprover")
+  subPaymentsPaid                 SubPayment[]                @relation("SubPaymentPayer")
   subEvaluations                  SubEvaluation[]
   createdProjectPhases            ProjectPhase[]
   createdQcChecklistTemplates     QcChecklistTemplate[]
-  assignedTptcAssignments         TptcAssignment[]          @relation("TptcAssignmentAssignee")
-  createdTptcAssignments          TptcAssignment[]          @relation("TptcAssignmentAssigner")
+  assignedTptcAssignments         TptcAssignment[]            @relation("TptcAssignmentAssignee")
+  createdTptcAssignments          TptcAssignment[]            @relation("TptcAssignmentAssigner")
   tptcDailyStatuses               TptcAssignmentDailyStatus[]
   taskDailyAssignments            TaskDailyAssignment[]
   dailyReportSubmissions          DailyReportSubmission[]
-  designPhotoGroupsCreated        DesignPhotoGroup[]        @relation("DesignPhotoGroupCreator")
-  designPhotoGroupAccess          DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessUser")
-  designPhotoGroupAccessGranted   DesignPhotoGroupAccess[]  @relation("DesignPhotoGroupAccessGrantor")
-  designPhotosUploaded            DesignPhoto[]             @relation("DesignPhotoUploader")
-  staffNotifications              StaffNotification[]       @relation("StaffNotificationRecipient")
-  staffNotificationsActed         StaffNotification[]       @relation("StaffNotificationActor")
-  customerNotificationsActed      CustomerNotification[]    @relation("CustomerNotificationActor")
+  designPhotoGroupsCreated        DesignPhotoGroup[]          @relation("DesignPhotoGroupCreator")
+  designPhotoGroupAccess          DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessUser")
+  designPhotoGroupAccessGranted   DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessGrantor")
+  designPhotosUploaded            DesignPhoto[]               @relation("DesignPhotoUploader")
+  staffNotifications              StaffNotification[]         @relation("StaffNotificationRecipient")
+  staffNotificationsActed         StaffNotification[]         @relation("StaffNotificationActor")
+  customerNotificationsActed      CustomerNotification[]      @relation("CustomerNotificationActor")
   pushSubscriptions               PushSubscription[]
   pushSendLogs                    PushSendLog[]
-  projectActivityLogs             ProjectActivityLog[]      @relation("ProjectActivityActor")
-  ksAttendances                   KsAttendance[]            @relation("KsAttendanceUser")
-  shiftAssignments                UserShiftAssignment[]     @relation("UserShiftAssignmentUser")
-  workersCreated                  Worker[]                  @relation("WorkerCreatedBy")
-  workerAttendancesMarked         WorkerAttendance[]        @relation("WorkerAttendanceMarkedBy")
-  workOrdersCreated               WorkOrder[]               @relation("WorkOrderCreatedBy")
-  workerTimesheetsCreated         WorkerTimesheet[]         @relation("WorkerTimesheetCreatedBy")
-  workOrderOutputsCreated         WorkOrderOutput[]         @relation("WorkOrderOutputCreatedBy")
-  workOrderOutputsApproved        WorkOrderOutput[]         @relation("WorkOrderOutputApprovedBy")
-  workOrderOutputPhotosUploaded   WorkOrderOutputPhoto[]    @relation("WorkOrderOutputPhotoUploadedBy")
-  workOrderOutputQcChecksDone     WorkOrderOutputQcCheck[]  @relation("WorkOrderOutputQcCheckCheckedBy")
-  workerQcIssuesCreated           WorkerQcIssue[]           @relation("WorkerQcIssueCreatedBy")
-  weeklyPayrollsClosed            WeeklyPayroll[]           @relation("WeeklyPayrollClosedBy")
-  weeklyPayrollsReadied           WeeklyPayroll[]           @relation("WeeklyPayrollReadiedBy")
-  weeklyPayrollsPaid              WeeklyPayroll[]           @relation("WeeklyPayrollPaidBy")
-  weeklyPayrollAdjustmentsCreated WeeklyPayrollAdjustment[] @relation("WeeklyPayrollAdjustmentCreatedBy")
-  gradeRatesCreated               GradeRate[]               @relation("GradeRateCreatedBy")
-  gradeHistoryProposed            GradeHistory[]            @relation("GradeHistoryProposer")
-  gradeHistoryApproved            GradeHistory[]            @relation("GradeHistoryApprover")
-  workerDocsUploaded              WorkerDoc[]               @relation("WorkerDocUploader")
-  materialProposalsCreated        MaterialProposal[]        @relation("MatProposalKs")
-  materialProposalsProcessed      MaterialProposal[]        @relation("MatProposalProcessor")
-  projectBudgetsCreated           ProjectBudget[]           @relation("ProjectBudgetCreator")
-  projectBudgetsLocked            ProjectBudget[]           @relation("ProjectBudgetLocker")
-  projectBudgetAmendmentsProposed ProjectBudgetAmendment[]  @relation("ProjectBudgetAmendmentProposer")
-  projectBudgetAmendmentsApproved ProjectBudgetAmendment[]  @relation("ProjectBudgetAmendmentApprover")
+  projectActivityLogs             ProjectActivityLog[]        @relation("ProjectActivityActor")
+  ksAttendances                   KsAttendance[]              @relation("KsAttendanceUser")
+  shiftAssignments                UserShiftAssignment[]       @relation("UserShiftAssignmentUser")
+  workersCreated                  Worker[]                    @relation("WorkerCreatedBy")
+  workerAttendancesMarked         WorkerAttendance[]          @relation("WorkerAttendanceMarkedBy")
+  workOrdersCreated               WorkOrder[]                 @relation("WorkOrderCreatedBy")
+  workerTimesheetsCreated         WorkerTimesheet[]           @relation("WorkerTimesheetCreatedBy")
+  workOrderOutputsCreated         WorkOrderOutput[]           @relation("WorkOrderOutputCreatedBy")
+  workOrderOutputsApproved        WorkOrderOutput[]           @relation("WorkOrderOutputApprovedBy")
+  workOrderOutputPhotosUploaded   WorkOrderOutputPhoto[]      @relation("WorkOrderOutputPhotoUploadedBy")
+  workOrderOutputQcChecksDone     WorkOrderOutputQcCheck[]    @relation("WorkOrderOutputQcCheckCheckedBy")
+  workerQcIssuesCreated           WorkerQcIssue[]             @relation("WorkerQcIssueCreatedBy")
+  weeklyPayrollsClosed            WeeklyPayroll[]             @relation("WeeklyPayrollClosedBy")
+  weeklyPayrollsReadied           WeeklyPayroll[]             @relation("WeeklyPayrollReadiedBy")
+  weeklyPayrollsPaid              WeeklyPayroll[]             @relation("WeeklyPayrollPaidBy")
+  weeklyPayrollAdjustmentsCreated WeeklyPayrollAdjustment[]   @relation("WeeklyPayrollAdjustmentCreatedBy")
+  gradeRatesCreated               GradeRate[]                 @relation("GradeRateCreatedBy")
+  gradeHistoryProposed            GradeHistory[]              @relation("GradeHistoryProposer")
+  gradeHistoryApproved            GradeHistory[]              @relation("GradeHistoryApprover")
+  workerDocsUploaded              WorkerDoc[]                 @relation("WorkerDocUploader")
+  materialProposalsCreated        MaterialProposal[]          @relation("MatProposalKs")
+  materialProposalsProcessed      MaterialProposal[]          @relation("MatProposalProcessor")
+  projectBudgetsCreated           ProjectBudget[]             @relation("ProjectBudgetCreator")
+  projectBudgetsLocked            ProjectBudget[]             @relation("ProjectBudgetLocker")
+  projectBudgetAmendmentsProposed ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentProposer")
+  projectBudgetAmendmentsApproved ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentApprover")
 
   @@map("users")
 }
@@ -706,11 +706,57 @@ model TaskTemplate {
   isActive            Boolean      @default(true) @map("is_active")
   createdAt           DateTime     @default(now()) @map("created_at")
 
+  // Mapping sang StandardTaskCatalog mới (Phase 3 sẽ fill dần qua UI)
+  stdPhaseCode String?              @map("std_phase_code")
+  stdTaskCode  String?              @map("std_task_code")
+  stdCatalogId String?              @map("std_catalog_id") @db.Uuid
+  stdCatalog   StandardTaskCatalog? @relation("TemplateStdCatalog", fields: [stdCatalogId], references: [id], onDelete: SetNull)
+
   tasks           Task[]
   qcTemplate      QcChecklistTemplate?
   assignmentItems TaskAssignmentTemplateItem[]
 
   @@map("task_templates")
+}
+
+/// Catalog mã chuẩn `GĐ-CT` cho danh mục công tác nhà phố Huỳnh Gia.
+/// Single source of truth. Tham chiếu: tài liệu nền `/SOP/danh-muc-cong-tac.html`.
+/// Luật giữ mã: số đã cấp là vĩnh viễn → soft-retire qua `retiredAt`, không xoá.
+model StandardTaskCatalog {
+  id           String    @id @default(uuid()) @db.Uuid
+  phaseCode    String    @map("phase_code") // "01"..."09"
+  taskCode     String    @map("task_code") // "010","020"... bước 10
+  phaseName    String    @map("phase_name") // "Chuẩn bị & khởi công"
+  taskName     String    @map("task_name")
+  groupLabel   String?   @map("group_label") // "Phần âm (trước tô)" cho GĐ 07
+  note         String?   @db.Text // ghi chú in nghiêng
+  isHoldPoint  Boolean   @default(false) @map("is_hold_point")
+  displayOrder Int       @map("display_order") // thứ tự hiển thị; mã = danh tính, KHÔNG phải thứ tự
+  retiredAt    DateTime? @map("retired_at") // soft-delete, không xoá để giữ luật mã vĩnh viễn
+
+  // Default values cho khi tạo Task mới — TPTC fill dần qua UI admin (catalog "ready dần")
+  defaultTeam         String?      @map("default_team")
+  defaultInspector    String?      @map("default_inspector")
+  defaultOffsetDays   Int?         @map("default_offset_days")
+  defaultDurationDays Int?         @map("default_duration_days")
+  materialsNeeded     String?      @map("materials_needed") @db.Text
+  qcChecklist         String?      @map("qc_checklist") @db.Text
+  proposerRole        String?      @map("proposer_role")
+  ordererRole         String?      @map("orderer_role")
+  receiverRole        String?      @map("receiver_role")
+  category            TaskCategory @default(normal)
+  isMilestone         Boolean      @default(false) @map("is_milestone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  templates TaskTemplate[] @relation("TemplateStdCatalog")
+  tasks     Task[]         @relation("TaskStdCatalog")
+
+  @@unique([phaseCode, taskCode])
+  @@index([phaseCode, displayOrder])
+  @@index([retiredAt])
+  @@map("standard_task_catalog")
 }
 
 model QcChecklistTemplate {
@@ -787,12 +833,12 @@ model TptcAssignment {
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
-  project        Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task           Task?                         @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  assignee       User                          @relation("TptcAssignmentAssignee", fields: [assignedToUserId], references: [id])
-  assigner       User                          @relation("TptcAssignmentAssigner", fields: [assignedByUserId], references: [id])
-  dailyItems     TaskDailyAssignment[]
-  dailyStatuses  TptcAssignmentDailyStatus[]
+  project       Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task          Task?                       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  assignee      User                        @relation("TptcAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assigner      User                        @relation("TptcAssignmentAssigner", fields: [assignedByUserId], references: [id])
+  dailyItems    TaskDailyAssignment[]
+  dailyStatuses TptcAssignmentDailyStatus[]
 
   @@index([assignedToUserId, status, dueAt])
   @@index([assignedByUserId])
@@ -807,14 +853,14 @@ enum TptcDailyStatusKind {
 }
 
 model TptcAssignmentDailyStatus {
-  id                String              @id @default(uuid()) @db.Uuid
-  tptcAssignmentId  String              @map("tptc_assignment_id") @db.Uuid
-  ksUserId          String              @map("ks_user_id") @db.Uuid
-  reportDate        DateTime            @map("report_date") @db.Date
-  status            TptcDailyStatusKind
-  note              String?             @db.Text
-  createdAt         DateTime            @default(now()) @map("created_at")
-  updatedAt         DateTime            @updatedAt @map("updated_at")
+  id               String              @id @default(uuid()) @db.Uuid
+  tptcAssignmentId String              @map("tptc_assignment_id") @db.Uuid
+  ksUserId         String              @map("ks_user_id") @db.Uuid
+  reportDate       DateTime            @map("report_date") @db.Date
+  status           TptcDailyStatusKind
+  note             String?             @db.Text
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
 
   tptcAssignment TptcAssignment @relation(fields: [tptcAssignmentId], references: [id], onDelete: Cascade)
   ksUser         User           @relation(fields: [ksUserId], references: [id])
@@ -1030,6 +1076,12 @@ model Task {
   constructionMethod    String?      @map("construction_method") @db.Text
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  // Mapping sang StandardTaskCatalog mới — Phase 3 fill cho task chưa-chạy, Phase 4 mặc định cho project mới
+  stdPhaseCode String?              @map("std_phase_code")
+  stdTaskCode  String?              @map("std_task_code")
+  stdCatalogId String?              @map("std_catalog_id") @db.Uuid
+  stdCatalog   StandardTaskCatalog? @relation("TaskStdCatalog", fields: [stdCatalogId], references: [id], onDelete: SetNull)
 
   project                 Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   template                TaskTemplate?             @relation(fields: [templateId], references: [id])
