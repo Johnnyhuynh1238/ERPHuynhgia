@@ -63,6 +63,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hướng dẫn", href: "/huongdanapp" },
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/admin/templates" },
+    { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
   ],
@@ -109,6 +110,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ thợ", href: "/admin/workers" },
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
+    { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
     { label: "Hướng dẫn", href: "/huongdanapp" },
   ],
 };

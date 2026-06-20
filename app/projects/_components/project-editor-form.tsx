@@ -33,7 +33,7 @@ const formSchema = z.object({
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   plannedDeadline: z.string().optional().nullable(),
-  templateCategory: z.enum(["nha_pho_1t1l", "blank"]),
+  templateCategory: z.enum(["standard_catalog", "nha_pho_1t1l", "blank"]),
   projectManagerId: z.string().uuid("Vui lòng chọn GĐ Thi Công").optional(),
   mainEngineerId: z.string().uuid("Vui lòng chọn KS chính"),
   warrantyTotalMonths: z.number().int().min(0).optional(),
@@ -279,7 +279,7 @@ function buildDefaultValues(currentUserId: string, initialValues?: Partial<Proje
     startDate: dateInput(initialValues?.startDate) || todayIso(),
     expectedEndDate: dateInput(initialValues?.expectedEndDate) || todayPlusDaysIso(120),
     plannedDeadline: dateInput(initialValues?.plannedDeadline) || "",
-    templateCategory: initialValues?.templateCategory || "nha_pho_1t1l",
+    templateCategory: initialValues?.templateCategory || "standard_catalog",
     projectManagerId: initialValues?.projectManagerId || "",
     mainEngineerId: initialValues?.mainEngineerId || "",
     status: initialValues?.status || "planning",
@@ -1340,7 +1340,8 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
           <div>
             <label className="mb-1 block text-sm font-medium">Loại công trình *{renderFieldMarker("templateCategory")}</label>
             <select className={getFieldInputClassName("templateCategory")} {...form.register("templateCategory")} disabled={!isCreate}>
-              <option value="nha_pho_1t1l">Nhà phố 1T1L</option>
+              <option value="standard_catalog">Danh mục chuẩn (9 GĐ, ~92 công tác)</option>
+              <option value="nha_pho_1t1l">Nhà phố 1T1L (legacy)</option>
               <option value="blank">Tạo trống (tự thêm phase/task sau)</option>
             </select>
           </div>

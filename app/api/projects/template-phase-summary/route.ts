@@ -22,7 +22,32 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const templateCategory = (searchParams.get("templateCategory") || "nha_pho_1t1l").trim();
+  const templateCategory = (searchParams.get("templateCategory") || "standard_catalog").trim();
+
+  if (templateCategory === "standard_catalog") {
+    const catalog = await prisma.standardTaskCatalog.findMany({
+      where: { retiredAt: null },
+      select: { phaseCode: true, phaseName: true, defaultDurationDays: true },
+      orderBy: [{ phaseCode: "asc" }, { displayOrder: "asc" }],
+    });
+    const phaseMap = new Map<string, { code: string; name: string; order: number; duration: number }>();
+    for (const row of catalog) {
+      const order = parseInt(row.phaseCode, 10) || 0;
+      const dur = Math.max(1, row.defaultDurationDays ?? 1);
+      const existing = phaseMap.get(row.phaseCode);
+      if (!existing) {
+        phaseMap.set(row.phaseCode, { code: row.phaseCode, name: row.phaseName, order, duration: dur });
+      } else if (dur > existing.duration) {
+        existing.duration = dur;
+      }
+    }
+    const phases = Array.from(phaseMap.values()).sort((a, b) => a.order - b.order);
+    return NextResponse.json({
+      templateCategory,
+      phases,
+      totalDuration: phases.reduce((sum, p) => sum + p.duration, 0),
+    });
+  }
 
   const templates = await prisma.taskTemplate.findMany({
     where: {

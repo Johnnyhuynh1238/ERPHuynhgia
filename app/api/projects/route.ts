@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, ProjectStatus, ProjectMemberRole, ProjectRoleType, TaskStatus, UserRole } from "@prisma/client";
+import { Prisma, ProjectStatus, ProjectMemberRole, ProjectRoleType, TaskCategory, TaskPhase, TaskStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -60,7 +60,7 @@ const createProjectSchema = z.object({
   startDate: z.string().min(1, "Ngày khởi công là bắt buộc"),
   expectedEndDate: z.string().min(1, "Ngày bàn giao dự kiến là bắt buộc"),
   plannedDeadline: z.string().optional().nullable(),
-  templateCategory: z.enum(["nha_pho_1t1l", "blank"]).default("nha_pho_1t1l"),
+  templateCategory: z.enum(["standard_catalog", "nha_pho_1t1l", "blank"]).default("standard_catalog"),
   projectManagerId: z.string().uuid("GĐ Thi Công không hợp lệ"),
   mainEngineerId: z.string().uuid("KS chính không hợp lệ"),
   warrantyTotalMonths: z.coerce.number().int().min(0).optional(),
@@ -395,7 +395,123 @@ export async function POST(request: Request) {
         },
       });
 
-      const taskTemplates = parsed.data.templateCategory === "blank"
+      // Catalog path (mặc định mới): seed task từ StandardTaskCatalog. Bỏ qua nhánh TaskTemplate legacy bên dưới.
+      if (parsed.data.templateCategory === "standard_catalog") {
+        const catalog = await tx.standardTaskCatalog.findMany({
+          where: { retiredAt: null },
+          orderBy: [{ phaseCode: "asc" }, { displayOrder: "asc" }],
+        });
+        if (catalog.length === 0) {
+          throw new Error("Catalog chuẩn rỗng — chưa seed");
+        }
+
+        // Group → ProjectPhase. catalog.phaseCode = "01".."09", giữ nguyên làm ProjectPhase.code mới.
+        type PhaseInfo = { code: string; name: string; displayOrder: number; duration: number };
+        const phaseInfoMap = new Map<string, PhaseInfo>();
+        catalog.forEach((row, idx) => {
+          const dur = Math.max(1, row.defaultDurationDays ?? 1);
+          const existing = phaseInfoMap.get(row.phaseCode);
+          if (!existing) {
+            phaseInfoMap.set(row.phaseCode, {
+              code: row.phaseCode,
+              name: row.phaseName,
+              displayOrder: parseInt(row.phaseCode, 10) || idx + 1,
+              duration: dur,
+            });
+          } else if (dur > existing.duration) {
+            existing.duration = dur;
+          }
+        });
+        const orderedPhases = Array.from(phaseInfoMap.values()).sort((a, b) => a.displayOrder - b.displayOrder);
+
+        let phaseCursor = startDate;
+        await tx.projectPhase.createMany({
+          data: orderedPhases.map((p) => {
+            const plannedStartDate = phaseCursor;
+            const plannedEndDate = addDays(plannedStartDate, p.duration - 1);
+            phaseCursor = addDays(plannedEndDate, 1);
+            return {
+              projectId: project.id,
+              code: p.code,
+              name: p.name,
+              description: null,
+              displayOrder: p.displayOrder,
+              duration: p.duration,
+              plannedStartDate,
+              plannedEndDate,
+              actualStartDate: null,
+              actualEndDate: null,
+              status: "not_started" as const,
+              createdBy: actorUser.id,
+            };
+          }),
+        });
+
+        const createdPhases = await tx.projectPhase.findMany({
+          where: { projectId: project.id },
+          select: { id: true, code: true },
+        });
+        const phaseIdByCode = new Map(createdPhases.map((p) => [p.code, p.id]));
+
+        // Map catalog phaseCode "01..09" → legacy TaskPhase enum (vẫn required trên Task cho đến P5 cleanup).
+        const LEGACY_PHASE_MAP: Record<string, TaskPhase> = {
+          "01": TaskPhase.P1_CHUAN_BI,
+          "02": TaskPhase.P2_MONG,
+          "03": TaskPhase.P3_KHUNG_TRET,
+          "04": TaskPhase.P4_KHUNG_LAU,
+          "05": TaskPhase.P5_ME_XAY_TO,
+          "06": TaskPhase.P5_ME_XAY_TO,
+          "07": TaskPhase.P8_LAP_TB,
+          "08": TaskPhase.P6_OP_LAT,
+          "09": TaskPhase.P9_BAN_GIAO,
+        };
+
+        await tx.task.createMany({
+          data: catalog.map((row) => {
+            const offsetDays = row.defaultOffsetDays ?? 0;
+            const durationDays = Math.max(1, row.defaultDurationDays ?? 1);
+            const plannedStartDate = addDays(startDate, offsetDays);
+            const plannedEndDate = addDays(plannedStartDate, durationDays - 1);
+            return {
+              projectId: project.id,
+              templateId: null,
+              stdCatalogId: row.id,
+              stdPhaseCode: row.phaseCode,
+              stdTaskCode: row.taskCode,
+              phaseId: phaseIdByCode.get(row.phaseCode) || null,
+              code: `${row.phaseCode}-${row.taskCode}`,
+              phase: LEGACY_PHASE_MAP[row.phaseCode] ?? TaskPhase.P1_CHUAN_BI,
+              name: row.taskName,
+              origin: "template" as const,
+              category: row.category as TaskCategory,
+              offsetDays,
+              durationDays,
+              duration: durationDays,
+              plannedStartDate,
+              plannedEndDate,
+              actualStartDate: null,
+              actualEndDate: null,
+              assignedEngineerId: parsed.data.mainEngineerId,
+              assignedForemanId: null,
+              team: row.defaultTeam,
+              inspectorName: row.defaultInspector ?? "",
+              materialsNeeded: row.materialsNeeded ?? "",
+              proposerRole: row.proposerRole ?? "",
+              ordererRole: row.ordererRole ?? "",
+              receiverRole: row.receiverRole ?? "",
+              qcChecklist: row.qcChecklist ?? "",
+              isMilestone: row.isMilestone,
+              visibleToCustomer: row.isMilestone,
+              status: TaskStatus.not_started,
+              isActive: true,
+              displayOrder: row.displayOrder,
+              notes: row.note,
+            };
+          }),
+        });
+      }
+
+      const taskTemplates = parsed.data.templateCategory === "blank" || parsed.data.templateCategory === "standard_catalog"
         ? []
         : await tx.taskTemplate.findMany({
             where: {
@@ -404,7 +520,7 @@ export async function POST(request: Request) {
             orderBy: [{ displayOrder: "asc" }, { code: "asc" }],
           });
 
-      if (parsed.data.templateCategory !== "blank" && taskTemplates.length === 0) {
+      if (parsed.data.templateCategory !== "blank" && parsed.data.templateCategory !== "standard_catalog" && taskTemplates.length === 0) {
         throw new Error("Chưa có template để tạo dự án");
       }
 
