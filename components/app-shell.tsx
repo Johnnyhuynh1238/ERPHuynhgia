@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   BarChart3,
@@ -11,6 +11,7 @@ import {
   FolderKanban,
   GraduationCap,
   Home,
+  LayoutGrid,
   ListChecks,
   MoreHorizontal,
   Receipt,
@@ -164,6 +165,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     return ROLE_MENUS[user.role] ?? [{ label: "Dashboard", href: "/" }];
   }, [user.role]);
 
+  const isAdmin = user.role === "admin";
   const primaryMenus = menus.slice(0, 4);
   const moreMenus = menus.slice(4);
   const roleLabel = ROLE_LABELS[user.role] || user.role;
@@ -270,6 +272,19 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
         <div className="sticky top-0 z-40 hidden items-center justify-between border-b border-[#252840] bg-[#0f1015]/90 px-6 py-4 backdrop-blur-xl md:flex">
           <h1 className="text-lg font-bold text-[#f0f2ff]">{pageTitle}</h1>
           <div className="flex items-center gap-3">
+            {isAdmin ? (
+              <Link
+                href="/admin/menu"
+                className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  pathname === "/admin/menu"
+                    ? "border-[#f97316]/60 bg-[#f97316]/20 text-[#fb923c]"
+                    : "border-[#2d3249] bg-[#1a1d2e] text-[#d9def3] hover:border-[#f97316]/40 hover:text-[#fb923c]"
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span>Menu</span>
+              </Link>
+            ) : null}
             <PushEnableButton />
             <NotificationsBell apiBase="/api/notifications" listHref="/notifications" />
           </div>
@@ -302,16 +317,28 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           })}
 
           {moreMenus.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setOpenMore(true)}
-              className={`flex flex-col items-center justify-center rounded-xl px-2 py-2 text-[10px] font-medium ${
-                openMore ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#8892b0]"
-              }`}
-            >
-              <MoreHorizontal className="mb-1 h-4 w-4" />
-              <span>Thêm</span>
-            </button>
+            isAdmin ? (
+              <Link
+                href="/admin/menu"
+                className={`flex flex-col items-center justify-center rounded-xl px-2 py-2 text-[10px] font-medium ${
+                  pathname === "/admin/menu" ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#8892b0]"
+                }`}
+              >
+                <LayoutGrid className="mb-1 h-4 w-4" />
+                <span>Menu</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setOpenMore(true)}
+                className={`flex flex-col items-center justify-center rounded-xl px-2 py-2 text-[10px] font-medium ${
+                  openMore ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#8892b0]"
+                }`}
+              >
+                <MoreHorizontal className="mb-1 h-4 w-4" />
+                <span>Thêm</span>
+              </button>
+            )
           ) : null}
         </div>
       </nav>
