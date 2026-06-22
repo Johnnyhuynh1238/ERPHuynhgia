@@ -10,7 +10,11 @@ export function canViewWorkers(role: string | null | undefined) {
 }
 
 export function canManageWorkers(role: string | null | undefined) {
-  return role === UserRole.admin || role === UserRole.construction_manager;
+  return (
+    role === UserRole.admin ||
+    role === UserRole.construction_manager ||
+    role === UserRole.accountant
+  );
 }
 
 export function canProposeGrade(role: string | null | undefined) {

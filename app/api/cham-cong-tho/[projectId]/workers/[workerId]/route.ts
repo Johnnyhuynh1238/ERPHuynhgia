@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { ATTENDANCE_ALLOWED_MIME, ATTENDANCE_MAX_PHOTO_BYTES } from "@/lib/attendance";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { canManageWorkers } from "@/lib/worker-management";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,12 @@ export async function PATCH(
   }
   const ok = await assertProjectAccess(user.id, user.role, params.projectId);
   if (!ok) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  if (!canManageWorkers(user.role)) {
+    return NextResponse.json(
+      { message: "Chỉ Kế toán hoặc TPTC mới được sửa hồ sơ thợ." },
+      { status: 403 },
+    );
+  }
 
   const existing = await prisma.worker.findFirst({
     where: { id: params.workerId, projectId: params.projectId },
@@ -125,6 +132,12 @@ export async function DELETE(
   }
   const ok = await assertProjectAccess(user.id, user.role, params.projectId);
   if (!ok) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  if (!canManageWorkers(user.role)) {
+    return NextResponse.json(
+      { message: "Chỉ Kế toán hoặc TPTC mới được xoá thợ." },
+      { status: 403 },
+    );
+  }
 
   const existing = await prisma.worker.findFirst({
     where: { id: params.workerId, projectId: params.projectId },

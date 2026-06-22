@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { ATTENDANCE_ALLOWED_MIME, ATTENDANCE_MAX_PHOTO_BYTES } from "@/lib/attendance";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
+import { canManageWorkers } from "@/lib/worker-management";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,12 @@ export async function POST(request: Request, { params }: { params: { projectId: 
   }
   const ok = await assertProjectAccess(user.id, user.role, params.projectId);
   if (!ok) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  if (!canManageWorkers(user.role)) {
+    return NextResponse.json(
+      { message: "Chỉ Kế toán hoặc TPTC mới được thêm thợ. Vui lòng liên hệ Kế toán." },
+      { status: 403 },
+    );
+  }
 
   const fd = await request.formData().catch(() => null);
   if (!fd) return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });

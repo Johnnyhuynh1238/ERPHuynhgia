@@ -33,9 +33,11 @@ const ROLE_LABEL: Record<"tho" | "phu", string> = { tho: "Thợ", phu: "Phụ" }
 export function ChamCongThoClient({
   projectId,
   initialSession,
+  canManage,
 }: {
   projectId: string;
   initialSession: Session;
+  canManage: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -259,17 +261,25 @@ export function ChamCongThoClient({
 
         {!loading && data && (
           <>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="mb-4 w-full rounded-lg border border-dashed border-[#252840] py-3 text-sm text-[#a78bfa] hover:bg-[#1a1d2e]"
-            >
-              + Thêm thợ mới
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="mb-4 w-full rounded-lg border border-dashed border-[#252840] py-3 text-sm text-[#a78bfa] hover:bg-[#1a1d2e]"
+              >
+                + Thêm thợ mới
+              </button>
+            ) : (
+              <div className="mb-4 rounded-lg border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0]">
+                Cần thêm thợ mới? Báo Kế toán nhập hồ sơ rồi tick chấm công.
+              </div>
+            )}
 
             {sortedWorkers.length === 0 && (
               <p className="text-center text-sm text-[#8892b0]">
-                Chưa có thợ nào. Bấm &ldquo;Thêm thợ mới&rdquo; để bắt đầu.
+                {canManage
+                  ? "Chưa có thợ nào. Bấm “Thêm thợ mới” để bắt đầu."
+                  : "Chưa có thợ nào. Báo Kế toán nhập hồ sơ thợ trước."}
               </p>
             )}
 
@@ -311,21 +321,23 @@ export function ChamCongThoClient({
                         {w.phone && <span>· {w.phone}</span>}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActionsFor(w);
-                      }}
-                      aria-label="Tuỳ chọn thợ"
-                      className="shrink-0 rounded-lg p-2 text-[#8892b0] hover:bg-[#0f1118] hover:text-[#f0f2ff]"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                        <circle cx="5" cy="12" r="2" />
-                        <circle cx="12" cy="12" r="2" />
-                        <circle cx="19" cy="12" r="2" />
-                      </svg>
-                    </button>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActionsFor(w);
+                        }}
+                        aria-label="Tuỳ chọn thợ"
+                        className="shrink-0 rounded-lg p-2 text-[#8892b0] hover:bg-[#0f1118] hover:text-[#f0f2ff]"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                          <circle cx="5" cy="12" r="2" />
+                          <circle cx="12" cy="12" r="2" />
+                          <circle cx="19" cy="12" r="2" />
+                        </svg>
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -347,7 +359,7 @@ export function ChamCongThoClient({
         </div>
       </footer>
 
-      {addOpen && (
+      {canManage && addOpen && (
         <AddWorkerModal
           projectId={projectId}
           onClose={() => setAddOpen(false)}
@@ -360,7 +372,7 @@ export function ChamCongThoClient({
         />
       )}
 
-      {actionsFor && (
+      {canManage && actionsFor && (
         <WorkerActionSheet
           worker={actionsFor}
           onClose={() => setActionsFor(null)}
@@ -375,7 +387,7 @@ export function ChamCongThoClient({
         />
       )}
 
-      {editingWorker && (
+      {canManage && editingWorker && (
         <EditWorkerModal
           projectId={projectId}
           worker={editingWorker}
@@ -384,7 +396,7 @@ export function ChamCongThoClient({
         />
       )}
 
-      {deletingWorker && (
+      {canManage && deletingWorker && (
         <DeleteWorkerDialog
           worker={deletingWorker}
           submitting={deleting}

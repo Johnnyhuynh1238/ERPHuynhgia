@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { canManageWorkers } from "@/lib/worker-management";
 import { ChamCongThoClient } from "./_components/cham-cong-tho-client";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,13 @@ export default async function Page({
   }
 
   const session = searchParams.session === "afternoon" ? "afternoon" : "morning";
+  const canManage = canManageWorkers(user.role);
 
-  return <ChamCongThoClient projectId={params.projectId} initialSession={session} />;
+  return (
+    <ChamCongThoClient
+      projectId={params.projectId}
+      initialSession={session}
+      canManage={canManage}
+    />
+  );
 }
