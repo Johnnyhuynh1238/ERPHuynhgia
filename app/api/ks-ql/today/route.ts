@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const [
     attendancePresentCount,
     workOrdersToday,
+    workOrderOutputsToday,
     materialPendingProcess,
     materialInTransit,
     qcPendingReview,
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
       where: { projectId, date: today, session: currentSession, present: true },
     }),
     prisma.workOrder.count({
+      where: { projectId, date: today },
+    }),
+    prisma.workOrderOutput.count({
       where: { projectId, date: today },
     }),
     prisma.materialProposal.count({
@@ -57,6 +61,9 @@ export async function GET(req: NextRequest) {
       },
     }).catch(() => 0),
   ]);
+
+  const allOrdersDistributed =
+    workOrdersToday > 0 && workOrderOutputsToday >= workOrdersToday;
 
   const alerts: { id: string; text: string; href?: string }[] = [];
   if (qcPendingReview > 0) {
@@ -80,7 +87,8 @@ export async function GET(req: NextRequest) {
     },
     evening: {
       workOrdersToday,
-      assignDone: false,
+      workOrderOutputsToday,
+      assignDone: allOrdersDistributed,
       materialRequestForTomorrow: false,
     },
     kpi: {

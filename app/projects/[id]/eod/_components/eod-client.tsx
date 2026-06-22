@@ -73,6 +73,7 @@ type Props = {
   canEdit: boolean;
   canTickQc: boolean;
   canApproveOutput: boolean;
+  backHref?: string | null;
 };
 
 function todayStr() {
@@ -89,7 +90,7 @@ const DAY_VALUE_OPTIONS = [
   { value: 0, label: "0" },
 ];
 
-export function EodClient({ projectId, canEdit, canTickQc, canApproveOutput }: Props) {
+export function EodClient({ projectId, canEdit, canTickQc, canApproveOutput, backHref }: Props) {
   const [date, setDate] = useState(todayStr());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -326,6 +327,11 @@ export function EodClient({ projectId, canEdit, canTickQc, canApproveOutput }: P
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            {backHref ? (
+              <a href={backHref} className="text-xs text-[#8892b0] hover:text-[#a78bfa]">
+                ← Về App KS
+              </a>
+            ) : null}
             <h2 className="text-lg font-semibold text-[#f0f2ff]">Cuối ngày</h2>
             <div className="text-xs text-[#8892b0]">
               Chấm công + sản lượng cho ngày đã chọn. Tuần: {data?.weekKey || "—"}

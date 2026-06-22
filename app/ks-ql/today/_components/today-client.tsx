@@ -44,6 +44,7 @@ type TodayData = {
   };
   evening: {
     workOrdersToday: number;
+    workOrderOutputsToday: number;
     assignDone: boolean;
     materialRequestForTomorrow: boolean;
   };
@@ -392,12 +393,24 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
               {
                 Icon: Sparkles,
                 title: "Rải công + % tiến độ",
-                status: data.evening.assignDone
-                  ? "Đã rải"
-                  : `${data.evening.workOrdersToday} phiếu giao việc`,
-                statusTone: data.evening.assignDone ? "done" : "todo",
-                cta: "Mở",
+                status:
+                  data.evening.workOrdersToday === 0
+                    ? "Chưa có phiếu giao việc"
+                    : data.evening.assignDone
+                      ? `Đã rải ${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu`
+                      : `${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu đã rải`,
+                statusTone:
+                  data.evening.workOrdersToday === 0
+                    ? "muted"
+                    : data.evening.assignDone
+                      ? "done"
+                      : "todo",
+                cta: data.evening.assignDone ? "Sửa" : "Rải",
                 sop: "6.2",
+                muted: data.evening.workOrdersToday === 0,
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
+                  : undefined,
               },
               {
                 Icon: Package,

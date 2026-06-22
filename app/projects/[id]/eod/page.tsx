@@ -8,7 +8,13 @@ import { EodClient } from "./_components/eod-client";
 
 export const metadata = { title: "Cuối ngày" };
 
-export default async function EodPage({ params }: { params: { id: string } }) {
+export default async function EodPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { back?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) redirect("/login");
 
@@ -27,12 +33,18 @@ export default async function EodPage({ params }: { params: { id: string } }) {
     redirect("/projects?denied=1");
   }
 
+  const backHref =
+    typeof searchParams.back === "string" && searchParams.back.startsWith("/ks-ql")
+      ? searchParams.back
+      : null;
+
   return (
     <EodClient
       projectId={project.id}
       canEdit={canEditEod({ id: user.id, role: user.role })}
       canTickQc={canTickQcCheck({ id: user.id, role: user.role })}
       canApproveOutput={canApproveOutput({ id: user.id, role: user.role })}
+      backHref={backHref}
     />
   );
 }
