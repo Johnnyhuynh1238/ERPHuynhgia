@@ -20,6 +20,7 @@ import {
   Sunset,
   Truck,
   Wrench,
+  Zap,
 } from "lucide-react";
 
 type Project = {
@@ -286,6 +287,23 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             </section>
           ) : null}
 
+          <QuickActions
+            cards={[
+              {
+                Icon: Package,
+                title: "Đặt VT/Máy",
+                status: "Bất cứ lúc nào · KT lên đơn",
+                statusTone: "muted",
+                cta: "Đặt",
+                sop: "6.4",
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
+                  : undefined,
+              },
+            ]}
+            onHint={setHintKey}
+          />
+
           <PhaseSection
             id="morning"
             title="Đầu ngày"
@@ -412,14 +430,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
               },
-              {
-                Icon: Package,
-                title: "Đặt VT/Máy ngày mai",
-                status: data.evening.materialRequestForTomorrow ? "Đã đặt" : "Chưa đặt",
-                statusTone: data.evening.materialRequestForTomorrow ? "done" : "todo",
-                cta: "Mở",
-                sop: "6.4",
-              },
             ]}
             onHint={setHintKey}
           />
@@ -533,6 +543,38 @@ const ACCENT_STYLES: Record<
     chipColor: "#6FA677",
   },
 };
+
+function QuickActions({
+  cards,
+  onHint,
+}: {
+  cards: CardDef[];
+  onHint: (key: string) => void;
+}) {
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border p-3 sm:p-4"
+      style={{
+        borderColor: "rgba(167,139,250,0.35)",
+        background:
+          "linear-gradient(135deg, rgba(167,139,250,0.08) 0%, transparent 60%), #181410",
+      }}
+    >
+      <div
+        className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider"
+        style={{ color: "#a78bfa" }}
+      >
+        <Zap className="h-3.5 w-3.5" />
+        Hành động nhanh
+      </div>
+      <div className="space-y-1.5">
+        {cards.map((c, i) => (
+          <ActionCard key={i} card={c} onHint={onHint} />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function PhaseSection({
   id,

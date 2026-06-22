@@ -8,8 +8,10 @@ import { ProposalsClient } from "@/app/proposals/_components/proposals-client";
 
 export default async function ProjectMaterialProposalsPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { back?: string };
 }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) {
@@ -30,8 +32,21 @@ export default async function ProjectMaterialProposalsPage({
     redirect("/projects?denied=1");
   }
 
+  const backHref =
+    typeof searchParams.back === "string" && searchParams.back.startsWith("/ks-ql")
+      ? searchParams.back
+      : null;
+
   return (
     <div className="space-y-4">
+      {backHref ? (
+        <a
+          href={backHref}
+          className="inline-flex items-center gap-1 text-xs text-[#a78bfa] hover:underline"
+        >
+          ← Về App KS
+        </a>
+      ) : null}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
         <h2 className="text-lg font-bold text-[#f0f2ff]">Đề xuất vật tư / máy</h2>
         <p className="mt-1 text-xs text-[#8892b0]">
