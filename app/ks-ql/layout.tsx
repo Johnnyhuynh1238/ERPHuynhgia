@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
-import { AppShell } from "@/components/app-shell";
+import { KsQlFrame } from "./_components/ks-ql-frame";
 
 const ALLOWED_ROLES = new Set(["engineer", "construction_manager", "admin"]);
 
@@ -10,15 +10,15 @@ export default async function KsQlLayout({ children }: { children: React.ReactNo
   if (!ALLOWED_ROLES.has(user.role as string)) redirect("/");
 
   return (
-    <AppShell
+    <KsQlFrame
       user={{
         id: user.id,
-        role: user.role,
-        name: user.name,
-        email: user.email,
+        name: user.name ?? "KS",
+        email: user.email ?? "",
+        role: user.role as string,
       }}
     >
       {children}
-    </AppShell>
+    </KsQlFrame>
   );
 }
