@@ -115,12 +115,21 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   const [data, setData] = useState<TodayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hintKey, setHintKey] = useState<string | null>(null);
+  const [hintMounted, setHintMounted] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (hintKey) {
+      const id = requestAnimationFrame(() => setHintMounted(true));
+      return () => cancelAnimationFrame(id);
+    }
+    setHintMounted(false);
+  }, [hintKey]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -153,10 +162,10 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
 
   if (projects.length === 0) {
     return (
-      <div className="rounded-2xl border border-[#1f2536] bg-[#131722] p-8 text-center">
-        <HardHat className="mx-auto mb-3 h-8 w-8 text-[#7b8499]" />
-        <div className="text-base font-medium text-white">Chưa có dự án nào</div>
-        <p className="mt-1 text-sm text-[#7b8499]">Liên hệ TPTC để được phân dự án.</p>
+      <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-8 text-center">
+        <HardHat className="mx-auto mb-3 h-8 w-8 text-[#9a8f80]" />
+        <div className="text-base font-medium text-[#f5ede4]">Chưa có dự án nào</div>
+        <p className="mt-1 text-sm text-[#9a8f80]">Liên hệ TPTC để được phân dự án.</p>
       </div>
     );
   }
@@ -164,9 +173,18 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   return (
     <div className="space-y-4">
       <section>
-        <div className="text-sm text-[#7b8499]">{now ? `${vnGreeting(hour)}, ${firstName}.` : "..."}</div>
-        <h1 className="mt-0.5 text-[26px] font-semibold tracking-tight text-white">Hôm nay</h1>
-        <div className="mt-0.5 text-xs text-[#7b8499]">{now ? vnDate(now) : ""}</div>
+        <div className="text-sm text-[#9a8f80]">{now ? `${vnGreeting(hour)}, ${firstName}.` : "..."}</div>
+        <h1
+          className="mt-0.5 text-[26px] font-semibold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #f5ede4 0%, #E0B855 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Hôm nay
+        </h1>
+        <div className="mt-0.5 text-xs text-[#9a8f80]">{now ? vnDate(now) : ""}</div>
       </section>
 
       {projects.length > 1 ? (
@@ -181,10 +199,10 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   url.searchParams.set("p", p.id);
                   window.location.href = url.toString();
                 }}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   active
-                    ? "border-orange-500/40 bg-orange-500/15 text-orange-300"
-                    : "border-[#1f2536] bg-[#131722] text-[#a0aec0] hover:bg-[#1a1f2e]"
+                    ? "border-[#E0B855]/50 bg-[#E0B855]/15 text-[#E0B855]"
+                    : "border-[#2a221c] bg-[#181410] text-[#d4c8b8] hover:border-[#3a2d22] hover:bg-[#221b15]"
                 }`}
               >
                 {p.name}
@@ -195,42 +213,70 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
       ) : null}
 
       {project ? (
-        <section className="overflow-hidden rounded-2xl border border-[#1f2536] bg-gradient-to-br from-[#13182a] to-[#0f1320] p-4">
+        <section
+          className="overflow-hidden rounded-2xl border border-[#2a221c] p-4"
+          style={{
+            background:
+              "linear-gradient(135deg, #1f1812 0%, #181410 50%, #120e0b 100%)",
+          }}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-orange-300">
+                <span
+                  className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ background: "rgba(210,122,82,0.15)", color: "#D27A52" }}
+                >
                   {project.code}
                 </span>
                 <span
-                  className={`text-[10px] uppercase tracking-wider ${
-                    project.status === "in_progress" ? "text-emerald-300" : "text-amber-300"
-                  }`}
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: project.status === "in_progress" ? "#6FA677" : "#E0B855" }}
                 >
                   {project.status === "in_progress" ? "Đang thi công" : "Đang chuẩn bị"}
                 </span>
               </div>
-              <div className="mt-1 truncate text-[17px] font-semibold text-white">{project.name}</div>
-              {project.address ? <div className="mt-0.5 truncate text-xs text-[#7b8499]">{project.address}</div> : null}
+              <div className="mt-1 truncate text-[17px] font-semibold text-[#f5ede4]">{project.name}</div>
+              {project.address ? (
+                <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{project.address}</div>
+              ) : null}
             </div>
           </div>
         </section>
       ) : null}
 
       {loading ? (
-        <div className="rounded-2xl border border-[#1f2536] bg-[#131722] p-10 text-center text-[#7b8499]">Đang tải…</div>
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-2xl border border-[#2a221c] bg-[#181410]"
+              style={{ animationDelay: `${i * 120}ms` }}
+            />
+          ))}
+        </div>
       ) : data ? (
         <>
           {data.alerts.length > 0 ? (
-            <section className="overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/10 to-amber-500/5 p-4">
-              <div className="mb-2 flex items-center gap-2 text-rose-300">
+            <section
+              className="overflow-hidden rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(210,107,107,0.35)",
+                background:
+                  "linear-gradient(135deg, rgba(210,107,107,0.12) 0%, rgba(224,184,85,0.05) 100%)",
+              }}
+            >
+              <div className="mb-2 flex items-center gap-2" style={{ color: "#D26B6B" }}>
                 <AlertTriangle className="h-4 w-4" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider">Cần xử lý ngay</span>
               </div>
               <ul className="space-y-1.5">
                 {data.alerts.map((a) => (
-                  <li key={a.id} className="flex items-start gap-2 text-sm text-rose-50">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                  <li key={a.id} className="flex items-start gap-2 text-sm text-[#f5ede4]">
+                    <span
+                      className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: "#D26B6B" }}
+                    />
                     <span>{a.text}</span>
                   </li>
                 ))}
@@ -243,7 +289,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             title="Đầu ngày"
             sub="6:00 – 8:00"
             Icon={Sunrise}
-            accent="amber"
+            accent="gold"
             isCurrent={slot === "morning"}
             cards={[
               {
@@ -292,7 +338,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             title="Trong ngày"
             sub="8:00 – 16:00"
             Icon={Sun}
-            accent="orange"
+            accent="terra"
             isCurrent={slot === "midday"}
             cards={[
               {
@@ -336,7 +382,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             title="Cuối ngày"
             sub="16:00 – 19:00"
             Icon={Sunset}
-            accent="indigo"
+            accent="green"
             isCurrent={slot === "evening"}
             cards={[
               {
@@ -361,26 +407,25 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             onHint={setHintKey}
           />
 
-          <section className="rounded-2xl border border-[#1f2536] bg-[#131722] p-4">
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#7b8499]">
+          <section className="rounded-2xl border border-[#2a221c] bg-[#181410] p-4">
+            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#9a8f80]">
               <Info className="h-3.5 w-3.5" />
               KPI giai đoạn
             </div>
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
               <div>
-                <div className="text-xs text-[#7b8499]">Giai đoạn</div>
-                <div className="text-sm font-medium text-white">{data.kpi.phaseLabel ?? "Chưa mở GĐ"}</div>
+                <div className="text-xs text-[#9a8f80]">Giai đoạn</div>
+                <div className="text-sm font-medium text-[#f5ede4]">{data.kpi.phaseLabel ?? "Chưa mở GĐ"}</div>
               </div>
               <div>
-                <div className="text-xs text-[#7b8499]">Tiến độ</div>
-                <div className="text-sm font-semibold text-white">{data.kpi.progressPercent}%</div>
+                <div className="text-xs text-[#9a8f80]">Tiến độ</div>
+                <div className="text-sm font-semibold text-[#f5ede4]">{data.kpi.progressPercent}%</div>
               </div>
               <div>
-                <div className="text-xs text-[#7b8499]">Công dôi/vượt</div>
+                <div className="text-xs text-[#9a8f80]">Công dôi/vượt</div>
                 <div
-                  className={`text-sm font-semibold ${
-                    data.kpi.laborDelta >= 0 ? "text-emerald-300" : "text-rose-300"
-                  }`}
+                  className="text-sm font-semibold"
+                  style={{ color: data.kpi.laborDelta >= 0 ? "#6FA677" : "#D26B6B" }}
                 >
                   {data.kpi.laborDelta >= 0 ? `+${data.kpi.laborDelta}` : data.kpi.laborDelta}
                 </div>
@@ -389,30 +434,35 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
           </section>
         </>
       ) : (
-        <div className="rounded-2xl border border-[#1f2536] bg-[#131722] p-10 text-center text-[#7b8499]">
+        <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-10 text-center text-[#9a8f80]">
           Chưa có dữ liệu.
         </div>
       )}
 
       {hintKey && SOP_HINTS[hintKey] ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 transition-opacity duration-200 sm:items-center ${
+            hintMounted ? "opacity-100" : "opacity-0"
+          }`}
           onClick={() => setHintKey(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-2xl border border-[#1f2536] bg-[#131722] p-5 shadow-2xl"
+            className={`w-full max-w-md overflow-hidden rounded-2xl border border-[#2a221c] bg-[#181410] p-5 shadow-2xl transition-all duration-200 ${
+              hintMounted ? "translate-y-0 scale-100" : "translate-y-4 scale-95"
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-orange-300">
+            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "#D27A52" }}>
               <HelpCircle className="h-3.5 w-3.5" />
               SOP 11 — gợi ý nhanh
             </div>
-            <div className="mb-1.5 text-lg font-semibold text-white">{SOP_HINTS[hintKey].title}</div>
-            <p className="text-[14px] leading-relaxed text-[#a0aec0]">{SOP_HINTS[hintKey].body}</p>
+            <div className="mb-1.5 text-lg font-semibold text-[#f5ede4]">{SOP_HINTS[hintKey].title}</div>
+            <p className="text-[14px] leading-relaxed text-[#d4c8b8]">{SOP_HINTS[hintKey].body}</p>
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => setHintKey(null)}
-                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-400"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110"
+                style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
               >
                 Đã hiểu
               </button>
@@ -436,24 +486,33 @@ type CardDef = {
   muted?: boolean;
 };
 
-const ACCENT_STYLES: Record<string, { ring: string; iconBg: string; iconText: string; chip: string }> = {
-  amber: {
-    ring: "border-amber-400/40 bg-gradient-to-br from-amber-500/8 to-transparent",
-    iconBg: "bg-amber-500/15",
-    iconText: "text-amber-300",
-    chip: "bg-amber-500/15 text-amber-300",
+const ACCENT_STYLES: Record<
+  string,
+  { borderColor: string; bgGrad: string; iconBg: string; iconColor: string; chipBg: string; chipColor: string }
+> = {
+  gold: {
+    borderColor: "rgba(224,184,85,0.4)",
+    bgGrad: "linear-gradient(135deg, rgba(224,184,85,0.08) 0%, transparent 60%), #181410",
+    iconBg: "rgba(224,184,85,0.15)",
+    iconColor: "#E0B855",
+    chipBg: "rgba(224,184,85,0.18)",
+    chipColor: "#E0B855",
   },
-  orange: {
-    ring: "border-orange-500/40 bg-gradient-to-br from-orange-500/8 to-transparent",
-    iconBg: "bg-orange-500/15",
-    iconText: "text-orange-300",
-    chip: "bg-orange-500/15 text-orange-300",
+  terra: {
+    borderColor: "rgba(210,122,82,0.4)",
+    bgGrad: "linear-gradient(135deg, rgba(210,122,82,0.08) 0%, transparent 60%), #181410",
+    iconBg: "rgba(210,122,82,0.15)",
+    iconColor: "#D27A52",
+    chipBg: "rgba(210,122,82,0.18)",
+    chipColor: "#D27A52",
   },
-  indigo: {
-    ring: "border-indigo-400/40 bg-gradient-to-br from-indigo-500/8 to-transparent",
-    iconBg: "bg-indigo-500/15",
-    iconText: "text-indigo-300",
-    chip: "bg-indigo-500/15 text-indigo-300",
+  green: {
+    borderColor: "rgba(111,166,119,0.4)",
+    bgGrad: "linear-gradient(135deg, rgba(111,166,119,0.08) 0%, transparent 60%), #181410",
+    iconBg: "rgba(111,166,119,0.15)",
+    iconColor: "#6FA677",
+    chipBg: "rgba(111,166,119,0.18)",
+    chipColor: "#6FA677",
   },
 };
 
@@ -471,7 +530,7 @@ function PhaseSection({
   title: string;
   sub: string;
   Icon: React.ComponentType<{ className?: string }>;
-  accent: "amber" | "orange" | "indigo";
+  accent: "gold" | "terra" | "green";
   isCurrent: boolean;
   cards: CardDef[];
   onHint: (key: string) => void;
@@ -487,79 +546,113 @@ function PhaseSection({
   return (
     <section
       data-slot={id}
-      className={`overflow-hidden rounded-2xl border transition-colors ${
-        isCurrent ? styles.ring : "border-[#1f2536] bg-[#131722]"
-      }`}
+      className="overflow-hidden rounded-2xl border transition-all duration-300"
+      style={{
+        borderColor: isCurrent ? styles.borderColor : "#2a221c",
+        background: isCurrent ? styles.bgGrad : "#181410",
+      }}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <span className={`grid h-10 w-10 place-items-center rounded-xl ${styles.iconBg} ${styles.iconText}`}>
+          <span
+            className="grid h-10 w-10 place-items-center rounded-xl transition-transform"
+            style={{ background: styles.iconBg, color: styles.iconColor }}
+          >
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[15px] font-semibold text-white">{title}</span>
+              <span className="text-[15px] font-semibold text-[#f5ede4]">{title}</span>
               {isCurrent ? (
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${styles.chip}`}>
-                  Đang
+                <span
+                  className="relative overflow-hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ background: styles.chipBg, color: styles.chipColor }}
+                >
+                  <span className="relative z-10">Đang</span>
+                  <span
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                      animation: "ks-shimmer 2.4s linear infinite",
+                    }}
+                  />
                 </span>
               ) : null}
             </div>
-            <div className="text-xs text-[#7b8499]">{sub}</div>
+            <div className="text-xs text-[#9a8f80]">{sub}</div>
           </div>
         </div>
-        <span className="text-[#7b8499]">
-          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        <span className="text-[#9a8f80] transition-transform duration-200" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>
+          <ChevronDown className="h-4 w-4" />
         </span>
       </button>
-      {open ? (
-        <div className="border-t border-[#1f2536] p-2 sm:p-3">
-          <div className="space-y-1.5">
-            {cards.map((c, i) => (
-              <ActionCard key={i} card={c} onHint={onHint} />
-            ))}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-[#2a221c] p-2 sm:p-3">
+            <div className="space-y-1.5">
+              {cards.map((c, i) => (
+                <ActionCard key={i} card={c} onHint={onHint} />
+              ))}
+            </div>
           </div>
         </div>
-      ) : null}
+      </div>
+      <style jsx>{`
+        @keyframes ks-shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
     </section>
   );
 }
 
 const TONE_BADGE: Record<Tone, string> = {
-  done: "text-emerald-300",
-  todo: "text-amber-300",
-  warn: "text-rose-300",
-  muted: "text-[#7b8499]",
+  done: "text-[#6FA677]",
+  todo: "text-[#E0B855]",
+  warn: "text-[#D26B6B]",
+  muted: "text-[#6e6457]",
 };
 
 function ActionCard({ card, onHint }: { card: CardDef; onHint: (key: string) => void }) {
   const Icon = card.Icon;
   return (
     <div
-      className={`group flex items-center gap-3 rounded-xl border border-[#1f2536] bg-[#0f1320] p-3 transition-colors ${
-        card.muted ? "opacity-60" : "hover:border-[#2a3147] hover:bg-[#121626]"
+      className={`group flex items-center gap-3 rounded-xl border border-[#2a221c] bg-[#120e0b] p-3 transition-all ${
+        card.muted
+          ? "opacity-60"
+          : "hover:-translate-y-px hover:border-[#3a2d22] hover:bg-[#1a1612] hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
       }`}
     >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#1f2536] bg-[#131722] text-[#a0aec0]">
-        <Icon className="h-4.5 w-4.5" />
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#2a221c] bg-[#181410] text-[#d4c8b8]">
+        <Icon className="h-[18px] w-[18px]" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium text-white">{card.title}</div>
+        <div className="truncate text-[14px] font-medium text-[#f5ede4]">{card.title}</div>
         <div className={`truncate text-xs ${TONE_BADGE[card.statusTone]}`}>{card.status}</div>
       </div>
       <button
         aria-label="Gợi ý SOP"
         onClick={() => onHint(card.sop)}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#1f2536] text-[#7b8499] transition-colors hover:bg-[#1a1f2e] hover:text-white"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#2a221c] text-[#9a8f80] transition-all hover:scale-105 hover:bg-[#221b15] hover:text-[#f5ede4]"
       >
         <HelpCircle className="h-4 w-4" />
       </button>
       <button
-        className="shrink-0 rounded-lg bg-orange-500 px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-orange-400"
+        className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"
+        style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
         onClick={() => alert(`[MVP] Mở "${card.title}" — sẽ nối route ở bước sau.`)}
       >
         {card.cta}
