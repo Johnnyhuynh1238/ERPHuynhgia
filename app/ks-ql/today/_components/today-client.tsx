@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -21,6 +21,7 @@ import {
   Truck,
   Zap,
 } from "lucide-react";
+import { PopupOrderMaterial } from "./popup-order-material";
 
 type Project = {
   id: string;
@@ -118,6 +119,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [hintKey, setHintKey] = useState<string | null>(null);
   const [hintMounted, setHintMounted] = useState(false);
+  const [showOrderPopup, setShowOrderPopup] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
@@ -132,6 +134,14 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
     }
     setHintMounted(false);
   }, [hintKey]);
+
+  const reloadTodayData = useCallback(() => {
+    if (!selectedProjectId) return;
+    fetch(`/api/ks-ql/today?projectId=${selectedProjectId}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setData(j))
+      .catch(() => {});
+  }, [selectedProjectId]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -295,24 +305,20 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 statusTone: "muted",
                 cta: "Đặt",
                 sop: "6.4",
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
-                  : undefined,
+                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
               {
                 Icon: Truck,
                 title: "Nhận VT/MM",
                 status:
                   data.morning.materialsIncoming === 0
-                    ? "Chưa có hàng về"
-                    : `${data.morning.materialsIncoming} món đang về`,
+                    ? "Chưa có hàng được duyệt cấp"
+                    : `${data.morning.materialsIncoming} món đã duyệt cấp`,
                 statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
                 cta: data.morning.materialsIncoming === 0 ? "Xem" : "Nhận",
                 sop: "6.5",
                 muted: data.morning.materialsIncoming === 0,
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
-                  : undefined,
+                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
             ]}
             onHint={setHintKey}
@@ -418,9 +424,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 statusTone: "muted",
                 cta: "Mở",
                 sop: "6.4",
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
-                  : undefined,
+                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
             ]}
             onHint={setHintKey}
@@ -457,6 +461,18 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
           Chưa có dữ liệu.
         </div>
       )}
+
+      {showOrderPopup && selectedProjectId && project ? (
+        <PopupOrderMaterial
+          projectId={selectedProjectId}
+          projectName={project.name}
+          currentUserId={user.id}
+          onClose={() => {
+            setShowOrderPopup(false);
+            reloadTodayData();
+          }}
+        />
+      ) : null}
 
       {hintKey && SOP_HINTS[hintKey] ? (
         <div
@@ -504,6 +520,7 @@ type CardDef = {
   sop: keyof typeof SOP_HINTS | string;
   muted?: boolean;
   href?: string;
+  onClick?: () => void;
 };
 
 const ACCENT_STYLES: Record<
@@ -702,7 +719,15 @@ function ActionCard({ card, onHint }: { card: CardDef; onHint: (key: string) => 
       >
         <HelpCircle className="h-4 w-4" />
       </button>
-      {card.href ? (
+      {card.onClick ? (
+        <button
+          className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"
+          style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
+          onClick={card.onClick}
+        >
+          {card.cta}
+        </button>
+      ) : card.href ? (
         <Link
           href={card.href}
           className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"

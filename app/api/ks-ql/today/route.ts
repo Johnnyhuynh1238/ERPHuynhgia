@@ -51,7 +51,9 @@ export async function GET(req: NextRequest) {
     prisma.materialProposal.count({
       where: {
         projectId,
-        orderStatus: { in: ["ordered"] },
+        ksId: user.id,
+        status: "accepted",
+        orderStatus: { notIn: ["received", "paid"] },
       },
     }),
     prisma.qcProgress.count({
