@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-
-const ACCOUNTANT_ROLES = new Set<string>([UserRole.accountant, UserRole.admin]);
+import { canViewProposal, isProposalStaffViewer } from "@/lib/proposal-access";
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -37,14 +35,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const isAccountantView = ACCOUNTANT_ROLES.has(user.role);
-  const isOwnKs = user.role === UserRole.engineer && proposal.ks.id === user.id;
-  if (!isAccountantView && !isOwnKs) {
+  if (!canViewProposal(user.role, proposal.ks.id, user.id)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+  const isStaffView = isProposalStaffViewer(user.role);
 
   return NextResponse.json({
     proposal,
-    viewMode: isAccountantView ? "accountant" : "ks",
+    viewMode: isStaffView ? "accountant" : "ks",
   });
 }

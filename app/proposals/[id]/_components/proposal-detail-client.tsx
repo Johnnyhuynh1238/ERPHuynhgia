@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ProposalComments } from "./proposal-comments";
 
 type ParsedItem = { ten: string; sl: number; dvt: string };
 
@@ -358,6 +359,8 @@ export function ProposalDetailClient({
           </div>
         )}
       </div>
+
+      <ProposalComments proposalId={proposal.id} currentUserId={currentUserId} />
 
       {isAccountantView && <AccountantChat proposalId={proposal.id} />}
     </div>

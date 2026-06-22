@@ -493,6 +493,7 @@ model User {
   workerDocsUploaded              WorkerDoc[]                 @relation("WorkerDocUploader")
   materialProposalsCreated        MaterialProposal[]          @relation("MatProposalKs")
   materialProposalsProcessed      MaterialProposal[]          @relation("MatProposalProcessor")
+  materialProposalCommentsAuthored MaterialProposalComment[]  @relation("MatProposalCommentAuthor")
   projectBudgetsCreated           ProjectBudget[]             @relation("ProjectBudgetCreator")
   projectBudgetsLocked            ProjectBudget[]             @relation("ProjectBudgetLocker")
   projectBudgetAmendmentsProposed ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentProposer")
@@ -2614,6 +2615,7 @@ model MaterialProposal {
   ks        User    @relation("MatProposalKs", fields: [ksId], references: [id])
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   processor User?   @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
+  comments  MaterialProposalComment[]
 
   @@index([projectId, status])
   @@index([ksId, createdAt(sort: Desc)])
@@ -2621,6 +2623,21 @@ model MaterialProposal {
   @@index([orderStatus])
   @@index([reminderDueAt])
   @@map("material_proposals")
+}
+
+model MaterialProposalComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  proposalId String   @map("proposal_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  authorRole String   @map("author_role")
+  body       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  proposal MaterialProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author   User             @relation("MatProposalCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([proposalId, createdAt])
+  @@map("material_proposal_comments")
 }
 
 model BaogiaLead {
