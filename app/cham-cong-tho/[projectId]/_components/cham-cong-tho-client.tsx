@@ -194,9 +194,16 @@ export function ChamCongThoClient({
       <header className="sticky top-0 z-10 border-b border-[#252840] bg-[#0f1118]/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <div>
-            <Link href="/reports" className="text-xs text-[#8892b0] hover:text-[#a78bfa]">
-              ← Nhiệm vụ hôm nay
-            </Link>
+            {(() => {
+              const backRaw = searchParams.get("back");
+              const backHref = backRaw && backRaw.startsWith("/") ? backRaw : "/reports";
+              const backLabel = backHref.startsWith("/ks-ql") ? "← Về App KS" : "← Nhiệm vụ hôm nay";
+              return (
+                <Link href={backHref} className="text-xs text-[#8892b0] hover:text-[#a78bfa]">
+                  {backLabel}
+                </Link>
+              );
+            })()}
             <h1 className="mt-1 text-lg font-bold">
               Chấm công thợ {SESSION_LABEL[session]}
             </h1>

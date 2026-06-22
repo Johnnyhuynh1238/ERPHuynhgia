@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { getWorkDateVn } from "@/lib/attendance";
 
 export const dynamic = "force-dynamic";
-
-function todayDate() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -28,17 +24,19 @@ export async function GET(req: NextRequest) {
   });
   if (!allowed) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
-  const today = todayDate();
+  const today = getWorkDateVn();
+  const hour = new Date().getUTCHours() + 7;
+  const currentSession = (hour % 24) < 13 ? "morning" : "afternoon";
 
   const [
-    attendanceTodayCount,
+    attendancePresentCount,
     workOrdersToday,
     materialPendingProcess,
     materialInTransit,
     qcPendingReview,
   ] = await Promise.all([
     prisma.workerAttendance.count({
-      where: { projectId, date: today },
+      where: { projectId, date: today, session: currentSession, present: true },
     }),
     prisma.workOrder.count({
       where: { projectId, date: today },
@@ -71,7 +69,7 @@ export async function GET(req: NextRequest) {
   const data = {
     alerts,
     morning: {
-      attendanceDone: attendanceTodayCount > 0,
+      attendanceDone: attendancePresentCount > 0,
       teamPhotoDone: false,
       materialsIncoming: materialInTransit,
       machinesWaiting: 0,
