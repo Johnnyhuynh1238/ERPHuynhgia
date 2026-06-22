@@ -70,7 +70,7 @@ type CreateTaskMode = "none" | "template" | "custom";
 
 type CustomTaskFormState = {
   name: string;
-  phase: TaskPhase;
+  phaseId: string;
   durationDays: string;
   offsetDays: string;
   team: string;
@@ -172,7 +172,7 @@ const TASK_CATEGORY_OPTIONS: Array<{ value: TaskCategory; label: string }> = [
 
 const DEFAULT_CUSTOM_TASK_FORM: CustomTaskFormState = {
   name: "",
-  phase: TaskPhase.P1_CHUAN_BI,
+  phaseId: "",
   durationDays: "1",
   offsetDays: "0",
   team: "",
@@ -588,7 +588,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     setTemplatePhaseCode("");
     setTemplateCategoryFilter("");
     setSelectedTemplateId("");
-    setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);
+    setCustomTaskForm({ ...DEFAULT_CUSTOM_TASK_FORM, phaseId: phases[0]?.id ?? "" });
   }
 
   function closeCreateTaskModal() {
@@ -692,6 +692,11 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
       return;
     }
 
+    if (!customTaskForm.phaseId) {
+      toast.error("Vui lòng chọn phase");
+      return;
+    }
+
     setCustomTaskSubmitting(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/tasks/custom`, {
@@ -699,7 +704,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          phase: customTaskForm.phase,
+          phaseId: customTaskForm.phaseId,
           durationDays,
           offsetDays,
           team: customTaskForm.team.trim() || undefined,
@@ -1340,7 +1345,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                       type="button"
                       onClick={() => {
                         setCreateTaskMode("custom");
-                        setCustomTaskForm(DEFAULT_CUSTOM_TASK_FORM);
+                        setCustomTaskForm({ ...DEFAULT_CUSTOM_TASK_FORM, phaseId: phases[0]?.id ?? "" });
                       }}
                       className="rounded-2xl border border-[#2d3249] bg-[#1a1d2e] p-4 text-left transition hover:border-amber-500/40"
                     >
@@ -1455,15 +1460,22 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
                         <label className="mb-1 block text-xs text-[#a4acc8]">Phase</label>
                         <select
                           className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                          value={customTaskForm.phase}
-                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, phase: e.target.value as TaskPhase }))}
-                          disabled={customTaskSubmitting}
+                          value={customTaskForm.phaseId}
+                          onChange={(e) => setCustomTaskForm((prev) => ({ ...prev, phaseId: e.target.value }))}
+                          disabled={customTaskSubmitting || phases.length === 0}
                         >
-                          {Object.entries(PHASE_LABEL).map(([phase, label]) => (
-                            <option key={phase} value={phase}>
-                              {label}
-                            </option>
-                          ))}
+                          {phases.length === 0 ? (
+                            <option value="">Dự án chưa có phase nào</option>
+                          ) : (
+                            <>
+                              <option value="">— Chọn phase —</option>
+                              {phases.map((phase) => (
+                                <option key={phase.id} value={phase.id}>
+                                  {phase.code} - {phase.name}
+                                </option>
+                              ))}
+                            </>
+                          )}
                         </select>
                       </div>
 
