@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ProposalComments } from "./proposal-comments";
 
 type ParsedItem = { ten: string; sl: number; dvt: string };
@@ -25,8 +25,6 @@ type Proposal = {
   project: { id: string; code: string; name: string };
   processor: { id: string; fullName: string } | null;
 };
-
-type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const STATUS_LABEL: Record<Proposal["status"], string> = {
   pending: "Chờ duyệt",
@@ -361,8 +359,6 @@ export function ProposalDetailClient({
       </div>
 
       <ProposalComments proposalId={proposal.id} currentUserId={currentUserId} />
-
-      {isAccountantView && <AccountantChat proposalId={proposal.id} />}
     </div>
   );
 }
@@ -396,112 +392,4 @@ function paymentLabel(method: string) {
   if (method === "transfer") return "Chuyển khoản";
   if (method === "debt") return "Ghi công nợ";
   return method;
-}
-
-function AccountantChat({ proposalId }: { proposalId: string }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  const callAi = useCallback(
-    async (history: ChatMessage[]) => {
-      setThinking(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/proposals/${proposalId}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.message || json.error || "Lỗi không xác định");
-        setMessages((prev) => [...prev, { role: "assistant", content: json.reply }]);
-      } catch (e: any) {
-        setError(e.message || "Không gọi được AI");
-      } finally {
-        setThinking(false);
-      }
-    },
-    [proposalId],
-  );
-
-  useEffect(() => {
-    if (messages.length === 0 && !thinking) callAi([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || thinking) return;
-    const next = [...messages, { role: "user" as const, content: text }];
-    setMessages(next);
-    setInput("");
-    await callAi(next);
-  };
-
-  return (
-    <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-      <div className="text-xs uppercase tracking-wide text-[#8892b0]">Trợ lý AI kế toán</div>
-      <div
-        ref={scrollRef}
-        className="mt-2 h-[320px] overflow-y-auto rounded-xl border border-[#2d3249] bg-[#13151f] p-3 space-y-2"
-      >
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
-                m.role === "user"
-                  ? "bg-[#fb923c] text-[#0b0d16]"
-                  : "bg-[#0b0d16] border border-[#2d3249] text-[#f0f2ff]"
-              }`}
-            >
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {thinking && (
-          <div className="flex justify-start">
-            <div className="rounded-2xl border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#8892b0]">
-              AI đang trả lời…
-            </div>
-          </div>
-        )}
-      </div>
-      {error && (
-        <div className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          {error}
-        </div>
-      )}
-      <div className="mt-2 flex gap-2">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          rows={2}
-          placeholder='Ví dụ: "Soạn tin nhắn gửi NCC cát đá"'
-          disabled={thinking}
-          className="flex-1 resize-none rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff] placeholder:text-[#5a627a] focus:outline-none focus:ring-1 focus:ring-[#fb923c] disabled:opacity-60"
-        />
-        <button
-          onClick={send}
-          disabled={!input.trim() || thinking}
-          className="rounded-xl border border-[#2d3249] bg-[#13151f] px-4 py-2 text-sm font-medium text-[#f0f2ff] hover:bg-[#1f2436] disabled:opacity-50"
-        >
-          Gửi
-        </button>
-      </div>
-    </div>
-  );
 }

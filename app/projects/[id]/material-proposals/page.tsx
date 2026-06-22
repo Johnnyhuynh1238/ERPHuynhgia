@@ -3,7 +3,7 @@ import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { prisma } from "@/lib/prisma";
-import { ProposalChat } from "./_components/proposal-chat";
+import { ProposalCreateForm } from "./_components/proposal-create-form";
 import { ProposalsClient } from "@/app/proposals/_components/proposals-client";
 
 export default async function ProjectMaterialProposalsPage({
@@ -33,12 +33,12 @@ export default async function ProjectMaterialProposalsPage({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <h2 className="text-lg font-bold text-[#f0f2ff]">Đề xuất vật tư</h2>
+        <h2 className="text-lg font-bold text-[#f0f2ff]">Đề xuất vật tư / máy</h2>
         <p className="mt-1 text-xs text-[#8892b0]">
-          Chat với AI để đề xuất vật tư cho công trình. AI sẽ đọc lại để xác nhận, bấm CHỐT để gửi kế toán.
+          Mô tả ngắn vật tư hoặc máy cần. KT sẽ lên đơn hàng chuẩn và trao đổi với KS · TPTC ở phần bình luận của mỗi đề xuất.
         </p>
       </div>
-      <ProposalChat projectId={project.id} projectName={project.name} />
+      <ProposalCreateForm projectId={project.id} projectName={project.name} />
       <ProposalsClient currentRole={user.role} projectId={project.id} />
     </div>
   );
