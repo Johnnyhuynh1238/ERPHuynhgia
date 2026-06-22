@@ -19,7 +19,6 @@ import {
   Sunrise,
   Sunset,
   Truck,
-  Wrench,
   Zap,
 } from "lucide-react";
 
@@ -300,6 +299,21 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
               },
+              {
+                Icon: Truck,
+                title: "Nhận VT/MM",
+                status:
+                  data.morning.materialsIncoming === 0
+                    ? "Chưa có hàng về"
+                    : `${data.morning.materialsIncoming} món đang về`,
+                statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
+                cta: data.morning.materialsIncoming === 0 ? "Xem" : "Nhận",
+                sop: "6.5",
+                muted: data.morning.materialsIncoming === 0,
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
+                  : undefined,
+              },
             ]}
             onHint={setHintKey}
           />
@@ -331,27 +345,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 cta: "Chụp",
                 sop: "6.1",
               },
-              {
-                Icon: Truck,
-                title: "VT đến hôm nay",
-                status:
-                  data.morning.materialsIncoming === 0
-                    ? "Chưa có"
-                    : `${data.morning.materialsIncoming} món chờ nhận`,
-                statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
-                cta: "Nhận",
-                sop: "6.5",
-                muted: data.morning.materialsIncoming === 0,
-              },
-              {
-                Icon: Wrench,
-                title: "Máy chờ kiểm",
-                status: data.morning.machinesWaiting === 0 ? "Không có" : `${data.morning.machinesWaiting} cái`,
-                statusTone: data.morning.machinesWaiting === 0 ? "muted" : "warn",
-                cta: "Xem",
-                sop: "6.6",
-                muted: data.morning.machinesWaiting === 0,
-              },
             ]}
             onHint={setHintKey}
           />
@@ -375,18 +368,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 cta: "Mở",
                 sop: "6.3",
                 muted: data.midday.qcHoldPoints === 0,
-              },
-              {
-                Icon: Package,
-                title: "VT về cần nhận",
-                status:
-                  data.midday.materialReceiveToday === 0
-                    ? "Chưa có"
-                    : `${data.midday.materialReceiveToday} phiếu`,
-                statusTone: data.midday.materialReceiveToday === 0 ? "muted" : "warn",
-                cta: "Nhận",
-                sop: "6.5",
-                muted: data.midday.materialReceiveToday === 0,
               },
               {
                 Icon: Flag,
@@ -428,6 +409,17 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 muted: data.evening.workOrdersToday === 0,
                 href: selectedProjectId
                   ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
+                  : undefined,
+              },
+              {
+                Icon: Package,
+                title: "Kiểm VT/MM cho ngày mai",
+                status: "Xem đã đặt đủ cho việc mai chưa",
+                statusTone: "muted",
+                cta: "Mở",
+                sop: "6.4",
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/material-proposals?back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
               },
             ]}
