@@ -726,92 +726,32 @@ export async function GET() {
   }
 
   if (user.role === UserRole.accountant) {
-    const monthStart = startOfMonthUtc(today);
-    const monthEnd = endOfMonthUtc(today);
     const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
-
-    const [upcoming, late, collectedMonthAgg, expectedMonthAgg, approvedSubPayments] = await Promise.all([
-      prisma.paymentSchedule.findMany({
+    const [payrollReady, subApproved, materialReceivedUnpaid, materialPending, workersMissingInfo] = await Promise.all([
+      prisma.weeklyPayroll.count({ where: { status: "ready_to_pay", project: projectAccess } }),
+      prisma.subPayment.count({ where: { status: "approved", subContract: { project: projectAccess } } }),
+      prisma.materialProposal.count({ where: { orderStatus: "received", project: projectAccess } }),
+      prisma.materialProposal.count({ where: { status: "pending", project: projectAccess } }),
+      prisma.worker.count({
         where: {
-          status: PaymentStatus.not_collected,
-          expectedDate: { gte: today, lte: in7Days },
-          project: projectAccess,
-        },
-        include: { project: { select: { id: true, code: true, name: true } } },
-        orderBy: { expectedDate: "asc" },
-      }),
-      prisma.paymentSchedule.findMany({
-        where: {
-          OR: [{ status: PaymentStatus.not_collected }, { status: PaymentStatus.customer_late }],
-          expectedDate: { lt: today },
-          project: projectAccess,
-        },
-        include: { project: { select: { id: true, code: true, name: true } } },
-        orderBy: { expectedDate: "asc" },
-      }),
-      prisma.paymentSchedule.aggregate({
-        _sum: { actualPaidAmount: true },
-        where: {
-          status: PaymentStatus.collected,
-          actualPaidDate: { gte: monthStart, lte: monthEnd },
-          project: projectAccess,
-        },
-      }),
-      prisma.paymentSchedule.aggregate({
-        _sum: { amount: true },
-        where: {
-          expectedDate: { gte: monthStart, lte: monthEnd },
-          project: projectAccess,
-        },
-      }),
-      prisma.subPayment.count({
-        where: {
-          status: "approved",
-          subContract: { project: projectAccess },
+          workerStatus: "active",
+          OR: [{ cccd: null }, { cccd: "" }, { bankAccount: null }, { bankAccount: "" }],
         },
       }),
     ]);
 
-    const collectedMonth = Number(collectedMonthAgg._sum.actualPaidAmount || 0);
-    const expectedMonth = Number(expectedMonthAgg._sum.amount || 0);
-
     return NextResponse.json({
       role: user.role,
-      cards: [
-        {
-          key: "accountant_due7",
-          label: "Đợt thu 7 ngày tới",
-          value: upcoming.length,
-          tone: upcoming.length ? "warn" : "good",
-        },
-        {
-          key: "accountant_late",
-          label: "Đợt thanh toán trễ",
-          value: late.length,
-          tone: late.length ? "danger" : "good",
-        },
-        {
-          key: "accountant_collected_month",
-          label: "Đã thu tháng này",
-          value: Math.round(collectedMonth),
-          tone: "good",
-        },
-        {
-          key: "accountant_expected_month",
-          label: "Dự kiến thu tháng này",
-          value: Math.round(expectedMonth),
-          tone: "info",
-        },
-        {
-          key: "accountant_sub_approved_pending_payout",
-          label: "Chi thầu phụ đã duyệt chờ payout",
-          value: approvedSubPayments,
-          tone: approvedSubPayments > 0 ? "warn" : "good",
-        },
-      ],
+      cards: [],
       accountant: {
-        upcomingPayments: upcoming.map((payment) => ({ ...payment, amount: Number(payment.amount) })),
-        latePayments: late.map((payment) => ({ ...payment, amount: Number(payment.amount) })),
+        expensePayment: {
+          total: payrollReady + subApproved + materialReceivedUnpaid,
+          payroll: payrollReady,
+          subPayment: subApproved,
+          materialReceived: materialReceivedUnpaid,
+        },
+        newWorker: { missingInfo: workersMissingInfo },
+        proposalPending: materialPending,
       },
     });
   }

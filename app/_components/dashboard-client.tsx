@@ -6,14 +6,18 @@ import {
   Bell,
   Briefcase,
   CalendarClock,
-  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
   Clock3,
   DollarSign,
   FolderKanban,
   Hammer,
   ListTodo,
+  Receipt,
   ShieldAlert,
+  ShoppingCart,
   TrendingUp,
+  UserPlus,
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,16 +38,6 @@ type TaskLite = {
   assignedEngineer?: { id: string; fullName: string | null } | null;
   reportGroup?: "overdue" | "running" | "starting";
   morningDecision?: "WORK" | "PAUSE" | null;
-};
-
-type PaymentLite = {
-  id: string;
-  phaseNumber: number;
-  milestoneDescription: string;
-  expectedDate: string;
-  amount: number;
-  status: "not_collected" | "request_sent" | "collected" | "customer_late";
-  project: { id: string; code: string; name: string };
 };
 
 type ProjectLite = { id: string; code: string; name: string; createdAt: string };
@@ -127,8 +121,14 @@ type DashboardData = {
     materialsCount: number;
   };
   accountant?: {
-    upcomingPayments: PaymentLite[];
-    latePayments: PaymentLite[];
+    expensePayment: {
+      total: number;
+      payroll: number;
+      subPayment: number;
+      materialReceived: number;
+    };
+    newWorker: { missingInfo: number };
+    proposalPending: number;
   };
 };
 
@@ -152,10 +152,6 @@ function fmtDate(dateIso: string) {
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const yyyy = d.getUTCFullYear();
   return `${dd}/${mm}/${yyyy}`;
-}
-
-function fmtMoney(value: number) {
-  return `${Math.round(value).toLocaleString("vi-VN")} đ`;
 }
 
 function rankClass(rank: string) {
@@ -291,10 +287,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     engineer_kpi_month: <TrendingUp className="h-4 w-4" />,
     foreman_week: <CalendarClock className="h-4 w-4" />,
     foreman_materials: <Wrench className="h-4 w-4" />,
-    accountant_due7: <Bell className="h-4 w-4" />,
-    accountant_late: <AlertTriangle className="h-4 w-4" />,
-    accountant_collected_month: <CheckCircle2 className="h-4 w-4" />,
-    accountant_expected_month: <TrendingUp className="h-4 w-4" />,
   };
 
   const cardAnchorMap: Record<string, string> = {
@@ -650,53 +642,115 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         </div>
       ) : null}
 
-      {data.role === "accountant" ? (
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lịch thanh toán sắp đến</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.accountant?.upcomingPayments?.length ? (
-                <div className="space-y-2">
-                  {data.accountant.upcomingPayments.map((payment) => (
-                    <Link key={payment.id} href={`/projects/${payment.project.id}/payments`} className="block rounded-xl border border-[#2d3249] bg-[#171a27] p-2 hover:bg-[#22263a]">
-                      <div className="text-sm font-medium">{payment.project.code} - Đợt {payment.phaseNumber}</div>
-                      <div className="text-xs text-[#8892b0]">
-                        {fmtDate(payment.expectedDate)} • {fmtMoney(payment.amount)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Không có đợt thanh toán sắp đến." href="/projects" action="Xem dự án" />
-              )}
-            </CardContent>
-          </Card>
+      {data.role === "accountant" && data.accountant ? <AccountantActions data={data.accountant} /> : null}
+    </div>
+  );
+}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Đợt thanh toán trễ</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.accountant?.latePayments?.length ? (
-                <div className="space-y-2">
-                  {data.accountant.latePayments.map((payment) => (
-                    <Link key={payment.id} href={`/projects/${payment.project.id}/payments`} className="block rounded-xl border border-red-500/40 bg-red-500/10 p-2">
-                      <div className="text-sm font-medium">{payment.project.code} - Đợt {payment.phaseNumber}</div>
-                      <div className="text-xs text-red-300">
-                        Quá hạn {fmtDate(payment.expectedDate)} • {fmtMoney(payment.amount)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Không có đợt thanh toán trễ." href="/projects" action="Xem dự án" />
-              )}
-            </CardContent>
-          </Card>
+function CountBadge({ value, tone }: { value: number; tone: "warn" | "muted" }) {
+  const cls =
+    tone === "warn"
+      ? "bg-amber-100 text-amber-700"
+      : "bg-slate-100 text-slate-600";
+  return (
+    <span className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${cls}`}>
+      {value}
+    </span>
+  );
+}
+
+function ExpenseSubLink({ href, label, value }: { href: string; label: string; value: number }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50"
+    >
+      <span className="text-sm text-slate-700">{label}</span>
+      <span className="flex items-center gap-2">
+        <CountBadge value={value} tone={value > 0 ? "warn" : "muted"} />
+        <ChevronRight className="h-4 w-4 text-slate-400" />
+      </span>
+    </Link>
+  );
+}
+
+function ActionCard({
+  href,
+  icon,
+  title,
+  subtitle,
+  badge,
+  className,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  badge?: { value: number; tone: "warn" | "muted" };
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50 ${className ?? ""}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700">{icon}</div>
+        <div>
+          <div className="text-sm font-semibold text-slate-900">{title}</div>
+          {subtitle ? <div className="text-xs text-slate-500">{subtitle}</div> : null}
         </div>
-      ) : null}
+      </div>
+      <div className="flex items-center gap-2">
+        {badge ? <CountBadge value={badge.value} tone={badge.tone} /> : null}
+        <ChevronRight className="h-5 w-5 text-slate-400" />
+      </div>
+    </Link>
+  );
+}
+
+function AccountantActions({ data }: { data: NonNullable<DashboardData["accountant"]> }) {
+  const expense = data.expensePayment;
+  return (
+    <div className="grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-slate-700" />
+            <span>Thanh toán chi phí công trình</span>
+            <CountBadge value={expense.total} tone={expense.total > 0 ? "warn" : "muted"} />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <ExpenseSubLink href="/projects" label="Lương tuần chờ chi" value={expense.payroll} />
+          <ExpenseSubLink href="/sub-payments" label="Nhà thầu phụ chờ payout" value={expense.subPayment} />
+          <ExpenseSubLink href="/proposals" label="Vật tư đã nhận chờ thanh toán" value={expense.materialReceived} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ActionCard
+          href="/proposals"
+          icon={<ShoppingCart className="h-5 w-5" />}
+          title="Yêu cầu mua hàng từ KS"
+          subtitle="Duyệt đề nghị vật tư"
+          badge={{ value: data.proposalPending, tone: data.proposalPending > 0 ? "warn" : "muted" }}
+        />
+        <ActionCard
+          href="/admin/workers"
+          icon={<UserPlus className="h-5 w-5" />}
+          title="Nhập thông tin thợ"
+          subtitle="Thợ thiếu CCCD/STK"
+          badge={{ value: data.newWorker.missingInfo, tone: data.newWorker.missingInfo > 0 ? "warn" : "muted" }}
+        />
+        <ActionCard
+          href="/admin/attendance"
+          icon={<ClipboardList className="h-5 w-5" />}
+          title="Chấm công nhân viên"
+          subtitle="KS / KT / quản lý"
+          className="sm:col-span-2"
+        />
+      </div>
     </div>
   );
 }
