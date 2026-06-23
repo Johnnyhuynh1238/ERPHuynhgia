@@ -225,15 +225,16 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
       ) : null}
 
       {project ? (
-        <section
-          className="overflow-hidden rounded-2xl border border-[#2a221c] p-4"
+        <Link
+          href={`/ks-ql/project/${project.id}`}
+          className="group block overflow-hidden rounded-2xl border border-[#2a221c] p-4 transition-all hover:-translate-y-px hover:border-[#E0B855]/40 hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
           style={{
             background:
               "linear-gradient(135deg, #1f1812 0%, #181410 50%, #120e0b 100%)",
           }}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span
                   className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
@@ -252,9 +253,13 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
               {project.address ? (
                 <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{project.address}</div>
               ) : null}
+              <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#E0B855] opacity-80 transition-opacity group-hover:opacity-100">
+                <span>Mở chi tiết dự án</span>
+                <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+              </div>
             </div>
           </div>
-        </section>
+        </Link>
       ) : null}
 
       {loading ? (
@@ -476,13 +481,13 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
 
       {hintKey && SOP_HINTS[hintKey] ? (
         <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 transition-opacity duration-200 sm:items-center ${
+          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] transition-opacity duration-200 sm:items-center sm:pb-4 ${
             hintMounted ? "opacity-100" : "opacity-0"
           }`}
           onClick={() => setHintKey(null)}
         >
           <div
-            className={`w-full max-w-md overflow-hidden rounded-2xl border border-[#2a221c] bg-[#181410] p-5 shadow-2xl transition-all duration-200 ${
+            className={`max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#2a221c] bg-[#181410] p-5 shadow-2xl transition-all duration-200 ${
               hintMounted ? "translate-y-0 scale-100" : "translate-y-4 scale-95"
             }`}
             onClick={(e) => e.stopPropagation()}

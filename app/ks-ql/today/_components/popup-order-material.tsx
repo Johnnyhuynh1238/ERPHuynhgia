@@ -139,13 +139,13 @@ export function PopupOrderMaterial({ projectId, projectName, currentUserId, onCl
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 transition-opacity duration-200 sm:items-center sm:p-4 ${
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 pb-[env(safe-area-inset-bottom)] transition-opacity duration-200 sm:items-center sm:p-4 sm:pb-4 ${
         mounted ? "opacity-100" : "opacity-0"
       }`}
       onClick={onClose}
     >
       <div
-        className={`flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[#2a221c] bg-[#0d0b09] shadow-2xl transition-all duration-200 sm:rounded-2xl ${
+        className={`flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[#2a221c] bg-[#0d0b09] shadow-2xl transition-all duration-200 sm:rounded-2xl ${
           mounted ? "translate-y-0 scale-100" : "translate-y-6 scale-95"
         }`}
         onClick={(e) => e.stopPropagation()}
