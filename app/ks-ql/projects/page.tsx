@@ -48,7 +48,7 @@ export default async function KsQlProjectsPage() {
             return (
               <Link
                 key={p.id}
-                href={`/ks-ql/today?p=${p.id}`}
+                href={`/ks-ql/project/${p.id}`}
                 className="group block overflow-hidden rounded-2xl border border-[#2a221c] bg-[#181410] p-4 transition-all hover:-translate-y-px hover:border-[#E0B855]/40 hover:bg-[#1f1812] hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
               >
                 <div className="flex items-start justify-between gap-3">
