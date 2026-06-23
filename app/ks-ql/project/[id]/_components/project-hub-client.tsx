@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Banknote,
@@ -17,6 +18,7 @@ import {
   Sun,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 
 type Phase = {
@@ -86,8 +88,67 @@ function phaseMarker(p: Phase): { icon: string; color: string } {
   return { icon: "○", color: "#5a4f42" };
 }
 
+const DONE_STATUSES = new Set(["done", "completed", "inspected", "internal_approved"]);
+
+function taskStatusOrder(s: string): number {
+  if (s === "in_progress") return 0;
+  if (s === "delayed") return 1;
+  if (DONE_STATUSES.has(s)) return 99;
+  return 50;
+}
+
+function taskStatusBadge(s: string): { label: string; bg: string; color: string } {
+  if (s === "in_progress")
+    return { label: "Đang làm", bg: "rgba(224,184,85,0.18)", color: "#E0B855" };
+  if (s === "delayed")
+    return { label: "Trễ", bg: "rgba(210,107,107,0.18)", color: "#D26B6B" };
+  if (DONE_STATUSES.has(s))
+    return { label: "Xong", bg: "rgba(111,166,119,0.18)", color: "#6FA677" };
+  return { label: "Chưa làm", bg: "rgba(154,143,128,0.18)", color: "#9a8f80" };
+}
+
 export function ProjectHubClient({ project, phases, currentRole }: Props) {
   const sb = statusBadge(project.status);
+  const [selectedPhase, setSelectedPhase] = useState<Phase | null>(null);
+  const [phasePopupMounted, setPhasePopupMounted] = useState(false);
+
+  const phaseByCode = useMemo(
+    () => new Map(phases.map((p) => [p.code, p])),
+    [phases],
+  );
+
+  useEffect(() => {
+    if (!selectedPhase) {
+      setPhasePopupMounted(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setPhasePopupMounted(true));
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      cancelAnimationFrame(id);
+      document.body.style.overflow = orig;
+    };
+  }, [selectedPhase]);
+
+  useEffect(() => {
+    if (!selectedPhase) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedPhase(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedPhase]);
+
+  const sortedPhaseTasks = useMemo(() => {
+    if (!selectedPhase) return [];
+    return [...selectedPhase.tasks].sort((a, b) => {
+      const oa = taskStatusOrder(a.status);
+      const ob = taskStatusOrder(b.status);
+      if (oa !== ob) return oa - ob;
+      return a.code.localeCompare(b.code);
+    });
+  }, [selectedPhase]);
 
   const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
   const doneTasks = phases.reduce(
@@ -223,10 +284,11 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
               const prog = phaseProgress(p);
               const mark = phaseMarker(p);
               return (
-                <Link
+                <button
                   key={p.id}
-                  href={`/projects/${project.id}/tasks#${p.code}`}
-                  className="group block rounded-xl border border-[#2a221c] bg-[#0d0b09] p-3 transition-colors hover:border-[#E0B855]/40"
+                  type="button"
+                  onClick={() => setSelectedPhase(p)}
+                  className="group block w-full rounded-xl border border-[#2a221c] bg-[#0d0b09] p-3 text-left transition-colors hover:border-[#E0B855]/40"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -277,7 +339,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                       />
                     </div>
                   ) : null}
-                </Link>
+                </button>
               );
             })}
           </div>
@@ -286,10 +348,14 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
         {(inProgressTasks.length > 0 || delayedTasks.length > 0) && (
           <div className="mt-3 space-y-1.5 border-t border-[#2a221c] pt-3">
             {delayedTasks.slice(0, 3).map((t) => (
-              <Link
+              <button
                 key={t.id}
-                href={`/projects/${project.id}/tasks`}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] transition-colors hover:bg-[#0d0b09]"
+                type="button"
+                onClick={() => {
+                  const ph = phaseByCode.get(t.phaseCode);
+                  if (ph) setSelectedPhase(ph);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[#0d0b09]"
               >
                 <span
                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
@@ -300,13 +366,17 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                 <span className="text-[10px] text-[#5a4f42]">{t.code}</span>
                 <span className="min-w-0 flex-1 truncate text-[#d4c8b8]">{t.name}</span>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#5a4f42]" />
-              </Link>
+              </button>
             ))}
             {inProgressTasks.slice(0, 3).map((t) => (
-              <Link
+              <button
                 key={t.id}
-                href={`/projects/${project.id}/tasks`}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] transition-colors hover:bg-[#0d0b09]"
+                type="button"
+                onClick={() => {
+                  const ph = phaseByCode.get(t.phaseCode);
+                  if (ph) setSelectedPhase(ph);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[#0d0b09]"
               >
                 <span
                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
@@ -317,7 +387,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                 <span className="text-[10px] text-[#5a4f42]">{t.code}</span>
                 <span className="min-w-0 flex-1 truncate text-[#d4c8b8]">{t.name}</span>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#5a4f42]" />
-              </Link>
+              </button>
             ))}
           </div>
         )}
@@ -343,6 +413,87 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
           ))}
         </div>
       </section>
+
+      {selectedPhase ? (
+        <div
+          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 pb-[env(safe-area-inset-bottom)] transition-opacity duration-200 sm:items-center sm:p-4 sm:pb-4 ${
+            phasePopupMounted ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setSelectedPhase(null)}
+        >
+          <div
+            className={`flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[#2a221c] bg-[#0d0b09] shadow-2xl transition-all duration-200 sm:rounded-2xl ${
+              phasePopupMounted ? "translate-y-0 scale-100" : "translate-y-6 scale-95"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[#2a221c] px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wider text-[#D27A52]">
+                  Giai đoạn {selectedPhase.code}
+                </div>
+                <div className="truncate text-[15px] font-semibold text-[#f5ede4]">
+                  {selectedPhase.name}
+                </div>
+                <div className="mt-0.5 text-[11px] text-[#9a8f80]">
+                  {fmtDate(selectedPhase.plannedStartDate)} → {fmtDate(selectedPhase.plannedEndDate)}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPhase(null)}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f5ede4]"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {sortedPhaseTasks.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#2a221c] px-3 py-6 text-center text-xs text-[#9a8f80]">
+                  Chưa có công tác nào trong giai đoạn này.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedPhaseTasks.map((t) => {
+                    const tb = taskStatusBadge(t.status);
+                    return (
+                      <Link
+                        key={t.id}
+                        href={`/tasks/${t.id}`}
+                        className="block rounded-xl border border-[#2a221c] bg-[#181410] p-3 transition-colors hover:border-[#E0B855]/40"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                                style={{ background: tb.bg, color: tb.color }}
+                              >
+                                {tb.label}
+                              </span>
+                              <span className="text-[10px] text-[#5a4f42]">{t.code}</span>
+                            </div>
+                            <div className="mt-1 text-sm font-medium leading-snug text-[#f5ede4]">
+                              {t.name}
+                            </div>
+                            {t.plannedEndDate ? (
+                              <div className="mt-0.5 text-[11px] text-[#9a8f80]">
+                                Hạn: {fmtDate(t.plannedEndDate)}
+                              </div>
+                            ) : null}
+                          </div>
+                          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[#5a4f42]" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
