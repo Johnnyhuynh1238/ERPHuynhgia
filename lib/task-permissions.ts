@@ -104,6 +104,11 @@ export async function getTaskWithAccess(taskId: string, user: UserCtx) {
     return { task, allowed: true };
   }
 
+  // KS (engineer) là project member đã được xem mọi task của dự án; edit/QC/status vẫn gate riêng.
+  if (user.role === UserRole.engineer) {
+    return { task, allowed: true };
+  }
+
   return { task, allowed: isAssigned };
 }
 
