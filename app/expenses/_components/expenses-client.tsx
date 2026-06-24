@@ -169,6 +169,10 @@ export function ExpensesClient({
   async function decodeQrFile(file: File) {
     setDecoding(true);
     try {
+      if (!file.type.startsWith("image/")) {
+        toast.error("File không phải ảnh. Chọn JPG/PNG nhé");
+        return;
+      }
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => resolve(String(r.result));
@@ -178,25 +182,42 @@ export function ExpensesClient({
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const im = new Image();
         im.onload = () => resolve(im);
-        im.onerror = () => reject(new Error("Không đọc được ảnh"));
+        im.onerror = () => reject(new Error("Không decode được ảnh — có thể format HEIC, chuyển JPG nhé"));
         im.src = dataUrl;
       });
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Không tạo được canvas");
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
       const jsQR = (await import("jsqr")).default;
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (!code || !code.data) {
-        toast.error("Không đọc được QR. Thử ảnh rõ hơn nhé");
+
+      const tryAt = (targetW: number): string | null => {
+        const scale = Math.min(1, targetW / img.naturalWidth);
+        const w = Math.max(64, Math.round(img.naturalWidth * scale));
+        const h = Math.max(64, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h);
+        const code = jsQR(data.data, data.width, data.height, { inversionAttempts: "attemptBoth" });
+        return code?.data || null;
+      };
+
+      // Thử nhiều scale: ảnh chụp 4K thường fail ở native, nhưng pass khi downscale
+      const targets = [1280, 800, 1920, 2400, img.naturalWidth];
+      let raw: string | null = null;
+      for (const t of targets) {
+        raw = tryAt(t);
+        if (raw) break;
+      }
+
+      if (!raw) {
+        toast.error(`Không đọc được QR (${img.naturalWidth}x${img.naturalHeight}). Thử ảnh cận hơn hoặc screenshot nhé`);
         return;
       }
-      const parsed = parseVietQrString(code.data);
+      const parsed = parseVietQrString(raw);
       if (!parsed) {
-        toast.error("QR không phải chuẩn VietQR. Nhập tay STK nhé");
+        toast.error("QR đọc được nhưng không phải chuẩn VietQR. Nhập tay STK nhé");
         return;
       }
       const bank = findBankByBin(parsed.bankBin);
@@ -209,7 +230,7 @@ export function ExpensesClient({
       toast.success(`Đã đọc QR: ${bank?.shortName ?? parsed.bankBin} · ${parsed.accountNumber}`);
     } catch (err) {
       console.error(err);
-      toast.error("Lỗi đọc QR");
+      toast.error(err instanceof Error ? err.message : "Lỗi đọc QR");
     } finally {
       setDecoding(false);
       if (qrInputRef.current) qrInputRef.current.value = "";
