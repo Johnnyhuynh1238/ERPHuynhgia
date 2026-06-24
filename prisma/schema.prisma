@@ -380,6 +380,25 @@ enum DailyAssignmentStatus {
   not_applicable
 }
 
+enum CashTxnDirection {
+  in
+  out
+}
+
+enum CashTxnRefType {
+  opening
+  expense
+  sub_payment
+  material_proposal
+  payment_schedule
+}
+
+enum ExpenseStatus {
+  pending
+  paid
+  cancelled
+}
+
 model User {
   id                 String   @id @default(uuid()) @db.Uuid
   email              String   @unique
@@ -498,6 +517,11 @@ model User {
   projectBudgetsLocked            ProjectBudget[]             @relation("ProjectBudgetLocker")
   projectBudgetAmendmentsProposed ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentProposer")
   projectBudgetAmendmentsApproved ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentApprover")
+  companyCashOpeningSet           CompanyCash[]               @relation("CompanyCashOpeningSetter")
+  expensesCreated                 Expense[]                   @relation("ExpenseCreator")
+  expensesPaid                    Expense[]                   @relation("ExpensePayer")
+  expensesCancelled               Expense[]                   @relation("ExpenseCanceller")
+  cashTransactionsCreated         CashTransaction[]           @relation("CashTransactionCreator")
 
   @@map("users")
 }
@@ -650,6 +674,8 @@ model Project {
   workerQcIssues            WorkerQcIssue[]
   weeklyPayrolls            WeeklyPayroll[]
   weeklyPayrollAdjustments  WeeklyPayrollAdjustment[]
+  expenses                  Expense[]
+  cashTransactions          CashTransaction[]
 
   @@index([status])
   @@map("projects")
@@ -2603,6 +2629,7 @@ model MaterialProposal {
   processedNote String?                @map("processed_note") @db.Text
   paymentMethod String?                @map("payment_method")
   paymentNote   String?                @map("payment_note") @db.Text
+  paidAmount    Decimal?               @map("paid_amount") @db.Decimal(18, 2)
   createdAt     DateTime               @default(now()) @map("created_at")
   acceptedAt    DateTime?              @map("accepted_at")
   orderedAt     DateTime?              @map("ordered_at")
@@ -3215,4 +3242,104 @@ model WeeklyPayrollAdjustment {
   @@index([projectId, workerId])
   @@index([appliedPayrollId])
   @@map("weekly_payroll_adjustments")
+}
+
+/// Singleton: 1 dòng duy nhất giữ số dư tiền tổng của công ty.
+/// Mọi giao dịch thu/chi sẽ update currentBalance trong transaction.
+model CompanyCash {
+  id             String    @id @default(uuid()) @db.Uuid
+  openingBalance Decimal   @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  openingDate    DateTime? @map("opening_date") @db.Date
+  openingNote    String?   @map("opening_note") @db.Text
+  openingSetBy   String?   @map("opening_set_by") @db.Uuid
+  openingSetAt   DateTime? @map("opening_set_at")
+  currentBalance Decimal   @default(0) @map("current_balance") @db.Decimal(18, 2)
+  lastTxnAt      DateTime? @map("last_txn_at")
+  initialized    Boolean   @default(false)
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  openingSetter User? @relation("CompanyCashOpeningSetter", fields: [openingSetBy], references: [id], onDelete: SetNull)
+
+  @@map("company_cash")
+}
+
+/// Danh mục chi (admin quản lý). Vật tư / Máy móc / Văn phòng …
+model ExpenseCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  expenses         Expense[]
+  cashTransactions CashTransaction[]
+
+  @@index([active, sortOrder])
+  @@map("expense_categories")
+}
+
+/// Lệnh chi do admin tạo trực tiếp, không qua workflow KS đề xuất.
+/// pending → KT đánh dấu đã chi → paid (đồng thời tạo CashTransaction).
+model Expense {
+  id              String        @id @default(uuid()) @db.Uuid
+  code            String        @unique
+  projectId       String?       @map("project_id") @db.Uuid
+  categoryId      String        @map("category_id") @db.Uuid
+  amount          Decimal       @db.Decimal(18, 2)
+  payee           String?
+  paymentMethod   String?       @map("payment_method")
+  note            String?       @db.Text
+  attachmentUrl   String?       @map("attachment_url")
+  status          ExpenseStatus @default(pending)
+  createdBy       String        @map("created_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at")
+  paidBy          String?       @map("paid_by") @db.Uuid
+  paidAt          DateTime?     @map("paid_at")
+  paidAmount      Decimal?      @map("paid_amount") @db.Decimal(18, 2)
+  paidNote        String?       @map("paid_note") @db.Text
+  paidReceiptUrl  String?       @map("paid_receipt_url")
+  cancelledBy     String?       @map("cancelled_by") @db.Uuid
+  cancelledAt     DateTime?     @map("cancelled_at")
+  cancelledReason String?       @map("cancelled_reason") @db.Text
+
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category  ExpenseCategory @relation(fields: [categoryId], references: [id])
+  creator   User            @relation("ExpenseCreator", fields: [createdBy], references: [id])
+  payer     User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
+  canceller User?           @relation("ExpenseCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([categoryId, createdAt(sort: Desc)])
+  @@map("expenses")
+}
+
+/// Nhật ký mọi giao dịch thu/chi.
+/// balanceAfter lưu sẵn để query nhanh + audit (không tính lại từ tổng).
+model CashTransaction {
+  id           String           @id @default(uuid()) @db.Uuid
+  direction    CashTxnDirection
+  amount       Decimal          @db.Decimal(18, 2)
+  occurredAt   DateTime         @map("occurred_at")
+  balanceAfter Decimal          @map("balance_after") @db.Decimal(18, 2)
+  refType      CashTxnRefType   @map("ref_type")
+  refId        String?          @map("ref_id") @db.Uuid
+  projectId    String?          @map("project_id") @db.Uuid
+  categoryId   String?          @map("category_id") @db.Uuid
+  note         String?          @db.Text
+  createdBy    String           @map("created_by") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  project  Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  creator  User             @relation("CashTransactionCreator", fields: [createdBy], references: [id])
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([refType, refId])
+  @@index([projectId, occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("cash_transactions")
 }

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { canMarkPaidSubPayment, getPaidProgressWarning, normalizeSubPaymentDate } from "@/lib/sub-payment-utils";
 import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
+import { recordCashTxn } from "@/lib/treasury";
 
 const schema = z.object({
   actualAmount: z.number().positive().optional(),
@@ -87,23 +88,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }, { status: 400 });
   }
 
-  const updated = await prisma.subPayment.update({
-    where: { id: row.id },
-    data: {
-      status: SubPaymentStatus.paid,
-      actualAmount: new Prisma.Decimal(amount),
-      actualPaidDate: paidDate,
-      receiptUrl: payload.receiptUrl.trim(),
-      paidBy: user.id,
-      paidAt: new Date(),
-      payNote: payload.note ? `[${payload.paymentMethod}] ${payload.note}` : `[${payload.paymentMethod}]`,
-    },
-    include: {
-      linkedTask: { select: { id: true, code: true, name: true, status: true } },
-      requester: { select: { id: true, fullName: true } },
-      approver: { select: { id: true, fullName: true } },
-      payer: { select: { id: true, fullName: true } },
-    },
+  const receiptUrl = payload.receiptUrl.trim();
+  const { updated } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.subPayment.update({
+      where: { id: row.id },
+      data: {
+        status: SubPaymentStatus.paid,
+        actualAmount: new Prisma.Decimal(amount),
+        actualPaidDate: paidDate,
+        receiptUrl,
+        paidBy: user.id,
+        paidAt: new Date(),
+        payNote: payload.note ? `[${payload.paymentMethod}] ${payload.note}` : `[${payload.paymentMethod}]`,
+      },
+      include: {
+        linkedTask: { select: { id: true, code: true, name: true, status: true } },
+        requester: { select: { id: true, fullName: true } },
+        approver: { select: { id: true, fullName: true } },
+        payer: { select: { id: true, fullName: true } },
+      },
+    });
+
+    await recordCashTxn(tx, {
+      direction: "out",
+      amount,
+      occurredAt: paidDate,
+      refType: "sub_payment",
+      refId: row.id,
+      projectId: row.subContract.projectId,
+      categoryId: null,
+      note: `TT thầu phụ ${row.code} (HĐ ${row.subContract.code}) [${payload.paymentMethod}]${payload.note ? ` — ${payload.note}` : ""}`,
+      createdBy: user.id,
+    });
+
+    return { updated };
   });
 
   await logProjectActivity(prisma, {

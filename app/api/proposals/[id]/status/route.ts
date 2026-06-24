@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { notifyMaterialProposalUpdate } from "@/lib/notify-material-proposal";
+import { recordCashTxn } from "@/lib/treasury";
 
 const REMINDER_DELAY_MS = 5 * 60 * 1000;
 
@@ -16,6 +17,7 @@ const bodySchema = z.discriminatedUnion("action", [
     action: z.literal("mark_paid"),
     paymentMethod: z.enum(["cash", "transfer", "debt"]),
     paymentNote: z.string().trim().max(500).optional(),
+    paidAmount: z.coerce.number().positive("Số tiền đã chi phải lớn hơn 0"),
   }),
 ]);
 
@@ -159,14 +161,38 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
     return NextResponse.json({ ok: true });
   } else if (action === "mark_paid") {
-    updateData = {
-      orderStatus: "paid",
-      paidAt: now,
-      paymentMethod: parsed.data.paymentMethod,
-      paymentNote: parsed.data.paymentNote || null,
-    };
+    const paidAmount = parsed.data.paidAmount;
+    const paymentMethod = parsed.data.paymentMethod;
+    const paymentNote = parsed.data.paymentNote || null;
+    const isDebt = paymentMethod === "debt";
+
+    await prisma.$transaction(async (tx) => {
+      await tx.materialProposal.update({
+        where: { id: proposal.id },
+        data: {
+          orderStatus: "paid",
+          paidAt: now,
+          paymentMethod,
+          paymentNote,
+          paidAmount: new Prisma.Decimal(paidAmount),
+        },
+      });
+      // Công nợ (debt) chưa xuất quỹ thực → không ghi cash_txn
+      if (!isDebt) {
+        await recordCashTxn(tx, {
+          direction: "out",
+          amount: paidAmount,
+          occurredAt: now,
+          refType: "material_proposal",
+          refId: proposal.id,
+          projectId: proposal.projectId,
+          categoryId: null,
+          note: `Chi vật tư đề xuất "${proposal.description.slice(0, 80)}" [${paymentMethod}]${paymentNote ? ` — ${paymentNote}` : ""}`,
+          createdBy: user.id,
+        });
+      }
+    });
     // Không push KS (theo yêu cầu)
-    await prisma.materialProposal.update({ where: { id: proposal.id }, data: updateData });
     return NextResponse.json({ ok: true });
   }
 

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
+import { recordCashTxn } from "@/lib/treasury";
 
 const markPaidSchema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày thu không hợp lệ"),
@@ -45,18 +46,32 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const payload = parsed.data;
   const paidAt = atUtcDate(payload.paidAt);
-  const updated = await prisma.paymentSchedule.update({
-    where: { id: params.id },
-    data: {
-      status: PaymentStatus.paid,
-      paidAt,
-      paidAmount: payload.paidAmount,
-      receiptUrl: payload.receiptUrl,
-      paymentNote: payload.paymentNote || null,
-      actualPaidDate: paidAt,
-      actualPaidAmount: payload.paidAmount,
-      notes: payload.paymentNote || null,
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const upd = await tx.paymentSchedule.update({
+      where: { id: params.id },
+      data: {
+        status: PaymentStatus.paid,
+        paidAt,
+        paidAmount: payload.paidAmount,
+        receiptUrl: payload.receiptUrl,
+        paymentNote: payload.paymentNote || null,
+        actualPaidDate: paidAt,
+        actualPaidAmount: payload.paidAmount,
+        notes: payload.paymentNote || null,
+      },
+    });
+    await recordCashTxn(tx, {
+      direction: "in",
+      amount: payload.paidAmount,
+      occurredAt: paidAt,
+      refType: "payment_schedule",
+      refId: upd.id,
+      projectId: upd.projectId,
+      categoryId: null,
+      note: `Thu đợt TT #${upd.installmentNo} "${upd.description}"${payload.paymentNote ? ` — ${payload.paymentNote}` : ""}`,
+      createdBy: user.id,
+    });
+    return upd;
   });
 
   await logProjectActivity(prisma, {

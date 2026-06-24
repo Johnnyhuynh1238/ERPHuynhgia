@@ -80,6 +80,7 @@ export function ProposalDetailClient({
   const [showPayModal, setShowPayModal] = useState(false);
   const [payMethod, setPayMethod] = useState<"cash" | "transfer" | "debt">("cash");
   const [payNote, setPayNote] = useState("");
+  const [payAmount, setPayAmount] = useState("");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -302,6 +303,16 @@ export function ProposalDetailClient({
 
         {showPayModal && (
           <div className="mt-3 space-y-2 rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
+            <div className="text-xs uppercase tracking-wide text-[#8892b0]">Số tiền đã chi (₫)</div>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder="VD: 5500000"
+              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+            />
             <div className="text-xs uppercase tracking-wide text-[#8892b0]">Phương thức thanh toán</div>
             <div className="flex flex-wrap gap-2">
               {(["cash", "transfer", "debt"] as const).map((m) => (
@@ -325,6 +336,11 @@ export function ProposalDetailClient({
                 </label>
               ))}
             </div>
+            <p className="text-[11px] text-[#5a627a]">
+              {payMethod === "debt"
+                ? "Công nợ: chưa xuất quỹ, không ghi nhật ký quỹ."
+                : "Sau khi xác nhận sẽ tự động ghi vào sổ quỹ (giảm số dư công ty)."}
+            </p>
             <textarea
               value={payNote}
               onChange={(e) => setPayNote(e.target.value)}
@@ -334,13 +350,19 @@ export function ProposalDetailClient({
             />
             <div className="flex gap-2">
               <button
-                onClick={() =>
+                onClick={() => {
+                  const amt = Number(payAmount);
+                  if (!Number.isFinite(amt) || amt <= 0) {
+                    setActionError("Nhập số tiền > 0");
+                    return;
+                  }
                   doAction({
                     action: "mark_paid",
+                    paidAmount: amt,
                     paymentMethod: payMethod,
                     paymentNote: payNote.trim() || undefined,
-                  })
-                }
+                  });
+                }}
                 disabled={actionBusy}
                 className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-[#0b0d16] disabled:opacity-50"
               >

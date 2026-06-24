@@ -19,6 +19,7 @@ import {
   Target,
   User,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Thầu phụ", href: "/subcontractors" },
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
     { label: "Chi thầu phụ", href: "/sub-payments" },
+    { label: "Lệnh chi", href: "/expenses" },
+    { label: "Sổ quỹ", href: "/treasury" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
@@ -92,6 +95,8 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
     { label: "Chi thầu phụ", href: "/sub-payments" },
     { label: "Thanh toán", href: "/payments" },
+    { label: "Lệnh chi", href: "/expenses" },
+    { label: "Sổ quỹ", href: "/treasury" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Chấm công NV", href: "/admin/attendance" },
     { label: "Bảng công thợ", href: "/admin/worker-attendance" },
@@ -151,6 +156,7 @@ function navIcon(href: string, label: string) {
   if (href.includes("kpi")) return Target;
   if (href.includes("users")) return Users;
   if (href.includes("templates")) return Settings;
+  if (href.includes("treasury") || href.includes("expenses")) return Wallet;
   if (href.includes("payments")) return Receipt;
   if (href.includes("subcontractors")) return Users;
   if (label.toLowerCase().includes("kpi")) return Target;
