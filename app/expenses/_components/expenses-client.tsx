@@ -1022,27 +1022,6 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
       })
     : null;
 
-  function openBankApp() {
-    if (!bank?.deepLink) {
-      toast.info("App ngân hàng này chưa hỗ trợ mở thẳng. Bấm Lưu ảnh QR rồi quét trong app.");
-      return;
-    }
-    // Most VN banking apps just need their custom scheme to open — they don't accept full QR payload
-    // in URL params universally. We just try to open the app; user then taps QR scanner or paste STK.
-    const fallbackTimer = window.setTimeout(() => {
-      toast.info(
-        `App ${bank.shortName} có thể chưa cài. Bấm Lưu ảnh QR rồi quét trong app banking của anh.`,
-        { duration: 6000 },
-      );
-    }, 1500);
-    const onHide = () => {
-      window.clearTimeout(fallbackTimer);
-      document.removeEventListener("visibilitychange", onHide);
-    };
-    document.addEventListener("visibilitychange", onHide);
-    window.location.href = bank.deepLink;
-  }
-
   async function saveQrImage() {
     if (!qrUrl) return;
     try {
@@ -1060,10 +1039,9 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
     }
   }
 
-  function copyAccount() {
-    if (!expense.payeeAccountNumber) return;
-    navigator.clipboard?.writeText(expense.payeeAccountNumber);
-    toast.success("Đã copy số TK");
+  function copy(text: string, label: string) {
+    navigator.clipboard?.writeText(text);
+    toast.success(`Đã copy ${label}`);
   }
 
   return (
@@ -1083,7 +1061,7 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
         {qrUrl && (
           <div className="flex justify-center rounded-lg bg-white p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrUrl} alt="VietQR" className="h-56 w-56 object-contain" />
+            <img src={qrUrl} alt="VietQR" className="h-72 w-72 object-contain" />
           </div>
         )}
 
@@ -1092,50 +1070,60 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
             <span className="text-[#8b95b7]">Ngân hàng</span>
             <span className="font-semibold text-[#f0f2ff]">{bank?.shortName ?? "—"}</span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => copy(expense.payeeAccountNumber!, "số TK")}
+            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#13151f]/60 px-1 py-0.5"
+            title="Bấm để copy"
+          >
             <span className="text-[#8b95b7]">Số TK</span>
-            <button
-              onClick={copyAccount}
-              className="font-mono text-[#f0f2ff] hover:text-emerald-300"
-              title="Bấm để copy"
-            >
-              {expense.payeeAccountNumber} ⧉
-            </button>
-          </div>
+            <span className="font-mono text-[#f0f2ff]">{expense.payeeAccountNumber} ⧉</span>
+          </button>
           {expense.payeeAccountName && (
-            <div className="flex justify-between gap-2">
+            <div className="flex justify-between gap-2 px-1">
               <span className="text-[#8b95b7]">Chủ TK</span>
               <span className="font-semibold uppercase text-[#f0f2ff]">{expense.payeeAccountName}</span>
             </div>
           )}
-          <div className="flex justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => copy(String(Math.round(expense.amount)), "số tiền")}
+            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#13151f]/60 px-1 py-0.5"
+            title="Bấm để copy"
+          >
             <span className="text-[#8b95b7]">Số tiền</span>
-            <span className="font-bold text-orange-300">{money(expense.amount)}</span>
-          </div>
-          <div className="flex justify-between gap-2">
+            <span className="font-bold text-orange-300">{money(expense.amount)} ⧉</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => copy(memo, "nội dung")}
+            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#13151f]/60 px-1 py-0.5"
+            title="Bấm để copy"
+          >
             <span className="text-[#8b95b7]">Nội dung</span>
-            <span className="font-mono text-[#f0f2ff]">{memo}</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={openBankApp}
-            disabled={!bank?.deepLink}
-            className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
-          >
-            {bank?.deepLink ? `📱 Mở app ${bank.shortName}` : "App NH này không hỗ trợ mở thẳng"}
-          </button>
-          <button
-            onClick={saveQrImage}
-            className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm font-semibold text-[#cfd4e8]"
-          >
-            💾 Lưu ảnh QR (quét từ thư viện trong app NH)
+            <span className="font-mono text-[#f0f2ff]">{memo} ⧉</span>
           </button>
         </div>
 
-        <div className="text-[11px] text-[#8b95b7]">
-          Sau khi chuyển xong → đóng popup này → bấm <b className="text-emerald-300">“Đã chi”</b> để ghi sổ quỹ.
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-100">
+          <div className="font-semibold mb-1">Cách dùng:</div>
+          <ol className="list-decimal pl-4 space-y-0.5">
+            <li>Mở app <b>{bank?.shortName ?? "ngân hàng"}</b> trên điện thoại</li>
+            <li>Bấm biểu tượng <b>Quét QR</b> trong app (thường ở trang chủ)</li>
+            <li>Quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi chọn “Quét từ thư viện”)</li>
+            <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
+          </ol>
+        </div>
+
+        <button
+          onClick={saveQrImage}
+          className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16]"
+        >
+          💾 Lưu ảnh QR vào thư viện
+        </button>
+
+        <div className="text-[11px] text-[#8b95b7] text-center">
+          Chuyển xong → đóng popup → bấm <b className="text-emerald-300">“Đã chi”</b> để ghi sổ.
         </div>
       </div>
     </div>
