@@ -38,6 +38,9 @@ const createSchema = z.object({
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
   priority: z.enum(["normal", "urgent"]).optional(),
+  payeeBankBin: z.string().trim().max(20).optional().nullable(),
+  payeeAccountNumber: z.string().trim().max(40).optional().nullable(),
+  payeeAccountName: z.string().trim().max(200).optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -124,6 +127,9 @@ export async function POST(request: Request) {
       status: ExpenseStatus.pending,
       priority,
       nextReminderAt: nextReminderForPriority(priority),
+      payeeBankBin: data.payeeBankBin?.trim() || null,
+      payeeAccountNumber: data.payeeAccountNumber?.trim() || null,
+      payeeAccountName: data.payeeAccountName?.trim() || null,
       createdBy: user.id,
     },
     include: {

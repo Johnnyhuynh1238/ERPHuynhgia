@@ -3313,6 +3313,10 @@ model Expense {
   cancelledReason String?         @map("cancelled_reason") @db.Text
   priority        ExpensePriority @default(normal)
   nextReminderAt  DateTime?       @map("next_reminder_at")
+  payeeBankBin       String?  @map("payee_bank_bin")        @db.VarChar(20)
+  payeeAccountNumber String?  @map("payee_account_number")  @db.VarChar(40)
+  payeeAccountName   String?  @map("payee_account_name")    @db.VarChar(200)
+  payeeQrUrl         String?  @map("payee_qr_url")
 
   project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   category  ExpenseCategory @relation(fields: [categoryId], references: [id])

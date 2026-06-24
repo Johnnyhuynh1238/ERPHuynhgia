@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { VN_BANKS, findBankByBin } from "@/lib/vn-banks";
+import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
@@ -25,6 +27,10 @@ type Expense = {
   paidReceiptUrl: string | null;
   cancelledAt: string | null;
   cancelledReason: string | null;
+  payeeBankBin: string | null;
+  payeeAccountNumber: string | null;
+  payeeAccountName: string | null;
+  payeeQrUrl: string | null;
   project: ProjectOption | null;
   category: CategoryOption;
   creator: { id: string; fullName: string };
@@ -54,6 +60,9 @@ type CreateForm = {
   priority: "normal" | "urgent";
   note: string;
   attachmentUrl: string;
+  payeeBankBin: string;
+  payeeAccountNumber: string;
+  payeeAccountName: string;
 };
 
 const emptyCreate: CreateForm = {
@@ -65,6 +74,9 @@ const emptyCreate: CreateForm = {
   priority: "normal",
   note: "",
   attachmentUrl: "",
+  payeeBankBin: "",
+  payeeAccountNumber: "",
+  payeeAccountName: "",
 };
 
 export function ExpensesClient({
@@ -95,6 +107,10 @@ export function ExpensesClient({
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
+  const [decoding, setDecoding] = useState(false);
+  const qrInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [transferFor, setTransferFor] = useState<Expense | null>(null);
 
   const [openPay, setOpenPay] = useState<Expense | null>(null);
   const [paying, setPaying] = useState(false);
@@ -150,6 +166,56 @@ export function ExpensesClient({
     return balance - amt;
   }, [form.amount, balance]);
 
+  async function decodeQrFile(file: File) {
+    setDecoding(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result));
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error("Không đọc được ảnh"));
+        im.src = dataUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Không tạo được canvas");
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const jsQR = (await import("jsqr")).default;
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (!code || !code.data) {
+        toast.error("Không đọc được QR. Thử ảnh rõ hơn nhé");
+        return;
+      }
+      const parsed = parseVietQrString(code.data);
+      if (!parsed) {
+        toast.error("QR không phải chuẩn VietQR. Nhập tay STK nhé");
+        return;
+      }
+      const bank = findBankByBin(parsed.bankBin);
+      setForm((f) => ({
+        ...f,
+        payeeBankBin: parsed.bankBin,
+        payeeAccountNumber: parsed.accountNumber,
+        amount: parsed.amount && parsed.amount > 0 ? String(parsed.amount) : f.amount,
+      }));
+      toast.success(`Đã đọc QR: ${bank?.shortName ?? parsed.bankBin} · ${parsed.accountNumber}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi đọc QR");
+    } finally {
+      setDecoding(false);
+      if (qrInputRef.current) qrInputRef.current.value = "";
+    }
+  }
+
   async function submitCreate(e: FormEvent) {
     e.preventDefault();
     if (!form.categoryId) {
@@ -159,6 +225,10 @@ export function ExpensesClient({
     const amt = Number(form.amount);
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error("Nhập số tiền > 0");
+      return;
+    }
+    if ((form.payeeBankBin && !form.payeeAccountNumber.trim()) || (!form.payeeBankBin && form.payeeAccountNumber.trim())) {
+      toast.error("Chọn ngân hàng và nhập STK hoặc bỏ trống cả 2");
       return;
     }
     setCreating(true);
@@ -174,6 +244,9 @@ export function ExpensesClient({
         priority: form.priority,
         note: form.note.trim() || null,
         attachmentUrl: form.attachmentUrl.trim() || null,
+        payeeBankBin: form.payeeBankBin || null,
+        payeeAccountNumber: form.payeeAccountNumber.trim() || null,
+        payeeAccountName: form.payeeAccountName.trim() || null,
       }),
     });
     const j = await res.json().catch(() => ({}));
@@ -456,6 +529,76 @@ export function ExpensesClient({
             </label>
           </div>
 
+          {/* Bank info for KT to "Chuyển khoản" */}
+          <div className="rounded-lg border border-[#2d3249] bg-[#0b0d16] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-[#cfd4e8]">Tài khoản nhận (để KT bấm “Chuyển khoản”)</div>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={qrInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) decodeQrFile(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => qrInputRef.current?.click()}
+                  disabled={decoding}
+                  className="rounded-lg border border-[#f97316]/40 bg-[#f97316]/10 px-2 py-1 text-[11px] font-semibold text-[#fb923c] disabled:opacity-50"
+                  title="Tải ảnh QR để tự động điền"
+                >
+                  {decoding ? "Đang đọc QR…" : "📷 Tải ảnh QR"}
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <label className="block">
+                <span className="text-[11px] text-[#8b95b7]">Ngân hàng</span>
+                <select
+                  value={form.payeeBankBin}
+                  onChange={(e) => setForm({ ...form, payeeBankBin: e.target.value })}
+                  className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                >
+                  <option value="">— Chọn ngân hàng —</option>
+                  {VN_BANKS.map((b) => (
+                    <option key={b.bin} value={b.bin}>
+                      {b.shortName} ({b.name})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-[#8b95b7]">Số tài khoản</span>
+                <input
+                  value={form.payeeAccountNumber}
+                  onChange={(e) =>
+                    setForm({ ...form, payeeAccountNumber: e.target.value.replace(/[^0-9A-Za-z]/g, "") })
+                  }
+                  placeholder="VD: 0123456789"
+                  className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-[#8b95b7]">Tên chủ TK</span>
+                <input
+                  value={form.payeeAccountName}
+                  onChange={(e) => setForm({ ...form, payeeAccountName: e.target.value })}
+                  placeholder="Hiện trên QR (tuỳ chọn)"
+                  className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                />
+              </label>
+            </div>
+            {form.payeeBankBin && form.payeeAccountNumber && (
+              <div className="text-[11px] text-emerald-300">
+                ✓ KT sẽ thấy nút “Chuyển khoản” mở thẳng app ngân hàng
+              </div>
+            )}
+          </div>
+
           {/* Priority toggle */}
           <div>
             <div className="text-xs text-[#8b95b7] mb-1">Độ khẩn</div>
@@ -601,7 +744,25 @@ export function ExpensesClient({
                   </div>
                 )}
 
+                {r.payeeBankBin && r.payeeAccountNumber && (
+                  <div className="rounded-lg bg-[#0b0d16] px-2 py-1.5 text-[11px] text-[#cfd4e8]">
+                    <span className="text-[#8b95b7]">TK:</span>{" "}
+                    <span className="font-semibold">{findBankByBin(r.payeeBankBin)?.shortName ?? r.payeeBankBin}</span>
+                    {" · "}
+                    <span className="font-mono">{r.payeeAccountNumber}</span>
+                    {r.payeeAccountName && <span className="text-[#8b95b7]"> · {r.payeeAccountName}</span>}
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-1 pt-1">
+                  {r.status === "pending" && r.payeeBankBin && r.payeeAccountNumber && (
+                    <button
+                      onClick={() => setTransferFor(r)}
+                      className="rounded bg-orange-500/25 text-orange-200 px-2 py-1 text-xs font-semibold"
+                    >
+                      💸 Chuyển khoản
+                    </button>
+                  )}
                   {r.status === "pending" && canMarkPaid && (
                     <button
                       onClick={() => openPayDialog(r)}
@@ -819,6 +980,143 @@ export function ExpensesClient({
           </div>
         </div>
       )}
+
+      {transferFor && (
+        <TransferModal expense={transferFor} onClose={() => setTransferFor(null)} />
+      )}
+    </div>
+  );
+}
+
+function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+  const bank = findBankByBin(expense.payeeBankBin);
+  const memo = expense.code;
+  const qrUrl = expense.payeeBankBin && expense.payeeAccountNumber
+    ? buildVietQrImageUrl({
+        bankBin: expense.payeeBankBin,
+        accountNumber: expense.payeeAccountNumber,
+        amount: expense.amount,
+        addInfo: memo,
+        accountName: expense.payeeAccountName ?? undefined,
+      })
+    : null;
+
+  function openBankApp() {
+    if (!bank?.deepLink) {
+      toast.info("App ngân hàng này chưa hỗ trợ mở thẳng. Bấm Lưu ảnh QR rồi quét trong app.");
+      return;
+    }
+    // Most VN banking apps just need their custom scheme to open — they don't accept full QR payload
+    // in URL params universally. We just try to open the app; user then taps QR scanner or paste STK.
+    const fallbackTimer = window.setTimeout(() => {
+      toast.info(
+        `App ${bank.shortName} có thể chưa cài. Bấm Lưu ảnh QR rồi quét trong app banking của anh.`,
+        { duration: 6000 },
+      );
+    }, 1500);
+    const onHide = () => {
+      window.clearTimeout(fallbackTimer);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.location.href = bank.deepLink;
+  }
+
+  async function saveQrImage() {
+    if (!qrUrl) return;
+    try {
+      const res = await fetch(qrUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${expense.code}-QR.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Đã lưu ảnh QR. Mở app NH → Quét từ thư viện.");
+    } catch {
+      window.open(qrUrl, "_blank");
+    }
+  }
+
+  function copyAccount() {
+    if (!expense.payeeAccountNumber) return;
+    navigator.clipboard?.writeText(expense.payeeAccountNumber);
+    toast.success("Đã copy số TK");
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-4 text-sm text-[#cfd4e8]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-base font-semibold text-orange-300">Chuyển khoản · {expense.code}</div>
+          <button onClick={onClose} className="text-[#8b95b7] hover:text-[#f0f2ff]">✕</button>
+        </div>
+
+        {qrUrl && (
+          <div className="flex justify-center rounded-lg bg-white p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrUrl} alt="VietQR" className="h-56 w-56 object-contain" />
+          </div>
+        )}
+
+        <div className="space-y-1 rounded-lg bg-[#0b0d16] p-3 text-xs">
+          <div className="flex justify-between gap-2">
+            <span className="text-[#8b95b7]">Ngân hàng</span>
+            <span className="font-semibold text-[#f0f2ff]">{bank?.shortName ?? "—"}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[#8b95b7]">Số TK</span>
+            <button
+              onClick={copyAccount}
+              className="font-mono text-[#f0f2ff] hover:text-emerald-300"
+              title="Bấm để copy"
+            >
+              {expense.payeeAccountNumber} ⧉
+            </button>
+          </div>
+          {expense.payeeAccountName && (
+            <div className="flex justify-between gap-2">
+              <span className="text-[#8b95b7]">Chủ TK</span>
+              <span className="font-semibold uppercase text-[#f0f2ff]">{expense.payeeAccountName}</span>
+            </div>
+          )}
+          <div className="flex justify-between gap-2">
+            <span className="text-[#8b95b7]">Số tiền</span>
+            <span className="font-bold text-orange-300">{money(expense.amount)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-[#8b95b7]">Nội dung</span>
+            <span className="font-mono text-[#f0f2ff]">{memo}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={openBankApp}
+            disabled={!bank?.deepLink}
+            className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
+          >
+            {bank?.deepLink ? `📱 Mở app ${bank.shortName}` : "App NH này không hỗ trợ mở thẳng"}
+          </button>
+          <button
+            onClick={saveQrImage}
+            className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm font-semibold text-[#cfd4e8]"
+          >
+            💾 Lưu ảnh QR (quét từ thư viện trong app NH)
+          </button>
+        </div>
+
+        <div className="text-[11px] text-[#8b95b7]">
+          Sau khi chuyển xong → đóng popup này → bấm <b className="text-emerald-300">“Đã chi”</b> để ghi sổ quỹ.
+        </div>
+      </div>
     </div>
   );
 }
