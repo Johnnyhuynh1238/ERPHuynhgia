@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { toast } from "sonner";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
+import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
@@ -38,7 +39,7 @@ type Expense = {
 };
 
 function money(v: number | null | undefined) {
-  return `${Math.round(v || 0).toLocaleString("vi-VN")} đ`;
+  return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
 }
 function fmtDate(s: string | null) {
   if (!s) return "—";
@@ -104,6 +105,7 @@ export function ExpensesClient({
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [pendingTotal, setPendingTotal] = useState<number>(0);
 
+  const [showTreasury, setShowTreasury] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
@@ -394,12 +396,18 @@ export function ExpensesClient({
     <div className="space-y-3">
       {/* Top bar: balance + actions */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2">
-        <div className="flex items-baseline gap-2">
+        <button
+          type="button"
+          onClick={() => setShowTreasury(true)}
+          className="flex items-baseline gap-2 rounded-lg px-1 -mx-1 text-left transition active:scale-[0.99]"
+          title="Bấm để xem chi tiết sổ quỹ"
+        >
           <span className="text-[11px] uppercase tracking-wide text-[#8892b0]">Số dư quỹ</span>
           <span className={`text-base font-bold ${balanceTone}`}>
             {balance == null ? "…" : money(balance)}
           </span>
-        </div>
+          <span className="text-[10px] text-[#8b95b7]">› chi tiết</span>
+        </button>
         {pendingCount > 0 && (
           <div className="text-[11px] text-amber-300">
             · Chờ chi: {pendingCount} lệnh ({money(pendingTotal)})
@@ -1075,6 +1083,32 @@ export function ExpensesClient({
             loadBalance();
           }}
         />
+      )}
+
+      {showTreasury && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 pt-4"
+          onClick={() => setShowTreasury(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-5xl rounded-xl border border-[#2d3249] bg-[#0b0d16] shadow-xl"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
+              <div className="text-base font-semibold text-orange-300">Sổ quỹ — chi tiết</div>
+              <button
+                onClick={() => setShowTreasury(false)}
+                className="rounded-lg px-2 py-1 text-[#8b95b7] hover:bg-[#0b0d16] hover:text-[#f0f2ff]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3">
+              <TreasuryClient projects={projects} categories={categories} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

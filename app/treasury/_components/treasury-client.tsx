@@ -35,7 +35,7 @@ type Txn = {
 };
 
 function money(v: number | null | undefined) {
-  return `${Math.round(v || 0).toLocaleString("vi-VN")} đ`;
+  return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
 }
 function fmtDate(s: string | null) {
   if (!s) return "—";
@@ -86,6 +86,9 @@ export function TreasuryClient({
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 50;
+  const [showFilters, setShowFilters] = useState(false);
+
+  const hasActiveFilter = !!(direction || refType || projectFilter || categoryFilter || from || to);
 
   const filterQs = useMemo(() => {
     const qs = new URLSearchParams();
@@ -175,8 +178,35 @@ export function TreasuryClient({
         )}
       </div>
 
-      {/* Filter */}
-      <div className="flex flex-wrap items-end gap-2">
+      {/* Filter toggle bar */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`rounded-lg border px-3 py-1.5 text-sm ${
+            showFilters || hasActiveFilter
+              ? "border-[#f97316] bg-[#f97316]/15 text-[#fb923c]"
+              : "border-[#2d3249] text-[#8b95b7]"
+          }`}
+        >
+          {showFilters ? "⏶ Ẩn lọc" : `⏷ Lọc${hasActiveFilter ? " (đang áp dụng)" : ""}`}
+        </button>
+        {hasActiveFilter && (
+          <button onClick={reset} className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-xs text-[#8b95b7]">
+            Reset
+          </button>
+        )}
+        <button
+          onClick={exportCsv}
+          className="ml-auto rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-sm"
+        >
+          Export CSV
+        </button>
+      </div>
+
+      {/* Filter (collapsible) */}
+      {showFilters && (
+      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-[#2d3249] bg-[#13151f] p-2">
         <select
           value={direction}
           onChange={(e) => {
@@ -265,13 +295,8 @@ export function TreasuryClient({
         >
           Reset
         </button>
-        <button
-          onClick={exportCsv}
-          className="ml-auto rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-sm"
-        >
-          Export CSV
-        </button>
       </div>
+      )}
 
       {/* Bảng nhật ký */}
       <div className="rounded-xl border border-[#2d3249] bg-[#13151f] overflow-x-auto">
