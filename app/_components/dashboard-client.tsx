@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 import {
   AlertTriangle,
   Bell,
@@ -730,6 +732,23 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
       : treasury.balance < 20_000_000
         ? "text-amber-600"
         : "text-emerald-600";
+  const balanceText = treasury.balance.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+  const balanceFontSize = balanceText.length > 14 ? "text-base" : balanceText.length > 10 ? "text-lg" : "text-xl";
+
+  const [showTreasury, setShowTreasury] = useState(false);
+  const [opts, setOpts] = useState<{
+    projects: { id: string; code: string; name: string }[];
+    categories: { id: string; code: string; name: string }[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!showTreasury || opts) return;
+    fetch("/api/treasury/options", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setOpts({ projects: j.projects || [], categories: j.categories || [] }))
+      .catch(() => setOpts({ projects: [], categories: [] }));
+  }, [showTreasury, opts]);
+
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -776,9 +795,10 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
           </div>
         </Link>
 
-        <Link
-          href="/treasury"
-          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
+        <button
+          type="button"
+          onClick={() => setShowTreasury(true)}
+          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.99] hover:bg-slate-50"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -787,13 +807,15 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
               </div>
               <div>
                 <div className="text-sm font-semibold text-slate-900">Sổ quỹ</div>
-                <div className="text-xs text-slate-500">Số dư hiện tại</div>
+                <div className="text-xs text-slate-500">Bấm để xem chi tiết</div>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-400" />
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className={`text-2xl font-bold ${balanceTone}`}>{fmtVndShort(treasury.balance)} đ</div>
+          <div className="flex items-baseline justify-between gap-2">
+            <div className={`font-bold ${balanceFontSize} ${balanceTone} whitespace-nowrap`}>
+              {balanceText} đ
+            </div>
             <div className="text-right text-xs">
               {treasury.initialized ? (
                 <div className="text-slate-500">tiền mặt + ngân hàng</div>
@@ -802,7 +824,7 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
               )}
             </div>
           </div>
-        </Link>
+        </button>
       </div>
 
       <Card>
@@ -843,6 +865,36 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
           className="sm:col-span-2"
         />
       </div>
+
+      {showTreasury && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 pt-4"
+          onClick={() => setShowTreasury(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-5xl rounded-xl bg-[#0b0d16] shadow-xl text-[#cfd4e8] border border-[#2d3249]"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
+              <div className="text-base font-semibold text-orange-300">Sổ quỹ — chi tiết</div>
+              <button
+                onClick={() => setShowTreasury(false)}
+                className="rounded-lg px-2 py-1 text-[#8b95b7] hover:bg-[#0b0d16] hover:text-[#f0f2ff]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3">
+              {opts ? (
+                <TreasuryClient projects={opts.projects} categories={opts.categories} />
+              ) : (
+                <div className="p-6 text-center text-sm text-[#8b95b7]">Đang tải sổ quỹ…</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
