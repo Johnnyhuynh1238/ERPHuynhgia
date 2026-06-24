@@ -108,7 +108,9 @@ export function ExpensesClient({
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
   const [decoding, setDecoding] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const qrInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const [transferFor, setTransferFor] = useState<Expense | null>(null);
 
@@ -165,6 +167,34 @@ export function ExpensesClient({
     if (!Number.isFinite(amt) || balance == null) return null;
     return balance - amt;
   }, [form.amount, balance]);
+
+  async function uploadAttachment(file: File) {
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("File quá lớn (tối đa 8MB)");
+      return;
+    }
+    setUploadingAttachment(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "attachment");
+      const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(j.message || "Upload thất bại");
+        return;
+      }
+      setForm((f) => ({ ...f, attachmentUrl: j.url }));
+      toast.success("Đã tải ảnh hoá đơn");
+    } finally {
+      setUploadingAttachment(false);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+    }
+  }
 
   async function decodeQrFile(file: File) {
     setDecoding(true);
@@ -539,15 +569,41 @@ export function ExpensesClient({
                 <option value="cash">Tiền mặt</option>
               </select>
             </label>
-            <label className="block">
-              <span className="text-xs text-[#8b95b7]">Link đính kèm (hoá đơn/báo giá)</span>
+            <div className="block">
+              <span className="text-xs text-[#8b95b7]">Ảnh hoá đơn / báo giá</span>
               <input
-                value={form.attachmentUrl}
-                onChange={(e) => setForm({ ...form, attachmentUrl: e.target.value })}
-                placeholder="https://…"
-                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                ref={attachmentInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadAttachment(f);
+                }}
               />
-            </label>
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachment}
+                  className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-xs font-medium text-[#cfd4e8] disabled:opacity-50"
+                >
+                  {uploadingAttachment ? "Đang tải…" : form.attachmentUrl ? "📎 Đổi ảnh" : "📷 Chọn ảnh"}
+                </button>
+                {form.attachmentUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, attachmentUrl: "" })}
+                    className="text-[11px] text-red-300 hover:text-red-200"
+                  >
+                    Xoá
+                  </button>
+                )}
+                {form.attachmentUrl && (
+                  <span className="text-[11px] text-emerald-300">✓ đã đính kèm</span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Bank info for KT to "Chuyển khoản" */}
@@ -697,12 +753,26 @@ export function ExpensesClient({
           {rows.map((r) => {
             const st = statusMeta(r.status);
             const isUrgent = r.priority === "urgent" && r.status === "pending";
+            const canQuickTransfer = r.status === "pending" && !!r.payeeBankBin && !!r.payeeAccountNumber && canMarkPaid;
             return (
               <div
                 key={r.id}
+                onClick={canQuickTransfer ? () => setTransferFor(r) : undefined}
+                role={canQuickTransfer ? "button" : undefined}
+                tabIndex={canQuickTransfer ? 0 : undefined}
+                onKeyDown={
+                  canQuickTransfer
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setTransferFor(r);
+                        }
+                      }
+                    : undefined
+                }
                 className={`rounded-xl border bg-[#13151f] p-3 space-y-2 ${
                   isUrgent ? "border-red-400/60 shadow-[0_0_0_1px_rgba(248,113,113,0.25)]" : "border-[#2d3249]"
-                }`}
+                } ${canQuickTransfer ? "cursor-pointer transition active:scale-[0.99]" : ""}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -775,21 +845,21 @@ export function ExpensesClient({
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {r.status === "pending" && r.payeeBankBin && r.payeeAccountNumber && (
+                <div className="flex flex-wrap gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                  {canQuickTransfer && (
                     <button
                       onClick={() => setTransferFor(r)}
                       className="rounded bg-orange-500/25 text-orange-200 px-2 py-1 text-xs font-semibold"
                     >
-                      💸 Chuyển khoản
+                      💸 Mở chuyển khoản
                     </button>
                   )}
-                  {r.status === "pending" && canMarkPaid && (
+                  {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
                     <button
                       onClick={() => openPayDialog(r)}
                       className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-1 text-xs font-medium"
                     >
-                      Đã chi
+                      Ghi nhận đã chi
                     </button>
                   )}
                   {r.status === "pending" && isAdmin && (
@@ -805,7 +875,7 @@ export function ExpensesClient({
                   )}
                   {r.attachmentUrl && (
                     <a
-                      href={r.attachmentUrl}
+                      href={r.attachmentUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=attachment` : r.attachmentUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded bg-blue-500/15 text-blue-300 px-2 py-1 text-xs"
@@ -815,7 +885,7 @@ export function ExpensesClient({
                   )}
                   {r.paidReceiptUrl && (
                     <a
-                      href={r.paidReceiptUrl}
+                      href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded bg-emerald-500/15 text-emerald-300 px-2 py-1 text-xs"
@@ -886,10 +956,10 @@ export function ExpensesClient({
         </div>
       )}
 
-      {/* Pay dialog */}
+      {/* Pay dialog (for cash / non-bank expenses) */}
       {openPay && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-6"
           onClick={() => setOpenPay(null)}
         >
           <form
@@ -897,7 +967,7 @@ export function ExpensesClient({
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-4"
           >
-            <div className="text-base font-semibold text-emerald-300">Đánh dấu đã chi</div>
+            <div className="text-base font-semibold text-emerald-300">Ghi nhận đã chi</div>
             <div className="text-xs text-[#8b95b7]">
               {openPay.code} — {openPay.category.name} — {money(openPay.amount)}
             </div>
@@ -922,15 +992,7 @@ export function ExpensesClient({
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
             </label>
-            <label className="block">
-              <span className="text-xs text-[#8b95b7]">Link chứng từ chi</span>
-              <input
-                value={payReceiptUrl}
-                onChange={(e) => setPayReceiptUrl(e.target.value)}
-                placeholder="https://…"
-                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-              />
-            </label>
+            <ReceiptFilePicker value={payReceiptUrl} onChange={setPayReceiptUrl} />
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Ghi chú KT</span>
               <textarea
@@ -1003,7 +1065,16 @@ export function ExpensesClient({
       )}
 
       {transferFor && (
-        <TransferModal expense={transferFor} onClose={() => setTransferFor(null)} />
+        <TransferModal
+          expense={transferFor}
+          canMarkPaid={canMarkPaid}
+          onClose={() => setTransferFor(null)}
+          onPaid={() => {
+            setTransferFor(null);
+            load();
+            loadBalance();
+          }}
+        />
       )}
     </div>
   );
@@ -1011,7 +1082,86 @@ export function ExpensesClient({
 
 const KT_BANK_LS_KEY = "expenses.ktBankBin";
 
-function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handle(file: File) {
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("File quá lớn (tối đa 8MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "receipt");
+      const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(j.message || "Upload thất bại");
+        return;
+      }
+      onChange(j.url);
+      toast.success("Đã tải ảnh chứng từ");
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  }
+
+  return (
+    <div className="block">
+      <span className="text-xs text-[#8b95b7]">Ảnh chứng từ chuyển khoản (tuỳ chọn)</span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handle(f);
+        }}
+      />
+      <div className="mt-1 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={uploading}
+          className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-xs font-medium text-[#cfd4e8] disabled:opacity-50"
+        >
+          {uploading ? "Đang tải…" : value ? "📎 Đổi ảnh" : "📷 Chọn ảnh"}
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-[11px] text-red-300 hover:text-red-200"
+          >
+            Xoá
+          </button>
+        )}
+        {value && <span className="text-[11px] text-emerald-300">✓ đã đính kèm</span>}
+      </div>
+    </div>
+  );
+}
+
+function TransferModal({
+  expense,
+  canMarkPaid,
+  onClose,
+  onPaid,
+}: {
+  expense: Expense;
+  canMarkPaid: boolean;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
   const recipientBank = findBankByBin(expense.payeeBankBin);
   const memo = expense.code;
   const qrUrl = expense.payeeBankBin && expense.payeeAccountNumber
@@ -1035,6 +1185,40 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
     if (bin) window.localStorage.setItem(KT_BANK_LS_KEY, bin);
   }
   const ktBank = findBankByBin(ktBankBin);
+
+  const [showPayForm, setShowPayForm] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payReceipt, setPayReceipt] = useState("");
+  const [payAmount, setPayAmount] = useState(String(Math.round(expense.amount)));
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payNote, setPayNote] = useState("");
+
+  async function confirmPaid() {
+    const amt = Number(payAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Nhập số tiền > 0");
+      return;
+    }
+    setPaying(true);
+    const res = await fetch(`/api/expenses/${expense.id}/mark-paid`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        paidAt: payDate,
+        paidAmount: amt,
+        paidNote: payNote.trim() || null,
+        paidReceiptUrl: payReceipt.trim() || null,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setPaying(false);
+    if (!res.ok) {
+      toast.error(j.message || "Không ghi sổ được");
+      return;
+    }
+    toast.success(j.message || "Đã ghi sổ quỹ");
+    onPaid();
+  }
 
   async function saveQrImage(silent = false) {
     if (!qrUrl) return false;
@@ -1116,25 +1300,25 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/70 p-3 pt-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-4 text-sm text-[#cfd4e8]"
+        className="w-full max-w-sm space-y-2.5 rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#cfd4e8] my-2"
       >
-        <div className="flex items-center justify-between">
+        <div className="sticky top-0 -mx-3 -mt-3 mb-1 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-3 py-2">
           <div className="text-base font-semibold text-orange-300">Chuyển khoản · {expense.code}</div>
-          <button onClick={onClose} className="text-[#8b95b7] hover:text-[#f0f2ff]">✕</button>
+          <button onClick={onClose} className="text-[#8b95b7] hover:text-[#f0f2ff]" aria-label="Đóng">✕</button>
         </div>
 
         {qrUrl && (
-          <div className="flex justify-center rounded-lg bg-white p-2">
+          <div className="flex justify-center rounded-lg bg-white p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrUrl} alt="VietQR" className="h-72 w-72 object-contain" />
+            <img src={qrUrl} alt="VietQR" className="h-56 w-56 object-contain" />
           </div>
         )}
 
-        <div className="space-y-1 rounded-lg bg-[#0b0d16] p-3 text-xs">
+        <div className="space-y-1 rounded-lg bg-[#0b0d16] p-2.5 text-xs">
           <div className="flex justify-between gap-2">
             <span className="text-[#8b95b7]">NH nhận</span>
             <span className="font-semibold text-[#f0f2ff]">{recipientBank?.shortName ?? "—"}</span>
@@ -1174,9 +1358,9 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
           </button>
         </div>
 
-        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-100">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
           <label className="block">
-            <span className="font-semibold">Em đang chuyển bằng app NH nào?</span>
+            <span className="font-semibold">App NH em đang dùng để chuyển</span>
             <select
               value={ktBankBin}
               onChange={(e) => chooseKtBank(e.target.value)}
@@ -1190,34 +1374,16 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
               ))}
             </select>
           </label>
-          {ktBank ? (
-            ktBank.autofill && ktBank.appId ? (
-              <ol className="list-decimal pl-4 space-y-0.5">
-                <li>Bấm nút <b>💸 Chuyển khoản</b> phía dưới</li>
-                <li>App {ktBank.shortName} tự mở trang chuyển khoản, đã điền sẵn STK + số tiền + nội dung</li>
-                <li>Kiểm tra → bấm <b>Chuyển</b> trong app</li>
-              </ol>
-            ) : ktBank.appId ? (
-              <ol className="list-decimal pl-4 space-y-0.5">
-                <li>Bấm nút <b>💸 Chuyển khoản</b> phía dưới → chọn <b>Save Image</b> để lưu QR</li>
-                <li>App {ktBank.shortName} tự mở → bấm <b>Quét QR</b> → <b>Quét từ thư viện</b></li>
-                <li>Chọn ảnh QR vừa lưu → app tự fill STK + số tiền + nội dung → bấm chuyển</li>
-              </ol>
-            ) : (
-              <ol className="list-decimal pl-4 space-y-0.5">
-                <li>Bấm nút <b>💾 Lưu ảnh QR</b> → lưu vào Photos</li>
-                <li>Mở app <b>{ktBank.shortName}</b> thủ công → Quét QR → Quét từ thư viện</li>
-                <li>Chọn ảnh QR vừa lưu → app tự fill → bấm chuyển</li>
-              </ol>
-            )
-          ) : (
-            <div className="text-[10px] text-amber-200/80">
-              Chọn NH em dùng để app nhớ cho lần sau. VietQR chuẩn Napas247 — mọi NH VN đều quét được.
+          {ktBank && !ktBank.autofill && (
+            <div className="mt-1 text-[10px] text-amber-200/80">
+              {ktBank.appId
+                ? `Bấm nút → lưu QR vào Photos → app ${ktBank.shortName} tự mở → Quét QR → Quét từ thư viện.`
+                : `Lưu QR → mở app ${ktBank.shortName} thủ công → Quét QR → Quét từ thư viện.`}
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <button
             onClick={transferCombo}
             disabled={!ktBank}
@@ -1226,22 +1392,88 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
             {!ktBank
               ? "Chọn NH em dùng để chuyển"
               : ktBank.autofill && ktBank.appId
-                ? `💸 Chuyển khoản qua ${ktBank.shortName}`
+                ? `💸 Chuyển qua ${ktBank.shortName}`
                 : ktBank.appId
                   ? `💸 Lưu QR + Mở ${ktBank.shortName}`
                   : `💾 Lưu QR (mở app ${ktBank.shortName} thủ công)`}
           </button>
           <button
             onClick={() => saveQrImage(false)}
-            className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm font-semibold text-[#cfd4e8]"
+            className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-1.5 text-xs font-medium text-[#cfd4e8]"
           >
             💾 Chỉ lưu ảnh QR
           </button>
         </div>
 
-        <div className="text-[11px] text-[#8b95b7] text-center">
-          Chuyển xong → đóng popup → bấm <b className="text-emerald-300">“Đã chi”</b> để ghi sổ.
-        </div>
+        {canMarkPaid && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 space-y-2">
+            {!showPayForm ? (
+              <button
+                type="button"
+                onClick={() => setShowPayForm(true)}
+                className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-[#0b0d16]"
+              >
+                ✓ Đã chuyển xong — ghi sổ
+              </button>
+            ) : (
+              <>
+                <div className="text-xs font-semibold text-emerald-300">Xác nhận đã chuyển khoản</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] text-[#8b95b7]">Số tiền (₫) *</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] text-[#8b95b7]">Ngày chi *</span>
+                    <input
+                      type="date"
+                      value={payDate}
+                      onChange={(e) => setPayDate(e.target.value)}
+                      className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                    />
+                  </label>
+                </div>
+                <ReceiptFilePicker value={payReceipt} onChange={setPayReceipt} />
+                <label className="block">
+                  <span className="text-[11px] text-[#8b95b7]">Ghi chú KT</span>
+                  <textarea
+                    rows={2}
+                    value={payNote}
+                    onChange={(e) => setPayNote(e.target.value)}
+                    placeholder="VD: chuyển lúc 14h, mã GD 88231"
+                    className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                  />
+                </label>
+                <div className="text-[10px] text-amber-300">
+                  Trừ ngay vào số dư quỹ. Không huỷ được sau khi xác nhận.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmPaid}
+                    disabled={paying}
+                    className="flex-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
+                  >
+                    {paying ? "Đang ghi…" : "Xác nhận đã chuyển"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPayForm(false)}
+                    className="rounded-lg border border-[#2d3249] px-3 py-2 text-xs text-[#8b95b7]"
+                  >
+                    Quay lại
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
