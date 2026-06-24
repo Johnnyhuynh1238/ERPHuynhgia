@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { VN_BANKS, findBankByBin } from "@/lib/vn-banks";
+import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 
 type ProjectOption = { id: string; code: string; name: string };
@@ -1058,23 +1058,24 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
       toast.error("Chọn NH em đang dùng trước nhé");
       return;
     }
-    if (!ktBank.deepLink) {
-      toast.info(`App ${ktBank.shortName} chưa có deep link. Mở app thủ công rồi quét QR.`);
+    if (!ktBank.appId) {
+      toast.info(`App ${ktBank.shortName} chưa hỗ trợ mở từ link. Mở app thủ công rồi quét QR.`);
       return;
     }
-    // Mở app NH. Nếu app chưa cài / scheme sai → toast hướng dẫn fallback.
-    const fallbackTimer = window.setTimeout(() => {
-      toast.info(
-        `Nếu app ${ktBank.shortName} chưa mở, anh "Lưu ảnh QR" rồi mở app thủ công → Quét từ thư viện.`,
-        { duration: 6000 },
-      );
-    }, 1800);
-    const onHide = () => {
-      window.clearTimeout(fallbackTimer);
-      document.removeEventListener("visibilitychange", onHide);
-    };
-    document.addEventListener("visibilitychange", onHide);
-    window.location.href = ktBank.deepLink;
+    if (!recipientBank?.appId || !expense.payeeAccountNumber) {
+      toast.error("Thiếu thông tin NH người nhận");
+      return;
+    }
+    // VietQR.io universal link — cơ chế Zalo dùng để mở thẳng app NH.
+    const link = buildVietQrDeepLink({
+      ktAppId: ktBank.appId,
+      recipientAccount: expense.payeeAccountNumber,
+      recipientBankAppId: recipientBank.appId,
+      amount: expense.amount,
+      memo,
+      recipientName: expense.payeeAccountName ?? undefined,
+    });
+    window.location.href = link;
   }
 
   function copy(text: string, label: string) {
@@ -1160,12 +1161,27 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
             </select>
           </label>
           {ktBank ? (
-            <ol className="list-decimal pl-4 space-y-0.5">
-              <li>Mở app <b>{ktBank.shortName}</b> trên điện thoại</li>
-              <li>Bấm biểu tượng <b>Quét QR</b> (thường ở trang chủ)</li>
-              <li>Quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi chọn “Quét từ thư viện”)</li>
-              <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
-            </ol>
+            ktBank.appId ? (
+              ktBank.autofill ? (
+                <ol className="list-decimal pl-4 space-y-0.5">
+                  <li>Bấm <b>📱 Mở app {ktBank.shortName}</b> phía dưới</li>
+                  <li>App tự mở trang chuyển khoản, đã điền sẵn STK + số tiền + nội dung</li>
+                  <li>Kiểm tra rồi bấm <b>Chuyển</b> trong app</li>
+                </ol>
+              ) : (
+                <ol className="list-decimal pl-4 space-y-0.5">
+                  <li>Bấm <b>📱 Mở app {ktBank.shortName}</b> phía dưới</li>
+                  <li>App {ktBank.shortName} mở → bấm <b>Quét QR</b> → quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi “Quét từ thư viện”)</li>
+                  <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
+                </ol>
+              )
+            ) : (
+              <ol className="list-decimal pl-4 space-y-0.5">
+                <li>App <b>{ktBank.shortName}</b> chưa hỗ trợ mở từ link</li>
+                <li>Bấm <b>💾 Lưu ảnh QR</b> phía dưới</li>
+                <li>Mở app {ktBank.shortName} thủ công → Quét QR → Quét từ thư viện</li>
+              </ol>
+            )
           ) : (
             <div className="text-[10px] text-amber-200/80">
               Chọn NH em dùng để app nhớ cho lần sau. VietQR chuẩn Napas247 — mọi NH VN đều quét được.
@@ -1176,10 +1192,14 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
         <div className="flex flex-col gap-2">
           <button
             onClick={openKtBankApp}
-            disabled={!ktBank}
+            disabled={!ktBank || !ktBank.appId}
             className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
           >
-            {ktBank ? `📱 Mở app ${ktBank.shortName}` : "Chọn NH em dùng để mở app"}
+            {!ktBank
+              ? "Chọn NH em dùng để mở app"
+              : !ktBank.appId
+                ? `App ${ktBank.shortName} chưa hỗ trợ link — quét QR thủ công`
+                : `📱 Mở app ${ktBank.shortName}`}
           </button>
           <button
             onClick={saveQrImage}
