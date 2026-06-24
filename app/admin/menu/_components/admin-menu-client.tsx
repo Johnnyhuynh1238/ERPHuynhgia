@@ -21,6 +21,7 @@ import {
   Library,
   ListChecks,
   Package,
+  Receipt,
   Settings,
   ShoppingCart,
   Sliders,
@@ -79,6 +80,14 @@ const SECTIONS: MenuSection[] = [
       { label: "Thầu phụ", href: "/subcontractors", icon: HardHat, desc: "Danh sách nhà thầu phụ" },
       { label: "HĐ thầu phụ", href: "/sub-contracts", icon: FileSignature, desc: "Hợp đồng giao khoán" },
       { label: "Chi thầu phụ", href: "/sub-payments", icon: Wallet, desc: "Thanh toán thầu phụ" },
+    ],
+  },
+  {
+    title: "Tài chính",
+    icon: Banknote,
+    items: [
+      { label: "Lệnh chi", href: "/expenses", icon: Receipt, desc: "Tạo lệnh chi gửi kế toán" },
+      { label: "Sổ quỹ", href: "/treasury", icon: Wallet, desc: "Nhật ký thu/chi + số dư" },
     ],
   },
   {
