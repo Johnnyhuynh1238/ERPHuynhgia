@@ -1009,8 +1009,10 @@ export function ExpensesClient({
   );
 }
 
+const KT_BANK_LS_KEY = "expenses.ktBankBin";
+
 function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
-  const bank = findBankByBin(expense.payeeBankBin);
+  const recipientBank = findBankByBin(expense.payeeBankBin);
   const memo = expense.code;
   const qrUrl = expense.payeeBankBin && expense.payeeAccountNumber
     ? buildVietQrImageUrl({
@@ -1021,6 +1023,18 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
         accountName: expense.payeeAccountName ?? undefined,
       })
     : null;
+
+  const [ktBankBin, setKtBankBin] = useState<string>("");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(KT_BANK_LS_KEY);
+    if (saved) setKtBankBin(saved);
+  }, []);
+  function chooseKtBank(bin: string) {
+    setKtBankBin(bin);
+    if (bin) window.localStorage.setItem(KT_BANK_LS_KEY, bin);
+  }
+  const ktBank = findBankByBin(ktBankBin);
 
   async function saveQrImage() {
     if (!qrUrl) return;
@@ -1067,8 +1081,8 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
 
         <div className="space-y-1 rounded-lg bg-[#0b0d16] p-3 text-xs">
           <div className="flex justify-between gap-2">
-            <span className="text-[#8b95b7]">Ngân hàng</span>
-            <span className="font-semibold text-[#f0f2ff]">{bank?.shortName ?? "—"}</span>
+            <span className="text-[#8b95b7]">NH nhận</span>
+            <span className="font-semibold text-[#f0f2ff]">{recipientBank?.shortName ?? "—"}</span>
           </div>
           <button
             type="button"
@@ -1105,14 +1119,34 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
           </button>
         </div>
 
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-100">
-          <div className="font-semibold mb-1">Cách dùng:</div>
-          <ol className="list-decimal pl-4 space-y-0.5">
-            <li>Mở app <b>{bank?.shortName ?? "ngân hàng"}</b> trên điện thoại</li>
-            <li>Bấm biểu tượng <b>Quét QR</b> trong app (thường ở trang chủ)</li>
-            <li>Quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi chọn “Quét từ thư viện”)</li>
-            <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
-          </ol>
+        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-100">
+          <label className="block">
+            <span className="font-semibold">Em đang chuyển bằng app NH nào?</span>
+            <select
+              value={ktBankBin}
+              onChange={(e) => chooseKtBank(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-amber-500/40 bg-[#13151f] px-2 py-1.5 text-xs text-amber-100"
+            >
+              <option value="">— Chọn NH em dùng —</option>
+              {VN_BANKS.map((b) => (
+                <option key={b.bin} value={b.bin}>
+                  {b.shortName} ({b.name})
+                </option>
+              ))}
+            </select>
+          </label>
+          {ktBank ? (
+            <ol className="list-decimal pl-4 space-y-0.5">
+              <li>Mở app <b>{ktBank.shortName}</b> trên điện thoại</li>
+              <li>Bấm biểu tượng <b>Quét QR</b> (thường ở trang chủ)</li>
+              <li>Quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi chọn “Quét từ thư viện”)</li>
+              <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
+            </ol>
+          ) : (
+            <div className="text-[10px] text-amber-200/80">
+              Chọn NH em dùng để app nhớ cho lần sau. VietQR chuẩn Napas247 — mọi NH VN đều quét được.
+            </div>
+          )}
         </div>
 
         <button
