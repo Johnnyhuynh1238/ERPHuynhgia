@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { ExpenseStatus, Prisma, UserRole } from "@prisma/client";
+import { ExpensePriority, ExpenseStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { fireAndForget, notifyExpenseCreated } from "@/lib/notifications";
+import { nextReminderForPriority } from "@/lib/expense-reminder";
 
 const ROLES_VIEW = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -36,6 +37,7 @@ const createSchema = z.object({
   paymentMethod: z.enum(["cash", "transfer"]).optional(),
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
+  priority: z.enum(["normal", "urgent"]).optional(),
 });
 
 export async function GET(request: Request) {
@@ -108,6 +110,7 @@ export async function POST(request: Request) {
   }
 
   const code = await nextExpenseCode();
+  const priority: ExpensePriority = data.priority === "urgent" ? ExpensePriority.urgent : ExpensePriority.normal;
   const expense = await prisma.expense.create({
     data: {
       code,
@@ -119,6 +122,8 @@ export async function POST(request: Request) {
       note: data.note?.trim() || null,
       attachmentUrl: data.attachmentUrl?.trim() || null,
       status: ExpenseStatus.pending,
+      priority,
+      nextReminderAt: nextReminderForPriority(priority),
       createdBy: user.id,
     },
     include: {

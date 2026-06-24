@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   TrendingUp,
   UserPlus,
+  Wallet,
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,8 @@ type DashboardData = {
     };
     newWorker: { missingInfo: number };
     proposalPending: number;
+    expensePending: { count: number; total: number; urgentCount: number };
+    treasury: { initialized: boolean; balance: number };
   };
 };
 
@@ -709,10 +712,99 @@ function ActionCard({
   );
 }
 
+function fmtVndShort(n: number) {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(n % 1_000_000_000 === 0 ? 0 : 1)} tỷ`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)} tr`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return new Intl.NumberFormat("vi-VN").format(Math.round(n));
+}
+
 function AccountantActions({ data }: { data: NonNullable<DashboardData["accountant"]> }) {
   const expense = data.expensePayment;
+  const pendingExp = data.expensePending;
+  const treasury = data.treasury;
+  const hasUrgent = pendingExp.urgentCount > 0;
+  const balanceTone =
+    treasury.balance < 5_000_000
+      ? "text-red-600"
+      : treasury.balance < 20_000_000
+        ? "text-amber-600"
+        : "text-emerald-600";
   return (
     <div className="grid gap-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/expenses"
+          className={`flex flex-col gap-2 rounded-xl border p-4 shadow-sm transition ${
+            hasUrgent
+              ? "border-red-400 bg-red-50 hover:bg-red-100"
+              : pendingExp.count > 0
+                ? "border-amber-300 bg-amber-50 hover:bg-amber-100"
+                : "border-slate-200 bg-white hover:bg-slate-50"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                  hasUrgent ? "bg-red-200 text-red-700" : "bg-orange-100 text-orange-700"
+                }`}
+              >
+                <Receipt className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Lệnh chi</div>
+                <div className="text-xs text-slate-500">Admin gửi → chuyển khoản</div>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-slate-400" />
+          </div>
+          <div className="flex items-baseline justify-between">
+            <div className={`text-2xl font-bold ${hasUrgent ? "text-red-700" : pendingExp.count > 0 ? "text-amber-700" : "text-slate-500"}`}>
+              {pendingExp.count}
+            </div>
+            <div className="text-right text-xs">
+              <div className={`font-semibold ${hasUrgent ? "text-red-700" : "text-slate-600"}`}>
+                {fmtVndShort(pendingExp.total)} đ
+              </div>
+              {hasUrgent ? (
+                <div className="font-semibold text-red-600">🚨 {pendingExp.urgentCount} GẤP</div>
+              ) : (
+                <div className="text-slate-500">chờ chi</div>
+              )}
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/treasury"
+          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Sổ quỹ</div>
+                <div className="text-xs text-slate-500">Số dư hiện tại</div>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-slate-400" />
+          </div>
+          <div className="flex items-baseline justify-between">
+            <div className={`text-2xl font-bold ${balanceTone}`}>{fmtVndShort(treasury.balance)} đ</div>
+            <div className="text-right text-xs">
+              {treasury.initialized ? (
+                <div className="text-slate-500">tiền mặt + ngân hàng</div>
+              ) : (
+                <div className="font-semibold text-amber-600">Chưa khai báo số dư</div>
+              )}
+            </div>
+          </div>
+        </Link>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

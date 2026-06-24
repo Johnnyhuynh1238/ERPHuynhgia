@@ -54,6 +54,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           paidAmount: new Prisma.Decimal(data.paidAmount),
           paidNote: data.paidNote?.trim() || null,
           paidReceiptUrl: data.paidReceiptUrl?.trim() || null,
+          nextReminderAt: null,
         },
         include: {
           project: { select: { id: true, code: true, name: true } },

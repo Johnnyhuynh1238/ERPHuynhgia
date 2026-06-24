@@ -35,6 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       cancelledBy: user.id,
       cancelledAt: new Date(),
       cancelledReason: reason,
+      nextReminderAt: null,
     },
   });
 

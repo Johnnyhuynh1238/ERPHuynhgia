@@ -727,7 +727,16 @@ export async function GET() {
 
   if (user.role === UserRole.accountant) {
     const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
-    const [payrollReady, subApproved, materialReceivedUnpaid, materialPending, workersMissingInfo] = await Promise.all([
+    const [
+      payrollReady,
+      subApproved,
+      materialReceivedUnpaid,
+      materialPending,
+      workersMissingInfo,
+      pendingExpense,
+      urgentExpenseCount,
+      cash,
+    ] = await Promise.all([
       prisma.weeklyPayroll.count({ where: { status: "ready_to_pay", project: projectAccess } }),
       prisma.subPayment.count({ where: { status: "approved", subContract: { project: projectAccess } } }),
       prisma.materialProposal.count({ where: { orderStatus: "received", project: projectAccess } }),
@@ -738,6 +747,13 @@ export async function GET() {
           OR: [{ cccd: null }, { cccd: "" }, { bankAccount: null }, { bankAccount: "" }],
         },
       }),
+      prisma.expense.aggregate({
+        where: { status: "pending" },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      prisma.expense.count({ where: { status: "pending", priority: "urgent" } }),
+      prisma.companyCash.findFirst({ select: { currentBalance: true, initialized: true } }),
     ]);
 
     return NextResponse.json({
@@ -752,6 +768,15 @@ export async function GET() {
         },
         newWorker: { missingInfo: workersMissingInfo },
         proposalPending: materialPending,
+        expensePending: {
+          count: pendingExpense._count._all,
+          total: Number(pendingExpense._sum.amount ?? 0),
+          urgentCount: urgentExpenseCount,
+        },
+        treasury: {
+          initialized: cash?.initialized ?? false,
+          balance: cash ? Number(cash.currentBalance) : 0,
+        },
       },
     });
   }

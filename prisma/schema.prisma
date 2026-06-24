@@ -399,6 +399,11 @@ enum ExpenseStatus {
   cancelled
 }
 
+enum ExpensePriority {
+  normal
+  urgent
+}
+
 model User {
   id                 String   @id @default(uuid()) @db.Uuid
   email              String   @unique
@@ -3305,7 +3310,9 @@ model Expense {
   paidReceiptUrl  String?       @map("paid_receipt_url")
   cancelledBy     String?       @map("cancelled_by") @db.Uuid
   cancelledAt     DateTime?     @map("cancelled_at")
-  cancelledReason String?       @map("cancelled_reason") @db.Text
+  cancelledReason String?         @map("cancelled_reason") @db.Text
+  priority        ExpensePriority @default(normal)
+  nextReminderAt  DateTime?       @map("next_reminder_at")
 
   project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   category  ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -3316,6 +3323,7 @@ model Expense {
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([categoryId, createdAt(sort: Desc)])
+  @@index([nextReminderAt])
   @@map("expenses")
 }
 
