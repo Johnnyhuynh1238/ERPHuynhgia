@@ -1053,6 +1053,30 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
     }
   }
 
+  function openKtBankApp() {
+    if (!ktBank) {
+      toast.error("Chọn NH em đang dùng trước nhé");
+      return;
+    }
+    if (!ktBank.deepLink) {
+      toast.info(`App ${ktBank.shortName} chưa có deep link. Mở app thủ công rồi quét QR.`);
+      return;
+    }
+    // Mở app NH. Nếu app chưa cài / scheme sai → toast hướng dẫn fallback.
+    const fallbackTimer = window.setTimeout(() => {
+      toast.info(
+        `Nếu app ${ktBank.shortName} chưa mở, anh "Lưu ảnh QR" rồi mở app thủ công → Quét từ thư viện.`,
+        { duration: 6000 },
+      );
+    }, 1800);
+    const onHide = () => {
+      window.clearTimeout(fallbackTimer);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.location.href = ktBank.deepLink;
+  }
+
   function copy(text: string, label: string) {
     navigator.clipboard?.writeText(text);
     toast.success(`Đã copy ${label}`);
@@ -1149,12 +1173,21 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
           )}
         </div>
 
-        <button
-          onClick={saveQrImage}
-          className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16]"
-        >
-          💾 Lưu ảnh QR vào thư viện
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={openKtBankApp}
+            disabled={!ktBank}
+            className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
+          >
+            {ktBank ? `📱 Mở app ${ktBank.shortName}` : "Chọn NH em dùng để mở app"}
+          </button>
+          <button
+            onClick={saveQrImage}
+            className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm font-semibold text-[#cfd4e8]"
+          >
+            💾 Lưu ảnh QR (quét từ thư viện)
+          </button>
+        </div>
 
         <div className="text-[11px] text-[#8b95b7] text-center">
           Chuyển xong → đóng popup → bấm <b className="text-emerald-300">“Đã chi”</b> để ghi sổ.
