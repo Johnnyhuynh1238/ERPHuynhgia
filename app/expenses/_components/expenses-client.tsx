@@ -1036,38 +1036,39 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
   }
   const ktBank = findBankByBin(ktBankBin);
 
-  async function saveQrImage() {
-    if (!qrUrl) return;
+  async function saveQrImage(silent = false) {
+    if (!qrUrl) return false;
     try {
       const res = await fetch(qrUrl);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${expense.code}-QR.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Đã lưu ảnh QR. Mở app NH → Quét từ thư viện.");
-    } catch {
-      window.open(qrUrl, "_blank");
+      const file = new File([blob], `${expense.code}-QR.png`, { type: "image/png" });
+      // iOS: Web Share API → KT chọn "Save Image" → vào Photos.
+      // Android Chrome: cũng support share API.
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "VietQR" });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${expense.code}-QR.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      if (!silent) toast.success("Đã lưu ảnh QR.");
+      return true;
+    } catch (err) {
+      // User huỷ share sheet cũng vào nhánh này — không phải lỗi.
+      if ((err as DOMException)?.name === "AbortError") return false;
+      if (!silent) {
+        toast.error("Lưu QR thất bại. Anh long-press vào ảnh QR để lưu thủ công.");
+      }
+      return false;
     }
   }
 
-  function openKtBankApp() {
-    if (!ktBank) {
-      toast.error("Chọn NH em đang dùng trước nhé");
-      return;
-    }
-    if (!ktBank.appId) {
-      toast.info(`App ${ktBank.shortName} chưa hỗ trợ mở từ link. Mở app thủ công rồi quét QR.`);
-      return;
-    }
-    if (!recipientBank?.appId || !expense.payeeAccountNumber) {
-      toast.error("Thiếu thông tin NH người nhận");
-      return;
-    }
-    // VietQR.io universal link — cơ chế Zalo dùng để mở thẳng app NH.
-    const link = buildVietQrDeepLink({
+  function buildKtDeepLink(): string | null {
+    if (!ktBank?.appId || !recipientBank?.appId || !expense.payeeAccountNumber) return null;
+    return buildVietQrDeepLink({
       ktAppId: ktBank.appId,
       recipientAccount: expense.payeeAccountNumber,
       recipientBankAppId: recipientBank.appId,
@@ -1075,7 +1076,36 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
       memo,
       recipientName: expense.payeeAccountName ?? undefined,
     });
-    window.location.href = link;
+  }
+
+  async function transferCombo() {
+    if (!ktBank) {
+      toast.error("Chọn NH em đang dùng trước nhé");
+      return;
+    }
+    const link = buildKtDeepLink();
+    // NH autofill (VTB/BIDV/OCB/ACB): chỉ mở app, không cần lưu QR.
+    if (ktBank.autofill && link) {
+      window.location.href = link;
+      return;
+    }
+    // NH non-autofill có deeplink (TCB/VCB/MB...): lưu QR rồi mở app.
+    if (link) {
+      const saved = await saveQrImage(true);
+      if (!saved) return;
+      toast.success(`Đã lưu QR. Đang mở ${ktBank.shortName}...`);
+      setTimeout(() => {
+        window.location.href = link;
+      }, 500);
+      return;
+    }
+    // NH không có appId: chỉ lưu QR, KT tự mở app.
+    const saved = await saveQrImage(true);
+    if (saved) {
+      toast.info(`Đã lưu QR. Mở app ${ktBank.shortName} → Quét QR → Quét từ thư viện.`, {
+        duration: 6000,
+      });
+    }
   }
 
   function copy(text: string, label: string) {
@@ -1161,25 +1191,23 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
             </select>
           </label>
           {ktBank ? (
-            ktBank.appId ? (
-              ktBank.autofill ? (
-                <ol className="list-decimal pl-4 space-y-0.5">
-                  <li>Bấm <b>📱 Mở app {ktBank.shortName}</b> phía dưới</li>
-                  <li>App tự mở trang chuyển khoản, đã điền sẵn STK + số tiền + nội dung</li>
-                  <li>Kiểm tra rồi bấm <b>Chuyển</b> trong app</li>
-                </ol>
-              ) : (
-                <ol className="list-decimal pl-4 space-y-0.5">
-                  <li>Bấm <b>📱 Mở app {ktBank.shortName}</b> phía dưới</li>
-                  <li>App {ktBank.shortName} mở → bấm <b>Quét QR</b> → quét QR phía trên (hoặc <b>Lưu ảnh</b> rồi “Quét từ thư viện”)</li>
-                  <li>App tự fill STK + số tiền + nội dung → bấm chuyển</li>
-                </ol>
-              )
+            ktBank.autofill && ktBank.appId ? (
+              <ol className="list-decimal pl-4 space-y-0.5">
+                <li>Bấm nút <b>💸 Chuyển khoản</b> phía dưới</li>
+                <li>App {ktBank.shortName} tự mở trang chuyển khoản, đã điền sẵn STK + số tiền + nội dung</li>
+                <li>Kiểm tra → bấm <b>Chuyển</b> trong app</li>
+              </ol>
+            ) : ktBank.appId ? (
+              <ol className="list-decimal pl-4 space-y-0.5">
+                <li>Bấm nút <b>💸 Chuyển khoản</b> phía dưới → chọn <b>Save Image</b> để lưu QR</li>
+                <li>App {ktBank.shortName} tự mở → bấm <b>Quét QR</b> → <b>Quét từ thư viện</b></li>
+                <li>Chọn ảnh QR vừa lưu → app tự fill STK + số tiền + nội dung → bấm chuyển</li>
+              </ol>
             ) : (
               <ol className="list-decimal pl-4 space-y-0.5">
-                <li>App <b>{ktBank.shortName}</b> chưa hỗ trợ mở từ link</li>
-                <li>Bấm <b>💾 Lưu ảnh QR</b> phía dưới</li>
-                <li>Mở app {ktBank.shortName} thủ công → Quét QR → Quét từ thư viện</li>
+                <li>Bấm nút <b>💾 Lưu ảnh QR</b> → lưu vào Photos</li>
+                <li>Mở app <b>{ktBank.shortName}</b> thủ công → Quét QR → Quét từ thư viện</li>
+                <li>Chọn ảnh QR vừa lưu → app tự fill → bấm chuyển</li>
               </ol>
             )
           ) : (
@@ -1191,21 +1219,23 @@ function TransferModal({ expense, onClose }: { expense: Expense; onClose: () => 
 
         <div className="flex flex-col gap-2">
           <button
-            onClick={openKtBankApp}
-            disabled={!ktBank || !ktBank.appId}
+            onClick={transferCombo}
+            disabled={!ktBank}
             className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
           >
             {!ktBank
-              ? "Chọn NH em dùng để mở app"
-              : !ktBank.appId
-                ? `App ${ktBank.shortName} chưa hỗ trợ link — quét QR thủ công`
-                : `📱 Mở app ${ktBank.shortName}`}
+              ? "Chọn NH em dùng để chuyển"
+              : ktBank.autofill && ktBank.appId
+                ? `💸 Chuyển khoản qua ${ktBank.shortName}`
+                : ktBank.appId
+                  ? `💸 Lưu QR + Mở ${ktBank.shortName}`
+                  : `💾 Lưu QR (mở app ${ktBank.shortName} thủ công)`}
           </button>
           <button
-            onClick={saveQrImage}
+            onClick={() => saveQrImage(false)}
             className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm font-semibold text-[#cfd4e8]"
           >
-            💾 Lưu ảnh QR (quét từ thư viện)
+            💾 Chỉ lưu ảnh QR
           </button>
         </div>
 
