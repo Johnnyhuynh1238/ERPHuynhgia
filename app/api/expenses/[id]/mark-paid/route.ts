@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
+import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
 
 const PAY_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -72,6 +73,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
       return upd;
     });
+
+    fireAndForget(
+      notifyExpensePaid({
+        expenseId: updated.id,
+        code: updated.code,
+        paidAmount: Number(data.paidAmount),
+        categoryName: updated.category.name,
+        projectLabel: updated.project ? `${updated.project.code} — ${updated.project.name}` : null,
+        actorUserId: user.id,
+        actorName: user.name || user.email || "Kế toán",
+      }),
+    );
 
     return NextResponse.json({
       expense: { ...updated, amount: Number(updated.amount), paidAmount: Number(updated.paidAmount) },

@@ -2474,6 +2474,9 @@ enum StaffNotificationKind {
   material_proposal_reminder
   tptc_assignment
   ks_tptc_acknowledged
+  expense_new
+  expense_paid
+  expense_cancelled
 }
 
 enum MaterialProposalStatus {

@@ -953,6 +953,138 @@ export async function notifyTptcRemind(input: {
   });
 }
 
+async function getRoleUserIds(roles: string[]): Promise<string[]> {
+  const rows = await prisma.user.findMany({
+    where: { role: { in: roles as any }, isActive: true },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+function fmtVndShort(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(Math.round(amount)) + " đ";
+}
+
+async function writeExpenseStaffNotif(input: {
+  recipients: string[];
+  actorUserId: string;
+  actorName: string;
+  kind: StaffNotificationKind;
+  title: string;
+  body: string;
+  link: string;
+  expenseId: string;
+  tag: string;
+}) {
+  const ids = Array.from(
+    new Set(input.recipients.filter((id) => id && id !== input.actorUserId)),
+  );
+  if (!ids.length) return;
+
+  await prisma.staffNotification.createMany({
+    data: ids.map((recipientId) => ({
+      recipientId,
+      projectId: null,
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      link: input.link,
+      actorUserId: input.actorUserId,
+      actorName: input.actorName,
+      refType: "expense",
+      refId: input.expenseId,
+    })),
+  });
+
+  await pushStaffNotification({
+    recipientIds: ids,
+    actorUserId: input.actorUserId,
+    title: input.title,
+    body: input.body,
+    link: input.link,
+    tag: input.tag,
+  });
+}
+
+/**
+ * Event — Admin tạo lệnh chi mới. Recipients: tất cả kế toán + admin khác.
+ */
+export async function notifyExpenseCreated(input: {
+  expenseId: string;
+  code: string;
+  amount: number;
+  categoryName: string;
+  payee: string | null;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["accountant", "admin"]);
+  const where = input.projectLabel ? ` cho ${input.projectLabel}` : "";
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_new",
+    title: `Lệnh chi mới ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${input.categoryName}${input.payee ? ` · ${input.payee}` : ""}${where}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-new-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — KT đánh dấu đã chi. Recipients: admin.
+ */
+export async function notifyExpensePaid(input: {
+  expenseId: string;
+  code: string;
+  paidAmount: number;
+  categoryName: string;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["admin"]);
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_paid",
+    title: `KT ${input.actorName} đã chi ${input.code} — ${fmtVndShort(input.paidAmount)}`,
+    body: `${input.categoryName}${where}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-paid-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — Admin huỷ lệnh chi. Recipients: tất cả kế toán.
+ */
+export async function notifyExpenseCancelled(input: {
+  expenseId: string;
+  code: string;
+  reason: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["accountant"]);
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_cancelled",
+    title: `Admin huỷ lệnh chi ${input.code}`,
+    body: `Lý do: ${input.reason}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-cancelled-${input.expenseId}`,
+  });
+}
+
 /**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.

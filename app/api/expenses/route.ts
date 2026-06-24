@@ -3,6 +3,7 @@ import { ExpenseStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { fireAndForget, notifyExpenseCreated } from "@/lib/notifications";
 
 const ROLES_VIEW = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -125,6 +126,19 @@ export async function POST(request: Request) {
       category: { select: { id: true, code: true, name: true } },
     },
   });
+
+  fireAndForget(
+    notifyExpenseCreated({
+      expenseId: expense.id,
+      code: expense.code,
+      amount: Number(expense.amount),
+      categoryName: expense.category.name,
+      payee: expense.payee,
+      projectLabel: expense.project ? `${expense.project.code} — ${expense.project.name}` : null,
+      actorUserId: user.id,
+      actorName: user.name || user.email || "Admin",
+    }),
+  );
 
   return NextResponse.json({
     expense: { ...expense, amount: Number(expense.amount), paidAmount: null },

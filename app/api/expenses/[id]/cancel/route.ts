@@ -3,6 +3,7 @@ import { ExpenseStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { fireAndForget, notifyExpenseCancelled } from "@/lib/notifications";
 
 const schema = z.object({
   reason: z.string().trim().min(1, "Lý do huỷ bắt buộc").max(2000),
@@ -20,20 +21,32 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const row = await prisma.expense.findUnique({ where: { id: params.id }, select: { id: true, status: true } });
+  const row = await prisma.expense.findUnique({ where: { id: params.id }, select: { id: true, status: true, code: true } });
   if (!row) return NextResponse.json({ message: "Không tìm thấy lệnh chi" }, { status: 404 });
   if (row.status !== ExpenseStatus.pending) {
     return NextResponse.json({ message: "Chỉ huỷ được lệnh đang chờ chi" }, { status: 400 });
   }
 
+  const reason = parsed.data.reason.trim();
   await prisma.expense.update({
     where: { id: row.id },
     data: {
       status: ExpenseStatus.cancelled,
       cancelledBy: user.id,
       cancelledAt: new Date(),
-      cancelledReason: parsed.data.reason.trim(),
+      cancelledReason: reason,
     },
   });
+
+  fireAndForget(
+    notifyExpenseCancelled({
+      expenseId: row.id,
+      code: row.code,
+      reason,
+      actorUserId: user.id,
+      actorName: user.name || user.email || "Admin",
+    }),
+  );
+
   return NextResponse.json({ message: "Đã huỷ lệnh chi" });
 }
