@@ -288,7 +288,36 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             </section>
           ) : null}
 
+          {(() => {
+            const m = data.morning;
+            const e = data.evening;
+            const q = data.midday;
+
+            let priLabor = 30;
+            if (!m.attendanceDone && hour >= 6 && hour < 12) priLabor = 95;
+            else if (e.workOrdersToday > 0 && !e.assignDone && hour >= 16) priLabor = 88;
+            else if (!m.attendanceDone || (e.workOrdersToday > 0 && !e.assignDone)) priLabor = 50;
+
+            let priQuality = 25;
+            if (q.qcHoldPoints > 0) priQuality = 80;
+
+            let priMaterial = 20;
+            if (m.materialsIncoming > 0) priMaterial = 75;
+            else if (hour >= 15 && hour < 18) priMaterial = 60;
+
+            const priFinance = 15;
+
+            let priKpi = 20;
+            if (hour >= 6 && hour < 10) priKpi = 100;
+            else if (hour >= 12 && hour < 14) priKpi = 90;
+
+            const sections: { id: string; priority: number; node: React.ReactNode }[] = [
+              {
+                id: "labor",
+                priority: priLabor,
+                node: (
           <ResponsibilitySection
+            key="labor"
             id="labor"
             title="Kiểm soát nhân công"
             sub="Chấm công, rải công, ảnh tổ"
@@ -346,12 +375,19 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 statusTone: data.morning.teamPhotoDone ? "done" : "todo",
                 cta: "Chụp",
                 sop: "6.1",
+                href: "/reports",
               },
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-
+                ),
+              },
+              {
+                id: "quality",
+                priority: priQuality,
+                node: (
           <ResponsibilitySection
+            key="quality"
             id="quality"
             title="Kiểm soát chất lượng"
             sub="QC hold-point, sự cố"
@@ -376,6 +412,9 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 cta: "Mở",
                 sop: "6.3",
                 muted: data.midday.qcHoldPoints === 0,
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/qc-mapping`
+                  : undefined,
               },
               {
                 Icon: Flag,
@@ -384,12 +423,19 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 statusTone: "muted",
                 cta: "Mở",
                 sop: "6.8",
+                href: "/reports",
               },
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-
+                ),
+              },
+              {
+                id: "material",
+                priority: priMaterial,
+                node: (
           <ResponsibilitySection
+            key="material"
             id="material"
             title="Kiểm soát vật tư & máy"
             sub="Đặt, nhận, kiểm, mua lẻ"
@@ -441,6 +487,9 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 statusTone: "muted",
                 cta: "Mở",
                 sop: "6.6",
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/log?entity=equipment`
+                  : undefined,
               },
               {
                 Icon: Receipt,
@@ -454,8 +503,14 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-
+                ),
+              },
+              {
+                id: "finance",
+                priority: priFinance,
+                node: (
           <ResponsibilitySection
+            key="finance"
             id="finance"
             title="Kiểm soát tài chính"
             sub="Dự toán giai đoạn vs thực tế"
@@ -489,7 +544,14 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             }
           />
 
+                ),
+              },
+              {
+                id: "kpi",
+                priority: priKpi,
+                node: (
           <ResponsibilitySection
+            key="kpi"
             id="kpi"
             title="KPI cá nhân"
             sub="Chấm công, lương của bạn"
@@ -507,9 +569,29 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 <div className="rounded-lg border border-[#2a221c] bg-[#120e0b] p-3 text-xs text-[#9a8f80]">
                   Trang chấm công bản thân + lương cá nhân sẽ nối vào đây.
                 </div>
+                <Link
+                  href="/me/kpi"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#60a5fa] hover:underline"
+                >
+                  Mở KPI cá nhân
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
               </div>
             }
           />
+                ),
+              },
+            ];
+            return (
+              <div className="space-y-4">
+                {sections
+                  .sort((a, b) => b.priority - a.priority)
+                  .map((s) => (
+                    <div key={s.id}>{s.node}</div>
+                  ))}
+              </div>
+            );
+          })()}
         </>
       ) : (
         <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-10 text-center text-[#9a8f80]">
