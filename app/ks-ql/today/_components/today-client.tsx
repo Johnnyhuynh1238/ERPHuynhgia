@@ -592,10 +592,9 @@ function SopBubble({
         transformOrigin: pos
           ? `${pos.tailLeft}px ${pos.placement === "above" ? "100%" : "0%"}`
           : "center",
-        transform: mounted ? "scale(1)" : "scale(0.55)",
+        animation: mounted ? "ks-bubble-pop 620ms cubic-bezier(0.22, 1, 0.36, 1) both" : "none",
         opacity: mounted ? 1 : 0,
-        transition:
-          "transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 160ms ease-out",
+        transition: "opacity 140ms ease-out",
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -625,6 +624,16 @@ function SopBubble({
           />
         ) : null}
       </div>
+      <style jsx>{`
+        @keyframes ks-bubble-pop {
+          0%   { transform: scale(0.15, 0.15); }
+          35%  { transform: scale(1.12, 0.86); }
+          55%  { transform: scale(0.93, 1.07); }
+          72%  { transform: scale(1.04, 0.97); }
+          86%  { transform: scale(0.985, 1.012); }
+          100% { transform: scale(1, 1); }
+        }
+      `}</style>
     </div>
   );
 }
