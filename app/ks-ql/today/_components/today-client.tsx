@@ -987,9 +987,9 @@ function ResponsibilitySection({
             {customContent ? (
               customContent
             ) : cards && onHint ? (
-              <div className="space-y-1.5">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
                 {cards.map((c, i) => (
-                  <ActionCard key={i} card={c} onHint={onHint} />
+                  <IconTile key={i} tile={c} onHint={onHint} />
                 ))}
               </div>
             ) : null}
@@ -1009,73 +1009,81 @@ function MetricBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-const TONE_BADGE: Record<Tone, string> = {
-  done: "text-[#6FA677]",
-  todo: "text-[#E0B855]",
-  warn: "text-[#D26B6B]",
-  muted: "text-[#6e6457]",
+const TONE_DOT: Record<Tone, string | null> = {
+  done: "#6FA677",
+  todo: "#E0B855",
+  warn: "#D26B6B",
+  muted: null,
 };
 
-function ActionCard({
-  card,
+function IconTile({
+  tile,
   onHint,
 }: {
-  card: CardDef;
+  tile: CardDef;
   onHint: (sop: string, anchor: DOMRect) => void;
 }) {
-  const Icon = card.Icon;
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  return (
-    <div
-      className={`group flex items-center gap-3 rounded-xl border border-[#2a221c] bg-[#120e0b] p-3 transition-all ${
-        card.muted
-          ? "opacity-60"
-          : "hover:-translate-y-px hover:border-[#3a2d22] hover:bg-[#1a1612] hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
-      }`}
-    >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#2a221c] bg-[#181410] text-[#d4c8b8]">
-        <Icon className="h-[18px] w-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium text-[#f5ede4]">{card.title}</div>
-        <div className={`truncate text-xs ${TONE_BADGE[card.statusTone]}`}>{card.status}</div>
-      </div>
-      <button
-        ref={triggerRef}
-        aria-label="Gợi ý SOP"
-        onClick={() => {
-          const r = triggerRef.current?.getBoundingClientRect();
-          if (r) onHint(card.sop, r);
-        }}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#2a221c] text-[#9a8f80] transition-all hover:scale-105 hover:bg-[#221b15] hover:text-[#f5ede4]"
+  const Icon = tile.Icon;
+  const helpRef = useRef<HTMLButtonElement>(null);
+  const dotColor = TONE_DOT[tile.statusTone];
+
+  const tileClass = `group flex w-full flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+    tile.muted
+      ? "opacity-50"
+      : "hover:-translate-y-px active:scale-95"
+  }`;
+
+  const inner = (
+    <>
+      <span
+        className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#2a221c] bg-[#1a1612] text-[#d4c8b8] transition-colors group-hover:border-[#3a2d22] group-hover:bg-[#221b15]"
       >
-        <HelpCircle className="h-4 w-4" />
-      </button>
-      {card.onClick ? (
-        <button
-          className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"
-          style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
-          onClick={card.onClick}
-        >
-          {card.cta}
+        <Icon className="h-5 w-5" />
+        {dotColor ? (
+          <span
+            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#181410]"
+            style={{ background: dotColor }}
+          />
+        ) : null}
+      </span>
+      <span className="line-clamp-2 text-center text-[11px] leading-tight text-[#d4c8b8]">
+        {tile.title}
+      </span>
+    </>
+  );
+
+  return (
+    <div className="relative">
+      {tile.onClick ? (
+        <button type="button" className={tileClass} onClick={tile.onClick}>
+          {inner}
         </button>
-      ) : card.href ? (
-        <Link
-          href={card.href}
-          className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"
-          style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
-        >
-          {card.cta}
+      ) : tile.href ? (
+        <Link href={tile.href} className={tileClass}>
+          {inner}
         </Link>
       ) : (
         <button
-          className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110 hover:shadow-[0_4px_12px_-4px_rgba(224,184,85,0.5)]"
-          style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
-          onClick={() => alert(`[MVP] Mở "${card.title}" — sẽ nối route ở bước sau.`)}
+          type="button"
+          className={tileClass}
+          onClick={() => alert(`[MVP] Mở "${tile.title}" — sẽ nối route ở bước sau.`)}
         >
-          {card.cta}
+          {inner}
         </button>
       )}
+      <button
+        ref={helpRef}
+        type="button"
+        aria-label="Gợi ý SOP"
+        onClick={(e) => {
+          e.stopPropagation();
+          const r = helpRef.current?.getBoundingClientRect();
+          if (r) onHint(tile.sop, r);
+        }}
+        className="absolute right-0.5 top-0.5 z-10 grid h-5 w-5 place-items-center rounded-full text-[#6e6457] transition-colors hover:bg-[#221b15] hover:text-[#f5ede4]"
+      >
+        <HelpCircle className="h-3 w-3" />
+      </button>
     </div>
   );
 }
