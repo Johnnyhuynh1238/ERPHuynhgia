@@ -752,53 +752,55 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link
-          href="/expenses"
-          className={`flex flex-col gap-2 rounded-xl border p-4 shadow-sm transition ${
-            hasUrgent
-              ? "border-red-400 bg-red-50 hover:bg-red-100"
-              : pendingExp.count > 0
-                ? "border-amber-300 bg-amber-50 hover:bg-amber-100"
-                : "border-slate-200 bg-white hover:bg-slate-50"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                  hasUrgent ? "bg-red-200 text-red-700" : "bg-orange-100 text-orange-700"
-                }`}
-              >
-                <Receipt className="h-5 w-5" />
+        {pendingExp.count > 0 && (
+          <Link
+            href="/expenses"
+            className={`slide-up smooth-press flex flex-col gap-2 rounded-xl border p-4 shadow-sm transition ${
+              hasUrgent
+                ? "border-red-400 bg-red-50 pulse-glow"
+                : "border-amber-300 bg-amber-50 hover:bg-amber-100"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                    hasUrgent ? "bg-red-200 text-red-700" : "bg-orange-100 text-orange-700"
+                  }`}
+                >
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Lệnh chi</div>
+                  <div className="text-xs text-slate-500">Admin gửi → chuyển khoản</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Lệnh chi</div>
-                <div className="text-xs text-slate-500">Admin gửi → chuyển khoản</div>
+              <ChevronRight className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="flex items-baseline justify-between">
+              <div className={`text-2xl font-bold ${hasUrgent ? "text-red-700" : "text-amber-700"}`}>
+                {pendingExp.count}
+              </div>
+              <div className="text-right text-xs">
+                <div className={`font-semibold ${hasUrgent ? "text-red-700" : "text-slate-600"}`}>
+                  {fmtVndShort(pendingExp.total)} đ
+                </div>
+                {hasUrgent ? (
+                  <div className="font-semibold text-red-600">🚨 {pendingExp.urgentCount} GẤP</div>
+                ) : (
+                  <div className="text-slate-500">chờ chi</div>
+                )}
               </div>
             </div>
-            <ChevronRight className="h-5 w-5 text-slate-400" />
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className={`text-2xl font-bold ${hasUrgent ? "text-red-700" : pendingExp.count > 0 ? "text-amber-700" : "text-slate-500"}`}>
-              {pendingExp.count}
-            </div>
-            <div className="text-right text-xs">
-              <div className={`font-semibold ${hasUrgent ? "text-red-700" : "text-slate-600"}`}>
-                {fmtVndShort(pendingExp.total)} đ
-              </div>
-              {hasUrgent ? (
-                <div className="font-semibold text-red-600">🚨 {pendingExp.urgentCount} GẤP</div>
-              ) : (
-                <div className="text-slate-500">chờ chi</div>
-              )}
-            </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
         <button
           type="button"
           onClick={() => setShowTreasury(true)}
-          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.99] hover:bg-slate-50"
+          className={`smooth-press flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:bg-slate-50 ${
+            pendingExp.count === 0 ? "sm:col-span-2" : ""
+          }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -868,12 +870,12 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
 
       {showTreasury && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 pt-4"
+          className="modal-backdrop-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 pt-4"
           onClick={() => setShowTreasury(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl rounded-xl bg-[#0b0d16] shadow-xl text-[#cfd4e8] border border-[#2d3249]"
+            className="modal-panel-in w-full max-w-5xl rounded-xl bg-[#0b0d16] shadow-xl text-[#cfd4e8] border border-[#2d3249]"
           >
             <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
               <div className="text-base font-semibold text-orange-300">Sổ quỹ — chi tiết</div>
