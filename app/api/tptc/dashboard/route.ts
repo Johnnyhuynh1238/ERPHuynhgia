@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BudgetCategory, DailyAssignmentStatus, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkerStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
+import { BudgetCategory, DailyAssignmentStatus, ExpenseStatus, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkerStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
@@ -98,6 +98,7 @@ type DashboardPayload = {
     eodMissingToday: number;
     woCarried: number;
     payrollDraft: number;
+    pettyCashPending: number;
   };
   projects: ProjectMetrics[];
   alerts: Array<{ projectId: string; projectCode: string; message: string; severity: "warn" | "danger" }>;
@@ -161,7 +162,7 @@ export async function GET() {
       role: user.role as "construction_manager" | "admin",
       today: today.toISOString().slice(0, 10),
       weekKey,
-      totals: { projectsCount: 0, laborUsedPct: 0, materialUsedPct: 0, qcPending: 0, eodMissingToday: 0, woCarried: 0, payrollDraft: 0 },
+      totals: { projectsCount: 0, laborUsedPct: 0, materialUsedPct: 0, qcPending: 0, eodMissingToday: 0, woCarried: 0, payrollDraft: 0, pettyCashPending: 0 },
       projects: [],
       alerts: [],
     };
@@ -513,6 +514,10 @@ export async function GET() {
     }
   }
 
+  const pettyCashPending = await prisma.expense.count({
+    where: { status: ExpenseStatus.tptc_pending },
+  });
+
   const payload: DashboardPayload = {
     role: user.role as "construction_manager" | "admin",
     today: today.toISOString().slice(0, 10),
@@ -525,6 +530,7 @@ export async function GET() {
       eodMissingToday: eodMissingTodaySum,
       woCarried: woCarriedSum,
       payrollDraft: payrollDraftSum,
+      pettyCashPending,
     },
     projects: projectMetrics,
     alerts: crossAlerts,

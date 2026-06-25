@@ -14,6 +14,7 @@ import {
   Info,
   ListTodo,
   Package,
+  Receipt,
   Sparkles,
   Sun,
   Sunrise,
@@ -22,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { PopupOrderMaterial } from "./popup-order-material";
+import { PopupPettyCash } from "./popup-petty-cash";
 
 type Project = {
   id: string;
@@ -111,6 +113,10 @@ const SOP_HINTS: Record<string, { title: string; body: string }> = {
     title: "6.8 Sự cố / ngoại lệ",
     body: "Bất cứ khi nào có vấn đề (chậm, thiếu, lỗi, máy hỏng, nghi thất thoát, thời tiết): gắn cờ + chọn loại + mô tả + ảnh.",
   },
+  "6.9": {
+    title: "6.9 Yêu cầu chi mua lẻ",
+    body: "Mua nhanh ngoài đề xuất (vật tư phát sinh, cơm thợ, xe ôm…). Nhập số tiền + ghi chú + ảnh hoá đơn → TPTC duyệt → KT chi.",
+  },
 };
 
 export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
@@ -120,6 +126,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   const [hintKey, setHintKey] = useState<string | null>(null);
   const [hintMounted, setHintMounted] = useState(false);
   const [showOrderPopup, setShowOrderPopup] = useState(false);
+  const [showPettyCashPopup, setShowPettyCashPopup] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
@@ -325,6 +332,15 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 muted: data.morning.materialsIncoming === 0,
                 onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
+              {
+                Icon: Receipt,
+                title: "Yêu cầu chi mua lẻ",
+                status: "Mua nhanh tại công trình · TPTC duyệt → KT chi",
+                statusTone: "muted",
+                cta: "Yêu cầu",
+                sop: "6.9",
+                onClick: selectedProjectId ? () => setShowPettyCashPopup(true) : undefined,
+              },
             ]}
             onHint={setHintKey}
           />
@@ -476,6 +492,14 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             setShowOrderPopup(false);
             reloadTodayData();
           }}
+        />
+      ) : null}
+
+      {showPettyCashPopup && selectedProjectId && project ? (
+        <PopupPettyCash
+          projectId={selectedProjectId}
+          projectName={project.name}
+          onClose={() => setShowPettyCashPopup(false)}
         />
       ) : null}
 

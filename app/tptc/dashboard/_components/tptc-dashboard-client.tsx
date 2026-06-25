@@ -18,6 +18,7 @@ type DashboardData = {
     eodMissingToday: number;
     woCarried: number;
     payrollDraft: number;
+    pettyCashPending: number;
   };
   projects: ProjectMetrics[];
   alerts: Array<{ projectId: string; projectCode: string; message: string; severity: "warn" | "danger" }>;
@@ -105,9 +106,15 @@ function KpiBar({ data }: { data: DashboardData }) {
       tone: data.totals.payrollDraft > 0 ? "text-amber-300" : "text-emerald-300",
       href: null,
     },
+    {
+      label: "Yêu cầu chi mua lẻ chờ duyệt",
+      value: data.totals.pettyCashPending,
+      tone: data.totals.pettyCashPending > 0 ? "text-amber-300" : "text-emerald-300",
+      href: "/tptc/petty-cash",
+    },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {items.map((item) => {
         const inner = (
           <Card className="border-[#252840] bg-[#1a1d2e]">

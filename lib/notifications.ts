@@ -1086,6 +1086,86 @@ export async function notifyExpenseCancelled(input: {
 }
 
 /**
+ * Event — KS gửi yêu cầu chi mua lẻ. Recipients: TPTC + admin.
+ */
+export async function notifyExpenseKsRequest(input: {
+  expenseId: string;
+  code: string;
+  amount: number;
+  note: string | null;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["construction_manager", "admin"]);
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_ks_request",
+    title: `KS ${input.actorName} xin chi ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${input.note ?? "Mua lẻ tại công trình"}${where}`,
+    link: `/tptc/petty-cash?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-ks-request-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — TPTC duyệt yêu cầu KS. Recipients: KT + KS tạo yêu cầu.
+ */
+export async function notifyExpenseTptcApproved(input: {
+  expenseId: string;
+  code: string;
+  amount: number;
+  note: string | null;
+  projectLabel: string | null;
+  ksUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const accountants = await getRoleUserIds(["accountant", "admin"]);
+  const recipients = Array.from(new Set([...accountants, input.ksUserId]));
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_tptc_approved",
+    title: `TPTC duyệt chi ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${input.note ?? "Mua lẻ tại công trình"}${where}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-tptc-approved-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — TPTC từ chối yêu cầu KS. Recipients: KS tạo yêu cầu.
+ */
+export async function notifyExpenseTptcRejected(input: {
+  expenseId: string;
+  code: string;
+  reason: string;
+  ksUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  await writeExpenseStaffNotif({
+    recipients: [input.ksUserId],
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_tptc_rejected",
+    title: `TPTC từ chối yêu cầu chi ${input.code}`,
+    body: `Lý do: ${input.reason}`,
+    link: `/ks-ql/today`,
+    expenseId: input.expenseId,
+    tag: `expense-tptc-rejected-${input.expenseId}`,
+  });
+}
+
+/**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.
  */

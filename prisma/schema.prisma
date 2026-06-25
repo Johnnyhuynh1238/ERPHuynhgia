@@ -394,6 +394,7 @@ enum CashTxnRefType {
 }
 
 enum ExpenseStatus {
+  tptc_pending
   pending
   paid
   cancelled
@@ -526,6 +527,7 @@ model User {
   expensesCreated                 Expense[]                   @relation("ExpenseCreator")
   expensesPaid                    Expense[]                   @relation("ExpensePayer")
   expensesCancelled               Expense[]                   @relation("ExpenseCanceller")
+  expensesTptcApproved            Expense[]                   @relation("ExpenseTptcApprover")
   cashTransactionsCreated         CashTransaction[]           @relation("CashTransactionCreator")
 
   @@map("users")
@@ -2482,6 +2484,9 @@ enum StaffNotificationKind {
   expense_new
   expense_paid
   expense_cancelled
+  expense_ks_request
+  expense_tptc_approved
+  expense_tptc_rejected
 }
 
 enum MaterialProposalStatus {
@@ -3318,11 +3323,16 @@ model Expense {
   payeeAccountName   String?  @map("payee_account_name")    @db.VarChar(200)
   payeeQrUrl         String?  @map("payee_qr_url")
 
+  tptcApprovedBy   String?   @map("tptc_approved_by") @db.Uuid
+  tptcApprovedAt   DateTime? @map("tptc_approved_at")
+  tptcRejectedReason String? @map("tptc_rejected_reason") @db.Text
+
   project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   category  ExpenseCategory @relation(fields: [categoryId], references: [id])
   creator   User            @relation("ExpenseCreator", fields: [createdBy], references: [id])
   payer     User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
   canceller User?           @relation("ExpenseCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
+  tptcApprover User?        @relation("ExpenseTptcApprover", fields: [tptcApprovedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])

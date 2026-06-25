@@ -57,6 +57,9 @@ export async function GET(request: Request) {
   const where: Prisma.ExpenseWhereInput = {};
   if (status && status !== "all" && (status === "pending" || status === "paid" || status === "cancelled")) {
     where.status = status as ExpenseStatus;
+  } else {
+    // KT/admin không thấy yêu cầu KS đang chờ TPTC duyệt
+    where.status = { in: [ExpenseStatus.pending, ExpenseStatus.paid, ExpenseStatus.cancelled] };
   }
   if (projectId === "none") where.projectId = null;
   else if (projectId) where.projectId = projectId;

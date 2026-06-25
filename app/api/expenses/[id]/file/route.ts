@@ -7,7 +7,12 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const VIEW_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
+const VIEW_ROLES = new Set<string>([
+  UserRole.admin,
+  UserRole.accountant,
+  UserRole.construction_manager,
+  UserRole.engineer,
+]);
 
 function contentTypeFor(value: string) {
   const ext = path.extname(value.split("?")[0]).toLowerCase();
@@ -30,9 +35,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   const expense = await prisma.expense.findUnique({
     where: { id: params.id },
-    select: { attachmentUrl: true, paidReceiptUrl: true },
+    select: { attachmentUrl: true, paidReceiptUrl: true, createdBy: true },
   });
   if (!expense) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
+  if (user.role === UserRole.engineer && expense.createdBy !== user.id) {
+    return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
 
   const stored = type === "receipt" ? expense.paidReceiptUrl : expense.attachmentUrl;
   if (!stored) return NextResponse.json({ message: "Không có file" }, { status: 404 });

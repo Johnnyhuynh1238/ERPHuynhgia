@@ -8,7 +8,12 @@ export const runtime = "nodejs";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"];
 const MAX_BYTES = 8 * 1024 * 1024;
-const ALLOWED_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
+const ALLOWED_ROLES = new Set<string>([
+  UserRole.admin,
+  UserRole.accountant,
+  UserRole.engineer,
+  UserRole.construction_manager,
+]);
 
 function extFromType(type: string) {
   if (type === "application/pdf") return "pdf";
