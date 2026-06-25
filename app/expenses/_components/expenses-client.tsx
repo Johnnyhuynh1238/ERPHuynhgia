@@ -1338,13 +1338,15 @@ function TransferModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm space-y-2.5 rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#cfd4e8] my-2"
+        className="w-full max-w-3xl rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#cfd4e8]"
       >
-        <div className="sticky top-0 -mx-3 -mt-3 mb-1 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-3 py-2">
+        <div className="sticky top-0 -mx-3 -mt-3 mb-2 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-3 py-2">
           <div className="text-base font-semibold text-orange-300">Chuyển khoản · {expense.code}</div>
           <button onClick={onClose} className="text-[#8b95b7] hover:text-[#f0f2ff]" aria-label="Đóng">✕</button>
         </div>
 
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="space-y-2.5">
         {qrUrl && (
           <div className="flex justify-center rounded-lg bg-white p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1391,7 +1393,9 @@ function TransferModal({
             <span className="font-mono text-[#f0f2ff]">{memo} ⧉</span>
           </button>
         </div>
+          </div>
 
+          <div className="space-y-2.5">
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
           <label className="block">
             <span className="font-semibold">App NH em đang dùng để chuyển</span>
@@ -1508,6 +1512,8 @@ function TransferModal({
             )}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

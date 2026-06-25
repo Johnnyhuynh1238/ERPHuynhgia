@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
+import { ExpensesClient } from "@/app/expenses/_components/expenses-client";
 import {
   AlertTriangle,
   Bell,
@@ -736,26 +737,28 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
   const balanceFontSize = balanceText.length > 14 ? "text-base" : balanceText.length > 10 ? "text-lg" : "text-xl";
 
   const [showTreasury, setShowTreasury] = useState(false);
+  const [showExpenses, setShowExpenses] = useState(false);
   const [opts, setOpts] = useState<{
     projects: { id: string; code: string; name: string }[];
     categories: { id: string; code: string; name: string }[];
   } | null>(null);
 
   useEffect(() => {
-    if (!showTreasury || opts) return;
+    if ((!showTreasury && !showExpenses) || opts) return;
     fetch("/api/treasury/options", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => setOpts({ projects: j.projects || [], categories: j.categories || [] }))
       .catch(() => setOpts({ projects: [], categories: [] }));
-  }, [showTreasury, opts]);
+  }, [showTreasury, showExpenses, opts]);
 
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
         {pendingExp.count > 0 && (
-          <Link
-            href="/expenses"
-            className={`slide-up smooth-press flex flex-col gap-2 rounded-xl border p-4 shadow-sm transition ${
+          <button
+            type="button"
+            onClick={() => setShowExpenses(true)}
+            className={`slide-up smooth-press flex flex-col gap-2 rounded-xl border p-4 text-left shadow-sm transition ${
               hasUrgent
                 ? "border-red-400 bg-red-50 pulse-glow"
                 : "border-amber-300 bg-amber-50 hover:bg-amber-100"
@@ -792,7 +795,7 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
                 )}
               </div>
             </div>
-          </Link>
+          </button>
         )}
 
         <button
@@ -867,6 +870,36 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
           className="sm:col-span-2"
         />
       </div>
+
+      {showExpenses && (
+        <div
+          className="modal-backdrop-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 pt-4"
+          onClick={() => setShowExpenses(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="modal-panel-in w-full max-w-6xl rounded-xl bg-[#0b0d16] shadow-xl text-[#cfd4e8] border border-[#2d3249]"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
+              <div className="text-base font-semibold text-orange-300">Lệnh chi — chi tiết</div>
+              <button
+                onClick={() => setShowExpenses(false)}
+                className="rounded-lg px-2 py-1 text-[#8b95b7] hover:bg-[#0b0d16] hover:text-[#f0f2ff]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3">
+              {opts ? (
+                <ExpensesClient role="accountant" projects={opts.projects} categories={opts.categories} />
+              ) : (
+                <div className="p-6 text-center text-sm text-[#8b95b7]">Đang tải lệnh chi…</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTreasury && (
         <div
