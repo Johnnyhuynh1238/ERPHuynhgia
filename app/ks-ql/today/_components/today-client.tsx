@@ -288,36 +288,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             </section>
           ) : null}
 
-          {(() => {
-            const m = data.morning;
-            const e = data.evening;
-            const q = data.midday;
-
-            let priLabor = 30;
-            if (!m.attendanceDone && hour >= 6 && hour < 12) priLabor = 95;
-            else if (e.workOrdersToday > 0 && !e.assignDone && hour >= 16) priLabor = 88;
-            else if (!m.attendanceDone || (e.workOrdersToday > 0 && !e.assignDone)) priLabor = 50;
-
-            let priQuality = 25;
-            if (q.qcHoldPoints > 0) priQuality = 80;
-
-            let priMaterial = 20;
-            if (m.materialsIncoming > 0) priMaterial = 75;
-            else if (hour >= 15 && hour < 18) priMaterial = 60;
-
-            const priFinance = 15;
-
-            let priKpi = 20;
-            if (hour >= 6 && hour < 10) priKpi = 100;
-            else if (hour >= 12 && hour < 14) priKpi = 90;
-
-            const sections: { id: string; priority: number; node: React.ReactNode }[] = [
-              {
-                id: "labor",
-                priority: priLabor,
-                node: (
           <ResponsibilitySection
-            key="labor"
             id="labor"
             title="Kiểm soát nhân công"
             sub="Chấm công, rải công, ảnh tổ"
@@ -345,6 +316,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 href: selectedProjectId
                   ? `/cham-cong-tho/${selectedProjectId}?session=${hour < 13 ? "morning" : "afternoon"}&back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
+                needsAction: !data.morning.attendanceDone,
               },
               {
                 Icon: Sparkles,
@@ -367,6 +339,12 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 href: selectedProjectId
                   ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
+                count:
+                  data.evening.workOrdersToday > 0 && !data.evening.assignDone
+                    ? data.evening.workOrdersToday - data.evening.workOrderOutputsToday
+                    : undefined,
+                needsAction:
+                  data.evening.workOrdersToday > 0 && !data.evening.assignDone,
               },
               {
                 Icon: Camera,
@@ -376,18 +354,13 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 cta: "Chụp",
                 sop: "6.1",
                 href: "/reports",
+                needsAction: !data.morning.teamPhotoDone,
               },
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-                ),
-              },
-              {
-                id: "quality",
-                priority: priQuality,
-                node: (
+
           <ResponsibilitySection
-            key="quality"
             id="quality"
             title="Kiểm soát chất lượng"
             sub="QC hold-point, sự cố"
@@ -415,6 +388,8 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 href: selectedProjectId
                   ? `/projects/${selectedProjectId}/qc-mapping`
                   : undefined,
+                count: data.midday.qcHoldPoints > 0 ? data.midday.qcHoldPoints : undefined,
+                needsAction: data.midday.qcHoldPoints > 0,
               },
               {
                 Icon: Flag,
@@ -428,14 +403,8 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-                ),
-              },
-              {
-                id: "material",
-                priority: priMaterial,
-                node: (
+
           <ResponsibilitySection
-            key="material"
             id="material"
             title="Kiểm soát vật tư & máy"
             sub="Đặt, nhận, kiểm, mua lẻ"
@@ -470,6 +439,8 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 sop: "6.5",
                 muted: data.morning.materialsIncoming === 0,
                 onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
+                count: data.morning.materialsIncoming > 0 ? data.morning.materialsIncoming : undefined,
+                needsAction: data.morning.materialsIncoming > 0,
               },
               {
                 Icon: Package,
@@ -503,16 +474,10 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
-                ),
-              },
-              {
-                id: "finance",
-                priority: priFinance,
-                node: (
+
           <ResponsibilitySection
-            key="finance"
             id="finance"
-            title="Kiểm soát tài chính"
+            title="Kiểm soát hiệu quả"
             sub="Dự toán giai đoạn vs thực tế"
             Icon={Coins}
             accent="purple"
@@ -544,14 +509,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             }
           />
 
-                ),
-              },
-              {
-                id: "kpi",
-                priority: priKpi,
-                node: (
           <ResponsibilitySection
-            key="kpi"
             id="kpi"
             title="KPI cá nhân"
             sub="Chấm công, lương của bạn"
@@ -579,19 +537,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
               </div>
             }
           />
-                ),
-              },
-            ];
-            return (
-              <div className="space-y-4">
-                {sections
-                  .sort((a, b) => b.priority - a.priority)
-                  .map((s) => (
-                    <div key={s.id}>{s.node}</div>
-                  ))}
-              </div>
-            );
-          })()}
         </>
       ) : (
         <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-10 text-center text-[#9a8f80]">
@@ -626,6 +571,38 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
           onClose={() => setHintOpen(null)}
         />
       ) : null}
+
+      <style jsx global>{`
+        @keyframes ks-icon-glow-pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(224, 184, 85, 0.55), 0 0 12px 2px rgba(224, 184, 85, 0.25);
+          }
+          50% {
+            box-shadow: 0 0 0 5px rgba(224, 184, 85, 0), 0 0 18px 4px rgba(224, 184, 85, 0.45);
+          }
+        }
+        .ks-icon-glow {
+          animation: ks-icon-glow-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes ks-icon-shimmer-sweep {
+          0% { transform: translateX(-120%); }
+          100% { transform: translateX(120%); }
+        }
+        .ks-icon-shimmer::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            115deg,
+            transparent 30%,
+            rgba(255, 236, 200, 0.0) 42%,
+            rgba(255, 236, 200, 0.55) 50%,
+            rgba(255, 236, 200, 0.0) 58%,
+            transparent 70%
+          );
+          animation: ks-icon-shimmer-sweep 2.4s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
@@ -848,6 +825,8 @@ type CardDef = {
   muted?: boolean;
   href?: string;
   onClick?: () => void;
+  count?: number;
+  needsAction?: boolean;
 };
 
 const ACCENT_STYLES: Record<
@@ -1033,13 +1012,26 @@ function IconTile({
       : "hover:-translate-y-px active:scale-95"
   }`;
 
+  const showCount = typeof tile.count === "number" && tile.count > 0;
   const inner = (
     <>
       <span
-        className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#2a221c] bg-[#1a1612] text-[#d4c8b8] transition-colors group-hover:border-[#3a2d22] group-hover:bg-[#221b15]"
+        className={`relative grid h-12 w-12 place-items-center rounded-2xl border border-[#2a221c] bg-[#1a1612] text-[#d4c8b8] transition-colors group-hover:border-[#3a2d22] group-hover:bg-[#221b15] ${
+          tile.needsAction ? "ks-icon-glow" : ""
+        }`}
       >
         <Icon className="h-5 w-5" />
-        {dotColor ? (
+        {tile.needsAction ? (
+          <span aria-hidden className="ks-icon-shimmer pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" />
+        ) : null}
+        {showCount ? (
+          <span
+            className="absolute -right-1 -top-1 grid min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-[#181410]"
+            style={{ background: "#FF3B30", height: 18 }}
+          >
+            {tile.count! > 99 ? "99+" : tile.count}
+          </span>
+        ) : !showCount && dotColor ? (
           <span
             className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#181410]"
             style={{ background: dotColor }}
