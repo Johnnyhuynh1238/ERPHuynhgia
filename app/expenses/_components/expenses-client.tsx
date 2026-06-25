@@ -114,7 +114,7 @@ export function ExpensesClient({
   const qrInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [transferFor, setTransferFor] = useState<Expense | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [openPay, setOpenPay] = useState<Expense | null>(null);
   const [paying, setPaying] = useState(false);
@@ -762,25 +762,30 @@ export function ExpensesClient({
             const st = statusMeta(r.status);
             const isUrgent = r.priority === "urgent" && r.status === "pending";
             const canQuickTransfer = r.status === "pending" && !!r.payeeBankBin && !!r.payeeAccountNumber && canMarkPaid;
+            const isExpanded = expandedId === r.id;
+            const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
             return (
               <div
                 key={r.id}
-                onClick={canQuickTransfer ? () => setTransferFor(r) : undefined}
+                onClick={canQuickTransfer ? toggle : undefined}
                 role={canQuickTransfer ? "button" : undefined}
                 tabIndex={canQuickTransfer ? 0 : undefined}
+                aria-expanded={canQuickTransfer ? isExpanded : undefined}
                 onKeyDown={
                   canQuickTransfer
                     ? (e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          setTransferFor(r);
+                          toggle();
                         }
                       }
                     : undefined
                 }
                 className={`rounded-xl border bg-[#13151f] p-3 space-y-2 ${
                   isUrgent ? "border-red-400/60 shadow-[0_0_0_1px_rgba(248,113,113,0.25)]" : "border-[#2d3249]"
-                } ${canQuickTransfer ? "cursor-pointer transition active:scale-[0.99]" : ""}`}
+                } ${canQuickTransfer ? "cursor-pointer transition active:scale-[0.995]" : ""} ${
+                  isExpanded ? "md:col-span-2 xl:col-span-3" : ""
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -856,10 +861,10 @@ export function ExpensesClient({
                 <div className="flex flex-wrap gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
                   {canQuickTransfer && (
                     <button
-                      onClick={() => setTransferFor(r)}
+                      onClick={toggle}
                       className="rounded bg-orange-500/25 text-orange-200 px-2 py-1 text-xs font-semibold"
                     >
-                      💸 Mở chuyển khoản
+                      {isExpanded ? "⌃ Thu gọn" : "💸 Chuyển khoản"}
                     </button>
                   )}
                   {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
@@ -902,6 +907,20 @@ export function ExpensesClient({
                     </a>
                   )}
                 </div>
+
+                {canQuickTransfer && isExpanded && (
+                  <div className="slide-up border-t border-[#2d3249] pt-3 mt-2" onClick={(e) => e.stopPropagation()}>
+                    <TransferDetails
+                      expense={r}
+                      canMarkPaid={canMarkPaid}
+                      onPaid={() => {
+                        setExpandedId(null);
+                        load();
+                        loadBalance();
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1072,19 +1091,6 @@ export function ExpensesClient({
         </div>
       )}
 
-      {transferFor && (
-        <TransferModal
-          expense={transferFor}
-          canMarkPaid={canMarkPaid}
-          onClose={() => setTransferFor(null)}
-          onPaid={() => {
-            setTransferFor(null);
-            load();
-            loadBalance();
-          }}
-        />
-      )}
-
       {showTreasury && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 pt-4"
@@ -1185,15 +1191,13 @@ function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: s
   );
 }
 
-function TransferModal({
+function TransferDetails({
   expense,
   canMarkPaid,
-  onClose,
   onPaid,
 }: {
   expense: Expense;
   canMarkPaid: boolean;
-  onClose: () => void;
   onPaid: () => void;
 }) {
   const recipientBank = findBankByBin(expense.payeeBankBin);
@@ -1332,19 +1336,7 @@ function TransferModal({
   }
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/70 p-3 pt-4"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#cfd4e8]"
-      >
-        <div className="sticky top-0 -mx-3 -mt-3 mb-2 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-3 py-2">
-          <div className="text-base font-semibold text-orange-300">Chuyển khoản · {expense.code}</div>
-          <button onClick={onClose} className="text-[#8b95b7] hover:text-[#f0f2ff]" aria-label="Đóng">✕</button>
-        </div>
-
+    <div className="text-sm text-[#cfd4e8]">
         <div className="grid gap-2.5 sm:grid-cols-2">
           <div className="space-y-2.5">
         {qrUrl && (
@@ -1514,7 +1506,6 @@ function TransferModal({
         )}
           </div>
         </div>
-      </div>
     </div>
   );
 }
