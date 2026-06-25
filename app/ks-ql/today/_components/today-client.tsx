@@ -1,26 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Camera,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
+  Coins,
   Flag,
   HardHat,
   HelpCircle,
-  Info,
   ListTodo,
   Package,
   Receipt,
   Sparkles,
-  Sun,
-  Sunrise,
-  Sunset,
   Truck,
-  Zap,
+  UserCircle,
+  Wrench,
 } from "lucide-react";
 import { PopupOrderMaterial } from "./popup-order-material";
 import { PopupPettyCash } from "./popup-petty-cash";
@@ -63,14 +61,6 @@ type Props = {
   projects: Project[];
   selectedProjectId: string | null;
 };
-
-type Slot = "morning" | "midday" | "evening";
-
-function currentSlot(hour: number): Slot {
-  if (hour < 8) return "morning";
-  if (hour < 16) return "midday";
-  return "evening";
-}
 
 function vnGreeting(hour: number) {
   if (hour < 11) return "Chào buổi sáng";
@@ -166,7 +156,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   }, [selectedProjectId]);
 
   const hour = now ? now.getHours() : 7;
-  const slot: Slot = useMemo(() => currentSlot(hour), [hour]);
   const project = projects.find((p) => p.id === selectedProjectId) ?? null;
   const firstName = (user.name || "KS").split(" ").pop() || user.name;
 
@@ -299,50 +288,23 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             </section>
           ) : null}
 
-          <QuickActions
-            cards={[
-              {
-                Icon: Package,
-                title: "Đặt VT/Máy",
-                status: "Bất cứ lúc nào · KT lên đơn",
-                statusTone: "muted",
-                cta: "Đặt",
-                sop: "6.4",
-                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
-              },
-              {
-                Icon: Truck,
-                title: "Nhận VT/MM",
-                status:
-                  data.morning.materialsIncoming === 0
-                    ? "Chưa có hàng được duyệt cấp"
-                    : `${data.morning.materialsIncoming} món đã duyệt cấp`,
-                statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
-                cta: data.morning.materialsIncoming === 0 ? "Xem" : "Nhận",
-                sop: "6.5",
-                muted: data.morning.materialsIncoming === 0,
-                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
-              },
-              {
-                Icon: Receipt,
-                title: "Yêu cầu chi mua lẻ",
-                status: "Mua nhanh tại công trình · TPTC duyệt → KT chi",
-                statusTone: "muted",
-                cta: "Yêu cầu",
-                sop: "6.9",
-                onClick: selectedProjectId ? () => setShowPettyCashPopup(true) : undefined,
-              },
-            ]}
-            onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
-          />
-
-          <PhaseSection
-            id="morning"
-            title="Đầu ngày"
-            sub="6:00 – 8:00"
-            Icon={Sunrise}
+          <ResponsibilitySection
+            id="labor"
+            title="Kiểm soát nhân công"
+            sub="Chấm công, rải công, ảnh tổ"
+            Icon={HardHat}
             accent="gold"
-            isCurrent={slot === "morning"}
+            summary={
+              data.morning.attendanceDone
+                ? data.evening.workOrdersToday === 0
+                  ? "Đã chấm công · chưa có phiếu giao việc"
+                  : data.evening.assignDone
+                    ? `Đã chấm công · đã rải ${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu`
+                    : `Đã chấm công · còn ${data.evening.workOrdersToday - data.evening.workOrderOutputsToday} phiếu chưa rải`
+                : "Chưa chấm công hôm nay"
+            }
+            badgeTone={data.morning.attendanceDone ? "ok" : "todo"}
+            defaultOpen
             cards={[
               {
                 Icon: ListTodo,
@@ -352,7 +314,29 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 cta: data.morning.attendanceDone ? "Sửa" : "Chấm",
                 sop: "6.1",
                 href: selectedProjectId
-                  ? `/cham-cong-tho/${selectedProjectId}?session=${slot === "morning" ? "morning" : "afternoon"}&back=/ks-ql/today?p=${selectedProjectId}`
+                  ? `/cham-cong-tho/${selectedProjectId}?session=${hour < 13 ? "morning" : "afternoon"}&back=/ks-ql/today?p=${selectedProjectId}`
+                  : undefined,
+              },
+              {
+                Icon: Sparkles,
+                title: "Rải công + % tiến độ",
+                status:
+                  data.evening.workOrdersToday === 0
+                    ? "Chưa có phiếu giao việc"
+                    : data.evening.assignDone
+                      ? `Đã rải ${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu`
+                      : `${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu đã rải`,
+                statusTone:
+                  data.evening.workOrdersToday === 0
+                    ? "muted"
+                    : data.evening.assignDone
+                      ? "done"
+                      : "todo",
+                cta: data.evening.assignDone ? "Sửa" : "Rải",
+                sop: "6.2",
+                muted: data.evening.workOrdersToday === 0,
+                href: selectedProjectId
+                  ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
                   : undefined,
               },
               {
@@ -367,13 +351,19 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
-          <PhaseSection
-            id="midday"
-            title="Trong ngày"
-            sub="8:00 – 16:00"
-            Icon={Sun}
+          <ResponsibilitySection
+            id="quality"
+            title="Kiểm soát chất lượng"
+            sub="QC hold-point, sự cố"
+            Icon={ClipboardCheck}
             accent="terra"
-            isCurrent={slot === "midday"}
+            summary={
+              data.midday.qcHoldPoints > 0
+                ? `${data.midday.qcHoldPoints} điểm QC cần tick`
+                : "Không có điểm QC chờ"
+            }
+            badgeTone={data.midday.qcHoldPoints > 0 ? "warn" : "ok"}
+            defaultOpen={data.midday.qcHoldPoints > 0}
             cards={[
               {
                 Icon: ClipboardCheck,
@@ -399,35 +389,41 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
-          <PhaseSection
-            id="evening"
-            title="Cuối ngày"
-            sub="16:00 – 19:00"
-            Icon={Sunset}
+          <ResponsibilitySection
+            id="material"
+            title="Kiểm soát vật tư & máy"
+            sub="Đặt, nhận, kiểm, mua lẻ"
+            Icon={Package}
             accent="green"
-            isCurrent={slot === "evening"}
+            summary={
+              data.morning.materialsIncoming > 0
+                ? `${data.morning.materialsIncoming} món VT đã duyệt cấp · chờ nhận`
+                : "Chưa có VT về"
+            }
+            badgeTone={data.morning.materialsIncoming > 0 ? "warn" : "ok"}
+            defaultOpen={data.morning.materialsIncoming > 0}
             cards={[
               {
-                Icon: Sparkles,
-                title: "Rải công + % tiến độ",
+                Icon: Package,
+                title: "Đặt VT/Máy",
+                status: "Bất cứ lúc nào · KT lên đơn",
+                statusTone: "muted",
+                cta: "Đặt",
+                sop: "6.4",
+                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
+              },
+              {
+                Icon: Truck,
+                title: "Nhận VT/MM",
                 status:
-                  data.evening.workOrdersToday === 0
-                    ? "Chưa có phiếu giao việc"
-                    : data.evening.assignDone
-                      ? `Đã rải ${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu`
-                      : `${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu đã rải`,
-                statusTone:
-                  data.evening.workOrdersToday === 0
-                    ? "muted"
-                    : data.evening.assignDone
-                      ? "done"
-                      : "todo",
-                cta: data.evening.assignDone ? "Sửa" : "Rải",
-                sop: "6.2",
-                muted: data.evening.workOrdersToday === 0,
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
-                  : undefined,
+                  data.morning.materialsIncoming === 0
+                    ? "Chưa có hàng được duyệt cấp"
+                    : `${data.morning.materialsIncoming} món đã duyệt cấp`,
+                statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
+                cta: data.morning.materialsIncoming === 0 ? "Xem" : "Nhận",
+                sop: "6.5",
+                muted: data.morning.materialsIncoming === 0,
+                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
               {
                 Icon: Package,
@@ -438,35 +434,82 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 sop: "6.4",
                 onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
+              {
+                Icon: Wrench,
+                title: "Sổ máy + trạng thái",
+                status: "Cập nhật khi đổi máy",
+                statusTone: "muted",
+                cta: "Mở",
+                sop: "6.6",
+              },
+              {
+                Icon: Receipt,
+                title: "Yêu cầu chi mua lẻ",
+                status: "Mua nhanh tại công trình · TPTC duyệt → KT chi",
+                statusTone: "muted",
+                cta: "Yêu cầu",
+                sop: "6.9",
+                onClick: selectedProjectId ? () => setShowPettyCashPopup(true) : undefined,
+              },
             ]}
             onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
-          <section className="rounded-2xl border border-[#2a221c] bg-[#181410] p-4">
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#9a8f80]">
-              <Info className="h-3.5 w-3.5" />
-              KPI giai đoạn
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-              <div>
-                <div className="text-xs text-[#9a8f80]">Giai đoạn</div>
-                <div className="text-sm font-medium text-[#f5ede4]">{data.kpi.phaseLabel ?? "Chưa mở GĐ"}</div>
+          <ResponsibilitySection
+            id="finance"
+            title="Kiểm soát tài chính"
+            sub="Dự toán giai đoạn vs thực tế"
+            Icon={Coins}
+            accent="purple"
+            summary="Đang phát triển — sẽ hiện cảnh báo vượt dự toán"
+            badgeTone="muted"
+            defaultOpen={false}
+            customContent={
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <MetricBox label="Dự toán nhân công" value="--" />
+                  <MetricBox label="Thực tế nhân công" value="--" />
+                  <MetricBox label="Dự toán vật tư" value="--" />
+                  <MetricBox label="Thực tế vật tư" value="--" />
+                </div>
+                <div className="rounded-lg border border-[#2a221c] bg-[#120e0b] p-3 text-xs text-[#9a8f80]">
+                  Cảnh báo vượt dự toán nhân công / vật tư sẽ hiện ở đây khi có
+                  dữ liệu thực tế.
+                </div>
+                {selectedProjectId ? (
+                  <Link
+                    href={`/projects/${selectedProjectId}/budget`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#E0B855] hover:underline"
+                  >
+                    Xem dự toán chi tiết
+                    <ChevronRight className="h-3 w-3" />
+                  </Link>
+                ) : null}
               </div>
-              <div>
-                <div className="text-xs text-[#9a8f80]">Tiến độ</div>
-                <div className="text-sm font-semibold text-[#f5ede4]">{data.kpi.progressPercent}%</div>
-              </div>
-              <div>
-                <div className="text-xs text-[#9a8f80]">Công dôi/vượt</div>
-                <div
-                  className="text-sm font-semibold"
-                  style={{ color: data.kpi.laborDelta >= 0 ? "#6FA677" : "#D26B6B" }}
-                >
-                  {data.kpi.laborDelta >= 0 ? `+${data.kpi.laborDelta}` : data.kpi.laborDelta}
+            }
+          />
+
+          <ResponsibilitySection
+            id="kpi"
+            title="KPI cá nhân"
+            sub="Chấm công, lương của bạn"
+            Icon={UserCircle}
+            accent="blue"
+            summary="Đang phát triển — chấm công bản thân + lương tháng"
+            badgeTone="muted"
+            defaultOpen={false}
+            customContent={
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <MetricBox label="Công tháng này" value="--" />
+                  <MetricBox label="Lương dự kiến" value="--" />
+                </div>
+                <div className="rounded-lg border border-[#2a221c] bg-[#120e0b] p-3 text-xs text-[#9a8f80]">
+                  Trang chấm công bản thân + lương cá nhân sẽ nối vào đây.
                 </div>
               </div>
-            </div>
-          </section>
+            }
+          />
         </>
       ) : (
         <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-10 text-center text-[#9a8f80]">
@@ -753,74 +796,70 @@ const ACCENT_STYLES: Record<
     chipBg: "rgba(111,166,119,0.18)",
     chipColor: "#6FA677",
   },
+  purple: {
+    borderColor: "rgba(167,139,250,0.4)",
+    bgGrad: "linear-gradient(135deg, rgba(167,139,250,0.08) 0%, transparent 60%), #181410",
+    iconBg: "rgba(167,139,250,0.15)",
+    iconColor: "#a78bfa",
+    chipBg: "rgba(167,139,250,0.18)",
+    chipColor: "#a78bfa",
+  },
+  blue: {
+    borderColor: "rgba(96,165,250,0.4)",
+    bgGrad: "linear-gradient(135deg, rgba(96,165,250,0.08) 0%, transparent 60%), #181410",
+    iconBg: "rgba(96,165,250,0.15)",
+    iconColor: "#60a5fa",
+    chipBg: "rgba(96,165,250,0.18)",
+    chipColor: "#60a5fa",
+  },
 };
 
-function QuickActions({
-  cards,
-  onHint,
-}: {
-  cards: CardDef[];
-  onHint: (sop: string, anchor: DOMRect) => void;
-}) {
-  return (
-    <section
-      className="overflow-hidden rounded-2xl border p-3 sm:p-4"
-      style={{
-        borderColor: "rgba(167,139,250,0.35)",
-        background:
-          "linear-gradient(135deg, rgba(167,139,250,0.08) 0%, transparent 60%), #181410",
-      }}
-    >
-      <div
-        className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider"
-        style={{ color: "#a78bfa" }}
-      >
-        <Zap className="h-3.5 w-3.5" />
-        Hành động nhanh
-      </div>
-      <div className="space-y-1.5">
-        {cards.map((c, i) => (
-          <ActionCard key={i} card={c} onHint={onHint} />
-        ))}
-      </div>
-    </section>
-  );
-}
+type BadgeTone = "ok" | "warn" | "todo" | "alert" | "muted";
 
-function PhaseSection({
+const BADGE_STYLES: Record<BadgeTone, { bg: string; color: string; label: string }> = {
+  ok: { bg: "rgba(111,166,119,0.18)", color: "#6FA677", label: "Ổn" },
+  warn: { bg: "rgba(224,184,85,0.18)", color: "#E0B855", label: "Cần xem" },
+  todo: { bg: "rgba(224,184,85,0.18)", color: "#E0B855", label: "Cần làm" },
+  alert: { bg: "rgba(210,107,107,0.18)", color: "#D26B6B", label: "Cảnh báo" },
+  muted: { bg: "rgba(154,143,128,0.15)", color: "#9a8f80", label: "—" },
+};
+
+function ResponsibilitySection({
   id,
   title,
   sub,
   Icon,
   accent,
-  isCurrent,
+  summary,
+  badgeTone,
+  defaultOpen,
   cards,
+  customContent,
   onHint,
 }: {
   id: string;
   title: string;
   sub: string;
   Icon: React.ComponentType<{ className?: string }>;
-  accent: "gold" | "terra" | "green";
-  isCurrent: boolean;
-  cards: CardDef[];
-  onHint: (sop: string, anchor: DOMRect) => void;
+  accent: "gold" | "terra" | "green" | "purple" | "blue";
+  summary?: string;
+  badgeTone?: BadgeTone;
+  defaultOpen?: boolean;
+  cards?: CardDef[];
+  customContent?: React.ReactNode;
+  onHint?: (sop: string, anchor: DOMRect) => void;
 }) {
-  const [open, setOpen] = useState(isCurrent);
-
-  useEffect(() => {
-    setOpen(isCurrent);
-  }, [isCurrent]);
-
+  const [open, setOpen] = useState(!!defaultOpen);
   const styles = ACCENT_STYLES[accent];
+  const badge = badgeTone ? BADGE_STYLES[badgeTone] : null;
 
   return (
     <section
-      data-slot={id}
+      data-section={id}
       className="overflow-hidden rounded-2xl border transition-all duration-300"
       style={{
-        borderColor: isCurrent ? styles.borderColor : "#2a221c",
-        background: isCurrent ? styles.bgGrad : "#181410",
+        borderColor: styles.borderColor,
+        background: styles.bgGrad,
       }}
     >
       <button
@@ -838,27 +877,22 @@ function PhaseSection({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-[15px] font-semibold text-[#f5ede4]">{title}</span>
-              {isCurrent ? (
+              {badge && badgeTone !== "muted" ? (
                 <span
-                  className="relative overflow-hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ background: styles.chipBg, color: styles.chipColor }}
+                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ background: badge.bg, color: badge.color }}
                 >
-                  <span className="relative z-10">Đang</span>
-                  <span
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
-                      animation: "ks-shimmer 2.4s linear infinite",
-                    }}
-                  />
+                  {badge.label}
                 </span>
               ) : null}
             </div>
-            <div className="text-xs text-[#9a8f80]">{sub}</div>
+            <div className="truncate text-xs text-[#9a8f80]">{summary || sub}</div>
           </div>
         </div>
-        <span className="text-[#9a8f80] transition-transform duration-200" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>
+        <span
+          className="text-[#9a8f80] transition-transform duration-200"
+          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+        >
           <ChevronDown className="h-4 w-4" />
         </span>
       </button>
@@ -868,25 +902,28 @@ function PhaseSection({
       >
         <div className="overflow-hidden">
           <div className="border-t border-[#2a221c] p-2 sm:p-3">
-            <div className="space-y-1.5">
-              {cards.map((c, i) => (
-                <ActionCard key={i} card={c} onHint={onHint} />
-              ))}
-            </div>
+            {customContent ? (
+              customContent
+            ) : cards && onHint ? (
+              <div className="space-y-1.5">
+                {cards.map((c, i) => (
+                  <ActionCard key={i} card={c} onHint={onHint} />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
-      <style jsx>{`
-        @keyframes ks-shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-      `}</style>
     </section>
+  );
+}
+
+function MetricBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[#2a221c] bg-[#120e0b] p-2.5">
+      <div className="text-[10px] uppercase tracking-wider text-[#9a8f80]">{label}</div>
+      <div className="mt-0.5 text-base font-semibold text-[#f5ede4]">{value}</div>
+    </div>
   );
 }
 
