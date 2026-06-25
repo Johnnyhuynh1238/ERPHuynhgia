@@ -298,75 +298,65 @@ export function TreasuryClient({
       </div>
       )}
 
-      {/* Bảng nhật ký */}
-      <div className="rounded-xl border border-[#2d3249] bg-[#13151f] overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-[#0b0d16]/60 text-[#8892b0]">
-            <tr>
-              <th className="px-3 py-2 text-left whitespace-nowrap">Ngày</th>
-              <th className="px-3 py-2 text-left">Loại</th>
-              <th className="px-3 py-2 text-left">Dự án</th>
-              <th className="px-3 py-2 text-left">Danh mục</th>
-              <th className="px-3 py-2 text-left">Mô tả</th>
-              <th className="px-3 py-2 text-right">Thu</th>
-              <th className="px-3 py-2 text-right">Chi</th>
-              <th className="px-3 py-2 text-right">Số dư sau</th>
-              <th className="px-3 py-2 text-left">Người ghi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-[#8892b0]">
-                  Đang tải…
-                </td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-[#8892b0]">
-                  Không có giao dịch nào theo bộ lọc.
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-[#2d3249]">
-                <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.occurredAt)}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${REFTYPE_CHIP[r.refType]}`}>
-                    {REFTYPE_LABEL[r.refType]}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  {r.project ? (
-                    <span>
-                      <span className="font-mono text-xs text-[#8b95b7]">{r.project.code}</span>{" "}
-                      {r.project.name}
+      {/* Nhật ký dạng card */}
+      <div className="space-y-2">
+        {loading && (
+          <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
+            Đang tải…
+          </div>
+        )}
+        {!loading && rows.length === 0 && (
+          <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
+            Không có giao dịch nào theo bộ lọc.
+          </div>
+        )}
+        {!loading &&
+          rows.map((r) => {
+            const isIn = r.direction === "in";
+            return (
+              <div
+                key={r.id}
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${REFTYPE_CHIP[r.refType]}`}>
+                      {REFTYPE_LABEL[r.refType]}
                     </span>
-                  ) : (
-                    <span className="text-[#8b95b7]">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">{r.category?.name || "—"}</td>
-                <td className="px-3 py-2 max-w-[420px]">
-                  <div className="truncate" title={r.note ?? ""}>
-                    {r.note || "—"}
+                    <span className="text-xs text-[#8b95b7]">{fmtDate(r.occurredAt)}</span>
                   </div>
-                </td>
-                <td className="px-3 py-2 text-right font-semibold whitespace-nowrap text-emerald-300">
-                  {r.direction === "in" ? money(r.amount) : ""}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold whitespace-nowrap text-red-300">
-                  {r.direction === "out" ? money(r.amount) : ""}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold whitespace-nowrap">
-                  {money(r.balanceAfter)}
-                </td>
-                <td className="px-3 py-2 text-[#8b95b7]">{r.creator.fullName}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <div
+                    className={`text-base font-bold whitespace-nowrap ${
+                      isIn ? "text-emerald-300" : "text-red-300"
+                    }`}
+                  >
+                    {isIn ? "+" : "−"} {money(r.amount)}
+                  </div>
+                </div>
+
+                {(r.note || r.project || r.category) && (
+                  <div className="mt-2 space-y-1 text-sm text-[#cfd4e8]">
+                    {r.note && <div className="break-words">{r.note}</div>}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#8b95b7]">
+                      {r.project && (
+                        <span>
+                          <span className="font-mono">{r.project.code}</span> · {r.project.name}
+                        </span>
+                      )}
+                      {r.category && <span>· {r.category.name}</span>}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#2d3249]/60 pt-2 text-xs text-[#8b95b7]">
+                  <span>{r.creator.fullName}</span>
+                  <span>
+                    Số dư sau: <span className="font-semibold text-[#cfd4e8]">{money(r.balanceAfter)}</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
       </div>
 
       {/* Phân trang */}
