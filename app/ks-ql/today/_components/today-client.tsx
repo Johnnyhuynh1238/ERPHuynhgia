@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -123,8 +123,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   const [now, setNow] = useState<Date | null>(null);
   const [data, setData] = useState<TodayData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hintKey, setHintKey] = useState<string | null>(null);
-  const [hintMounted, setHintMounted] = useState(false);
+  const [hintOpen, setHintOpen] = useState<{ sop: string; anchor: DOMRect } | null>(null);
   const [showOrderPopup, setShowOrderPopup] = useState(false);
   const [showPettyCashPopup, setShowPettyCashPopup] = useState(false);
 
@@ -133,14 +132,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
     const t = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    if (hintKey) {
-      const id = requestAnimationFrame(() => setHintMounted(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setHintMounted(false);
-  }, [hintKey]);
 
   const reloadTodayData = useCallback(() => {
     if (!selectedProjectId) return;
@@ -342,7 +333,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 onClick: selectedProjectId ? () => setShowPettyCashPopup(true) : undefined,
               },
             ]}
-            onHint={setHintKey}
+            onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
           <PhaseSection
@@ -373,7 +364,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 sop: "6.1",
               },
             ]}
-            onHint={setHintKey}
+            onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
           <PhaseSection
@@ -405,7 +396,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 sop: "6.8",
               },
             ]}
-            onHint={setHintKey}
+            onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
           <PhaseSection
@@ -448,7 +439,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
               },
             ]}
-            onHint={setHintKey}
+            onHint={(sop, anchor) => setHintOpen({ sop, anchor })}
           />
 
           <section className="rounded-2xl border border-[#2a221c] bg-[#181410] p-4">
@@ -503,37 +494,137 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
         />
       ) : null}
 
-      {hintKey && SOP_HINTS[hintKey] ? (
-        <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] transition-opacity duration-200 sm:items-center sm:pb-4 ${
-            hintMounted ? "opacity-100" : "opacity-0"
-          }`}
-          onClick={() => setHintKey(null)}
-        >
-          <div
-            className={`max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#2a221c] bg-[#181410] p-5 shadow-2xl transition-all duration-200 ${
-              hintMounted ? "translate-y-0 scale-100" : "translate-y-4 scale-95"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "#D27A52" }}>
-              <HelpCircle className="h-3.5 w-3.5" />
-              SOP 11 — gợi ý nhanh
-            </div>
-            <div className="mb-1.5 text-lg font-semibold text-[#f5ede4]">{SOP_HINTS[hintKey].title}</div>
-            <p className="text-[14px] leading-relaxed text-[#d4c8b8]">{SOP_HINTS[hintKey].body}</p>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setHintKey(null)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-[#0d0b09] transition-all hover:brightness-110"
-                style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
-              >
-                Đã hiểu
-              </button>
-            </div>
-          </div>
-        </div>
+      {hintOpen && SOP_HINTS[hintOpen.sop] ? (
+        <SopBubble
+          hint={SOP_HINTS[hintOpen.sop]}
+          anchor={hintOpen.anchor}
+          onClose={() => setHintOpen(null)}
+        />
       ) : null}
+    </div>
+  );
+}
+
+function SopBubble({
+  hint,
+  anchor,
+  onClose,
+}: {
+  hint: { title: string; body: string };
+  anchor: DOMRect;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    left: number;
+    top?: number;
+    bottom?: number;
+    placement: "above" | "below";
+    tailLeft: number;
+  } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const box = ref.current.getBoundingClientRect();
+    const W = box.width;
+    const H = box.height;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 12;
+    const triggerCx = anchor.left + anchor.width / 2;
+
+    let left = triggerCx - W / 2;
+    left = Math.max(margin, Math.min(left, vw - W - margin));
+    const tailLeft = Math.max(20, Math.min(triggerCx - left, W - 20));
+
+    const spaceAbove = anchor.top - margin;
+    const spaceBelow = vh - (anchor.top + anchor.height) - margin;
+    const placement: "above" | "below" =
+      spaceAbove >= H + 12 || spaceAbove > spaceBelow ? "above" : "below";
+
+    if (placement === "above") {
+      setPos({ left, bottom: vh - anchor.top + 10, placement, tailLeft });
+    } else {
+      setPos({ left, top: anchor.top + anchor.height + 10, placement, tailLeft });
+    }
+  }, [anchor]);
+
+  useEffect(() => {
+    if (!pos) return;
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, [pos]);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (ref.current?.contains(e.target as Node)) return;
+      onClose();
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onScroll = () => onClose();
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    document.addEventListener("keydown", onEsc);
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onEsc);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [onClose]);
+
+  const tailVisible = !!pos;
+
+  return (
+    <div
+      ref={ref}
+      role="tooltip"
+      className="fixed z-50 w-72 max-w-[calc(100vw-1.5rem)]"
+      style={{
+        left: pos?.left ?? -9999,
+        top: pos?.top,
+        bottom: pos?.bottom,
+        visibility: pos ? "visible" : "hidden",
+        transformOrigin: pos
+          ? `${pos.tailLeft}px ${pos.placement === "above" ? "100%" : "0%"}`
+          : "center",
+        transform: mounted ? "scale(1)" : "scale(0.55)",
+        opacity: mounted ? 1 : 0,
+        transition:
+          "transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 160ms ease-out",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="relative rounded-2xl border border-[#3a2d22] bg-[#1f1812] p-3.5 shadow-2xl">
+        <div
+          className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+          style={{ color: "#D27A52" }}
+        >
+          <HelpCircle className="h-3 w-3" />
+          SOP 11 — gợi ý nhanh
+        </div>
+        <div className="mt-1 text-[14px] font-semibold leading-snug text-[#f5ede4]">
+          {hint.title}
+        </div>
+        <p className="mt-1 text-[13px] leading-relaxed text-[#d4c8b8]">{hint.body}</p>
+        {tailVisible && pos ? (
+          <span
+            aria-hidden
+            className="absolute block h-3 w-3 rotate-45 border bg-[#1f1812]"
+            style={{
+              left: pos.tailLeft - 6,
+              borderColor: "#3a2d22",
+              ...(pos.placement === "above"
+                ? { bottom: -7, borderTopColor: "transparent", borderLeftColor: "transparent" }
+                : { top: -7, borderBottomColor: "transparent", borderRightColor: "transparent" }),
+            }}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -587,7 +678,7 @@ function QuickActions({
   onHint,
 }: {
   cards: CardDef[];
-  onHint: (key: string) => void;
+  onHint: (sop: string, anchor: DOMRect) => void;
 }) {
   return (
     <section
@@ -631,7 +722,7 @@ function PhaseSection({
   accent: "gold" | "terra" | "green";
   isCurrent: boolean;
   cards: CardDef[];
-  onHint: (key: string) => void;
+  onHint: (sop: string, anchor: DOMRect) => void;
 }) {
   const [open, setOpen] = useState(isCurrent);
 
@@ -724,8 +815,15 @@ const TONE_BADGE: Record<Tone, string> = {
   muted: "text-[#6e6457]",
 };
 
-function ActionCard({ card, onHint }: { card: CardDef; onHint: (key: string) => void }) {
+function ActionCard({
+  card,
+  onHint,
+}: {
+  card: CardDef;
+  onHint: (sop: string, anchor: DOMRect) => void;
+}) {
   const Icon = card.Icon;
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
     <div
       className={`group flex items-center gap-3 rounded-xl border border-[#2a221c] bg-[#120e0b] p-3 transition-all ${
@@ -742,8 +840,12 @@ function ActionCard({ card, onHint }: { card: CardDef; onHint: (key: string) => 
         <div className={`truncate text-xs ${TONE_BADGE[card.statusTone]}`}>{card.status}</div>
       </div>
       <button
+        ref={triggerRef}
         aria-label="Gợi ý SOP"
-        onClick={() => onHint(card.sop)}
+        onClick={() => {
+          const r = triggerRef.current?.getBoundingClientRect();
+          if (r) onHint(card.sop, r);
+        }}
         className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#2a221c] text-[#9a8f80] transition-all hover:scale-105 hover:bg-[#221b15] hover:text-[#f5ede4]"
       >
         <HelpCircle className="h-4 w-4" />
