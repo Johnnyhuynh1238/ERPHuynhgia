@@ -596,32 +596,57 @@ function SopBubble({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="relative rounded-2xl border border-[#3a2d22] bg-[#1f1812] p-3.5 shadow-2xl">
-        <div
-          className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color: "#D27A52" }}
-        >
-          <HelpCircle className="h-3 w-3" />
-          SOP 11 — gợi ý nhanh
+      {tailVisible && pos ? (
+        <span
+          aria-hidden
+          className="ks-tail-glow pointer-events-none absolute block"
+          style={{
+            left: pos.tailLeft - 30,
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(255,221,150,0.85) 0%, rgba(224,184,85,0.55) 28%, rgba(210,122,82,0.25) 55%, transparent 75%)",
+            ...(pos.placement === "above" ? { bottom: -30 } : { top: -30 }),
+          }}
+        />
+      ) : null}
+      <div className="relative overflow-hidden rounded-2xl border border-[#3a2d22] bg-[#1f1812] p-3.5 shadow-2xl">
+        <span
+          aria-hidden
+          className="ks-shine pointer-events-none absolute -inset-y-2 -left-1/2 block w-3/5"
+          style={{
+            background:
+              "linear-gradient(115deg, transparent 35%, rgba(255,236,200,0.18) 48%, rgba(255,221,150,0.28) 50%, rgba(255,236,200,0.18) 52%, transparent 65%)",
+          }}
+        />
+        <div className="relative">
+          <div
+            className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: "#D27A52" }}
+          >
+            <HelpCircle className="h-3 w-3" />
+            SOP 11 — gợi ý nhanh
+          </div>
+          <div className="mt-1 text-[14px] font-semibold leading-snug text-[#f5ede4]">
+            {hint.title}
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#d4c8b8]">{hint.body}</p>
         </div>
-        <div className="mt-1 text-[14px] font-semibold leading-snug text-[#f5ede4]">
-          {hint.title}
-        </div>
-        <p className="mt-1 text-[13px] leading-relaxed text-[#d4c8b8]">{hint.body}</p>
-        {tailVisible && pos ? (
-          <span
-            aria-hidden
-            className="absolute block h-3 w-3 rotate-45 border bg-[#1f1812]"
-            style={{
-              left: pos.tailLeft - 6,
-              borderColor: "#3a2d22",
-              ...(pos.placement === "above"
-                ? { bottom: -7, borderTopColor: "transparent", borderLeftColor: "transparent" }
-                : { top: -7, borderBottomColor: "transparent", borderRightColor: "transparent" }),
-            }}
-          />
-        ) : null}
       </div>
+      {tailVisible && pos ? (
+        <span
+          aria-hidden
+          className="absolute block h-3 w-3 rotate-45 border bg-[#1f1812]"
+          style={{
+            left: pos.tailLeft - 6,
+            borderColor: "#3a2d22",
+            ...(pos.placement === "above"
+              ? { bottom: -7, borderTopColor: "transparent", borderLeftColor: "transparent" }
+              : { top: -7, borderBottomColor: "transparent", borderRightColor: "transparent" }),
+          }}
+        />
+      ) : null}
       <style jsx>{`
         @keyframes ks-ipad-zoom {
           0% {
@@ -643,6 +668,43 @@ function SopBubble({
             filter: blur(0);
             opacity: 1;
           }
+        }
+        @keyframes ks-tail-burst {
+          0% {
+            transform: scale(0.25);
+            opacity: 0.95;
+          }
+          55% {
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(3.2);
+            opacity: 0;
+          }
+        }
+        .ks-tail-glow {
+          animation: ks-tail-burst 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          will-change: transform, opacity;
+        }
+        @keyframes ks-shine-sweep {
+          0% {
+            transform: translateX(-30%) rotate(0deg);
+            opacity: 0;
+          }
+          20% {
+            opacity: 1;
+          }
+          80% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(360%) rotate(0deg);
+            opacity: 0;
+          }
+        }
+        .ks-shine {
+          animation: ks-shine-sweep 1100ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+          will-change: transform, opacity;
         }
       `}</style>
     </div>
