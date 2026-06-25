@@ -759,11 +759,27 @@ export function ExpensesClient({
       {!loading && rows.length > 0 && (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => {
-            const st = statusMeta(r.status);
             const isUrgent = r.priority === "urgent" && r.status === "pending";
             const canQuickTransfer = r.status === "pending" && !!r.payeeBankBin && !!r.payeeAccountNumber && canMarkPaid;
             const isExpanded = expandedId === r.id;
             const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
+            const bank = r.payeeBankBin ? findBankByBin(r.payeeBankBin) : null;
+
+            const statusBadge =
+              r.status === "pending"
+                ? { label: "Chờ chi", chip: "bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30" }
+                : r.status === "paid"
+                  ? { label: "Đã chi", chip: "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30" }
+                  : { label: "Đã huỷ", chip: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30" };
+
+            const cardBorder = isUrgent
+              ? "border-red-500/60 shadow-[0_0_0_1px_rgba(248,113,113,0.20),0_4px_16px_-6px_rgba(248,113,113,0.3)]"
+              : r.status === "paid"
+                ? "border-emerald-500/20"
+                : r.status === "cancelled"
+                  ? "border-zinc-700/40 opacity-80"
+                  : "border-[#2d3249]";
+
             return (
               <div
                 key={r.id}
@@ -781,135 +797,172 @@ export function ExpensesClient({
                       }
                     : undefined
                 }
-                className={`rounded-xl border bg-[#13151f] p-3 space-y-2 ${
-                  isUrgent ? "border-red-400/60 shadow-[0_0_0_1px_rgba(248,113,113,0.25)]" : "border-[#2d3249]"
-                } ${canQuickTransfer ? "cursor-pointer transition active:scale-[0.995]" : ""} ${
-                  isExpanded ? "md:col-span-2 xl:col-span-3" : ""
-                }`}
+                className={`rounded-2xl border bg-gradient-to-br from-[#13151f] to-[#0f111a] p-4 flex flex-col gap-3 ${cardBorder} ${
+                  canQuickTransfer ? "cursor-pointer transition hover:border-orange-400/40 active:scale-[0.995]" : ""
+                } ${isExpanded ? "md:col-span-2 xl:col-span-3 ring-1 ring-orange-400/30" : ""}`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] text-[#8b95b7]">{r.code}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${st.cls}`}>
-                        {st.label}
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusBadge.chip}`}>
+                      {statusBadge.label}
+                    </span>
+                    {isUrgent && (
+                      <span className="rounded-full bg-red-500/25 px-2 py-0.5 text-[10px] font-bold text-red-200 ring-1 ring-red-400/40">
+                        🚨 GẤP
                       </span>
-                      {isUrgent && (
-                        <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-200">
-                          🚨 GẤP
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-[11px] text-[#8b95b7]">
-                      {fmtDate(r.createdAt)} · {r.creator.fullName}
-                    </div>
+                    )}
+                    <span className="font-mono text-[10px] tracking-wider text-[#6b7299]">{r.code}</span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-base font-bold text-[#f0f2ff] whitespace-nowrap">
+                  <div className="text-right shrink-0">
+                    <div className="text-xl font-extrabold leading-none tracking-tight text-[#f5f7ff] whitespace-nowrap">
                       {money(r.amount)}
                     </div>
                     {r.paidAmount != null && r.paidAmount !== r.amount && (
-                      <div className="text-[11px] text-emerald-300 whitespace-nowrap">
+                      <div className="mt-1 text-[10px] font-medium text-emerald-300 whitespace-nowrap">
                         Thực chi {money(r.paidAmount)}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="text-xs text-[#cfd4e8]">
-                  <span className="text-[#8b95b7]">{r.category.name}</span>
-                  {r.payee && <span> · {r.payee}</span>}
-                </div>
-                <div className="text-[11px] text-[#8b95b7]">
-                  {r.project ? (
-                    <>
-                      <span className="font-mono">{r.project.code}</span> — {r.project.name}
-                    </>
-                  ) : (
-                    <>Chi chung công ty</>
-                  )}
+                {/* Meta: category + project + creator */}
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2 text-[#e5e7f5]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400/80 shrink-0" aria-hidden />
+                    <span className="font-medium truncate">{r.category.name}</span>
+                    {r.payee && <span className="text-[#8b95b7] truncate">· {r.payee}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-[#8b95b7]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264] shrink-0" aria-hidden />
+                    {r.project ? (
+                      <span className="truncate">
+                        <span className="font-mono text-[#a1a8c8]">{r.project.code}</span> — {r.project.name}
+                      </span>
+                    ) : (
+                      <span>Chi chung công ty</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-[#6b7299]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264]/60 shrink-0" aria-hidden />
+                    <span>{fmtDate(r.createdAt)} · {r.creator.fullName}</span>
+                  </div>
                 </div>
 
+                {/* Note */}
                 {r.note && (
-                  <div className="text-xs text-[#cfd4e8] bg-[#0b0d16] rounded px-2 py-1.5">{r.note}</div>
+                  <div className="rounded-lg bg-[#0b0d16]/80 border border-[#2d3249]/50 px-3 py-2 text-xs text-[#cfd4e8] italic">
+                    &ldquo;{r.note}&rdquo;
+                  </div>
                 )}
 
+                {/* Bank info */}
+                {bank && r.payeeAccountNumber && (
+                  <div className="flex items-center gap-2.5 rounded-lg bg-[#0b0d16] border border-[#2d3249]/60 px-3 py-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-orange-500/15 text-orange-300 text-[10px] font-bold">
+                      {bank.shortName.slice(0, 3).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-semibold text-[#f0f2ff] truncate">{bank.shortName}</div>
+                      <div className="font-mono text-[11px] text-[#cfd4e8] truncate">{r.payeeAccountNumber}</div>
+                    </div>
+                    {r.payeeAccountName && (
+                      <div className="text-right text-[10px] font-medium uppercase tracking-wide text-[#8b95b7] truncate max-w-[140px]">
+                        {r.payeeAccountName}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Status meta */}
                 {r.status === "paid" && (
-                  <div className="text-[11px] text-emerald-300/80">
-                    Đã chi ngày {fmtDate(r.paidAt)}
-                    {r.payer ? ` · KT ${r.payer.fullName}` : ""}
-                    {r.paidNote ? ` · ${r.paidNote}` : ""}
+                  <div className="flex items-start gap-1.5 text-[11px] text-emerald-300/80">
+                    <span aria-hidden>✓</span>
+                    <span>
+                      Đã chi {fmtDate(r.paidAt)}
+                      {r.payer ? ` · KT ${r.payer.fullName}` : ""}
+                      {r.paidNote ? ` · ${r.paidNote}` : ""}
+                    </span>
                   </div>
                 )}
                 {r.status === "cancelled" && (
-                  <div className="text-[11px] text-zinc-400">
-                    Huỷ ngày {fmtDate(r.cancelledAt)}
-                    {r.cancelledReason ? ` · ${r.cancelledReason}` : ""}
+                  <div className="flex items-start gap-1.5 text-[11px] text-zinc-400">
+                    <span aria-hidden>✕</span>
+                    <span>
+                      Huỷ {fmtDate(r.cancelledAt)}
+                      {r.cancelledReason ? ` · ${r.cancelledReason}` : ""}
+                    </span>
                   </div>
                 )}
 
-                {r.payeeBankBin && r.payeeAccountNumber && (
-                  <div className="rounded-lg bg-[#0b0d16] px-2 py-1.5 text-[11px] text-[#cfd4e8]">
-                    <span className="text-[#8b95b7]">TK:</span>{" "}
-                    <span className="font-semibold">{findBankByBin(r.payeeBankBin)?.shortName ?? r.payeeBankBin}</span>
-                    {" · "}
-                    <span className="font-mono">{r.payeeAccountNumber}</span>
-                    {r.payeeAccountName && <span className="text-[#8b95b7]"> · {r.payeeAccountName}</span>}
+                {/* Actions */}
+                {(canQuickTransfer ||
+                  (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
+                  (r.status === "pending" && isAdmin) ||
+                  r.attachmentUrl ||
+                  r.paidReceiptUrl) && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#2d3249]/40" onClick={(e) => e.stopPropagation()}>
+                    {canQuickTransfer && (
+                      <button
+                        onClick={toggle}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                          isExpanded
+                            ? "bg-[#2d3249] text-[#cfd4e8] hover:bg-[#373d57]"
+                            : "bg-orange-500 text-[#0b0d16] hover:bg-orange-400"
+                        }`}
+                      >
+                        {isExpanded ? "⌃ Thu gọn" : "💸 Chuyển khoản"}
+                      </button>
+                    )}
+                    {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
+                      <button
+                        onClick={() => openPayDialog(r)}
+                        className="rounded-lg bg-emerald-500/20 text-emerald-300 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30"
+                      >
+                        Ghi nhận đã chi
+                      </button>
+                    )}
+                    {r.status === "pending" && isAdmin && (
+                      <button
+                        onClick={() => {
+                          setOpenCancel(r);
+                          setCancelReason("");
+                        }}
+                        className="rounded-lg bg-red-500/15 text-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-500/25"
+                      >
+                        Huỷ
+                      </button>
+                    )}
+                    {(r.attachmentUrl || r.paidReceiptUrl) && (
+                      <div className="ml-auto flex gap-1.5">
+                        {r.attachmentUrl && (
+                          <a
+                            href={r.attachmentUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=attachment` : r.attachmentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg bg-blue-500/15 text-blue-300 px-3 py-1.5 text-xs font-medium hover:bg-blue-500/25"
+                          >
+                            📎 Hoá đơn
+                          </a>
+                        )}
+                        {r.paidReceiptUrl && (
+                          <a
+                            href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25"
+                          >
+                            📄 Chứng từ
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                  {canQuickTransfer && (
-                    <button
-                      onClick={toggle}
-                      className="rounded bg-orange-500/25 text-orange-200 px-2 py-1 text-xs font-semibold"
-                    >
-                      {isExpanded ? "⌃ Thu gọn" : "💸 Chuyển khoản"}
-                    </button>
-                  )}
-                  {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
-                    <button
-                      onClick={() => openPayDialog(r)}
-                      className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-1 text-xs font-medium"
-                    >
-                      Ghi nhận đã chi
-                    </button>
-                  )}
-                  {r.status === "pending" && isAdmin && (
-                    <button
-                      onClick={() => {
-                        setOpenCancel(r);
-                        setCancelReason("");
-                      }}
-                      className="rounded bg-red-500/15 text-red-300 px-2 py-1 text-xs"
-                    >
-                      Huỷ
-                    </button>
-                  )}
-                  {r.attachmentUrl && (
-                    <a
-                      href={r.attachmentUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=attachment` : r.attachmentUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded bg-blue-500/15 text-blue-300 px-2 py-1 text-xs"
-                    >
-                      Hoá đơn
-                    </a>
-                  )}
-                  {r.paidReceiptUrl && (
-                    <a
-                      href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded bg-emerald-500/15 text-emerald-300 px-2 py-1 text-xs"
-                    >
-                      Chứng từ
-                    </a>
-                  )}
-                </div>
-
+                {/* Expanded transfer details */}
                 {canQuickTransfer && isExpanded && (
-                  <div className="slide-up border-t border-[#2d3249] pt-3 mt-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="slide-up rounded-lg bg-[#0b0d16]/60 border border-[#2d3249]/60 p-3 mt-1" onClick={(e) => e.stopPropagation()}>
                     <TransferDetails
                       expense={r}
                       canMarkPaid={canMarkPaid}
