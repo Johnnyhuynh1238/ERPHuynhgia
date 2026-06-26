@@ -215,18 +215,8 @@ export function ProjectBudgetClient({
   const [showAmendmentForm, setShowAmendmentForm] = useState(false);
   const [amendmentReason, setAmendmentReason] = useState("");
   const [amendmentRows, setAmendmentRows] = useState<AmendmentEditRow[]>([]);
-  // Per-phase expanded category (null = collapsed)
-  const [expanded, setExpanded] = useState<Record<PhaseCode, Category | null>>({
-    "01": null,
-    "02": null,
-    "03": null,
-    "04": null,
-    "05": null,
-    "06": null,
-    "07": null,
-    "08": null,
-    "09": null,
-  });
+  // Single active branch — click outside collapses
+  const [activeBranch, setActiveBranch] = useState<{ phase: PhaseCode; category: Category } | null>(null);
   // Modal: which task's sub-tasks are being edited
   const [breakdownModalLocal, setBreakdownModalLocal] = useState<string | null>(null);
 
@@ -267,6 +257,20 @@ export function ProjectBudgetClient({
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!activeBranch) return;
+    function onDocMouseDown(e: MouseEvent) {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest("[data-budget-modal]")) return;
+      const sec = t.closest("[data-phase-section]") as HTMLElement | null;
+      if (sec && sec.dataset.phaseSection === activeBranch!.phase) return;
+      setActiveBranch(null);
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [activeBranch]);
 
   const locked = data?.budget?.status === "locked";
   const readOnly = !canEdit || locked;
@@ -331,7 +335,7 @@ export function ProjectBudgetClient({
 
   function addRow(category: Category, phaseCode: PhaseCode) {
     setRows((prev) => [...prev, emptyRow(category, phaseCode)]);
-    setExpanded((prev) => ({ ...prev, [phaseCode]: category }));
+    setActiveBranch({ phase: phaseCode, category });
   }
 
   function removeRow(local: string) {
@@ -372,7 +376,9 @@ export function ProjectBudgetClient({
   }
 
   function toggleBranch(phase: PhaseCode, cat: Category) {
-    setExpanded((prev) => ({ ...prev, [phase]: prev[phase] === cat ? null : cat }));
+    setActiveBranch((prev) =>
+      prev && prev.phase === phase && prev.category === cat ? null : { phase, category: cat },
+    );
   }
 
   async function save() {
@@ -590,10 +596,14 @@ export function ProjectBudgetClient({
             (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.count ?? 0),
             0,
           );
-          const activeCat = expanded[phase];
+          const activeCat = activeBranch?.phase === phase ? activeBranch.category : null;
 
           return (
-            <section key={phase} className="rounded-2xl border border-[#252840] bg-[#1a1d2e]">
+            <section
+              key={phase}
+              data-phase-section={phase}
+              className="rounded-2xl border border-[#252840] bg-[#1a1d2e]"
+            >
               {/* Phase header */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#252840] px-3 py-2.5">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1065,6 +1075,7 @@ function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: B
   const amount = Math.round(qty * row.unitPrice);
   return (
     <div
+      data-budget-modal
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
       aria-modal="true"
