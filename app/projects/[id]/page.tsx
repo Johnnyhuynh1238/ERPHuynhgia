@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
+import { ProjectHubGrid } from "./_components/project-hub-grid";
+import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 
 function startOfTodayUtc() {
   const now = new Date();
@@ -76,9 +78,32 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
   ]);
 
   const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
+  const isAdmin = user.role === UserRole.admin;
+  const canViewSubContracts = isAdmin
+    ? true
+    : await canUserAccessProjectSubContracts(params.id, { id: user.id, role: user.role });
 
   return (
-    <ProjectInfoClient
+    <div className="space-y-4">
+      {isAdmin && (
+        <ProjectHubGrid
+          projectId={project.id}
+          caps={{
+            isAdmin: true,
+            canViewBudget: true,
+            canViewWorkOrders: true,
+            canViewEod: true,
+            canViewQcMapping: true,
+            canViewPayroll: true,
+            canProposeMaterials: true,
+            canViewSubContracts,
+            canViewConstructionLog: true,
+            canViewPayments: true,
+            canViewMembers: true,
+          }}
+        />
+      )}
+      <ProjectInfoClient
       project={JSON.parse(
         JSON.stringify(
           canViewFinancial
@@ -98,5 +123,6 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
       currentUserId={user.id}
       todaySiteRest={todaySiteRest ? JSON.parse(JSON.stringify(todaySiteRest)) : null}
     />
+    </div>
   );
 }

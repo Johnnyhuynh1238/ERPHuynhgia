@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 import { ProjectTabsNav } from "./_components/project-tabs-nav";
+import { ProjectBackLink } from "./_components/project-back-link";
 
 type ProjectLayoutProps = {
   children: React.ReactNode;
@@ -97,6 +98,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   return (
     <ProtectedLayout>
       <div className="space-y-4">
+        <ProjectBackLink projectId={project.id} projectName={project.name} />
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -109,9 +111,11 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
             </span>
           </div>
 
-          <div className="mt-4 border-t border-[#252840] pt-3">
-            <ProjectTabsNav tabs={tabs} />
-          </div>
+          {!isAdmin && (
+            <div className="mt-4 border-t border-[#252840] pt-3">
+              <ProjectTabsNav tabs={tabs} />
+            </div>
+          )}
         </div>
 
         {children}
