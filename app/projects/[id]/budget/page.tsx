@@ -18,7 +18,7 @@ export default async function ProjectBudgetPage({ params }: { params: { id: stri
 
   const project = await prisma.project.findFirst({
     where: { id: params.id, ...buildProjectAccessWhere({ id: user.id, role: user.role }) },
-    select: { id: true, code: true, name: true, customerName: true, contractValue: true },
+    select: { id: true, code: true, name: true, customerName: true, contractValue: true, profitMarginPct: true },
   });
 
   if (!project) {
@@ -32,6 +32,7 @@ export default async function ProjectBudgetPage({ params }: { params: { id: stri
       projectId={project.id}
       projectName={project.name}
       contractValue={project.contractValue ? Number(project.contractValue) : null}
+      profitMarginPct={project.profitMarginPct ? Number(project.profitMarginPct) : null}
       canEdit={canEditBudget({ id: user.id, role: user.role })}
       canLock={canLockBudget({ id: user.id, role: user.role })}
       canPropose={canProposeAmendment({ id: user.id, role: user.role })}

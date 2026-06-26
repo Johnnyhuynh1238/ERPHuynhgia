@@ -109,6 +109,7 @@ type Props = {
   projectId: string;
   projectName: string;
   contractValue: number | null;
+  profitMarginPct: number | null;
   canEdit: boolean;
   canLock: boolean;
   canPropose: boolean;
@@ -202,6 +203,7 @@ function emptyAmendmentRow(category: Category, phaseCode: PhaseCode): AmendmentE
 export function ProjectBudgetClient({
   projectId,
   contractValue,
+  profitMarginPct,
   canEdit,
   canLock,
   canPropose,
@@ -584,6 +586,52 @@ export function ProjectBudgetClient({
           })}
         </div>
       </div>
+
+      {/* Banner ngân sách dự toán (chi phí cho phép) */}
+      {contractValue && profitMarginPct !== null && (() => {
+        const cap = Math.round(contractValue * (1 - profitMarginPct / 100));
+        const used = totals.total;
+        const remaining = cap - used;
+        const pct = cap > 0 ? (used / cap) * 100 : 0;
+        const over = used > cap;
+        const warn = !over && pct >= 90;
+        const tone = over
+          ? { bg: "bg-rose-500/15", ring: "ring-rose-500/40", text: "text-rose-300", bar: "bg-rose-500" }
+          : warn
+            ? { bg: "bg-amber-500/15", ring: "ring-amber-500/40", text: "text-amber-300", bar: "bg-amber-500" }
+            : { bg: "bg-emerald-500/10", ring: "ring-emerald-500/30", text: "text-emerald-300", bar: "bg-emerald-500" };
+        return (
+          <div className={`rounded-xl ${tone.bg} p-3 ring-1 ${tone.ring}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className={`text-[11px] font-semibold uppercase tracking-wider ${tone.text}`}>
+                  {over ? "⚠ Vượt ngân sách" : warn ? "⚠ Sắp chạm ngân sách" : "Ngân sách dự toán"}
+                </div>
+                <div className="mt-0.5 text-xs text-[#c0c8e0]">
+                  Biên LN <span className={`font-semibold ${tone.text}`}>{profitMarginPct}%</span> · Trần chi phí{" "}
+                  <span className={`font-bold ${tone.text}`}>{fmtVND(cap)}đ</span> ({(100 - profitMarginPct).toFixed(0)}% HD)
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`text-base font-bold ${tone.text}`}>
+                  {over ? "+" : ""}{fmtVND(Math.abs(remaining))}đ
+                </div>
+                <div className="text-[10px] text-[#8892b0]">{over ? "vượt trần" : "còn lại"}</div>
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#0f1220] ring-1 ring-[#252840]">
+              <div
+                className={`h-full ${tone.bar} transition-all`}
+                style={{ width: `${Math.min(100, pct).toFixed(1)}%` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-[#5a6080]">
+              <span>Đã lập: {fmtVND(used)}đ ({pct.toFixed(1)}%)</span>
+              <span>Trần: {fmtVND(cap)}đ</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 9 card giai đoạn */}
       <div className="space-y-1.5">

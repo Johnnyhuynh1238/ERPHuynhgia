@@ -623,6 +623,7 @@ model Project {
   areaM2                 Decimal       @map("area_m2") @db.Decimal(12, 2)
   unitPrice              Decimal       @map("unit_price") @db.Decimal(15, 2)
   contractValue          Decimal?      @map("contract_value") @db.Decimal(15, 2)
+  profitMarginPct        Decimal?      @map("profit_margin_pct") @db.Decimal(5, 2)
   startDate              DateTime      @map("start_date") @db.Date
   expectedEndDate        DateTime      @map("expected_end_date") @db.Date
   plannedDeadline        DateTime?     @map("planned_deadline") @db.Date
