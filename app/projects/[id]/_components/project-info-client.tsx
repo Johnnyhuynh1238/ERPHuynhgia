@@ -3,6 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  AlertOctagon,
+  Building2,
+  CloudSun,
+  Inbox,
+  Link as LinkIcon,
+  NotebookPen,
+  Power,
+  User as UserIcon,
+  UserCog,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ProjectData = {
@@ -119,6 +131,7 @@ export function ProjectInfoClient({
   const [deleting, setDeleting] = useState(false);
   const [portalPassword, setPortalPassword] = useState("");
   const [cloning, setCloning] = useState(false);
+  const [infoModal, setInfoModal] = useState<string | null>(null);
 
   const [ownerForm, setOwnerForm] = useState({
     customerName: project.customerName,
@@ -514,42 +527,55 @@ export function ProjectInfoClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.id, canViewCommentInbox]);
 
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Thông tin chủ nhà</h2>
+  const infoSections: Array<{
+    key: string;
+    label: string;
+    icon: LucideIcon;
+    tone: "blue" | "emerald" | "amber" | "violet" | "rose" | "slate";
+    visible: boolean;
+    badge?: string | number | null;
+    render: () => React.ReactNode;
+  }> = [
+    {
+      key: "owner",
+      label: "Thông tin chủ nhà",
+      icon: UserIcon,
+      tone: "blue",
+      visible: true,
+      render: () => (
+        <div className="space-y-3">
+          <div className="grid gap-2 text-sm">
+            <div>Tên: {data.customerName}</div>
+            <div>SĐT: {data.customerPhone || "-"}</div>
+            <div>CCCD: {data.customerIdNumber || "-"}</div>
+            <div>Địa chỉ: {data.address}</div>
+          </div>
           {isAdmin ? (
-            <Button variant="outline" onClick={() => setShowOwnerEdit(true)}>
+            <Button variant="outline" onClick={() => { setInfoModal(null); setShowOwnerEdit(true); }}>
               Sửa thông tin
             </Button>
           ) : null}
         </div>
-        <div className="grid gap-2 text-sm">
-          <div>Tên: {data.customerName}</div>
-          <div>SĐT: {data.customerPhone}</div>
-          <div>CCCD: {data.customerIdNumber || "-"}</div>
-          <div>Địa chỉ: {data.address}</div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Cổng chủ nhà</h2>
-        </div>
+      ),
+    },
+    {
+      key: "portal",
+      label: "Cổng chủ nhà",
+      icon: LinkIcon,
+      tone: "emerald",
+      visible: true,
+      render: () => (
         <div className="space-y-2 text-sm">
-          <div className="space-y-2">
-            <div>
-              Link: {data.customerPortalToken ? (
-                <a className="break-all text-orange-300 underline" href={buildPortalUrl(data.customerPortalToken)} target="_blank" rel="noreferrer">
-                  {buildPortalUrl(data.customerPortalToken)}
-                </a>
-              ) : "-"}
-            </div>
-            {data.customerPortalToken ? (
-              <Button type="button" variant="outline" onClick={copyPortalLink}>Copy link đầy đủ</Button>
-            ) : null}
+          <div>
+            Link: {data.customerPortalToken ? (
+              <a className="break-all text-orange-300 underline" href={buildPortalUrl(data.customerPortalToken)} target="_blank" rel="noreferrer">
+                {buildPortalUrl(data.customerPortalToken)}
+              </a>
+            ) : "-"}
           </div>
+          {data.customerPortalToken ? (
+            <Button type="button" variant="outline" onClick={copyPortalLink}>Copy link đầy đủ</Button>
+          ) : null}
           <div className="flex items-center gap-2">
             <span>Trạng thái:</span>
             <button
@@ -576,38 +602,47 @@ export function ProjectInfoClient({
             </>
           ) : null}
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Thông tin dự án</h2>
+      ),
+    },
+    {
+      key: "project",
+      label: "Thông tin dự án",
+      icon: Building2,
+      tone: "violet",
+      visible: true,
+      render: () => (
+        <div className="space-y-3">
+          <div className="grid gap-2 text-sm md:grid-cols-2">
+            <div>Tên dự án: {data.name}</div>
+            {canViewFinancial ? <div>Giá trị HĐ: {formatMoney(data.contractValue ?? 0)}</div> : null}
+            <div>Khởi công: {formatDate(data.startDate)}</div>
+            <div>Bàn giao dự kiến: {formatDate(data.expectedEndDate)}</div>
+            <div>Bàn giao thực tế: {formatDate(data.actualEndDate)}</div>
+            <div>Trạng thái: {data.status}</div>
+            <div className="md:col-span-2">Ghi chú: {data.notes || "-"}</div>
+          </div>
           {isAdmin ? (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setShowCloneModal(true)}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={() => { setInfoModal(null); setShowCloneModal(true); }}>
                 Sao chép dự án
               </Button>
               <Button variant="outline" onClick={() => router.push(`/projects/${data.id}/edit`)}>
-                Cập Nhật Dự Án
+                Cập nhật dự án
               </Button>
             </div>
           ) : null}
         </div>
-        <div className="grid gap-2 text-sm md:grid-cols-2">
-          <div>Tên dự án: {data.name}</div>
-          {canViewFinancial ? <div>Giá trị HĐ: {formatMoney(data.contractValue ?? 0)}</div> : null}
-          <div>Khởi công: {formatDate(data.startDate)}</div>
-          <div>Bàn giao dự kiến: {formatDate(data.expectedEndDate)}</div>
-          <div>Bàn giao thực tế: {formatDate(data.actualEndDate)}</div>
-          <div>Trạng thái: {data.status}</div>
-          <div className="md:col-span-2">Ghi chú: {data.notes || "-"}</div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Phân công</h2>
-        </div>
-        {projectAssignments.length === 0 ? (
+      ),
+    },
+    {
+      key: "assignment",
+      label: "Phân công",
+      icon: UserCog,
+      tone: "amber",
+      visible: true,
+      badge: projectAssignments.length || null,
+      render: () =>
+        projectAssignments.length === 0 ? (
           <div className="text-sm text-[#8892b0]">Admin chưa phân công</div>
         ) : (
           <div className="space-y-2 text-sm">
@@ -621,26 +656,16 @@ export function ProjectInfoClient({
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Cấu hình hệ thống báo cáo</h2>
-          {isAdmin ? (
-            <div className="flex items-center gap-2">
-              {!data.goLiveDate ? (
-                <Button variant="outline" onClick={setGoLiveToday}>
-                  Set Go-live hôm nay
-                </Button>
-              ) : null}
-              <Button variant="outline" onClick={() => setShowGoLiveEdit(true)}>
-                Chỉnh sửa
-              </Button>
-            </div>
-          ) : null}
-        </div>
-        <div className="space-y-2 text-sm">
+        ),
+    },
+    {
+      key: "golive",
+      label: "Cấu hình báo cáo",
+      icon: Power,
+      tone: data.goLiveDate ? "emerald" : "amber",
+      visible: true,
+      render: () => (
+        <div className="space-y-3 text-sm">
           <div>
             Go-live: <span className="font-medium">{formatDate(data.goLiveDate)}</span>
           </div>
@@ -653,25 +678,29 @@ export function ProjectInfoClient({
               Đang áp dụng từ {formatDate(data.goLiveDate)}
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Trạng thái công trường hôm nay</h2>
-          {canManageSiteStatus ? (
-            todayRest ? (
-              <Button variant="outline" onClick={removeSiteRest}>
-                Hủy đánh dấu nghỉ
+          {isAdmin ? (
+            <div className="flex items-center gap-2">
+              {!data.goLiveDate ? (
+                <Button variant="outline" onClick={setGoLiveToday}>
+                  Set Go-live hôm nay
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={() => { setInfoModal(null); setShowGoLiveEdit(true); }}>
+                Chỉnh sửa
               </Button>
-            ) : (
-              <Button variant="outline" onClick={() => setShowSiteRestModal(true)}>
-                Đánh dấu công trường nghỉ hôm nay
-              </Button>
-            )
+            </div>
           ) : null}
         </div>
-        <div className="text-sm">
+      ),
+    },
+    {
+      key: "site-status",
+      label: "Công trường hôm nay",
+      icon: CloudSun,
+      tone: todayRest ? "blue" : "emerald",
+      visible: true,
+      render: () => (
+        <div className="space-y-3 text-sm">
           {todayRest ? (
             <div className="space-y-1">
               <div className="inline-flex rounded-full bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-300">
@@ -683,73 +712,167 @@ export function ProjectInfoClient({
           ) : (
             <div className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">Đang hoạt động</div>
           )}
+          {canManageSiteStatus ? (
+            todayRest ? (
+              <Button variant="outline" onClick={removeSiteRest}>
+                Hủy đánh dấu nghỉ
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => { setInfoModal(null); setShowSiteRestModal(true); }}>
+                Đánh dấu công trường nghỉ
+              </Button>
+            )
+          ) : null}
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <h2 className="mb-3 font-semibold">Ghi chú dự án</h2>
-        <div className="text-sm text-[#d9def3]">{data.notes || "Chưa có ghi chú"}</div>
-      </div>
-
-      {isAdmin ? (
-        <div className="rounded-2xl border border-red-800/70 bg-red-950/30 p-4">
-          <h2 className="mb-3 font-semibold text-red-200">Vùng nguy hiểm</h2>
-          <Button
-            type="button"
-            className="bg-red-600 text-white hover:bg-red-500"
-            onClick={() => setShowDeleteStep1(true)}
-          >
+      ),
+    },
+    {
+      key: "notes",
+      label: "Ghi chú dự án",
+      icon: NotebookPen,
+      tone: "slate",
+      visible: true,
+      render: () => (
+        <div className="text-sm text-[#d9def3] whitespace-pre-wrap">{data.notes || "Chưa có ghi chú"}</div>
+      ),
+    },
+    {
+      key: "inbox",
+      label: "Inbox cổng chủ nhà",
+      icon: Inbox,
+      tone: "violet",
+      visible: canViewCommentInbox,
+      badge: commentItems.filter((c) => !c.readByStaff).length || null,
+      render: () => (
+        <div className="space-y-3">
+          {commentItems.length === 0 ? <div className="text-sm text-[#8892b0]">Chưa có bình luận nào</div> : null}
+          {commentItems.map((comment) => (
+            <div key={comment.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
+              <div className="mb-1 flex items-center justify-between text-xs text-[#8892b0]">
+                <span>
+                  {comment.task ? `${comment.task.code} · ${comment.task.name}` : comment.eveningReport ? `Nhật ký ${new Date(comment.eveningReport.reportDate).toLocaleDateString("vi-VN")}` : "Bình luận"}
+                </span>
+                <span>{new Date(comment.createdAt).toLocaleString("vi-VN")}</span>
+              </div>
+              <div className="text-sm">{comment.content}</div>
+              <div className="mt-2 space-y-1">
+                {comment.replies.map((reply) => (
+                  <div key={reply.id} className="rounded border border-[#39405f] bg-[#1c2233] p-2 text-xs">
+                    <span className="font-semibold">{reply.author.fullName}: </span>
+                    {reply.content}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={replyDrafts[comment.id] || ""}
+                  onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [comment.id]: e.target.value }))}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs"
+                  placeholder="Phản hồi cho chủ nhà..."
+                />
+                <Button variant="outline" onClick={() => replyComment(comment.id)}>Gửi</Button>
+              </div>
+              {!comment.readByStaff ? (
+                <Button variant="outline" className="mt-2" onClick={() => markCommentRead(comment.id)}>
+                  Đánh dấu đã đọc
+                </Button>
+              ) : (
+                <div className="mt-2 text-xs text-emerald-300">Đã đọc</div>
+              )}
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "danger",
+      label: "Vùng nguy hiểm",
+      icon: AlertOctagon,
+      tone: "rose",
+      visible: isAdmin,
+      render: () => (
+        <div className="space-y-3">
+          <div className="text-sm text-red-200">Xoá dự án sẽ xoá toàn bộ dữ liệu liên quan. Cần xác nhận 2 bước.</div>
+          <Button type="button" className="bg-red-600 text-white hover:bg-red-500" onClick={() => { setInfoModal(null); setShowDeleteStep1(true); }}>
             Xóa dự án
           </Button>
         </div>
-      ) : null}
+      ),
+    },
+  ];
 
-      {canViewCommentInbox ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-          <h2 className="mb-3 font-semibold">Inbox Cổng chủ nhà</h2>
-          <div className="space-y-3">
-            {commentItems.length === 0 ? <div className="text-sm text-[#8892b0]">Chưa có bình luận nào</div> : null}
-            {commentItems.map((comment) => (
-              <div key={comment.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
-                <div className="mb-1 flex items-center justify-between text-xs text-[#8892b0]">
-                  <span>
-                    {comment.task ? `${comment.task.code} · ${comment.task.name}` : comment.eveningReport ? `Nhật ký ${new Date(comment.eveningReport.reportDate).toLocaleDateString("vi-VN")}` : "Bình luận"}
-                  </span>
-                  <span>{new Date(comment.createdAt).toLocaleString("vi-VN")}</span>
-                </div>
-                <div className="text-sm">{comment.content}</div>
+  const visibleInfoSections = infoSections.filter((s) => s.visible);
+  const activeSection = visibleInfoSections.find((s) => s.key === infoModal) ?? null;
 
-                <div className="mt-2 space-y-1">
-                  {comment.replies.map((reply) => (
-                    <div key={reply.id} className="rounded border border-[#39405f] bg-[#1c2233] p-2 text-xs">
-                      <span className="font-semibold">{reply.author.fullName}: </span>
-                      {reply.content}
-                    </div>
-                  ))}
-                </div>
+  const TONE_ICON_BG: Record<string, string> = {
+    blue: "bg-blue-500/10 text-blue-300 ring-blue-500/30",
+    emerald: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+    amber: "bg-amber-500/10 text-amber-300 ring-amber-500/30",
+    violet: "bg-violet-500/10 text-violet-300 ring-violet-500/30",
+    rose: "bg-rose-500/10 text-rose-300 ring-rose-500/30",
+    slate: "bg-slate-500/10 text-slate-300 ring-slate-500/30",
+  };
 
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={replyDrafts[comment.id] || ""}
-                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [comment.id]: e.target.value }))}
-                    className="w-full rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-xs"
-                    placeholder="Phản hồi cho chủ nhà..."
-                  />
-                  <Button variant="outline" onClick={() => replyComment(comment.id)}>Gửi</Button>
-                </div>
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+        <div className="mb-2 flex items-center gap-2 px-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#5a6080]" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#8892b0]">Thông tin dự án</h3>
+          <span className="ml-auto text-[10px] text-[#5a6080]">{visibleInfoSections.length} mục</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+          {visibleInfoSections.map((s) => {
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setInfoModal(s.key)}
+                className="group flex flex-col items-center gap-1.5 rounded-xl bg-[#0f1220] p-2.5 text-center ring-1 ring-[#252840] transition hover:ring-orange-500/40"
+              >
+                <span className={`relative grid h-9 w-9 place-items-center rounded-lg ring-1 ${TONE_ICON_BG[s.tone]} transition group-hover:scale-105`}>
+                  <Icon className="h-4 w-4" />
+                  {s.badge ? (
+                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                      {s.badge}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="text-xs font-medium text-[#f0f2ff]">{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-                {!comment.readByStaff ? (
-                  <Button variant="outline" className="mt-2" onClick={() => markCommentRead(comment.id)}>
-                    Đánh dấu đã đọc
-                  </Button>
-                ) : (
-                  <div className="mt-2 text-xs text-emerald-300">Đã đọc</div>
-                )}
+      {activeSection ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setInfoModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[#252840] p-4">
+              <div className="flex items-center gap-2">
+                <span className={`grid h-8 w-8 place-items-center rounded-lg ring-1 ${TONE_ICON_BG[activeSection.tone]}`}>
+                  <activeSection.icon className="h-4 w-4" />
+                </span>
+                <h2 className="text-base font-semibold text-[#f0f2ff]">{activeSection.label}</h2>
               </div>
-            ))}
+              <Button variant="outline" onClick={() => setInfoModal(null)}>Đóng</Button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {activeSection.render()}
+            </div>
           </div>
         </div>
       ) : null}
+
 
       {showCloneModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3">

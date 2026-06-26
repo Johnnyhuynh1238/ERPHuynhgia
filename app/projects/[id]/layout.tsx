@@ -1,11 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { ProjectStatus, UserRole } from "@prisma/client";
+import { ProjectStatus } from "@prisma/client";
 import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
-import { ProjectTabsNav } from "./_components/project-tabs-nav";
 import { ProjectBackLink } from "./_components/project-back-link";
 
 type ProjectLayoutProps = {
@@ -64,37 +62,6 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
     redirect("/projects?denied=1");
   }
 
-  const isAdmin = user.role === UserRole.admin;
-  const canViewPayments = user.role === UserRole.admin || user.role === UserRole.accountant;
-  const canViewMembers = user.role === UserRole.admin || user.role === UserRole.construction_manager;
-
-  const canViewConstructionLog = user.role !== UserRole.accountant;
-  const canViewSubContracts = await canUserAccessProjectSubContracts(params.id, { id: user.id, role: user.role });
-  const canProposeMaterials = user.role === UserRole.engineer || user.role === UserRole.admin;
-  const canViewBudgetTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
-  const canViewWorkOrdersTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
-  const canViewEodTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
-  const canViewQcMappingTab = ["admin", "construction_manager"].includes(user.role);
-  const canViewPayrollTab = ["admin", "construction_manager", "engineer", "accountant"].includes(user.role);
-
-  const tabs = [
-    { label: "Thông tin chung", href: `/projects/${params.id}` },
-    { label: "Tiến độ", href: `/projects/${params.id}/tasks` },
-    ...(canViewBudgetTab ? [{ label: "Dự toán", href: `/projects/${params.id}/budget` }] : []),
-    ...(canViewWorkOrdersTab ? [{ label: "Giao việc", href: `/projects/${params.id}/work-orders` }] : []),
-    ...(canViewEodTab ? [{ label: "Cuối ngày", href: `/projects/${params.id}/eod` }] : []),
-    ...(canViewQcMappingTab ? [{ label: "QC Mapping", href: `/projects/${params.id}/qc-mapping` }] : []),
-    ...(canViewQcMappingTab ? [{ label: "Chuẩn hoá DM", href: `/projects/${params.id}/migrate-to-catalog` }] : []),
-    ...(canViewPayrollTab ? [{ label: "Lương tuần", href: `/projects/${params.id}/payroll` }] : []),
-    ...(canProposeMaterials ? [{ label: "Đề xuất vật tư", href: `/projects/${params.id}/material-proposals` }] : []),
-    ...(canViewSubContracts ? [{ label: "Thầu phụ", href: `/projects/${params.id}/sub-contracts` }] : []),
-    ...(canViewConstructionLog ? [{ label: "Nhật ký thi công", href: `/projects/${params.id}/construction-log` }] : []),
-    ...(canViewPayments ? [{ label: "Lịch thanh toán", href: `/projects/${params.id}/payments` }] : []),
-    ...(canViewMembers ? [{ label: "Thành viên", href: `/projects/${params.id}/members` }] : []),
-    { label: "Hồ sơ", href: `/projects/${params.id}/documents` },
-    ...(isAdmin ? [{ label: "Log dự án", href: `/projects/${params.id}/log` }] : []),
-  ];
-
   return (
     <ProtectedLayout>
       <div className="space-y-4">
@@ -111,11 +78,6 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
             </span>
           </div>
 
-          {!isAdmin && (
-            <div className="mt-4 border-t border-[#252840] pt-3">
-              <ProjectTabsNav tabs={tabs} />
-            </div>
-          )}
         </div>
 
         {children}

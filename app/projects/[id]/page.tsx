@@ -79,30 +79,29 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
 
   const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
   const isAdmin = user.role === UserRole.admin;
+  const role = user.role as UserRole;
   const canViewSubContracts = isAdmin
     ? true
-    : await canUserAccessProjectSubContracts(params.id, { id: user.id, role: user.role });
+    : await canUserAccessProjectSubContracts(params.id, { id: user.id, role });
+
+  const inAllowedSet = (allowed: UserRole[]) => allowed.includes(role);
+  const caps = {
+    isAdmin,
+    canViewBudget: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
+    canViewWorkOrders: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
+    canViewEod: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
+    canViewQcMapping: inAllowedSet([UserRole.admin, UserRole.construction_manager]),
+    canViewPayroll: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
+    canProposeMaterials: inAllowedSet([UserRole.admin, UserRole.engineer]),
+    canViewSubContracts,
+    canViewConstructionLog: role !== UserRole.accountant,
+    canViewPayments: inAllowedSet([UserRole.admin, UserRole.accountant]),
+    canViewMembers: inAllowedSet([UserRole.admin, UserRole.construction_manager]),
+  };
 
   return (
     <div className="space-y-4">
-      {isAdmin && (
-        <ProjectHubGrid
-          projectId={project.id}
-          caps={{
-            isAdmin: true,
-            canViewBudget: true,
-            canViewWorkOrders: true,
-            canViewEod: true,
-            canViewQcMapping: true,
-            canViewPayroll: true,
-            canProposeMaterials: true,
-            canViewSubContracts,
-            canViewConstructionLog: true,
-            canViewPayments: true,
-            canViewMembers: true,
-          }}
-        />
-      )}
+      <ProjectHubGrid projectId={project.id} caps={caps} />
       <ProjectInfoClient
       project={JSON.parse(
         JSON.stringify(
