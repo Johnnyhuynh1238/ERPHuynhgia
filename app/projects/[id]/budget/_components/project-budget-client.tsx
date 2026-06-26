@@ -116,17 +116,37 @@ type Props = {
   currentUserRole: UserRole;
 };
 
-const CAT_ACCENT: Record<Category, { text: string; bg: string; ring: string; dot: string }> = {
-  labor: { text: "text-blue-300", bg: "bg-blue-500/10", ring: "ring-blue-500/40", dot: "bg-blue-400" },
-  material: { text: "text-emerald-300", bg: "bg-emerald-500/10", ring: "ring-emerald-500/40", dot: "bg-emerald-400" },
-  equipment: { text: "text-amber-300", bg: "bg-amber-500/10", ring: "ring-amber-500/40", dot: "bg-amber-400" },
+const CAT_TONE: Record<
+  Category,
+  { text: string; bg: string; ring: string; dot: string; activeBg: string; activeRing: string }
+> = {
+  labor: {
+    text: "text-blue-300",
+    bg: "bg-blue-500/5",
+    ring: "ring-blue-500/30",
+    dot: "bg-blue-400",
+    activeBg: "bg-blue-500/15",
+    activeRing: "ring-blue-500",
+  },
+  material: {
+    text: "text-emerald-300",
+    bg: "bg-emerald-500/5",
+    ring: "ring-emerald-500/30",
+    dot: "bg-emerald-400",
+    activeBg: "bg-emerald-500/15",
+    activeRing: "ring-emerald-500",
+  },
+  equipment: {
+    text: "text-amber-300",
+    bg: "bg-amber-500/5",
+    ring: "ring-amber-500/30",
+    dot: "bg-amber-400",
+    activeBg: "bg-amber-500/15",
+    activeRing: "ring-amber-500",
+  },
 };
 
-const CAT_SHORT: Record<Category, string> = {
-  labor: "NC",
-  material: "VT",
-  equipment: "MM",
-};
+const CAT_SHORT: Record<Category, string> = { labor: "NC", material: "VT", equipment: "MM" };
 
 function fmtVND(value: number) {
   return value.toLocaleString("vi-VN");
@@ -195,8 +215,20 @@ export function ProjectBudgetClient({
   const [showAmendmentForm, setShowAmendmentForm] = useState(false);
   const [amendmentReason, setAmendmentReason] = useState("");
   const [amendmentRows, setAmendmentRows] = useState<AmendmentEditRow[]>([]);
-  const [activeCategory, setActiveCategory] = useState<Category>("labor");
-  const [activePhaseCode, setActivePhaseCode] = useState<PhaseCode>("02");
+  // Per-phase expanded category (null = collapsed)
+  const [expanded, setExpanded] = useState<Record<PhaseCode, Category | null>>({
+    "01": null,
+    "02": null,
+    "03": null,
+    "04": null,
+    "05": null,
+    "06": null,
+    "07": null,
+    "08": null,
+    "09": null,
+  });
+  // Modal: which task's sub-tasks are being edited
+  const [breakdownModalLocal, setBreakdownModalLocal] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,31 +284,38 @@ export function ProjectBudgetClient({
     return { labor, material, equipment, total: labor + material + equipment };
   }, [rows]);
 
-  const totalsByPhase = useMemo(() => {
-    const m = new Map<PhaseCode, number>();
-    for (const code of PHASE_CODES) m.set(code, 0);
+  const phaseStats = useMemo(() => {
+    const m = new Map<string, { sum: number; count: number }>();
+    for (const code of PHASE_CODES) {
+      for (const cat of BUDGET_CATEGORIES) {
+        m.set(`${code}|${cat}`, { sum: 0, count: 0 });
+      }
+    }
     for (const r of rows) {
-      m.set(r.phaseCode, (m.get(r.phaseCode) ?? 0) + Math.round(effectiveQty(r) * r.unitPrice));
+      const key = `${r.phaseCode}|${r.category}`;
+      const cur = m.get(key) ?? { sum: 0, count: 0 };
+      m.set(key, {
+        sum: cur.sum + Math.round(effectiveQty(r) * r.unitPrice),
+        count: cur.count + 1,
+      });
     }
     return m;
   }, [rows]);
 
-  const itemCountByPhase = useMemo(() => {
-    const m = new Map<PhaseCode, number>();
-    for (const code of PHASE_CODES) m.set(code, 0);
-    for (const r of rows) m.set(r.phaseCode, (m.get(r.phaseCode) ?? 0) + 1);
-    return m;
-  }, [rows]);
-
-  const rowsByCategoryPhase = useMemo(() => {
+  const rowsByKey = useMemo(() => {
     const map = new Map<string, ItemRow[]>();
     for (const r of rows) {
-      const key = `${r.category}|${r.phaseCode}`;
+      const key = `${r.phaseCode}|${r.category}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }
     return map;
   }, [rows]);
+
+  const modalRow = useMemo(
+    () => (breakdownModalLocal ? rows.find((r) => r._local === breakdownModalLocal) ?? null : null),
+    [breakdownModalLocal, rows],
+  );
 
   function updateRow(local: string, patch: Partial<ItemRow>) {
     setRows((prev) =>
@@ -292,6 +331,7 @@ export function ProjectBudgetClient({
 
   function addRow(category: Category, phaseCode: PhaseCode) {
     setRows((prev) => [...prev, emptyRow(category, phaseCode)]);
+    setExpanded((prev) => ({ ...prev, [phaseCode]: category }));
   }
 
   function removeRow(local: string) {
@@ -329,6 +369,10 @@ export function ProjectBudgetClient({
         return { ...r, breakdown, quantity: qty, amount: Math.round(qty * r.unitPrice) };
       }),
     );
+  }
+
+  function toggleBranch(phase: PhaseCode, cat: Category) {
+    setExpanded((prev) => ({ ...prev, [phase]: prev[phase] === cat ? null : cat }));
   }
 
   async function save() {
@@ -463,235 +507,169 @@ export function ProjectBudgetClient({
     return <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-sm text-[#8892b0]">Đang tải dự toán…</div>;
   }
 
-  const activeRows = rowsByCategoryPhase.get(`${activeCategory}|${activePhaseCode}`) ?? [];
-  const activePhaseTotal = activeRows.reduce(
-    (s, r) => s + Math.round(effectiveQty(r) * r.unitPrice),
-    0,
-  );
-
   return (
     <div className="space-y-4">
-      {/* Header + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-[#5a6080]">Dự toán công trình</div>
-          <div className="mt-0.5 flex items-center gap-2 text-base font-semibold text-[#f0f2ff]">
-            {data?.budget ? (
-              locked ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
-                </span>
+      {/* Card chính: 1 card tổng thông số + actions */}
+      <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4 ring-1 ring-orange-500/10">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-orange-400/80">Dự toán công trình</div>
+            <div className="mt-1 text-2xl font-bold text-[#f0f2ff] sm:text-3xl">{fmtVND(totals.total)}đ</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+              {data?.budget ? (
+                locked ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 font-medium text-amber-300 ring-1 ring-amber-500/30">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
+                  </span>
+                )
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 ring-1 ring-amber-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 font-medium text-[#8892b0]">
+                  Chưa lập
                 </span>
-              )
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 text-xs font-medium text-[#8892b0]">
-                Chưa lập
-              </span>
+              )}
+              {contractValue !== null && contractValue > 0 && (
+                <span className="text-[#8892b0]">
+                  · {((totals.total / contractValue) * 100).toFixed(1)}% giá trị HĐ ({fmtVND(contractValue)}đ)
+                </span>
+              )}
+              {data?.budget?.lockedAt && (
+                <span className="text-[#8892b0]">
+                  · Chốt bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleDateString("vi-VN")}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {canEdit && !locked && (
+              <Button onClick={save} disabled={saving}>
+                {saving ? "Đang lưu…" : "Lưu dự toán"}
+              </Button>
             )}
-            {data?.budget?.lockedAt && (
-              <span className="text-xs font-normal text-[#8892b0]">
-                bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleString("vi-VN")}
-              </span>
+            {canLock && !locked && data?.budget && (
+              <Button variant="outline" onClick={lockBudget}>
+                Chốt dự toán
+              </Button>
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          {canEdit && !locked && (
-            <Button onClick={save} disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu dự toán"}
-            </Button>
-          )}
-          {canLock && !locked && data?.budget && (
-            <Button variant="outline" onClick={lockBudget}>
-              Chốt dự toán
-            </Button>
-          )}
+
+        {/* 3 mini stats NC/VT/MM ngay trong card chính */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {BUDGET_CATEGORIES.map((cat) => {
+            const sum = totals[cat === "labor" ? "labor" : cat === "material" ? "material" : "equipment"];
+            const pct = totals.total > 0 ? (sum / totals.total) * 100 : 0;
+            const t = CAT_TONE[cat];
+            return (
+              <div key={cat} className={`rounded-xl ${t.bg} p-3 ring-1 ${t.ring}`}>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] uppercase tracking-wider text-[#8892b0]">{CATEGORY_LABEL[cat]}</div>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold ${t.text} bg-[#0f1220]`}>
+                    {CAT_SHORT[cat]}
+                  </span>
+                </div>
+                <div className={`mt-1.5 text-base font-bold ${t.text} sm:text-lg`}>{fmtVND(sum)}đ</div>
+                <div className="mt-1 text-[10px] text-[#5a6080]">{pct.toFixed(1)}%</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Top summary card: NC / VT / MM / TỔNG — mỗi cột 2 hàng (Dự toán + Thực tế) */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryCard
-          label="Nhân công"
-          short="NC"
-          color={CAT_ACCENT.labor}
-          planned={totals.labor}
-        />
-        <SummaryCard
-          label="Vật tư"
-          short="VT"
-          color={CAT_ACCENT.material}
-          planned={totals.material}
-        />
-        <SummaryCard
-          label="Máy móc TB"
-          short="MM"
-          color={CAT_ACCENT.equipment}
-          planned={totals.equipment}
-        />
-        <SummaryCard
-          label="Tổng dự toán"
-          short="TỔNG"
-          color={{ text: "text-orange-200", bg: "bg-orange-500/10", ring: "ring-orange-500/40", dot: "bg-orange-400" }}
-          planned={totals.total}
-          subline={
-            contractValue !== null && contractValue > 0
-              ? `= ${((totals.total / contractValue) * 100).toFixed(1)}% giá trị HĐ`
-              : undefined
-          }
-          emphasis
-        />
-      </div>
+      {/* 9 card giai đoạn */}
+      <div className="space-y-3">
+        {PHASE_CODES.map((phase) => {
+          const phaseTotal = BUDGET_CATEGORIES.reduce(
+            (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.sum ?? 0),
+            0,
+          );
+          const phaseCount = BUDGET_CATEGORIES.reduce(
+            (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.count ?? 0),
+            0,
+          );
+          const activeCat = expanded[phase];
 
-      {/* Main 2-col layout: sidebar 9 phases + content */}
-      <div className="grid grid-cols-[180px_1fr] gap-3 md:grid-cols-[220px_1fr]">
-        {/* Sidebar */}
-        <aside className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-2">
-          <div className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-[#5a6080]">
-            9 giai đoạn (SOP 47)
-          </div>
-          <nav className="flex flex-col gap-0.5">
-            {PHASE_CODES.map((code) => {
-              const sum = totalsByPhase.get(code) ?? 0;
-              const count = itemCountByPhase.get(code) ?? 0;
-              const active = activePhaseCode === code;
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setActivePhaseCode(code)}
-                  className={`group rounded-lg px-2 py-1.5 text-left transition ${
-                    active
-                      ? "bg-[#252840] ring-1 ring-orange-500/50"
-                      : "hover:bg-[#0f1220]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-mono font-semibold ${
-                          active ? "bg-orange-500 text-white" : "bg-[#0f1220] text-[#8892b0]"
-                        }`}
-                      >
-                        {code}
-                      </span>
-                      <span className={`truncate text-xs font-medium ${active ? "text-white" : "text-[#c0c8e0]"}`}>
-                        {PHASE_CODE_SHORT[code]}
-                      </span>
-                    </div>
-                    {count > 0 && (
-                      <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${active ? "bg-orange-400" : "bg-[#5a6080]"}`} />
-                    )}
-                  </div>
-                  {sum > 0 && (
-                    <div className={`mt-0.5 pl-7 text-[10px] ${active ? "text-orange-300" : "text-[#5a6080]"}`}>
-                      {fmtVND(sum)}đ
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        {/* Content */}
-        <section className="min-w-0 rounded-2xl border border-[#252840] bg-[#1a1d2e]">
-          {/* Phase header */}
-          <div className="border-b border-[#252840] p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wide text-[#5a6080]">Giai đoạn {activePhaseCode}</div>
-                <div className="truncate text-sm font-semibold text-[#f0f2ff]">{PHASE_CODE_LABEL[activePhaseCode]}</div>
+          return (
+            <section key={phase} className="rounded-2xl border border-[#252840] bg-[#1a1d2e]">
+              {/* Phase header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#252840] px-3 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-xs font-mono font-bold text-orange-300 ring-1 ring-orange-500/30">
+                    {phase}
+                  </span>
+                  <span className="truncate text-sm font-semibold text-[#f0f2ff]">
+                    {PHASE_CODE_LABEL[phase].replace(/^\d+\s*·\s*/, "")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-[#5a6080]">{phaseCount} hạng mục</span>
+                  <span className="font-semibold text-orange-300">{fmtVND(phaseTotal)}đ</span>
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <div className="text-[10px] uppercase tracking-wide text-[#5a6080]">Cộng giai đoạn</div>
-                <div className="text-sm font-semibold text-orange-300">{fmtVND(totalsByPhase.get(activePhaseCode) ?? 0)}đ</div>
-              </div>
-            </div>
 
-            {/* Category tabs */}
-            <div className="mt-3 grid grid-cols-3 gap-1.5">
-              {BUDGET_CATEGORIES.map((cat) => {
-                const active = activeCategory === cat;
-                const c = CAT_ACCENT[cat];
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setActiveCategory(cat)}
-                    className={`rounded-lg px-2 py-1.5 text-xs font-medium transition ${
-                      active
-                        ? `${c.bg} ${c.text} ring-1 ${c.ring}`
-                        : "bg-[#0f1220] text-[#8892b0] hover:text-white"
-                    }`}
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
-                      <span>{CAT_SHORT[cat]} · {CATEGORY_LABEL[cat]}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Active rows */}
-          <div className="space-y-2 p-3">
-            {activeRows.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220]/50 px-3 py-6 text-center text-xs text-[#5a6080]">
-                Chưa có hạng mục {CAT_SHORT[activeCategory]} trong giai đoạn này.
+              {/* 3 nhánh NC / VT / MM */}
+              <div className="grid grid-cols-3 gap-2 p-3">
+                {BUDGET_CATEGORIES.map((cat) => {
+                  const st = phaseStats.get(`${phase}|${cat}`) ?? { sum: 0, count: 0 };
+                  const active = activeCat === cat;
+                  const t = CAT_TONE[cat];
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => toggleBranch(phase, cat)}
+                      className={`group flex flex-col items-start gap-1 rounded-xl p-2.5 text-left transition ring-1 ${
+                        active ? `${t.activeBg} ring-2 ${t.activeRing}` : `${t.bg} ${t.ring} hover:ring-2`
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className={`text-[11px] font-semibold uppercase tracking-wider ${t.text}`}>
+                          {CAT_SHORT[cat]}
+                        </span>
+                        <span className={`text-[10px] ${active ? "text-white" : "text-[#5a6080]"}`}>
+                          {active ? "▴" : "▾"}
+                        </span>
+                      </div>
+                      <div className={`text-sm font-bold ${t.text}`}>{fmtVND(st.sum)}đ</div>
+                      <div className="text-[10px] text-[#5a6080]">{st.count} hạng mục</div>
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              activeRows.map((r) => (
-                <ItemCard
-                  key={r._local}
-                  row={r}
+
+              {/* Expanded task list */}
+              {activeCat && (
+                <BranchTasks
+                  phase={phase}
+                  category={activeCat}
+                  rows={rowsByKey.get(`${phase}|${activeCat}`) ?? []}
                   readOnly={readOnly}
-                  onUpdate={(patch) => updateRow(r._local!, patch)}
-                  onRemove={() => removeRow(r._local!)}
-                  onAddBreakdown={() => addBreakdownToRow(r._local!)}
-                  onUpdateBreakdown={(bLocal, patch) => updateBreakdown(r._local!, bLocal, patch)}
-                  onRemoveBreakdown={(bLocal) => removeBreakdown(r._local!, bLocal)}
+                  onAdd={() => addRow(activeCat, phase)}
+                  onUpdate={(local, patch) => updateRow(local, patch)}
+                  onRemove={(local) => removeRow(local)}
+                  onOpenBreakdown={(local) => setBreakdownModalLocal(local)}
                 />
-              ))
-            )}
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => addRow(activeCategory, activePhaseCode)}
-                className="w-full rounded-lg border border-dashed border-orange-500/40 bg-orange-500/5 px-3 py-2 text-xs font-medium text-orange-300 hover:bg-orange-500/10"
-              >
-                + Thêm hạng mục {CAT_SHORT[activeCategory]} vào {PHASE_CODE_SHORT[activePhaseCode]}
-              </button>
-            )}
-
-            <div className="mt-2 flex items-center justify-between rounded-lg bg-[#0f1220] px-3 py-2 text-xs">
-              <span className="text-[#8892b0]">
-                Cộng {CAT_SHORT[activeCategory]} trong {PHASE_CODE_SHORT[activePhaseCode]}
-              </span>
-              <span className={`font-semibold ${CAT_ACCENT[activeCategory].text}`}>
-                {fmtVND(activePhaseTotal)}đ
-              </span>
-            </div>
-          </div>
-
-          {!readOnly && (
-            <div className="border-t border-[#252840] p-3">
-              <label className="text-[10px] uppercase tracking-wide text-[#5a6080]">Ghi chú dự toán</label>
-              <textarea
-                className="mt-1 w-full rounded-lg bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                rows={2}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Ghi chú chung về dự toán…"
-              />
-            </div>
-          )}
-        </section>
+              )}
+            </section>
+          );
+        })}
       </div>
+
+      {!readOnly && (
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+          <label className="text-[10px] uppercase tracking-wide text-[#5a6080]">Ghi chú dự toán</label>
+          <textarea
+            className="mt-1 w-full rounded-lg bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ghi chú chung về dự toán…"
+          />
+        </div>
+      )}
 
       {/* Amendments */}
       {locked && (
@@ -713,7 +691,7 @@ export function ProjectBudgetClient({
                 rows={2}
                 value={amendmentReason}
                 onChange={(e) => setAmendmentReason(e.target.value)}
-                placeholder="VD: Chủ nhà yêu cầu bổ sung lan can, đào sâu hơn 0.5m do gặp đá…"
+                placeholder="VD: Chủ nhà yêu cầu bổ sung lan can…"
               />
               <div className="mt-3 space-y-2">
                 {amendmentRows.map((r) => (
@@ -787,7 +765,7 @@ export function ProjectBudgetClient({
                 <div className="pt-1">
                   <button
                     type="button"
-                    onClick={() => addAmendmentRow(activeCategory, activePhaseCode)}
+                    onClick={() => addAmendmentRow("labor", "02")}
                     className="w-full rounded-lg border border-dashed border-orange-500/40 bg-orange-500/5 px-2 py-1.5 text-xs font-medium text-orange-300 hover:bg-orange-500/10"
                   >
                     + Thêm dòng điều chỉnh
@@ -883,91 +861,117 @@ export function ProjectBudgetClient({
           </div>
         </div>
       )}
+
+      {/* Modal sub-task */}
+      {modalRow && (
+        <BreakdownModal
+          row={modalRow}
+          readOnly={readOnly}
+          onClose={() => setBreakdownModalLocal(null)}
+          onAdd={() => addBreakdownToRow(modalRow._local!)}
+          onUpdate={(bLocal, patch) => updateBreakdown(modalRow._local!, bLocal, patch)}
+          onRemove={(bLocal) => removeBreakdown(modalRow._local!, bLocal)}
+        />
+      )}
     </div>
   );
 }
 
-type SummaryColor = { text: string; bg: string; ring: string; dot: string };
+type BranchTasksProps = {
+  phase: PhaseCode;
+  category: Category;
+  rows: ItemRow[];
+  readOnly: boolean;
+  onAdd: () => void;
+  onUpdate: (local: string, patch: Partial<ItemRow>) => void;
+  onRemove: (local: string) => void;
+  onOpenBreakdown: (local: string) => void;
+};
 
-function SummaryCard({
-  label,
-  short,
-  color,
-  planned,
-  subline,
-  emphasis,
-}: {
-  label: string;
-  short: string;
-  color: SummaryColor;
-  planned: number;
-  subline?: string;
-  emphasis?: boolean;
-}) {
+function BranchTasks({ phase, category, rows, readOnly, onAdd, onUpdate, onRemove, onOpenBreakdown }: BranchTasksProps) {
+  const t = CAT_TONE[category];
   return (
-    <div
-      className={`rounded-2xl border border-[#252840] p-3 ${
-        emphasis ? `${color.bg} ring-1 ${color.ring}` : "bg-[#1a1d2e]"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wide text-[#5a6080]">{label}</div>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold ${emphasis ? "bg-orange-500/30 text-orange-200" : "bg-[#0f1220] text-[#8892b0]"}`}>
-          {short}
-        </span>
-      </div>
-      <div className="mt-2 space-y-1.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-[#5a6080]">Dự toán</span>
-          <span className={`truncate text-sm font-semibold ${color.text}`}>{fmtVND(planned)}đ</span>
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-[#5a6080]">Thực tế</span>
-          <span className="text-sm font-medium text-[#5a6080]" title="Chưa link với tiến độ">—</span>
+    <div className={`border-t border-[#252840] ${t.bg} px-3 py-3`}>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-[11px] uppercase tracking-wider text-[#8892b0]">
+          <span className={t.text}>{CAT_SHORT[category]}</span> trong{" "}
+          <span className="text-[#c0c8e0]">{phase} {PHASE_CODE_SHORT[phase]}</span> — {rows.length} hạng mục
         </div>
       </div>
-      {subline && <div className="mt-1.5 text-[10px] text-[#8892b0]">{subline}</div>}
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220]/50 px-3 py-4 text-center text-xs text-[#5a6080]">
+          Chưa có hạng mục.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((r) => (
+            <TaskRow
+              key={r._local}
+              row={r}
+              readOnly={readOnly}
+              onUpdate={(patch) => onUpdate(r._local!, patch)}
+              onRemove={() => onRemove(r._local!)}
+              onOpenBreakdown={() => onOpenBreakdown(r._local!)}
+            />
+          ))}
+        </div>
+      )}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className={`mt-2 w-full rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium ${t.text} ${t.ring} ${t.bg} hover:opacity-90`}
+        >
+          + Thêm hạng mục {CAT_SHORT[category]} vào {PHASE_CODE_SHORT[phase]}
+        </button>
+      )}
     </div>
   );
 }
 
-type ItemCardProps = {
+type TaskRowProps = {
   row: ItemRow;
   readOnly: boolean;
   onUpdate: (patch: Partial<ItemRow>) => void;
   onRemove: () => void;
-  onAddBreakdown: () => void;
-  onUpdateBreakdown: (bLocal: string, patch: Partial<BreakdownRow>) => void;
-  onRemoveBreakdown: (bLocal: string) => void;
+  onOpenBreakdown: () => void;
 };
 
-function ItemCard({
-  row,
-  readOnly,
-  onUpdate,
-  onRemove,
-  onAddBreakdown,
-  onUpdateBreakdown,
-  onRemoveBreakdown,
-}: ItemCardProps) {
+function TaskRow({ row, readOnly, onUpdate, onRemove, onOpenBreakdown }: TaskRowProps) {
   const hasBreakdown = row.breakdown.length > 0;
-  const qtyLocked = hasBreakdown;
   const qty = effectiveQty(row);
   const amount = Math.round(qty * row.unitPrice);
 
   return (
-    <div className="rounded-xl bg-[#0f1220] p-2.5 ring-1 ring-[#252840]">
-      {/* Row 1: name */}
-      <div className="flex items-start gap-2">
+    <div className="rounded-lg bg-[#0f1220] p-2 ring-1 ring-[#252840]">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenBreakdown}
+          className={`shrink-0 grid h-7 w-7 place-items-center rounded text-xs ${
+            hasBreakdown
+              ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/40"
+              : "bg-[#1a1d2e] text-[#5a6080] ring-1 ring-[#252840] hover:text-orange-300"
+          }`}
+          title={hasBreakdown ? `${row.breakdown.length} công tác con` : "Mở để thêm công tác con"}
+        >
+          {hasBreakdown ? row.breakdown.length : "+"}
+        </button>
         <div className="min-w-0 flex-1">
           {readOnly ? (
-            <div className="truncate text-sm font-medium text-[#f0f2ff]">{row.name}</div>
+            <button
+              type="button"
+              onClick={onOpenBreakdown}
+              className="block w-full truncate text-left text-sm font-medium text-[#f0f2ff] hover:text-orange-300"
+            >
+              {row.name || "(chưa có tên)"}
+            </button>
           ) : (
             <input
               className="w-full rounded bg-[#1a1d2e] px-2 py-1 text-sm font-medium text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
               value={row.name}
               onChange={(e) => onUpdate({ name: e.target.value })}
-              placeholder="Tên hạng mục (VD: Đào móng / Xi măng PC40 / Máy trộn)"
+              placeholder="Tên hạng mục"
             />
           )}
         </div>
@@ -975,16 +979,15 @@ function ItemCard({
           <button
             type="button"
             onClick={onRemove}
-            className="shrink-0 rounded bg-rose-500/10 px-2 py-1 text-[10px] font-medium text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
+            className="shrink-0 rounded bg-rose-500/10 px-1.5 py-1 text-[10px] font-medium text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
+            title="Xóa hạng mục"
           >
-            Xóa
+            ×
           </button>
         )}
       </div>
-
-      {/* Row 2: ĐV · KL · Đơn giá · Thành tiền */}
-      <div className="mt-1.5 grid grid-cols-[60px_1fr_1fr_1fr] gap-1.5 sm:grid-cols-[80px_1fr_1.2fr_1.2fr]">
-        <FieldCell label="ĐV">
+      <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+        <Cell label="ĐV">
           {readOnly ? (
             <span className="text-xs text-[#f0f2ff]">{row.unit}</span>
           ) : (
@@ -995,12 +998,12 @@ function ItemCard({
               placeholder="m³"
             />
           )}
-        </FieldCell>
-        <FieldCell label={qtyLocked ? "KL (tự cộng)" : "KL"}>
-          {readOnly || qtyLocked ? (
+        </Cell>
+        <Cell label={hasBreakdown ? "KL (tự cộng)" : "KL"}>
+          {readOnly || hasBreakdown ? (
             <span
-              className={`text-xs ${qtyLocked ? "text-orange-300" : "text-[#f0f2ff]"}`}
-              title={qtyLocked ? "Tự cộng từ công tác con" : undefined}
+              className={`text-xs ${hasBreakdown ? "text-orange-300" : "text-[#f0f2ff]"}`}
+              title={hasBreakdown ? "Tự cộng từ công tác con" : undefined}
             >
               {qty}
             </span>
@@ -1013,8 +1016,8 @@ function ItemCard({
               onChange={(e) => onUpdate({ quantity: Number(e.target.value) || 0 })}
             />
           )}
-        </FieldCell>
-        <FieldCell label="Đơn giá">
+        </Cell>
+        <Cell label="Đơn giá">
           {readOnly ? (
             <span className="text-xs text-[#f0f2ff]">{fmtVND(row.unitPrice)}</span>
           ) : (
@@ -1026,120 +1029,16 @@ function ItemCard({
               onChange={(e) => onUpdate({ unitPrice: Math.round(Number(e.target.value) || 0) })}
             />
           )}
-        </FieldCell>
-        <FieldCell label="Thành tiền" emphasize>
+        </Cell>
+        <Cell label="Thành tiền" emphasize>
           <span className="text-xs font-semibold text-orange-300">{fmtVND(amount)}đ</span>
-        </FieldCell>
-      </div>
-
-      {/* Row 3: ghi chú (optional, narrow) */}
-      {(!readOnly || row.note) && (
-        <div className="mt-1.5">
-          {readOnly ? (
-            row.note && <div className="text-[11px] text-[#8892b0]">Ghi chú: {row.note}</div>
-          ) : (
-            <input
-              className="w-full rounded bg-[#1a1d2e] px-2 py-1 text-[11px] text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-              value={row.note ?? ""}
-              onChange={(e) => onUpdate({ note: e.target.value })}
-              placeholder="Ghi chú (tuỳ chọn)"
-            />
-          )}
-        </div>
-      )}
-
-      {/* Breakdown nested (always visible) */}
-      <div className="mt-2 rounded-lg border border-dashed border-[#252840] bg-[#1a1d2e]/40 p-2">
-        <div className="flex items-center justify-between">
-          <div className="text-[10px] uppercase tracking-wide text-[#5a6080]">
-            Công tác con {hasBreakdown && `(${row.breakdown.length})`}
-          </div>
-          {hasBreakdown && (
-            <div className="text-[10px] text-orange-300">Tổng KL: {qty}</div>
-          )}
-        </div>
-        {hasBreakdown ? (
-          <div className="mt-1 space-y-1">
-            {row.breakdown.map((b) => (
-              <div key={b._local} className="grid grid-cols-[1fr_70px_24px] gap-1.5 sm:grid-cols-[1fr_90px_1fr_24px]">
-                <div className="flex min-w-0 items-center gap-1">
-                  <span className="shrink-0 text-[#5a6080]">└</span>
-                  {readOnly ? (
-                    <span className="truncate text-xs text-[#f0f2ff]">{b.name}</span>
-                  ) : (
-                    <input
-                      className="w-full rounded bg-[#0f1220] px-1.5 py-0.5 text-xs text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                      value={b.name}
-                      onChange={(e) => onUpdateBreakdown(b._local, { name: e.target.value })}
-                      placeholder="Tên công tác con (VD: Trục A)"
-                    />
-                  )}
-                </div>
-                {readOnly ? (
-                  <span className="text-right text-xs text-[#f0f2ff]">{b.quantity}</span>
-                ) : (
-                  <input
-                    type="number"
-                    step="0.001"
-                    className="rounded bg-[#0f1220] px-1.5 py-0.5 text-right text-xs text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                    value={b.quantity || ""}
-                    onChange={(e) => onUpdateBreakdown(b._local, { quantity: Number(e.target.value) || 0 })}
-                    placeholder="KL"
-                  />
-                )}
-                <div className="hidden sm:block">
-                  {readOnly ? (
-                    <span className="text-[11px] text-[#8892b0]">{b.note}</span>
-                  ) : (
-                    <input
-                      className="w-full rounded bg-[#0f1220] px-1.5 py-0.5 text-[11px] text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                      value={b.note ?? ""}
-                      onChange={(e) => onUpdateBreakdown(b._local, { note: e.target.value })}
-                      placeholder="Ghi chú (tuỳ chọn)"
-                    />
-                  )}
-                </div>
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveBreakdown(b._local)}
-                    className="rounded text-xs text-rose-300 hover:text-rose-200"
-                    title="Xóa công tác con"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-1 text-[11px] text-[#5a6080]">
-            Chưa chia nhỏ — KL nhập trực tiếp ở dòng cha.
-          </div>
-        )}
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={onAddBreakdown}
-            className="mt-1.5 text-[11px] text-orange-300 hover:text-orange-200"
-          >
-            + Thêm công tác con
-          </button>
-        )}
+        </Cell>
       </div>
     </div>
   );
 }
 
-function FieldCell({
-  label,
-  children,
-  emphasize,
-}: {
-  label: string;
-  children: React.ReactNode;
-  emphasize?: boolean;
-}) {
+function Cell({ label, children, emphasize }: { label: string; children: React.ReactNode; emphasize?: boolean }) {
   return (
     <div
       className={`rounded px-1.5 py-0.5 ring-1 ${
@@ -1148,6 +1047,132 @@ function FieldCell({
     >
       <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">{label}</div>
       <div className="text-right">{children}</div>
+    </div>
+  );
+}
+
+type BreakdownModalProps = {
+  row: ItemRow;
+  readOnly: boolean;
+  onClose: () => void;
+  onAdd: () => void;
+  onUpdate: (bLocal: string, patch: Partial<BreakdownRow>) => void;
+  onRemove: (bLocal: string) => void;
+};
+
+function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: BreakdownModalProps) {
+  const qty = effectiveQty(row);
+  const amount = Math.round(qty * row.unitPrice);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-[#252840] p-4">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-[#5a6080]">
+              Công tác con · {row.phaseCode} {PHASE_CODE_SHORT[row.phaseCode]} · {CATEGORY_LABEL[row.category]}
+            </div>
+            <div className="mt-0.5 truncate text-base font-semibold text-[#f0f2ff]">{row.name || "(chưa có tên)"}</div>
+            <div className="mt-1 text-xs text-[#8892b0]">
+              Tổng KL: <span className="font-semibold text-orange-300">{qty}</span> {row.unit} · Thành tiền:{" "}
+              <span className="font-semibold text-orange-300">{fmtVND(amount)}đ</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded bg-[#0f1220] px-2 py-1 text-sm text-[#8892b0] ring-1 ring-[#252840] hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-4">
+          {row.breakdown.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220] px-3 py-6 text-center text-xs text-[#5a6080]">
+              Chưa có công tác con. Nhập trực tiếp KL ở dòng cha, hoặc thêm con bên dưới.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {row.breakdown.map((b, idx) => (
+                <div key={b._local} className="rounded-lg bg-[#0f1220] p-2 ring-1 ring-[#252840]">
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-[10px] text-[#5a6080]">#{idx + 1}</span>
+                    {readOnly ? (
+                      <span className="flex-1 truncate text-sm text-[#f0f2ff]">{b.name}</span>
+                    ) : (
+                      <input
+                        className="flex-1 rounded bg-[#1a1d2e] px-2 py-1 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
+                        value={b.name}
+                        onChange={(e) => onUpdate(b._local, { name: e.target.value })}
+                        placeholder="Tên công tác con (VD: Trục A / Cọc 1)"
+                      />
+                    )}
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onRemove(b._local)}
+                        className="shrink-0 rounded bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                    <div className="rounded bg-[#1a1d2e] px-2 py-1 ring-1 ring-[#252840]">
+                      <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">Khối lượng</div>
+                      {readOnly ? (
+                        <div className="text-right text-xs text-[#f0f2ff]">{b.quantity} {row.unit}</div>
+                      ) : (
+                        <input
+                          type="number"
+                          step="0.001"
+                          className="w-full bg-transparent text-right text-xs text-[#f0f2ff] outline-none"
+                          value={b.quantity || ""}
+                          onChange={(e) => onUpdate(b._local, { quantity: Number(e.target.value) || 0 })}
+                        />
+                      )}
+                    </div>
+                    <div className="rounded bg-[#1a1d2e] px-2 py-1 ring-1 ring-[#252840]">
+                      <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">Ghi chú</div>
+                      {readOnly ? (
+                        <div className="text-[11px] text-[#8892b0]">{b.note || "—"}</div>
+                      ) : (
+                        <input
+                          className="w-full bg-transparent text-[11px] text-[#f0f2ff] outline-none"
+                          value={b.note ?? ""}
+                          onChange={(e) => onUpdate(b._local, { note: e.target.value })}
+                          placeholder="(tuỳ chọn)"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="mt-2 w-full rounded-lg border border-dashed border-orange-500/40 bg-orange-500/5 px-3 py-2 text-xs font-medium text-orange-300 hover:bg-orange-500/10"
+            >
+              + Thêm công tác con
+            </button>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[#252840] p-3">
+          <Button onClick={onClose}>Xong</Button>
+        </div>
+      </div>
     </div>
   );
 }
