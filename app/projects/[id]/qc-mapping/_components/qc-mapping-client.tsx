@@ -3,14 +3,12 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PHASE_LABEL } from "@/lib/project-budget";
+import { PHASE_CODES, PHASE_CODE_LABEL, type PhaseCode } from "@/lib/project-budget";
 import type { QcChecklistItem } from "@/lib/qc-mapping";
-
-type Phase = "mong" | "than" | "mai";
 
 type Item = {
   id: string;
-  phase: Phase;
+  phaseCode: PhaseCode;
   name: string;
   unit: string;
   qcChecklist: QcChecklistItem[];
@@ -65,8 +63,18 @@ export function QcMappingClient({ projectId, items }: Props) {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const grouped = useMemo(() => {
-    const out: Record<Phase, Item[]> = { mong: [], than: [], mai: [] };
-    for (const it of items) out[it.phase].push(it);
+    const out: Record<PhaseCode, Item[]> = {
+      "01": [],
+      "02": [],
+      "03": [],
+      "04": [],
+      "05": [],
+      "06": [],
+      "07": [],
+      "08": [],
+      "09": [],
+    };
+    for (const it of items) out[it.phaseCode].push(it);
     return out;
   }, [items]);
 
@@ -139,13 +147,13 @@ export function QcMappingClient({ projectId, items }: Props) {
         </div>
       </div>
 
-      {(["mong", "than", "mai"] as Phase[]).map((phase) => {
-        const list = grouped[phase];
+      {PHASE_CODES.map((phaseCode) => {
+        const list = grouped[phaseCode];
         if (list.length === 0) return null;
         return (
-          <div key={phase} className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+          <div key={phaseCode} className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
             <div className="mb-3 text-sm font-semibold text-[#f0f2ff]">
-              Giai đoạn: {PHASE_LABEL[phase]} ({list.length} đầu việc)
+              {PHASE_CODE_LABEL[phaseCode]} ({list.length} đầu việc)
             </div>
             <div className="space-y-3">
               {list.map((it) => {

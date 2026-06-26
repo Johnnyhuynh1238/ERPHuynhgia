@@ -84,6 +84,7 @@ export async function PATCH(
           budgetId: amendment.budgetId,
           category: it.category as BudgetCategory,
           phase: it.phase,
+          phaseCode: it.phaseCode,
           name: it.name,
           unit: it.unit,
           quantity: it.quantity,

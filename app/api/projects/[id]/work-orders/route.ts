@@ -36,7 +36,7 @@ function serializeWorkOrder(wo: {
   createdAt: Date;
   workers: Array<{ id: string; worker: { id: string; fullName: string; grade: number | null } }>;
   createdBy: { id: string; fullName: string };
-  budgetItem: { id: string; phase: string; quantity: Prisma.Decimal };
+  budgetItem: { id: string; phase: string; phaseCode: string; quantity: Prisma.Decimal };
 }) {
   return {
     id: wo.id,
@@ -44,6 +44,7 @@ function serializeWorkOrder(wo: {
     groupNo: wo.groupNo,
     budgetItemId: wo.budgetItemId,
     budgetPhase: wo.budgetItem.phase,
+    budgetPhaseCode: wo.budgetItem.phaseCode,
     budgetQty: Number(wo.budgetItem.quantity),
     workItem: wo.workItem,
     unit: wo.unit,
@@ -78,7 +79,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     where: { projectId: params.id, ...(date ? { date } : {}) },
     orderBy: [{ date: "desc" }, { groupNo: "asc" }],
     include: {
-      budgetItem: { select: { id: true, phase: true, quantity: true } },
+      budgetItem: { select: { id: true, phase: true, phaseCode: true, quantity: true } },
       createdBy: { select: { id: true, fullName: true } },
       workers: { include: { worker: { select: { id: true, fullName: true, grade: true } } } },
     },
@@ -88,8 +89,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
   // Labor budget items + workers available
   const budgetItems = await prisma.projectBudgetItem.findMany({
     where: { budget: { projectId: params.id }, category: "labor" },
-    orderBy: [{ phase: "asc" }, { sortRank: "asc" }],
-    select: { id: true, phase: true, name: true, unit: true, quantity: true, unitPrice: true, sortRank: true },
+    orderBy: [{ phaseCode: "asc" }, { sortRank: "asc" }],
+    select: {
+      id: true,
+      phase: true,
+      phaseCode: true,
+      name: true,
+      unit: true,
+      quantity: true,
+      unitPrice: true,
+      sortRank: true,
+    },
   });
 
   const workers = await prisma.worker.findMany({
@@ -113,6 +123,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     budgetItems: budgetItems.map((b) => ({
       id: b.id,
       phase: b.phase,
+      phaseCode: b.phaseCode,
       name: b.name,
       unit: b.unit,
       quantity: Number(b.quantity),

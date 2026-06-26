@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { AmendmentStatus, BudgetCategory, BudgetPhase, BudgetStatus, Prisma } from "@prisma/client";
+import { AmendmentStatus, BudgetCategory, BudgetStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { canProposeAmendment } from "@/lib/project-budget";
+import { canProposeAmendment, phaseCodeToLegacyPhase, type PhaseCode } from "@/lib/project-budget";
 import { logProjectActivity } from "@/lib/project-activity-log";
 
 const itemSchema = z.object({
   category: z.nativeEnum(BudgetCategory),
-  phase: z.nativeEnum(BudgetPhase),
+  phaseCode: z.string().regex(/^0[1-9]$/, "Mã giai đoạn phải là 01..09"),
   name: z.string().trim().min(1).max(255),
   unit: z.string().trim().min(1).max(20),
   quantity: z.coerce.number(),
@@ -47,7 +47,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const items = parsed.data.items.map((it) => ({
-    ...it,
+    category: it.category,
+    phaseCode: it.phaseCode as PhaseCode,
+    phase: phaseCodeToLegacyPhase(it.phaseCode as PhaseCode),
+    name: it.name,
+    unit: it.unit,
+    quantity: it.quantity,
+    unitPrice: it.unitPrice,
+    note: it.note ?? null,
     amount: Math.round(it.quantity * it.unitPrice),
   }));
   const deltaLabor = items.filter((i) => i.category === "labor").reduce((s, i) => s + i.amount, 0);
@@ -68,12 +75,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
         create: items.map((it) => ({
           category: it.category,
           phase: it.phase,
+          phaseCode: it.phaseCode,
           name: it.name,
           unit: it.unit,
           quantity: new Prisma.Decimal(it.quantity),
           unitPrice: BigInt(it.unitPrice),
           amount: BigInt(it.amount),
-          note: it.note ?? null,
+          note: it.note,
         })),
       },
     },

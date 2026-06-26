@@ -4,19 +4,36 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { canEditBudget, canViewBudget } from "@/lib/project-budget";
+import {
+  canEditBudget,
+  canViewBudget,
+  phaseCodeToLegacyPhase,
+  type PhaseCode,
+} from "@/lib/project-budget";
 import { logProjectActivity } from "@/lib/project-activity-log";
+
+const phaseCodeSchema = z
+  .string()
+  .regex(/^0[1-9]$/, "Mã giai đoạn phải là 01..09");
+
+const breakdownItemSchema = z.object({
+  name: z.string().trim().min(1, "Tên công tác con là bắt buộc").max(255),
+  quantity: z.coerce.number().min(0, "Khối lượng công tác con không hợp lệ"),
+  note: z.string().trim().max(255).optional().nullable(),
+});
 
 const itemSchema = z.object({
   id: z.string().uuid().optional(),
   category: z.nativeEnum(BudgetCategory),
-  phase: z.nativeEnum(BudgetPhase),
+  phaseCode: phaseCodeSchema,
+  standardTaskId: z.string().uuid().optional().nullable(),
   name: z.string().trim().min(1, "Tên hạng mục là bắt buộc").max(255),
   unit: z.string().trim().min(1, "Đơn vị là bắt buộc").max(20),
   quantity: z.coerce.number().min(0, "Khối lượng không hợp lệ"),
   unitPrice: z.coerce.number().int().min(0, "Đơn giá không hợp lệ"),
   note: z.string().trim().max(500).optional().nullable(),
   sortRank: z.coerce.number().optional(),
+  breakdown: z.array(breakdownItemSchema).max(200).optional().nullable(),
 });
 
 const putSchema = z.object({
@@ -24,10 +41,14 @@ const putSchema = z.object({
   items: z.array(itemSchema).max(500),
 });
 
+type SerializedBreakdownItem = { name: string; quantity: number; note: string | null };
+
 type SerializedItem = {
   id: string;
   category: BudgetCategory;
-  phase: BudgetPhase;
+  phase: BudgetPhase; // legacy — keep for older readers
+  phaseCode: string;
+  standardTaskId: string | null;
   name: string;
   unit: string;
   quantity: number;
@@ -35,14 +56,32 @@ type SerializedItem = {
   amount: number;
   note: string | null;
   sortRank: number;
+  breakdown: SerializedBreakdownItem[];
 };
 
-type SerializedAmendmentItem = Omit<SerializedItem, "sortRank">;
+type SerializedAmendmentItem = Omit<SerializedItem, "sortRank" | "breakdown" | "standardTaskId">;
+
+function normalizeBreakdown(raw: Prisma.JsonValue | null | undefined): SerializedBreakdownItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r): SerializedBreakdownItem | null => {
+      if (!r || typeof r !== "object") return null;
+      const obj = r as { name?: unknown; quantity?: unknown; note?: unknown };
+      const name = typeof obj.name === "string" ? obj.name : null;
+      const quantity = typeof obj.quantity === "number" ? obj.quantity : Number(obj.quantity);
+      if (!name || !Number.isFinite(quantity)) return null;
+      const note = typeof obj.note === "string" ? obj.note : null;
+      return { name, quantity, note };
+    })
+    .filter((x): x is SerializedBreakdownItem => x != null);
+}
 
 function serializeItem(item: {
   id: string;
   category: BudgetCategory;
   phase: BudgetPhase;
+  phaseCode: string;
+  standardTaskId: string | null;
   name: string;
   unit: string;
   quantity: Prisma.Decimal | number;
@@ -50,11 +89,14 @@ function serializeItem(item: {
   amount: bigint;
   note: string | null;
   sortRank: number;
+  breakdown: Prisma.JsonValue | null;
 }): SerializedItem {
   return {
     id: item.id,
     category: item.category,
     phase: item.phase,
+    phaseCode: item.phaseCode,
+    standardTaskId: item.standardTaskId,
     name: item.name,
     unit: item.unit,
     quantity: Number(item.quantity),
@@ -62,6 +104,7 @@ function serializeItem(item: {
     amount: Number(item.amount),
     note: item.note,
     sortRank: item.sortRank,
+    breakdown: normalizeBreakdown(item.breakdown),
   };
 }
 
@@ -69,6 +112,7 @@ function serializeAmendmentItem(item: {
   id: string;
   category: BudgetCategory;
   phase: BudgetPhase;
+  phaseCode: string;
   name: string;
   unit: string;
   quantity: Prisma.Decimal | number;
@@ -80,6 +124,7 @@ function serializeAmendmentItem(item: {
     id: item.id,
     category: item.category,
     phase: item.phase,
+    phaseCode: item.phaseCode,
     name: item.name,
     unit: item.unit,
     quantity: Number(item.quantity),
@@ -105,7 +150,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const budget = await prisma.projectBudget.findUnique({
     where: { projectId: params.id },
     include: {
-      items: { orderBy: [{ category: "asc" }, { phase: "asc" }, { sortRank: "asc" }] },
+      items: { orderBy: [{ category: "asc" }, { phaseCode: "asc" }, { sortRank: "asc" }] },
       createdBy: { select: { id: true, fullName: true } },
       lockedBy: { select: { id: true, fullName: true } },
       amendments: {
@@ -178,11 +223,31 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 
   const payload = parsed.data;
-  const items = payload.items.map((it, index) => ({
-    ...it,
-    sortRank: it.sortRank ?? index,
-    amount: Math.round(it.quantity * it.unitPrice),
-  }));
+  const items = payload.items.map((it, index) => {
+    // Nếu có breakdown thì tự cộng tổng → khóa lại quantity của parent
+    const breakdown = (it.breakdown ?? []).map((b) => ({
+      name: b.name,
+      quantity: Number(b.quantity) || 0,
+      note: b.note ?? null,
+    }));
+    const breakdownSum = breakdown.reduce((s, b) => s + b.quantity, 0);
+    const quantity = breakdown.length > 0 ? breakdownSum : it.quantity;
+    return {
+      id: it.id,
+      category: it.category,
+      phaseCode: it.phaseCode as PhaseCode,
+      phase: phaseCodeToLegacyPhase(it.phaseCode as PhaseCode),
+      standardTaskId: it.standardTaskId ?? null,
+      name: it.name,
+      unit: it.unit,
+      quantity,
+      unitPrice: it.unitPrice,
+      note: it.note ?? null,
+      sortRank: it.sortRank ?? index,
+      breakdown,
+      amount: Math.round(quantity * it.unitPrice),
+    };
+  });
   const totalLabor = items.filter((i) => i.category === "labor").reduce((s, i) => s + i.amount, 0);
   const totalMaterial = items.filter((i) => i.category === "material").reduce((s, i) => s + i.amount, 0);
   const totalEquipment = items.filter((i) => i.category === "equipment").reduce((s, i) => s + i.amount, 0);
@@ -219,15 +284,15 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           },
         });
 
-    // Preserve qcChecklist across save by (category|phase|name) fingerprint
+    // Preserve qcChecklist across save by (category|phaseCode|name) fingerprint
     const existingItems = await tx.projectBudgetItem.findMany({
       where: { budgetId: budget.id },
-      select: { category: true, phase: true, name: true, qcChecklist: true },
+      select: { category: true, phaseCode: true, name: true, qcChecklist: true },
     });
     const qcByKey = new Map<string, Prisma.JsonValue>();
     for (const ex of existingItems) {
       if (ex.qcChecklist != null) {
-        qcByKey.set(`${ex.category}|${ex.phase}|${ex.name}`, ex.qcChecklist);
+        qcByKey.set(`${ex.category}|${ex.phaseCode}|${ex.name}`, ex.qcChecklist);
       }
     }
 
@@ -235,18 +300,24 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (items.length > 0) {
       await tx.projectBudgetItem.createMany({
         data: items.map((it) => {
-          const preservedQc = qcByKey.get(`${it.category}|${it.phase}|${it.name}`);
+          const preservedQc = qcByKey.get(`${it.category}|${it.phaseCode}|${it.name}`);
           return {
             budgetId: budget.id,
             category: it.category,
             phase: it.phase,
+            phaseCode: it.phaseCode,
+            standardTaskId: it.standardTaskId,
             name: it.name,
             unit: it.unit,
             quantity: new Prisma.Decimal(it.quantity),
             unitPrice: BigInt(it.unitPrice),
             amount: BigInt(it.amount),
-            note: it.note ?? null,
+            note: it.note,
             sortRank: it.sortRank,
+            breakdown:
+              it.breakdown.length > 0
+                ? (it.breakdown as unknown as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
             qcChecklist: preservedQc == null ? Prisma.JsonNull : (preservedQc as Prisma.InputJsonValue),
           };
         }),

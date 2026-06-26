@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { canConfigQcChecklist, parseQcChecklist } from "@/lib/qc-mapping";
+import { isPhaseCode } from "@/lib/project-budget";
 import { QcMappingClient } from "./_components/qc-mapping-client";
 
 export const metadata = { title: "QC Mapping" };
@@ -26,20 +27,22 @@ export default async function QcMappingPage({ params }: { params: { id: string }
 
   const items = await prisma.projectBudgetItem.findMany({
     where: { budget: { projectId: params.id }, category: "labor" },
-    select: { id: true, phase: true, name: true, unit: true, qcChecklist: true, sortRank: true },
-    orderBy: [{ phase: "asc" }, { sortRank: "asc" }],
+    select: { id: true, phaseCode: true, name: true, unit: true, qcChecklist: true, sortRank: true },
+    orderBy: [{ phaseCode: "asc" }, { sortRank: "asc" }],
   });
 
   return (
     <QcMappingClient
       projectId={project.id}
-      items={items.map((it) => ({
-        id: it.id,
-        phase: it.phase,
-        name: it.name,
-        unit: it.unit,
-        qcChecklist: parseQcChecklist(it.qcChecklist),
-      }))}
+      items={items
+        .filter((it) => isPhaseCode(it.phaseCode))
+        .map((it) => ({
+          id: it.id,
+          phaseCode: it.phaseCode as "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09",
+          name: it.name,
+          unit: it.unit,
+          qcChecklist: parseQcChecklist(it.qcChecklist),
+        }))}
     />
   );
 }

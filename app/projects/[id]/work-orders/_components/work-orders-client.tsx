@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { WORK_ORDER_STATUS_LABEL } from "@/lib/work-order";
+import { PHASE_CODE_SHORT, type PhaseCode } from "@/lib/project-budget";
 
 type Phase = "mong" | "than" | "mai";
 type Status = "open" | "done" | "carried";
@@ -11,6 +12,7 @@ type Status = "open" | "done" | "carried";
 type BudgetItem = {
   id: string;
   phase: Phase;
+  phaseCode: PhaseCode;
   name: string;
   unit: string;
   quantity: number;
@@ -31,6 +33,7 @@ type WorkOrder = {
   groupNo: number;
   budgetItemId: string;
   budgetPhase: Phase;
+  budgetPhaseCode: PhaseCode;
   budgetQty: number;
   workItem: string;
   unit: string;
@@ -48,7 +51,6 @@ type Props = {
   canEdit: boolean;
 };
 
-const PHASE_LABEL: Record<Phase, string> = { mong: "Móng", than: "Thân", mai: "Mái" };
 
 function todayStr() {
   const d = new Date();
@@ -257,7 +259,7 @@ export function WorkOrdersClient({ projectId, canEdit }: Props) {
                 <option value="">-- Chọn --</option>
                 {budgetItems.map((b) => (
                   <option key={b.id} value={b.id}>
-                    [{PHASE_LABEL[b.phase]}] {b.name} ({b.unit}) — đã giao {b.assigned}/{b.quantity}
+                    [{b.phaseCode} {PHASE_CODE_SHORT[b.phaseCode]}] {b.name} ({b.unit}) — đã giao {b.assigned}/{b.quantity}
                   </option>
                 ))}
               </select>
@@ -359,7 +361,7 @@ export function WorkOrdersClient({ projectId, canEdit }: Props) {
                     >
                       {WORK_ORDER_STATUS_LABEL[o.status]}
                     </span>
-                    <span className="text-xs text-[#8892b0]">[{PHASE_LABEL[o.budgetPhase]}]</span>
+                    <span className="text-xs text-[#8892b0]">[{o.budgetPhaseCode} {PHASE_CODE_SHORT[o.budgetPhaseCode]}]</span>
                   </div>
                   {canEdit && (
                     <div className="flex gap-1">

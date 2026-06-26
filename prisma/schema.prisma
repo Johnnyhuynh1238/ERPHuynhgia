@@ -784,8 +784,9 @@ model StandardTaskCatalog {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates TaskTemplate[] @relation("TemplateStdCatalog")
-  tasks     Task[]         @relation("TaskStdCatalog")
+  templates    TaskTemplate[]      @relation("TemplateStdCatalog")
+  tasks        Task[]              @relation("TaskStdCatalog")
+  budgetItems  ProjectBudgetItem[]
 
   @@unique([phaseCode, taskCode])
   @@index([phaseCode, displayOrder])
@@ -2884,25 +2885,31 @@ model ProjectBudget {
 }
 
 model ProjectBudgetItem {
-  id          String         @id @default(uuid()) @db.Uuid
-  budgetId    String         @map("budget_id") @db.Uuid
-  category    BudgetCategory
-  phase       BudgetPhase
-  name        String
-  unit        String         @db.VarChar(20)
-  quantity    Decimal        @db.Decimal(14, 3)
-  unitPrice   BigInt         @map("unit_price")
-  amount      BigInt
-  note        String?
-  sortRank    Float          @default(0) @map("sort_rank")
-  qcChecklist Json?          @map("qc_checklist")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id             String         @id @default(uuid()) @db.Uuid
+  budgetId       String         @map("budget_id") @db.Uuid
+  category       BudgetCategory
+  phase          BudgetPhase // DEPRECATED — giữ tạm cho compat; truy vấn mới dùng phaseCode
+  phaseCode      String         @default("02") @map("phase_code") @db.VarChar(2) // "01".."09" khớp StandardTaskCatalog
+  standardTaskId String?        @map("standard_task_id") @db.Uuid
+  name           String
+  unit           String         @db.VarChar(20)
+  quantity       Decimal        @db.Decimal(14, 3)
+  unitPrice      BigInt         @map("unit_price")
+  amount         BigInt
+  note           String?
+  sortRank       Float          @default(0) @map("sort_rank")
+  qcChecklist    Json?          @map("qc_checklist")
+  breakdown      Json?          @db.JsonB // [{name, quantity, note?}] — công tác con
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  budget     ProjectBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  workOrders WorkOrder[]
+  budget       ProjectBudget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  standardTask StandardTaskCatalog? @relation(fields: [standardTaskId], references: [id], onDelete: SetNull)
+  workOrders   WorkOrder[]
 
+  @@index([budgetId, category, phaseCode])
   @@index([budgetId, category, phase])
+  @@index([standardTaskId])
   @@map("project_budget_items")
 }
 
@@ -2935,7 +2942,8 @@ model ProjectBudgetAmendmentItem {
   id          String         @id @default(uuid()) @db.Uuid
   amendmentId String         @map("amendment_id") @db.Uuid
   category    BudgetCategory
-  phase       BudgetPhase
+  phase       BudgetPhase // DEPRECATED — giữ tạm cho compat
+  phaseCode   String         @default("02") @map("phase_code") @db.VarChar(2)
   name        String
   unit        String         @db.VarChar(20)
   quantity    Decimal        @db.Decimal(14, 3)
@@ -2946,6 +2954,7 @@ model ProjectBudgetAmendmentItem {
 
   amendment ProjectBudgetAmendment @relation(fields: [amendmentId], references: [id], onDelete: Cascade)
 
+  @@index([amendmentId, category, phaseCode])
   @@index([amendmentId, category, phase])
   @@map("project_budget_amendment_items")
 }
