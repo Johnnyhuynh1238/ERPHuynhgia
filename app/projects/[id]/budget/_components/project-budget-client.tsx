@@ -586,7 +586,7 @@ export function ProjectBudgetClient({
       </div>
 
       {/* 9 card giai đoạn */}
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {PHASE_CODES.map((phase) => {
           const phaseTotal = BUDGET_CATEGORIES.reduce(
             (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.sum ?? 0),
@@ -602,26 +602,26 @@ export function ProjectBudgetClient({
             <section
               key={phase}
               data-phase-section={phase}
-              className="rounded-2xl border border-[#252840] bg-[#1a1d2e]"
+              className="rounded-xl border border-[#252840] bg-[#1a1d2e]"
             >
               {/* Phase header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#252840] px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2 border-b border-[#252840] px-2.5 py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-xs font-mono font-bold text-orange-300 ring-1 ring-orange-500/30">
+                  <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[11px] font-mono font-bold text-orange-300 ring-1 ring-orange-500/30">
                     {phase}
                   </span>
-                  <span className="truncate text-sm font-semibold text-[#f0f2ff]">
+                  <span className="truncate text-xs font-semibold text-[#f0f2ff]">
                     {PHASE_CODE_LABEL[phase].replace(/^\d+\s*·\s*/, "")}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-[#5a6080]">{phaseCount} hạng mục</span>
+                <div className="flex shrink-0 items-center gap-2 text-[11px]">
+                  <span className="text-[#5a6080]">{phaseCount} hm</span>
                   <span className="font-semibold text-orange-300">{fmtVND(phaseTotal)}đ</span>
                 </div>
               </div>
 
               {/* 3 nhánh NC / VT / MM */}
-              <div className="grid grid-cols-3 gap-2 p-3">
+              <div className="grid grid-cols-3 gap-1.5 p-1.5">
                 {BUDGET_CATEGORIES.map((cat) => {
                   const st = phaseStats.get(`${phase}|${cat}`) ?? { sum: 0, count: 0 };
                   const active = activeCat === cat;
@@ -631,20 +631,22 @@ export function ProjectBudgetClient({
                       key={cat}
                       type="button"
                       onClick={() => toggleBranch(phase, cat)}
-                      className={`group flex flex-col items-start gap-1 rounded-xl p-2.5 text-left transition ring-1 ${
+                      className={`flex items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-left transition ring-1 ${
                         active ? `${t.activeBg} ring-2 ${t.activeRing}` : `${t.bg} ${t.ring} hover:ring-2`
                       }`}
                     >
-                      <div className="flex w-full items-center justify-between">
-                        <span className={`text-[11px] font-semibold uppercase tracking-wider ${t.text}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.text}`}>
                           {CAT_SHORT[cat]}
                         </span>
-                        <span className={`text-[10px] ${active ? "text-white" : "text-[#5a6080]"}`}>
+                        <span className="text-[9px] text-[#5a6080]">{st.count}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className={`text-xs font-bold ${t.text}`}>{fmtVND(st.sum)}đ</span>
+                        <span className={`text-[9px] ${active ? "text-white" : "text-[#5a6080]"}`}>
                           {active ? "▴" : "▾"}
                         </span>
                       </div>
-                      <div className={`text-sm font-bold ${t.text}`}>{fmtVND(st.sum)}đ</div>
-                      <div className="text-[10px] text-[#5a6080]">{st.count} hạng mục</div>
                     </button>
                   );
                 })}
