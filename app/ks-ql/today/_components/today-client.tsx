@@ -5,7 +5,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import {
   AlertTriangle,
   Camera,
-  ChevronDown,
   ChevronRight,
   ClipboardCheck,
   Coins,
@@ -304,7 +303,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 : "Chưa chấm công hôm nay"
             }
             badgeTone={data.morning.attendanceDone ? "ok" : "todo"}
-            defaultOpen
             cards={[
               {
                 Icon: ListTodo,
@@ -372,7 +370,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 : "Không có điểm QC chờ"
             }
             badgeTone={data.midday.qcHoldPoints > 0 ? "warn" : "ok"}
-            defaultOpen={data.midday.qcHoldPoints > 0}
             cards={[
               {
                 Icon: ClipboardCheck,
@@ -416,7 +413,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 : "Chưa có VT về"
             }
             badgeTone={data.morning.materialsIncoming > 0 ? "warn" : "ok"}
-            defaultOpen={data.morning.materialsIncoming > 0}
             cards={[
               {
                 Icon: Package,
@@ -483,7 +479,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             accent="purple"
             summary="Đang phát triển — sẽ hiện cảnh báo vượt dự toán"
             badgeTone="muted"
-            defaultOpen={false}
             customContent={
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -517,7 +512,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             accent="blue"
             summary="Đang phát triển — chấm công bản thân + lương tháng"
             badgeTone="muted"
-            defaultOpen={false}
             customContent={
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -893,7 +887,6 @@ function ResponsibilitySection({
   accent,
   summary,
   badgeTone,
-  defaultOpen,
   cards,
   customContent,
   onHint,
@@ -905,75 +898,54 @@ function ResponsibilitySection({
   accent: "gold" | "terra" | "green" | "purple" | "blue";
   summary?: string;
   badgeTone?: BadgeTone;
-  defaultOpen?: boolean;
   cards?: CardDef[];
   customContent?: React.ReactNode;
   onHint?: (sop: string, anchor: DOMRect) => void;
 }) {
-  const [open, setOpen] = useState(!!defaultOpen);
   const styles = ACCENT_STYLES[accent];
   const badge = badgeTone ? BADGE_STYLES[badgeTone] : null;
 
   return (
     <section
       data-section={id}
-      className="overflow-hidden rounded-2xl border transition-all duration-300"
+      className="overflow-hidden rounded-2xl border"
       style={{
         borderColor: styles.borderColor,
         background: styles.bgGrad,
       }}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02]"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="grid h-10 w-10 place-items-center rounded-xl transition-transform"
-            style={{ background: styles.iconBg, color: styles.iconColor }}
-          >
-            <Icon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-[15px] font-semibold text-[#f5ede4]">{title}</span>
-              {badge && badgeTone !== "muted" ? (
-                <span
-                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ background: badge.bg, color: badge.color }}
-                >
-                  {badge.label}
-                </span>
-              ) : null}
-            </div>
-            <div className="truncate text-xs text-[#9a8f80]">{summary || sub}</div>
-          </div>
-        </div>
+      <div className="flex min-w-0 items-center gap-3 px-4 py-3.5">
         <span
-          className="text-[#9a8f80] transition-transform duration-200"
-          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+          className="grid h-10 w-10 place-items-center rounded-xl"
+          style={{ background: styles.iconBg, color: styles.iconColor }}
         >
-          <ChevronDown className="h-4 w-4" />
+          <Icon className="h-5 w-5" />
         </span>
-      </button>
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-out"
-        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
-      >
-        <div className="overflow-hidden">
-          <div className="border-t border-[#2a221c] p-2 sm:p-3">
-            {customContent ? (
-              customContent
-            ) : cards && onHint ? (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
-                {cards.map((c, i) => (
-                  <IconTile key={i} tile={c} onHint={onHint} />
-                ))}
-              </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[15px] font-semibold text-[#f5ede4]">{title}</span>
+            {badge && badgeTone !== "muted" ? (
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ background: badge.bg, color: badge.color }}
+              >
+                {badge.label}
+              </span>
             ) : null}
           </div>
+          <div className="truncate text-xs text-[#9a8f80]">{summary || sub}</div>
         </div>
+      </div>
+      <div className="border-t border-[#2a221c] p-2 sm:p-3">
+        {customContent ? (
+          customContent
+        ) : cards && onHint ? (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+            {cards.map((c, i) => (
+              <IconTile key={i} tile={c} onHint={onHint} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
