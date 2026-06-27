@@ -268,62 +268,61 @@ export function ProjectBudgetClient({
 
   return (
     <div className="space-y-4">
-      {/* Header card */}
-      <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4 ring-1 ring-orange-500/10">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-orange-400/80">Dự toán giá vốn · theo cấu kiện</div>
-            <div className="mt-1 text-2xl font-bold text-[#f0f2ff] sm:text-3xl">{fmtVND(grandTotal.total)}đ</div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-              {data?.budget ? (locked ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 font-medium text-amber-300 ring-1 ring-amber-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
-                </span>
-              )) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 font-medium text-[#8892b0]">Chưa lập</span>
-              )}
-              {contractValue !== null && contractValue > 0 && (
-                <span className="text-[#8892b0]">· {((grandTotal.total / contractValue) * 100).toFixed(1)}% giá trị HĐ ({fmtVND(contractValue)}đ)</span>
-              )}
-              {profitMarginPct !== null && profitMarginPct > 0 && (
-                <span className="text-[#8892b0]">· LN mục tiêu {profitMarginPct.toFixed(0)}%</span>
-              )}
-              {data?.budget?.lockedAt && (
-                <span className="text-[#8892b0]">· Chốt bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleDateString("vi-VN")}</span>
-              )}
+      {/* OVERVIEW: header tổng + 4 stage cards lớn */}
+      {view === "overview" && (
+        <>
+          <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4 ring-1 ring-orange-500/10">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-orange-400/80">Dự toán giá vốn · theo cấu kiện</div>
+                <div className="mt-1 text-2xl font-bold text-[#f0f2ff] sm:text-3xl">{fmtVND(grandTotal.total)}đ</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                  {data?.budget ? (locked ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 font-medium text-amber-300 ring-1 ring-amber-500/30">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
+                    </span>
+                  )) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 font-medium text-[#8892b0]">Chưa lập</span>
+                  )}
+                  {contractValue !== null && contractValue > 0 && (
+                    <span className="text-[#8892b0]">· {((grandTotal.total / contractValue) * 100).toFixed(1)}% giá trị HĐ ({fmtVND(contractValue)}đ)</span>
+                  )}
+                  {profitMarginPct !== null && profitMarginPct > 0 && (
+                    <span className="text-[#8892b0]">· LN mục tiêu {profitMarginPct.toFixed(0)}%</span>
+                  )}
+                  {data?.budget?.lockedAt && (
+                    <span className="text-[#8892b0]">· Chốt bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleDateString("vi-VN")}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {canLock && !locked && data?.budget && (
+                  <Button onClick={lockBudget} size="sm" className="bg-emerald-600 hover:bg-emerald-500">Chốt dự toán</Button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-lg bg-blue-500/10 p-2 ring-1 ring-blue-500/20">
+                <div className="text-[10px] uppercase text-blue-300/70">Nhân công</div>
+                <div className="mt-0.5 font-semibold text-blue-200">{fmtVND(grandTotal.labor)}đ</div>
+              </div>
+              <div className="rounded-lg bg-emerald-500/10 p-2 ring-1 ring-emerald-500/20">
+                <div className="text-[10px] uppercase text-emerald-300/70">Vật tư</div>
+                <div className="mt-0.5 font-semibold text-emerald-200">{fmtVND(grandTotal.material)}đ</div>
+              </div>
+              <div className="rounded-lg bg-amber-500/10 p-2 ring-1 ring-amber-500/20">
+                <div className="text-[10px] uppercase text-amber-300/70">Máy móc</div>
+                <div className="mt-0.5 font-semibold text-amber-200">{fmtVND(grandTotal.equipment)}đ</div>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {canLock && !locked && data?.budget && (
-              <Button onClick={lockBudget} size="sm" className="bg-emerald-600 hover:bg-emerald-500">Chốt dự toán</Button>
-            )}
-          </div>
-        </div>
 
-        {/* 3 totals NC/VT/MM */}
-        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-          <div className="rounded-lg bg-blue-500/10 p-2 ring-1 ring-blue-500/20">
-            <div className="text-[10px] uppercase text-blue-300/70">Nhân công</div>
-            <div className="mt-0.5 font-semibold text-blue-200">{fmtVND(grandTotal.labor)}đ</div>
-          </div>
-          <div className="rounded-lg bg-emerald-500/10 p-2 ring-1 ring-emerald-500/20">
-            <div className="text-[10px] uppercase text-emerald-300/70">Vật tư</div>
-            <div className="mt-0.5 font-semibold text-emerald-200">{fmtVND(grandTotal.material)}đ</div>
-          </div>
-          <div className="rounded-lg bg-amber-500/10 p-2 ring-1 ring-amber-500/20">
-            <div className="text-[10px] uppercase text-amber-300/70">Máy móc</div>
-            <div className="mt-0.5 font-semibold text-amber-200">{fmtVND(grandTotal.equipment)}đ</div>
-          </div>
-        </div>
-      </div>
-
-      {/* OVERVIEW: 4 stage cards lớn */}
-      {view === "overview" && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {BUDGET_STAGES.map((s) => {
             const t = stageTotals.get(s)!;
             const tone = STAGE_TONE[s];
@@ -359,7 +358,8 @@ export function ProjectBudgetClient({
               </button>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* STAGE LIST: header back về overview + grid card cấu kiện */}
