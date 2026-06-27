@@ -97,8 +97,8 @@ export function ProjectBudgetClient({
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [view, setView] = useState<"overview" | BudgetStageCode>("overview");
+  const [openCompId, setOpenCompId] = useState<string | null>(null);
   const activeStage: BudgetStageCode = view === "overview" ? "N" : view;
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // forms
   const [addingCompStage, setAddingCompStage] = useState<BudgetStageCode | null>(null);
@@ -185,13 +185,7 @@ export function ProjectBudgetClient({
     [components, activeStage],
   );
 
-  function toggleExpand(id: string) {
-    setExpanded((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  }
+  const openComp = openCompId ? components.find((c) => c.id === openCompId) ?? null : null;
 
   async function createComponent() {
     if (!addingCompStage || !newCompName.trim()) return;
@@ -368,8 +362,8 @@ export function ProjectBudgetClient({
         </div>
       )}
 
-      {/* STAGE DETAIL: back + stage info */}
-      {view !== "overview" && (
+      {/* STAGE LIST: header back về overview + grid card cấu kiện */}
+      {view !== "overview" && !openComp && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2">
             <button
@@ -392,202 +386,266 @@ export function ProjectBudgetClient({
           <div className="rounded-xl bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] ring-1 ring-[#252840]">
             {STAGE_DESCRIPTION[activeStage]}
           </div>
-        </>
-      )}
 
-      {/* Components list for active stage */}
-      {view !== "overview" && (
-      <div className="space-y-3">
-        {stageComponents.length === 0 && addingCompStage !== activeStage && (
-          <div className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/50 p-6 text-center text-sm text-[#8892b0]">
-            Chưa có cấu kiện cho stage <span className={STAGE_TONE[activeStage].text}>{STAGE_LABEL[activeStage]}</span>
-          </div>
-        )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {stageComponents.length === 0 && addingCompStage !== activeStage && (
+              <div className="col-span-full rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/50 p-6 text-center text-sm text-[#8892b0]">
+                Chưa có cấu kiện cho stage <span className={STAGE_TONE[activeStage].text}>{STAGE_LABEL[activeStage]}</span>
+              </div>
+            )}
 
-        {stageComponents.map((c) => {
-          const ct = compTotals.get(c.id) ?? { labor: 0, material: 0, equipment: 0, total: 0, count: 0 };
-          const its = itemsByComp.get(c.id) ?? [];
-          const isExpanded = expanded.has(c.id);
-          const isEditing = editingComp === c.id;
-          return (
-            <div key={c.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
-              <div className="flex items-center gap-2 p-3">
+            {stageComponents.map((c) => {
+              const ct = compTotals.get(c.id) ?? { labor: 0, material: 0, equipment: 0, total: 0, count: 0 };
+              return (
                 <button
+                  key={c.id}
                   type="button"
-                  onClick={() => toggleExpand(c.id)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
-                  aria-label={isExpanded ? "Thu gọn" : "Mở rộng"}
+                  onClick={() => setOpenCompId(c.id)}
+                  className={`group rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-left transition hover:border-transparent hover:${STAGE_TONE[c.stage].activeBg} hover:ring-2 hover:${STAGE_TONE[c.stage].ring}`}
                 >
-                  {isExpanded ? "▾" : "▸"}
-                </button>
-
-                {isEditing ? (
-                  <div className="flex flex-1 flex-wrap items-center gap-2">
-                    <input
-                      value={editCompName}
-                      onChange={(e) => setEditCompName(e.target.value)}
-                      className="min-w-[180px] flex-1 rounded-md bg-[#0f1220] px-2 py-1 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
-                      placeholder="Tên cấu kiện"
-                    />
-                    <input
-                      value={editCompFloor}
-                      onChange={(e) => setEditCompFloor(e.target.value)}
-                      className="w-20 rounded-md bg-[#0f1220] px-2 py-1 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
-                      placeholder="Tầng"
-                    />
-                    <Button size="sm" onClick={saveEditComponent} disabled={savingFlag} className="bg-emerald-600 hover:bg-emerald-500">Lưu</Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingComp(null)}>Hủy</Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="truncate text-sm font-semibold text-[#f0f2ff]">{c.name}</span>
                         {c.floor && (
-                          <span className="inline-flex shrink-0 items-center rounded bg-[#252840] px-1.5 py-0.5 text-[10px] font-medium text-[#8892b0]">
+                          <span className="inline-flex items-center rounded bg-[#252840] px-1.5 py-0.5 text-[10px] font-medium text-[#8892b0]">
                             {c.floor}
                           </span>
                         )}
-                        <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${STAGE_TONE[c.stage].text} ${STAGE_TONE[c.stage].bg}`}>
-                          {c.stage}
-                        </span>
                       </div>
-                      <div className="mt-0.5 text-[11px] text-[#8892b0]">{ct.count} công tác</div>
+                      <div className="mt-1 text-[11px] text-[#8892b0]">{ct.count} công tác</div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-[#f0f2ff]">{fmtVND(ct.total)}đ</div>
-                      <div className="text-[10px] text-[#8892b0]">
-                        NC {fmtVND(ct.labor)} · VT {fmtVND(ct.material)} · MM {fmtVND(ct.equipment)}
-                      </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-lg font-bold text-[#f0f2ff]">{fmtVND(ct.total)}<span className="text-xs">đ</span></div>
                     </div>
-                    {!readOnly && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => startEditComponent(c)}
-                          className="rounded-md p-1.5 text-xs text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
-                          title="Sửa cấu kiện"
-                        >✎</button>
-                        <button
-                          type="button"
-                          onClick={() => deleteComponent(c)}
-                          className="rounded-md p-1.5 text-xs text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300"
-                          title="Xóa cấu kiện"
-                        >✕</button>
-                      </div>
-                    )}
-                  </>
-                )}
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px]">
+                    <div className="rounded-md bg-blue-500/10 px-2 py-1 ring-1 ring-blue-500/20">
+                      <div className="text-blue-300/70">NC</div>
+                      <div className="font-semibold text-blue-200">{fmtVND(ct.labor)}</div>
+                    </div>
+                    <div className="rounded-md bg-emerald-500/10 px-2 py-1 ring-1 ring-emerald-500/20">
+                      <div className="text-emerald-300/70">VT</div>
+                      <div className="font-semibold text-emerald-200">{fmtVND(ct.material)}</div>
+                    </div>
+                    <div className="rounded-md bg-amber-500/10 px-2 py-1 ring-1 ring-amber-500/20">
+                      <div className="text-amber-300/70">MM</div>
+                      <div className="font-semibold text-amber-200">{fmtVND(ct.equipment)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[#8892b0] transition group-hover:text-[#f0f2ff]">
+                    Mở chi tiết <span className="transition group-hover:translate-x-0.5">→</span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Add component form */}
+            {addingCompStage === activeStage ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-orange-500/40 bg-[#1a1d2e] p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={newCompName}
+                    onChange={(e) => setNewCompName(e.target.value)}
+                    placeholder="Tên cấu kiện (vd: Móng, Cột T1, Tường bao T2…)"
+                    className="min-w-[200px] flex-1 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                    autoFocus
+                  />
+                  <input
+                    value={newCompFloor}
+                    onChange={(e) => setNewCompFloor(e.target.value)}
+                    placeholder="Tầng (T1/T2/ST… để trống nếu không tầng)"
+                    className="w-56 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                  />
+                  <Button size="sm" onClick={createComponent} disabled={savingFlag || !newCompName.trim()} className="bg-orange-600 hover:bg-orange-500">Tạo</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setAddingCompStage(null); setNewCompName(""); setNewCompFloor(""); }}>Hủy</Button>
+                </div>
               </div>
+            ) : (
+              !readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setAddingCompStage(activeStage)}
+                  className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/30 p-4 text-sm text-[#8892b0] hover:border-orange-500/40 hover:bg-[#1a1d2e] hover:text-[#f0f2ff]"
+                >
+                  + Thêm cấu kiện vào {STAGE_LABEL[activeStage]}
+                </button>
+              )
+            )}
+          </div>
+        </>
+      )}
 
-              {isExpanded && (
-                <div className="border-t border-[#252840] bg-[#0f1220]/40">
-                  {its.length === 0 && addingItemComp !== c.id && (
-                    <div className="px-4 py-3 text-xs text-[#8892b0]">Chưa có công tác. {!readOnly && "Bấm + để thêm."}</div>
-                  )}
-                  {its.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-[#1a1d2e]/60 text-[10px] uppercase tracking-wider text-[#8892b0]">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Công tác</th>
-                            <th className="px-2 py-2 text-center">ĐV</th>
-                            <th className="px-2 py-2 text-right">KL</th>
-                            <th className="px-2 py-2 text-right text-blue-300">Giá NC</th>
-                            <th className="px-2 py-2 text-right text-emerald-300">Giá VT</th>
-                            <th className="px-2 py-2 text-right text-amber-300">Giá MM</th>
-                            <th className="px-2 py-2 text-right">Tổng</th>
-                            {!readOnly && <th className="px-2 py-2 w-16"></th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {its.map((it) =>
-                            editingItem === it.id ? (
-                              <ItemEditRow
-                                key={it.id}
-                                projectId={projectId}
-                                componentId={c.id}
-                                item={it}
-                                onDone={async () => { setEditingItem(null); await load(); }}
-                                onCancel={() => setEditingItem(null)}
-                              />
-                            ) : (
-                              <tr key={it.id} className="border-t border-[#252840] hover:bg-[#1a1d2e]/40">
-                                <td className="px-3 py-2 text-[#f0f2ff]">{it.name}{it.note && <div className="text-[10px] text-[#8892b0]">{it.note}</div>}</td>
-                                <td className="px-2 py-2 text-center text-[#8892b0]">{it.unit}</td>
-                                <td className="px-2 py-2 text-right text-[#f0f2ff]">{it.quantity.toLocaleString("vi-VN")}</td>
-                                <td className="px-2 py-2 text-right text-blue-200">{fmtVND(it.laborUnitPrice)}</td>
-                                <td className="px-2 py-2 text-right text-emerald-200">{fmtVND(it.materialUnitPrice)}</td>
-                                <td className="px-2 py-2 text-right text-amber-200">{fmtVND(it.equipmentUnitPrice)}</td>
-                                <td className="px-2 py-2 text-right font-semibold text-[#f0f2ff]">{fmtVND(it.amount)}đ</td>
-                                {!readOnly && (
-                                  <td className="px-2 py-2 text-right">
-                                    <div className="inline-flex items-center gap-1">
-                                      <button onClick={() => setEditingItem(it.id)} className="rounded p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]" title="Sửa">✎</button>
-                                      <button onClick={() => deleteItem(it)} className="rounded p-1 text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300" title="Xóa">✕</button>
-                                    </div>
-                                  </td>
-                                )}
-                              </tr>
-                            ),
-                          )}
-                        </tbody>
-                      </table>
+      {/* COMPONENT DETAIL: header back về stage + grid card công tác */}
+      {view !== "overview" && openComp && (() => {
+        const c = openComp;
+        const ct = compTotals.get(c.id) ?? { labor: 0, material: 0, equipment: 0, total: 0, count: 0 };
+        const its = itemsByComp.get(c.id) ?? [];
+        const isEditingComp = editingComp === c.id;
+        return (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setOpenCompId(null)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#252840] px-3 py-1.5 text-xs font-medium text-[#f0f2ff] hover:bg-[#2f334a]"
+              >
+                ← Quay lại {STAGE_LABEL[c.stage]}
+              </button>
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`inline-flex items-center justify-center rounded-md ${STAGE_TONE[c.stage].bg} px-2 py-0.5 font-bold ${STAGE_TONE[c.stage].text} ring-1 ${STAGE_TONE[c.stage].ring}`}>
+                  {c.stage}
+                </span>
+                <span className="font-bold text-[#f0f2ff]">{fmtVND(ct.total)}đ</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4">
+              {isEditingComp ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={editCompName}
+                    onChange={(e) => setEditCompName(e.target.value)}
+                    className="min-w-[200px] flex-1 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                    placeholder="Tên cấu kiện"
+                  />
+                  <input
+                    value={editCompFloor}
+                    onChange={(e) => setEditCompFloor(e.target.value)}
+                    className="w-28 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                    placeholder="Tầng"
+                  />
+                  <Button size="sm" onClick={saveEditComponent} disabled={savingFlag} className="bg-emerald-600 hover:bg-emerald-500">Lưu</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingComp(null)}>Hủy</Button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-lg font-semibold text-[#f0f2ff]">{c.name}</span>
+                      {c.floor && (
+                        <span className="inline-flex items-center rounded bg-[#252840] px-2 py-0.5 text-xs font-medium text-[#8892b0]">{c.floor}</span>
+                      )}
                     </div>
-                  )}
-
-                  {addingItemComp === c.id ? (
-                    <ItemEditRow
-                      projectId={projectId}
-                      componentId={c.id}
-                      item={null}
-                      asNewRow
-                      onDone={async () => { setAddingItemComp(null); await load(); }}
-                      onCancel={() => setAddingItemComp(null)}
-                    />
-                  ) : (
-                    !readOnly && (
-                      <div className="border-t border-[#252840] px-3 py-2">
-                        <Button size="sm" variant="outline" onClick={() => setAddingItemComp(c.id)} className="text-xs">+ Thêm công tác</Button>
+                    <div className="mt-1 text-xs text-[#8892b0]">{ct.count} công tác · Tổng <span className="font-semibold text-[#f0f2ff]">{fmtVND(ct.total)}đ</span></div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div className="rounded-lg bg-blue-500/10 p-2 ring-1 ring-blue-500/20">
+                        <div className="text-[10px] uppercase text-blue-300/70">Nhân công</div>
+                        <div className="font-semibold text-blue-200">{fmtVND(ct.labor)}đ</div>
                       </div>
-                    )
+                      <div className="rounded-lg bg-emerald-500/10 p-2 ring-1 ring-emerald-500/20">
+                        <div className="text-[10px] uppercase text-emerald-300/70">Vật tư</div>
+                        <div className="font-semibold text-emerald-200">{fmtVND(ct.material)}đ</div>
+                      </div>
+                      <div className="rounded-lg bg-amber-500/10 p-2 ring-1 ring-amber-500/20">
+                        <div className="text-[10px] uppercase text-amber-300/70">Máy móc</div>
+                        <div className="font-semibold text-amber-200">{fmtVND(ct.equipment)}đ</div>
+                      </div>
+                    </div>
+                  </div>
+                  {!readOnly && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEditComponent(c)}
+                        className="rounded-md p-2 text-sm text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
+                        title="Sửa cấu kiện"
+                      >✎</button>
+                      <button
+                        type="button"
+                        onClick={async () => { await deleteComponent(c); setOpenCompId(null); }}
+                        className="rounded-md p-2 text-sm text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300"
+                        title="Xóa cấu kiện"
+                      >✕</button>
+                    </div>
                   )}
                 </div>
               )}
             </div>
-          );
-        })}
 
-        {/* Add component form */}
-        {addingCompStage === activeStage ? (
-          <div className="rounded-2xl border border-dashed border-orange-500/40 bg-[#1a1d2e] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={newCompName}
-                onChange={(e) => setNewCompName(e.target.value)}
-                placeholder="Tên cấu kiện (vd: Móng, Cột T1, Tường bao T2…)"
-                className="min-w-[200px] flex-1 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
-                autoFocus
-              />
-              <input
-                value={newCompFloor}
-                onChange={(e) => setNewCompFloor(e.target.value)}
-                placeholder="Tầng (T1/T2/ST… để trống nếu không tầng)"
-                className="w-56 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
-              />
-              <Button size="sm" onClick={createComponent} disabled={savingFlag || !newCompName.trim()} className="bg-orange-600 hover:bg-orange-500">Tạo</Button>
-              <Button size="sm" variant="outline" onClick={() => { setAddingCompStage(null); setNewCompName(""); setNewCompFloor(""); }}>Hủy</Button>
+            {/* Item cards */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {its.length === 0 && addingItemComp !== c.id && (
+                <div className="col-span-full rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/50 p-6 text-center text-sm text-[#8892b0]">
+                  Chưa có công tác. {!readOnly && "Bấm + để thêm."}
+                </div>
+              )}
+
+              {its.map((it) => (
+                editingItem === it.id ? (
+                  <div key={it.id} className="col-span-full">
+                    <ItemEditForm
+                      projectId={projectId}
+                      componentId={c.id}
+                      item={it}
+                      onDone={async () => { setEditingItem(null); await load(); }}
+                      onCancel={() => setEditingItem(null)}
+                    />
+                  </div>
+                ) : (
+                  <div key={it.id} className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#f0f2ff]">{it.name}</div>
+                        {it.note && <div className="mt-0.5 text-[11px] text-[#8892b0]">{it.note}</div>}
+                        <div className="mt-1 text-[11px] text-[#8892b0]">
+                          KL: <span className="font-semibold text-[#f0f2ff]">{it.quantity.toLocaleString("vi-VN")}</span> {it.unit}
+                        </div>
+                      </div>
+                      {!readOnly && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button onClick={() => setEditingItem(it.id)} className="rounded p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]" title="Sửa">✎</button>
+                          <button onClick={() => deleteItem(it)} className="rounded p-1 text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300" title="Xóa">✕</button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px]">
+                      <div className="rounded-md bg-blue-500/10 px-2 py-1.5 ring-1 ring-blue-500/20">
+                        <div className="text-blue-300/70">NC /{it.unit}</div>
+                        <div className="font-semibold text-blue-200">{fmtVND(it.laborUnitPrice)}</div>
+                      </div>
+                      <div className="rounded-md bg-emerald-500/10 px-2 py-1.5 ring-1 ring-emerald-500/20">
+                        <div className="text-emerald-300/70">VT /{it.unit}</div>
+                        <div className="font-semibold text-emerald-200">{fmtVND(it.materialUnitPrice)}</div>
+                      </div>
+                      <div className="rounded-md bg-amber-500/10 px-2 py-1.5 ring-1 ring-amber-500/20">
+                        <div className="text-amber-300/70">MM /{it.unit}</div>
+                        <div className="font-semibold text-amber-200">{fmtVND(it.equipmentUnitPrice)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-[#252840] pt-2">
+                      <span className="text-[11px] text-[#8892b0]">Thành tiền</span>
+                      <span className="text-sm font-bold text-[#f0f2ff]">{fmtVND(it.amount)}đ</span>
+                    </div>
+                  </div>
+                )
+              ))}
+
+              {addingItemComp === c.id ? (
+                <div className="col-span-full">
+                  <ItemEditForm
+                    projectId={projectId}
+                    componentId={c.id}
+                    item={null}
+                    onDone={async () => { setAddingItemComp(null); await load(); }}
+                    onCancel={() => setAddingItemComp(null)}
+                  />
+                </div>
+              ) : (
+                !readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setAddingItemComp(c.id)}
+                    className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/30 p-4 text-sm text-[#8892b0] hover:border-orange-500/40 hover:bg-[#1a1d2e] hover:text-[#f0f2ff]"
+                  >
+                    + Thêm công tác
+                  </button>
+                )
+              )}
             </div>
-          </div>
-        ) : (
-          !readOnly && (
-            <Button onClick={() => setAddingCompStage(activeStage)} variant="outline" className="w-full border-dashed">
-              + Thêm cấu kiện vào stage {STAGE_LABEL[activeStage]}
-            </Button>
-          )
-        )}
-      </div>
-      )}
+          </>
+        );
+      })()}
 
       {locked && (
         <div className="rounded-xl bg-emerald-500/5 p-3 text-xs text-emerald-200/80 ring-1 ring-emerald-500/20">
@@ -599,18 +657,17 @@ export function ProjectBudgetClient({
 }
 
 // ============================================================
-// ItemEditRow: dùng cho cả add (asNewRow) và edit
+// ItemEditForm: card block dùng cho cả add và edit công tác
 // ============================================================
-type ItemEditRowProps = {
+type ItemEditFormProps = {
   projectId: string;
   componentId: string;
   item: Item | null;
-  asNewRow?: boolean;
   onDone: () => Promise<void> | void;
   onCancel: () => void;
 };
 
-function ItemEditRow({ projectId, componentId, item, asNewRow, onDone, onCancel }: ItemEditRowProps) {
+function ItemEditForm({ projectId, componentId, item, onDone, onCancel }: ItemEditFormProps) {
   const [name, setName] = useState(item?.name ?? "");
   const [unit, setUnit] = useState(item?.unit ?? "");
   const [quantity, setQuantity] = useState<string>(item ? String(item.quantity) : "");
@@ -662,47 +719,64 @@ function ItemEditRow({ projectId, componentId, item, asNewRow, onDone, onCancel 
     } finally { setSaving(false); }
   }
 
-  const inputCls = "w-full rounded-md bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500";
-
-  if (asNewRow) {
-    return (
-      <div className="border-t border-orange-500/30 bg-orange-500/5 p-3">
-        <div className="grid grid-cols-12 gap-2">
-          <input className={`${inputCls} col-span-5`} placeholder="Tên công tác" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          <input className={`${inputCls} col-span-1`} placeholder="ĐV" value={unit} onChange={(e) => setUnit(e.target.value)} />
-          <input className={`${inputCls} col-span-2`} placeholder="KL" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="NC" type="number" value={labor} onChange={(e) => setLabor(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="VT" type="number" value={material} onChange={(e) => setMaterial(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="MM" type="number" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
-          <div className="col-span-1 flex items-center justify-end text-xs font-semibold text-[#f0f2ff]">{fmtVND(total)}</div>
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          <input className={`${inputCls} flex-1`} placeholder="Ghi chú (tùy chọn)" value={note} onChange={(e) => setNote(e.target.value)} />
-          <Button size="sm" onClick={save} disabled={saving} className="bg-orange-600 hover:bg-orange-500">Thêm</Button>
-          <Button size="sm" variant="outline" onClick={onCancel}>Hủy</Button>
-        </div>
-      </div>
-    );
-  }
+  const inputCls = "w-full rounded-md bg-[#0f1220] px-2.5 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500";
+  const labelCls = "mb-1 block text-[10px] uppercase tracking-wider text-[#8892b0]";
 
   return (
-    <tr className="border-t border-orange-500/30 bg-orange-500/5">
-      <td colSpan={8} className="p-3">
-        <div className="grid grid-cols-12 gap-2">
-          <input className={`${inputCls} col-span-5`} placeholder="Tên công tác" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          <input className={`${inputCls} col-span-1`} placeholder="ĐV" value={unit} onChange={(e) => setUnit(e.target.value)} />
-          <input className={`${inputCls} col-span-2`} placeholder="KL" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="NC" type="number" value={labor} onChange={(e) => setLabor(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="VT" type="number" value={material} onChange={(e) => setMaterial(e.target.value)} />
-          <input className={`${inputCls} col-span-1`} placeholder="MM" type="number" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
-          <div className="col-span-1 flex items-center justify-end text-xs font-semibold text-[#f0f2ff]">{fmtVND(total)}</div>
+    <div className="rounded-2xl border border-orange-500/40 bg-orange-500/5 p-4">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-orange-300">
+        {item ? "Sửa công tác" : "Thêm công tác mới"}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label className={labelCls}>Tên công tác</label>
+          <input className={inputCls} placeholder="vd: Bê tông đá 1x2 mác 250" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <input className={`${inputCls} flex-1`} placeholder="Ghi chú" value={note} onChange={(e) => setNote(e.target.value)} />
-          <Button size="sm" onClick={save} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">Lưu</Button>
+        <div>
+          <label className={labelCls}>Đơn vị</label>
+          <input className={inputCls} placeholder="m3, m2, kg…" value={unit} onChange={(e) => setUnit(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelCls}>Khối lượng</label>
+          <input className={inputCls} placeholder="0" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-lg bg-blue-500/5 p-2 ring-1 ring-blue-500/20">
+          <label className="mb-1 block text-[10px] uppercase tracking-wider text-blue-300/80">Đơn giá NC /{unit || "đv"}</label>
+          <input className={`${inputCls} bg-[#0f1220]`} placeholder="0" type="number" value={labor} onChange={(e) => setLabor(e.target.value)} />
+          <div className="mt-1 text-right text-[11px] text-blue-300">= {fmtVND(Math.round(qty * lp))}đ</div>
+        </div>
+        <div className="rounded-lg bg-emerald-500/5 p-2 ring-1 ring-emerald-500/20">
+          <label className="mb-1 block text-[10px] uppercase tracking-wider text-emerald-300/80">Đơn giá VT /{unit || "đv"}</label>
+          <input className={`${inputCls} bg-[#0f1220]`} placeholder="0" type="number" value={material} onChange={(e) => setMaterial(e.target.value)} />
+          <div className="mt-1 text-right text-[11px] text-emerald-300">= {fmtVND(Math.round(qty * mp))}đ</div>
+        </div>
+        <div className="rounded-lg bg-amber-500/5 p-2 ring-1 ring-amber-500/20">
+          <label className="mb-1 block text-[10px] uppercase tracking-wider text-amber-300/80">Đơn giá MM /{unit || "đv"}</label>
+          <input className={`${inputCls} bg-[#0f1220]`} placeholder="0" type="number" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
+          <div className="mt-1 text-right text-[11px] text-amber-300">= {fmtVND(Math.round(qty * ep))}đ</div>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <label className={labelCls}>Ghi chú (tùy chọn)</label>
+        <input className={inputCls} placeholder="Ghi chú thêm…" value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-orange-500/20 pt-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[#8892b0]">Thành tiền</div>
+          <div className="text-lg font-bold text-[#f0f2ff]">{fmtVND(total)}đ</div>
+        </div>
+        <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={onCancel}>Hủy</Button>
+          <Button size="sm" onClick={save} disabled={saving} className={item ? "bg-emerald-600 hover:bg-emerald-500" : "bg-orange-600 hover:bg-orange-500"}>
+            {saving ? "Đang lưu…" : item ? "Lưu" : "Thêm"}
+          </Button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
