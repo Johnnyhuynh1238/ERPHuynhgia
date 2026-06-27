@@ -848,7 +848,7 @@ export function ProjectInfoClient({
 
       {activeSection ? (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3"
           role="dialog"
           aria-modal="true"
           onClick={() => setInfoModal(null)}
