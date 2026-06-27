@@ -86,6 +86,7 @@ const SECTIONS: MenuSection[] = [
     title: "Tài chính",
     icon: Banknote,
     items: [
+      { label: "Lệnh thu", href: "/receipts", icon: Receipt, desc: "Tạo lệnh thu (KH, vay, hoàn ứng…)" },
       { label: "Lệnh chi", href: "/expenses", icon: Receipt, desc: "Tạo lệnh chi gửi kế toán" },
       { label: "Sổ quỹ", href: "/treasury", icon: Wallet, desc: "Nhật ký thu/chi + số dư" },
     ],
