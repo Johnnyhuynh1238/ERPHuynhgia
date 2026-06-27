@@ -192,77 +192,101 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
     <div className="space-y-4">
       <div className="rounded-xl border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Lịch thanh toán (6 đợt)</h2>
+          <h2 className="font-semibold">Lịch thanh toán ({rows.length} đợt)</h2>
           <div className="text-sm text-slate-500">{project?.code}</div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b bg-slate-50 text-xs uppercase text-slate-600">
-                <th className="px-3 py-2">Đợt</th>
-                <th className="px-3 py-2">Mốc hoàn thành</th>
-                <th className="px-3 py-2">% HĐ</th>
-                <th className="px-3 py-2">Số tiền dự kiến</th>
-                <th className="px-3 py-2">Ngày dự kiến</th>
-                <th className="px-3 py-2">Ngày thu thực tế</th>
-                <th className="px-3 py-2">Số tiền thu thực</th>
-                <th className="px-3 py-2">Trạng thái</th>
-                <th className="px-3 py-2">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const hint = paymentHint(row);
-                return (
-                  <tr key={row.id} className={`border-b ${hint?.className || ""}`}>
-                    <td className="px-3 py-2 font-medium">{row.phaseNumber}</td>
-                    <td className="px-3 py-2">
-                      {hint ? <span className="mr-1">{hint.icon}</span> : null}
-                      {row.milestoneDescription}
-                    </td>
-                    <td className="px-3 py-2">{Math.round(row.percent)}%</td>
-                    <td className="px-3 py-2">{fmtMoney(row.amount)}</td>
-                    <td className="px-3 py-2">{fmtDate(row.expectedDate)}</td>
-                    <td className="px-3 py-2">{fmtDate(row.actualPaidDate)}</td>
-                    <td className="px-3 py-2">{fmtMoney(row.actualPaidAmount)}</td>
-                    <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-1 text-xs ${STATUS_CLASS[row.status]}`}>{STATUS_LABEL[row.status]}</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {canEdit ? (
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => openEdit(row)}>
-                            Sửa
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => toast.info("In đề nghị thanh toán sẽ làm ở Phase 2")}
-                          >
-                            In đề nghị thanh toán
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => {
+            const hint = paymentHint(row);
+            return (
+              <div
+                key={row.id}
+                className={`flex flex-col rounded-lg border p-3 ${hint?.className || "bg-white"}`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-900 px-2 text-xs font-semibold text-white">
+                      Đợt {row.phaseNumber}
+                    </span>
+                    <span className="text-sm font-medium text-slate-600">{Math.round(row.percent)}% HĐ</span>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-xs ${STATUS_CLASS[row.status]}`}>
+                    {STATUS_LABEL[row.status]}
+                  </span>
+                </div>
 
-              <tr className="bg-slate-100 font-semibold">
-                <td className="px-3 py-2" colSpan={2}>
-                  TỔNG CỘNG
-                </td>
-                <td className="px-3 py-2">{Math.round(totals.percent)}%</td>
-                <td className="px-3 py-2">{fmtMoney(totals.expected)}</td>
-                <td className="px-3 py-2">-</td>
-                <td className="px-3 py-2">{totals.collectedCount}/{rows.length} đợt</td>
-                <td className="px-3 py-2">{fmtMoney(totals.actual)}</td>
-                <td className="px-3 py-2" colSpan={2} />
-              </tr>
-            </tbody>
-          </table>
+                <div className="mb-3 text-sm text-slate-800">
+                  {hint ? <span className="mr-1">{hint.icon}</span> : null}
+                  {row.milestoneDescription}
+                  {hint ? (
+                    <span className="ml-1 text-xs font-medium text-slate-500">({hint.text})</span>
+                  ) : null}
+                </div>
+
+                <dl className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Số tiền dự kiến</dt>
+                    <dd className="font-semibold text-slate-900">{fmtMoney(row.amount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Ngày dự kiến</dt>
+                    <dd className="text-slate-800">{fmtDate(row.expectedDate)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Số tiền thu thực</dt>
+                    <dd className="font-semibold text-emerald-700">{fmtMoney(row.actualPaidAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Ngày thu thực tế</dt>
+                    <dd className="text-slate-800">{fmtDate(row.actualPaidDate)}</dd>
+                  </div>
+                </dl>
+
+                {row.notes ? (
+                  <div className="mb-3 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                    Ghi chú: {row.notes}
+                  </div>
+                ) : null}
+
+                {canEdit ? (
+                  <div className="mt-auto flex flex-wrap gap-2 pt-1">
+                    <Button variant="outline" className="h-8 px-3 text-xs" onClick={() => openEdit(row)}>
+                      Sửa
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 px-3 text-xs"
+                      onClick={() => toast.info("In đề nghị thanh toán sẽ làm ở Phase 2")}
+                    >
+                      In đề nghị thanh toán
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Tổng % HĐ</div>
+            <div className="text-base font-semibold">{Math.round(totals.percent)}%</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Tổng dự kiến</div>
+            <div className="text-base font-semibold">{fmtMoney(totals.expected)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Đã thu</div>
+            <div className="text-base font-semibold text-emerald-700">{fmtMoney(totals.actual)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Số đợt đã thu</div>
+            <div className="text-base font-semibold">
+              {totals.collectedCount}/{rows.length}
+            </div>
+          </div>
         </div>
       </div>
 
