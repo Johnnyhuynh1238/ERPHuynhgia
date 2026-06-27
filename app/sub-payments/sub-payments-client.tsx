@@ -6,6 +6,7 @@ import { SubPaymentStatus } from "@prisma/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatMoney } from "@/lib/sub-contract-view";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type SubPaymentRow = {
   id: string;
@@ -56,8 +57,10 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
   const [paymentMethod, setPaymentMethod] = useState("chuyển khoản");
   const [note, setNote] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const { accounts: cashAccounts } = useCashAccounts();
 
   const canMarkPaid = currentRole === "admin" || currentRole === "accountant";
 
@@ -131,6 +134,10 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
 
   async function submitMarkPaid() {
     if (!openMarkPaid) return;
+    if (!accountId) {
+      toast.error("Chọn tài khoản chi");
+      return;
+    }
 
     setSaving(true);
     const res = await fetch(`/api/sub-payments/${openMarkPaid}/mark-paid`, {
@@ -142,6 +149,7 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
         paymentMethod,
         receiptUrl,
         note: note || null,
+        accountId,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -242,6 +250,16 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
                 <select className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                   <option value="chuyển khoản">Chuyển khoản</option>
                   <option value="tiền mặt">Tiền mặt</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Tài khoản chi *</label>
+                <select className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  <option value="">— Chọn tài khoản —</option>
+                  {cashAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                  ))}
                 </select>
               </div>
 

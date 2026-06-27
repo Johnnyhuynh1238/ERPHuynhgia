@@ -17,6 +17,7 @@ import {
   subContractStatusLabel,
   subContractUnitLabel,
 } from "@/lib/sub-contract-view";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ContractDetail = {
   id: string;
@@ -310,6 +311,8 @@ export function SubContractDetailClient({
   const [actualDate, setActualDate] = useState(todayStr());
   const [paymentMethod, setPaymentMethod] = useState("chuyển khoản");
   const [payNote, setPayNote] = useState("");
+  const [payAccountId, setPayAccountId] = useState("");
+  const { accounts: cashAccounts } = useCashAccounts();
 
   const [draftRows, setDraftRows] = useState<DraftPaymentRow[]>([]);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -585,6 +588,10 @@ export function SubContractDetailClient({
 
   async function submitMarkPaid() {
     if (!openMarkPaid) return;
+    if (!payAccountId) {
+      toast.error("Chọn tài khoản chi");
+      return;
+    }
 
     setMarkPaidLoading(true);
     const res = await fetch(`/api/sub-payments/${openMarkPaid}/mark-paid`, {
@@ -596,6 +603,7 @@ export function SubContractDetailClient({
         receiptUrl,
         paymentMethod,
         note: payNote || null,
+        accountId: payAccountId,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -615,6 +623,7 @@ export function SubContractDetailClient({
     setActualDate(todayStr());
     setPaymentMethod("chuyển khoản");
     setPayNote("");
+    setPayAccountId("");
     await loadPayments();
   }
 
@@ -625,6 +634,7 @@ export function SubContractDetailClient({
     setPaymentMethod("chuyển khoản");
     setPayNote("");
     setReceiptUrl(payment.receiptUrl || "");
+    setPayAccountId("");
   }
 
   function calcWeightedPreview(scores: Record<string, number>) {
@@ -1207,6 +1217,20 @@ export function SubContractDetailClient({
                 >
                   <option value="chuyển khoản">Chuyển khoản</option>
                   <option value="tiền mặt">Tiền mặt</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Tài khoản chi *</label>
+                <select
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                  value={payAccountId}
+                  onChange={(e) => setPayAccountId(e.target.value)}
+                >
+                  <option value="">— Chọn tài khoản —</option>
+                  {cashAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                  ))}
                 </select>
               </div>
 

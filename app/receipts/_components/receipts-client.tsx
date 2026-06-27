@@ -2,6 +2,7 @@
 
 import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ProjectOption = { id: string; code: string; name: string };
 
@@ -110,7 +111,9 @@ export function ReceiptsClient({
   const [recvDate, setRecvDate] = useState(new Date().toISOString().slice(0, 10));
   const [recvNote, setRecvNote] = useState("");
   const [recvReceiptUrl, setRecvReceiptUrl] = useState("");
+  const [recvAccountId, setRecvAccountId] = useState("");
   const [uploadingRecvReceipt, setUploadingRecvReceipt] = useState(false);
+  const { accounts: cashAccounts } = useCashAccounts();
   const recvReceiptInputRef = useRef<HTMLInputElement | null>(null);
 
   const [openCancel, setOpenCancel] = useState<Receipt | null>(null);
@@ -213,6 +216,10 @@ export function ReceiptsClient({
       toast.error("Nhập số tiền > 0");
       return;
     }
+    if (!recvAccountId) {
+      toast.error("Chọn tài khoản nhận");
+      return;
+    }
     setReceiving(true);
     const res = await fetch(`/api/receipts/${openReceive.id}/mark-received`, {
       method: "POST",
@@ -222,6 +229,7 @@ export function ReceiptsClient({
         receivedAmount: amt,
         receivedNote: recvNote.trim() || null,
         receivedReceiptUrl: recvReceiptUrl.trim() || null,
+        accountId: recvAccountId,
       }),
     });
     const j = await res.json().catch(() => ({}));
@@ -235,6 +243,7 @@ export function ReceiptsClient({
     setRecvAmount("");
     setRecvNote("");
     setRecvReceiptUrl("");
+    setRecvAccountId("");
     setRecvDate(new Date().toISOString().slice(0, 10));
     load();
   }
@@ -715,6 +724,20 @@ export function ReceiptsClient({
                 required
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
               />
+            </label>
+            <label className="block">
+              <span className="text-xs text-[#8b95b7]">Tài khoản nhận *</span>
+              <select
+                value={recvAccountId}
+                onChange={(e) => setRecvAccountId(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
+              >
+                <option value="">— Chọn tài khoản —</option>
+                {cashAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Ghi chú (tuỳ chọn)</span>

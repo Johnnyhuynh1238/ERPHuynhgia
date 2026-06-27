@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ProjectOption = {
   id: string;
@@ -67,6 +68,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
   const [loading, setLoading] = useState(false);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(emptyPaymentForm);
   const [drawingUploading, setDrawingUploading] = useState(false);
+  const { accounts: cashAccounts } = useCashAccounts();
 
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedProjectId) || null, [projects, selectedProjectId]);
   const paidTotal = payments.reduce((sum, payment) => sum + (payment.status === "paid" ? payment.paidAmount || payment.amount : 0), 0);
@@ -174,6 +176,11 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
       return;
     }
 
+    const accountId = formData.get("accountId");
+    if (!accountId || typeof accountId !== "string") {
+      toast.error("Chọn tài khoản nhận");
+      return;
+    }
     const res = await fetch(`/api/payment-schedules/${payment.id}/mark-paid`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,6 +189,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
         paidAmount: formData.get("paidAmount"),
         receiptUrl: receiptJson.receiptUrl,
         paymentNote: formData.get("paymentNote"),
+        accountId,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -324,8 +332,14 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
                   <form onSubmit={(event) => void markPaid(event, payment)} className="mt-3 grid gap-2 md:grid-cols-4">
                     <input required name="paidAt" type="date" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
                     <input required name="paidAmount" placeholder="Số tiền thu" defaultValue={payment.amount} className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
+                    <select required name="accountId" defaultValue="" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm">
+                      <option value="">— Tài khoản nhận —</option>
+                      {cashAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                      ))}
+                    </select>
                     <input required name="receipt" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
-                    <input name="paymentNote" placeholder="Ghi chú" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" />
+                    <input name="paymentNote" placeholder="Ghi chú" className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm md:col-span-4" />
                     <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white md:col-span-4">Đánh dấu đã thu</button>
                   </form>
                 ) : null}

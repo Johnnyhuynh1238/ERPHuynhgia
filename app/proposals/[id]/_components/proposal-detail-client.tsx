@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ProposalComments } from "./proposal-comments";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ParsedItem = { ten: string; sl: number; dvt: string };
 
@@ -81,6 +82,8 @@ export function ProposalDetailClient({
   const [payMethod, setPayMethod] = useState<"cash" | "transfer" | "debt">("cash");
   const [payNote, setPayNote] = useState("");
   const [payAmount, setPayAmount] = useState("");
+  const [payAccountId, setPayAccountId] = useState("");
+  const { accounts: cashAccounts } = useCashAccounts();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -341,6 +344,21 @@ export function ProposalDetailClient({
                 ? "Công nợ: chưa xuất quỹ, không ghi nhật ký quỹ."
                 : "Sau khi xác nhận sẽ tự động ghi vào sổ quỹ (giảm số dư công ty)."}
             </p>
+            {payMethod !== "debt" && (
+              <>
+                <div className="text-xs uppercase tracking-wide text-[#8892b0]">Tài khoản chi *</div>
+                <select
+                  value={payAccountId}
+                  onChange={(e) => setPayAccountId(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                >
+                  <option value="">— Chọn tài khoản —</option>
+                  {cashAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <textarea
               value={payNote}
               onChange={(e) => setPayNote(e.target.value)}
@@ -356,11 +374,16 @@ export function ProposalDetailClient({
                     setActionError("Nhập số tiền > 0");
                     return;
                   }
+                  if (payMethod !== "debt" && !payAccountId) {
+                    setActionError("Chọn tài khoản chi");
+                    return;
+                  }
                   doAction({
                     action: "mark_paid",
                     paidAmount: amt,
                     paymentMethod: payMethod,
                     paymentNote: payNote.trim() || undefined,
+                    ...(payMethod !== "debt" ? { accountId: payAccountId } : {}),
                   });
                 }}
                 disabled={actionBusy}

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
@@ -122,6 +123,8 @@ export function ExpensesClient({
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payNote, setPayNote] = useState("");
   const [payReceiptUrl, setPayReceiptUrl] = useState("");
+  const [payAccountId, setPayAccountId] = useState("");
+  const { accounts: cashAccounts } = useCashAccounts();
 
   const [openCancel, setOpenCancel] = useState<Expense | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -323,6 +326,10 @@ export function ExpensesClient({
       toast.error("Nhập số tiền > 0");
       return;
     }
+    if (!payAccountId) {
+      toast.error("Chọn tài khoản quỹ");
+      return;
+    }
     setPaying(true);
     const res = await fetch(`/api/expenses/${openPay.id}/mark-paid`, {
       method: "POST",
@@ -332,6 +339,7 @@ export function ExpensesClient({
         paidAmount: amt,
         paidNote: payNote.trim() || null,
         paidReceiptUrl: payReceiptUrl.trim() || null,
+        accountId: payAccountId,
       }),
     });
     const j = await res.json().catch(() => ({}));
@@ -345,6 +353,7 @@ export function ExpensesClient({
     setPayAmount("");
     setPayNote("");
     setPayReceiptUrl("");
+    setPayAccountId("");
     setPayDate(new Date().toISOString().slice(0, 10));
     load();
     loadBalance();
@@ -1074,6 +1083,20 @@ export function ExpensesClient({
             </label>
             <ReceiptFilePicker value={payReceiptUrl} onChange={setPayReceiptUrl} />
             <label className="block">
+              <span className="text-xs text-[#8b95b7]">Tài khoản quỹ *</span>
+              <select
+                value={payAccountId}
+                onChange={(e) => setPayAccountId(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+              >
+                <option value="">— Chọn tài khoản —</option>
+                {cashAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
               <span className="text-xs text-[#8b95b7]">Ghi chú KT</span>
               <textarea
                 rows={2}
@@ -1083,7 +1106,7 @@ export function ExpensesClient({
               />
             </label>
             <div className="text-[11px] text-amber-300">
-              Lưu ý: trừ vào số dư công ty trong sổ quỹ. Không huỷ được sau khi xác nhận.
+              Lưu ý: trừ vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.
             </div>
             <div className="flex gap-2">
               <button
@@ -1283,11 +1306,17 @@ function TransferDetails({
   const [payAmount, setPayAmount] = useState(String(Math.round(expense.amount)));
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payNote, setPayNote] = useState("");
+  const [payAccountId, setPayAccountId] = useState("");
+  const { accounts: cashAccounts } = useCashAccounts();
 
   async function confirmPaid() {
     const amt = Number(payAmount);
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error("Nhập số tiền > 0");
+      return;
+    }
+    if (!payAccountId) {
+      toast.error("Chọn tài khoản quỹ");
       return;
     }
     setPaying(true);
@@ -1299,6 +1328,7 @@ function TransferDetails({
         paidAmount: amt,
         paidNote: payNote.trim() || null,
         paidReceiptUrl: payReceipt.trim() || null,
+        accountId: payAccountId,
       }),
     });
     const j = await res.json().catch(() => ({}));
@@ -1524,6 +1554,19 @@ function TransferDetails({
                 </div>
                 <ReceiptFilePicker value={payReceipt} onChange={setPayReceipt} />
                 <label className="block">
+                  <span className="text-[11px] text-[#8b95b7]">Tài khoản quỹ *</span>
+                  <select
+                    value={payAccountId}
+                    onChange={(e) => setPayAccountId(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1.5 text-xs text-[#f0f2ff]"
+                  >
+                    <option value="">— Chọn tài khoản —</option>
+                    {cashAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
                   <span className="text-[11px] text-[#8b95b7]">Ghi chú KT</span>
                   <textarea
                     rows={2}
@@ -1534,7 +1577,7 @@ function TransferDetails({
                   />
                 </label>
                 <div className="text-[10px] text-amber-300">
-                  Trừ ngay vào số dư quỹ. Không huỷ được sau khi xác nhận.
+                  Trừ ngay vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.
                 </div>
                 <div className="flex gap-2">
                   <button

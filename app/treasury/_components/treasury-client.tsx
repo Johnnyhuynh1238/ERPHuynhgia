@@ -6,6 +6,14 @@ import { toast } from "sonner";
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
 
+type AccountSummary = {
+  id: string;
+  code: string;
+  name: string;
+  kind: "cash" | "bank";
+  currentBalance: number;
+};
+
 type Summary = {
   initialized: boolean;
   currentBalance: number;
@@ -17,7 +25,10 @@ type Summary = {
   lastTxnAt: string | null;
   pendingExpenseTotal: number;
   pendingExpenseCount: number;
+  accounts: AccountSummary[];
 };
+
+type TxnAccount = { id: string; code: string; name: string; kind: "cash" | "bank" };
 
 type Txn = {
   id: string;
@@ -25,13 +36,15 @@ type Txn = {
   amount: number;
   occurredAt: string;
   balanceAfter: number;
-  refType: "opening" | "expense" | "sub_payment" | "material_proposal" | "payment_schedule" | "receipt";
+  refType: "opening" | "expense" | "sub_payment" | "material_proposal" | "payment_schedule" | "receipt" | "transfer";
   refId: string | null;
   note: string | null;
   createdAt: string;
   project: ProjectOption | null;
   category: CategoryOption | null;
   creator: { id: string; fullName: string };
+  account: TxnAccount | null;
+  counterAccount: TxnAccount | null;
 };
 
 function money(v: number | null | undefined) {
@@ -57,6 +70,7 @@ const REFTYPE_LABEL: Record<Txn["refType"], string> = {
   material_proposal: "Đề xuất vật tư",
   payment_schedule: "Thu chủ nhà",
   receipt: "Lệnh thu",
+  transfer: "Chuyển quỹ",
 };
 const REFTYPE_CHIP: Record<Txn["refType"], string> = {
   opening: "bg-slate-500/15 text-slate-300",
@@ -65,6 +79,12 @@ const REFTYPE_CHIP: Record<Txn["refType"], string> = {
   material_proposal: "bg-cyan-500/15 text-cyan-300",
   payment_schedule: "bg-emerald-500/15 text-emerald-300",
   receipt: "bg-green-500/15 text-green-300",
+  transfer: "bg-indigo-500/15 text-indigo-300",
+};
+
+const ACCOUNT_KIND_LABEL: Record<"cash" | "bank", string> = {
+  cash: "Tiền mặt",
+  bank: "Ngân hàng",
 };
 
 export function TreasuryClient({
@@ -82,6 +102,7 @@ export function TreasuryClient({
   const [refType, setRefType] = useState<string>("");
   const [projectFilter, setProjectFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [accountFilter, setAccountFilter] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
@@ -90,7 +111,15 @@ export function TreasuryClient({
   const pageSize = 50;
   const [showFilters, setShowFilters] = useState(false);
 
-  const hasActiveFilter = !!(direction || refType || projectFilter || categoryFilter || from || to);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [trFrom, setTrFrom] = useState("");
+  const [trTo, setTrTo] = useState("");
+  const [trAmount, setTrAmount] = useState("");
+  const [trDate, setTrDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [trNote, setTrNote] = useState("");
+  const [trSaving, setTrSaving] = useState(false);
+
+  const hasActiveFilter = !!(direction || refType || projectFilter || categoryFilter || accountFilter || from || to);
 
   const filterQs = useMemo(() => {
     const qs = new URLSearchParams();
@@ -98,10 +127,11 @@ export function TreasuryClient({
     if (refType) qs.set("refType", refType);
     if (projectFilter) qs.set("projectId", projectFilter);
     if (categoryFilter) qs.set("categoryId", categoryFilter);
+    if (accountFilter) qs.set("accountId", accountFilter);
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     return qs;
-  }, [direction, refType, projectFilter, categoryFilter, from, to]);
+  }, [direction, refType, projectFilter, categoryFilter, accountFilter, from, to]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,6 +166,7 @@ export function TreasuryClient({
     setRefType("");
     setProjectFilter("");
     setCategoryFilter("");
+    setAccountFilter("");
     setFrom("");
     setTo("");
     setPage(1);
@@ -147,6 +178,47 @@ export function TreasuryClient({
     window.location.href = `/api/treasury/transactions?${qs.toString()}`;
   }
 
+  async function submitTransfer() {
+    if (!trFrom || !trTo) {
+      toast.error("Chọn tài khoản nguồn và đích");
+      return;
+    }
+    if (trFrom === trTo) {
+      toast.error("Tài khoản nguồn và đích phải khác nhau");
+      return;
+    }
+    const amt = Number(trAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Nhập số tiền > 0");
+      return;
+    }
+    setTrSaving(true);
+    const res = await fetch("/api/treasury/transfer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fromAccountId: trFrom,
+        toAccountId: trTo,
+        amount: amt,
+        occurredAt: trDate,
+        note: trNote || null,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setTrSaving(false);
+    if (!res.ok) {
+      toast.error(json.message || "Chuyển quỹ thất bại");
+      return;
+    }
+    toast.success("Đã chuyển quỹ");
+    setShowTransfer(false);
+    setTrFrom("");
+    setTrTo("");
+    setTrAmount("");
+    setTrNote("");
+    await load();
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
@@ -155,8 +227,19 @@ export function TreasuryClient({
       <div className="rounded-2xl border border-orange-400/30 bg-gradient-to-br from-[#1a1d2a] to-[#13151f] p-5">
         {summary?.initialized ? (
           <>
-            <div className="text-xs uppercase tracking-wide text-[#8b95b7]">Số dư công ty</div>
-            <div className="mt-1 text-3xl font-bold text-orange-300">{money(summary.currentBalance)}</div>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-[#8b95b7]">Số dư công ty</div>
+                <div className="mt-1 text-3xl font-bold text-orange-300">{money(summary.currentBalance)}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTransfer(true)}
+                className="rounded-lg bg-indigo-500/15 px-3 py-1.5 text-sm text-indigo-300 hover:bg-indigo-500/25"
+              >
+                ⇄ Chuyển quỹ
+              </button>
+            </div>
             <div className="mt-2 grid gap-2 text-xs text-[#8b95b7] md:grid-cols-3">
               <div>
                 Đầu kỳ: <span className="text-[#cfd4e8]">{money(summary.openingBalance)}</span>{" "}
@@ -172,6 +255,24 @@ export function TreasuryClient({
                 </span>
               </div>
             </div>
+            {summary.accounts.length > 0 && (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {summary.accounts.map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-xl border border-[#2d3249] bg-[#0b0d16] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-[#f0f2ff]">{a.name}</div>
+                      <span className="rounded-full bg-[#1a1d2e] px-2 py-0.5 text-[10px] uppercase text-[#8b95b7]">
+                        {ACCOUNT_KIND_LABEL[a.kind]}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-lg font-bold text-emerald-300">{money(a.currentBalance)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <div className="text-sm text-amber-300">
@@ -236,7 +337,25 @@ export function TreasuryClient({
           <option value="sub_payment">TT thầu phụ</option>
           <option value="material_proposal">Đề xuất vật tư</option>
           <option value="opening">Khởi tạo</option>
+          <option value="transfer">Chuyển quỹ</option>
         </select>
+        {summary?.accounts && summary.accounts.length > 0 && (
+          <select
+            value={accountFilter}
+            onChange={(e) => {
+              setAccountFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-1.5 text-sm text-[#f0f2ff]"
+          >
+            <option value="">Mọi tài khoản</option>
+            {summary.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ({ACCOUNT_KIND_LABEL[a.kind]})
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={projectFilter}
           onChange={(e) => {
@@ -337,10 +456,19 @@ export function TreasuryClient({
                   </div>
                 </div>
 
-                {(r.note || r.project || r.category) && (
+                {(r.note || r.project || r.category || r.account) && (
                   <div className="mt-2 space-y-1 text-sm text-[#cfd4e8]">
                     {r.note && <div className="break-words">{r.note}</div>}
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#8b95b7]">
+                      {r.account && (
+                        <span className="text-indigo-300">
+                          {r.refType === "transfer" && r.counterAccount
+                            ? r.direction === "out"
+                              ? `${r.account.name} → ${r.counterAccount.name}`
+                              : `${r.counterAccount.name} → ${r.account.name}`
+                            : r.account.name}
+                        </span>
+                      )}
                       {r.project && (
                         <span>
                           <span className="font-mono">{r.project.code}</span> · {r.project.name}
@@ -361,6 +489,106 @@ export function TreasuryClient({
             );
           })}
       </div>
+
+      {/* Transfer modal */}
+      {showTransfer && summary?.accounts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#2d3249] bg-[#13151f] p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-lg font-semibold text-[#f0f2ff]">Chuyển quỹ</div>
+              <button
+                type="button"
+                onClick={() => setShowTransfer(false)}
+                className="text-[#8b95b7] hover:text-[#f0f2ff]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-[#8b95b7]">Từ tài khoản *</label>
+                <select
+                  value={trFrom}
+                  onChange={(e) => setTrFrom(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                >
+                  <option value="">— Chọn tài khoản —</option>
+                  {summary.accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({ACCOUNT_KIND_LABEL[a.kind]}) · {money(a.currentBalance)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#8b95b7]">Đến tài khoản *</label>
+                <select
+                  value={trTo}
+                  onChange={(e) => setTrTo(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                >
+                  <option value="">— Chọn tài khoản —</option>
+                  {summary.accounts
+                    .filter((a) => a.id !== trFrom)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({ACCOUNT_KIND_LABEL[a.kind]})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#8b95b7]">Số tiền *</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={trAmount}
+                  onChange={(e) => setTrAmount(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#8b95b7]">Ngày chuyển</label>
+                <input
+                  type="date"
+                  value={trDate}
+                  onChange={(e) => setTrDate(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#8b95b7]">Ghi chú</label>
+                <textarea
+                  rows={2}
+                  value={trNote}
+                  onChange={(e) => setTrNote(e.target.value)}
+                  className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTransfer(false)}
+                  disabled={trSaving}
+                  className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#8b95b7]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={submitTransfer}
+                  disabled={trSaving}
+                  className="rounded-lg bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {trSaving ? "Đang chuyển..." : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Phân trang */}
       {total > pageSize && (
