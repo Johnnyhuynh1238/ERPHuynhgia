@@ -4,79 +4,42 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  BUDGET_CATEGORIES,
-  CATEGORY_LABEL,
-  PHASE_CODES,
-  PHASE_CODE_LABEL,
-  PHASE_CODE_SHORT,
-  type PhaseCode,
+  BUDGET_STAGES,
+  STAGE_LABEL,
+  STAGE_DESCRIPTION,
+  type BudgetStageCode,
 } from "@/lib/project-budget";
 import type { UserRole } from "@prisma/client";
 
-type Category = (typeof BUDGET_CATEGORIES)[number];
 type Status = "draft" | "locked";
-type AmendmentStatus = "draft" | "approved" | "rejected";
 
-type BreakdownRow = {
+type Component = {
+  id: string;
+  stage: BudgetStageCode;
   name: string;
-  quantity: number;
+  floor: string | null;
+  sortOrder: number;
   note: string | null;
-  _local: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
-type ItemRow = {
-  id?: string;
-  category: Category;
-  phaseCode: PhaseCode;
-  standardTaskId: string | null;
+type Item = {
+  id: string;
+  componentId: string | null;
+  stage: BudgetStageCode | null;
   name: string;
   unit: string;
   quantity: number;
-  unitPrice: number;
+  laborUnitPrice: number;
+  laborAmount: number;
+  materialUnitPrice: number;
+  materialAmount: number;
+  equipmentUnitPrice: number;
+  equipmentAmount: number;
   amount: number;
   note: string | null;
   sortRank: number;
-  breakdown: BreakdownRow[];
-  _local?: string;
-};
-
-type AmendmentItem = {
-  id: string;
-  category: Category;
-  phaseCode: PhaseCode;
-  name: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  amount: number;
-  note: string | null;
-};
-
-type AmendmentEditRow = {
-  category: Category;
-  phaseCode: PhaseCode;
-  name: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  note: string | null;
-  _local: string;
-};
-
-type Amendment = {
-  id: string;
-  reason: string;
-  status: AmendmentStatus;
-  deltaLabor: number;
-  deltaMaterial: number;
-  deltaEquipment: number;
-  deltaAmount: number;
-  proposedBy: { id: string; fullName: string };
-  approvedBy: { id: string; fullName: string } | null;
-  approvedAt: string | null;
-  rejectReason: string | null;
-  createdAt: string;
-  items: AmendmentItem[];
 };
 
 type Budget = {
@@ -92,16 +55,12 @@ type Budget = {
   lockedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  items: Array<
-    Omit<ItemRow, "breakdown" | "_local"> & {
-      breakdown: Array<{ name: string; quantity: number; note: string | null }>;
-    }
-  >;
-  amendments: Amendment[];
+  items: Item[];
 };
 
 type ApiResponse = {
   project: { id: string; code: string; name: string; customerName: string; contractValue: number | null };
+  components: Component[];
   budget: Budget | null;
 };
 
@@ -117,88 +76,16 @@ type Props = {
   currentUserRole: UserRole;
 };
 
-const CAT_TONE: Record<
-  Category,
-  { text: string; bg: string; ring: string; dot: string; activeBg: string; activeRing: string }
-> = {
-  labor: {
-    text: "text-blue-300",
-    bg: "bg-blue-500/5",
-    ring: "ring-blue-500/30",
-    dot: "bg-blue-400",
-    activeBg: "bg-blue-500/15",
-    activeRing: "ring-blue-500",
-  },
-  material: {
-    text: "text-emerald-300",
-    bg: "bg-emerald-500/5",
-    ring: "ring-emerald-500/30",
-    dot: "bg-emerald-400",
-    activeBg: "bg-emerald-500/15",
-    activeRing: "ring-emerald-500",
-  },
-  equipment: {
-    text: "text-amber-300",
-    bg: "bg-amber-500/5",
-    ring: "ring-amber-500/30",
-    dot: "bg-amber-400",
-    activeBg: "bg-amber-500/15",
-    activeRing: "ring-amber-500",
-  },
-};
-
-const CAT_SHORT: Record<Category, string> = { labor: "NC", material: "VT", equipment: "MM" };
-
 function fmtVND(value: number) {
   return value.toLocaleString("vi-VN");
 }
 
-function genLocalId() {
-  return `local-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function sumBreakdown(rows: BreakdownRow[]) {
-  return rows.reduce((s, b) => s + (Number.isFinite(b.quantity) ? b.quantity : 0), 0);
-}
-
-function effectiveQty(row: ItemRow): number {
-  if (row.breakdown.length > 0) return sumBreakdown(row.breakdown);
-  return row.quantity;
-}
-
-function emptyRow(category: Category, phaseCode: PhaseCode): ItemRow {
-  return {
-    category,
-    phaseCode,
-    standardTaskId: null,
-    name: "",
-    unit: "",
-    quantity: 0,
-    unitPrice: 0,
-    amount: 0,
-    note: "",
-    sortRank: 0,
-    breakdown: [],
-    _local: genLocalId(),
-  };
-}
-
-function emptyBreakdown(): BreakdownRow {
-  return { name: "", quantity: 0, note: null, _local: genLocalId() };
-}
-
-function emptyAmendmentRow(category: Category, phaseCode: PhaseCode): AmendmentEditRow {
-  return {
-    category,
-    phaseCode,
-    name: "",
-    unit: "",
-    quantity: 0,
-    unitPrice: 0,
-    note: null,
-    _local: genLocalId(),
-  };
-}
+const STAGE_TONE: Record<BudgetStageCode, { text: string; bg: string; ring: string; activeBg: string }> = {
+  CB: { text: "text-sky-300",     bg: "bg-sky-500/10",     ring: "ring-sky-500/30",     activeBg: "bg-sky-500/20" },
+  N:  { text: "text-amber-300",   bg: "bg-amber-500/10",   ring: "ring-amber-500/30",   activeBg: "bg-amber-500/20" },
+  T:  { text: "text-emerald-300", bg: "bg-emerald-500/10", ring: "ring-emerald-500/30", activeBg: "bg-emerald-500/20" },
+  HT: { text: "text-violet-300",  bg: "bg-violet-500/10",  ring: "ring-violet-500/30",  activeBg: "bg-violet-500/20" },
+};
 
 export function ProjectBudgetClient({
   projectId,
@@ -206,21 +93,25 @@ export function ProjectBudgetClient({
   profitMarginPct,
   canEdit,
   canLock,
-  canPropose,
-  canApprove,
 }: Props) {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
-  const [rows, setRows] = useState<ItemRow[]>([]);
-  const [note, setNote] = useState("");
-  const [showAmendmentForm, setShowAmendmentForm] = useState(false);
-  const [amendmentReason, setAmendmentReason] = useState("");
-  const [amendmentRows, setAmendmentRows] = useState<AmendmentEditRow[]>([]);
-  // Single active branch — click outside collapses
-  const [activeBranch, setActiveBranch] = useState<{ phase: PhaseCode; category: Category } | null>(null);
-  // Modal: which task's sub-tasks are being edited
-  const [breakdownModalLocal, setBreakdownModalLocal] = useState<string | null>(null);
+  const [activeStage, setActiveStage] = useState<BudgetStageCode>("N");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // forms
+  const [addingCompStage, setAddingCompStage] = useState<BudgetStageCode | null>(null);
+  const [newCompName, setNewCompName] = useState("");
+  const [newCompFloor, setNewCompFloor] = useState("");
+
+  const [editingComp, setEditingComp] = useState<string | null>(null);
+  const [editCompName, setEditCompName] = useState("");
+  const [editCompFloor, setEditCompFloor] = useState("");
+
+  const [addingItemComp, setAddingItemComp] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+
+  const [savingFlag, setSavingFlag] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,281 +124,146 @@ export function ProjectBudgetClient({
       }
       const json: ApiResponse = await res.json();
       setData(json);
-      if (json.budget) {
-        setRows(
-          json.budget.items.map((it) => ({
-            ...it,
-            breakdown: (it.breakdown ?? []).map((b) => ({
-              name: b.name,
-              quantity: b.quantity,
-              note: b.note ?? null,
-              _local: genLocalId(),
-            })),
-            _local: it.id,
-          })),
-        );
-        setNote(json.budget.note ?? "");
-      } else {
-        setRows([]);
-        setNote("");
-      }
     } finally {
       setLoading(false);
     }
   }, [projectId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!activeBranch) return;
-    function onDocMouseDown(e: MouseEvent) {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest("[data-budget-modal]")) return;
-      const sec = t.closest("[data-phase-section]") as HTMLElement | null;
-      if (sec && sec.dataset.phaseSection === activeBranch!.phase) return;
-      setActiveBranch(null);
-    }
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [activeBranch]);
+  useEffect(() => { load(); }, [load]);
 
   const locked = data?.budget?.status === "locked";
   const readOnly = !canEdit || locked;
 
-  const totals = useMemo(() => {
-    const labor = rows
-      .filter((r) => r.category === "labor")
-      .reduce((s, r) => s + Math.round(effectiveQty(r) * r.unitPrice), 0);
-    const material = rows
-      .filter((r) => r.category === "material")
-      .reduce((s, r) => s + Math.round(effectiveQty(r) * r.unitPrice), 0);
-    const equipment = rows
-      .filter((r) => r.category === "equipment")
-      .reduce((s, r) => s + Math.round(effectiveQty(r) * r.unitPrice), 0);
-    return { labor, material, equipment, total: labor + material + equipment };
-  }, [rows]);
+  const components = data?.components ?? [];
+  const items = data?.budget?.items ?? [];
 
-  const phaseStats = useMemo(() => {
-    const m = new Map<string, { sum: number; count: number }>();
-    for (const code of PHASE_CODES) {
-      for (const cat of BUDGET_CATEGORIES) {
-        m.set(`${code}|${cat}`, { sum: 0, count: 0 });
-      }
-    }
-    for (const r of rows) {
-      const key = `${r.phaseCode}|${r.category}`;
-      const cur = m.get(key) ?? { sum: 0, count: 0 };
-      m.set(key, {
-        sum: cur.sum + Math.round(effectiveQty(r) * r.unitPrice),
-        count: cur.count + 1,
-      });
+  const itemsByComp = useMemo(() => {
+    const m = new Map<string, Item[]>();
+    for (const it of items) {
+      if (!it.componentId) continue;
+      const arr = m.get(it.componentId) ?? [];
+      arr.push(it);
+      m.set(it.componentId, arr);
     }
     return m;
-  }, [rows]);
+  }, [items]);
 
-  const rowsByKey = useMemo(() => {
-    const map = new Map<string, ItemRow[]>();
-    for (const r of rows) {
-      const key = `${r.phaseCode}|${r.category}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
+  const compTotals = useMemo(() => {
+    const m = new Map<string, { labor: number; material: number; equipment: number; total: number; count: number }>();
+    itemsByComp.forEach((arr, cid) => {
+      let l = 0, mt = 0, e = 0;
+      for (const it of arr) { l += it.laborAmount; mt += it.materialAmount; e += it.equipmentAmount; }
+      m.set(cid, { labor: l, material: mt, equipment: e, total: l + mt + e, count: arr.length });
+    });
+    return m;
+  }, [itemsByComp]);
+
+  const stageTotals = useMemo(() => {
+    const m = new Map<BudgetStageCode, { labor: number; material: number; equipment: number; total: number; compCount: number; itemCount: number }>();
+    for (const s of BUDGET_STAGES) m.set(s, { labor: 0, material: 0, equipment: 0, total: 0, compCount: 0, itemCount: 0 });
+    for (const c of components) {
+      const t = m.get(c.stage)!;
+      t.compCount += 1;
+      const ct = compTotals.get(c.id);
+      if (ct) {
+        t.labor += ct.labor; t.material += ct.material; t.equipment += ct.equipment;
+        t.total += ct.total; t.itemCount += ct.count;
+      }
     }
-    return map;
-  }, [rows]);
+    return m;
+  }, [components, compTotals]);
 
-  const modalRow = useMemo(
-    () => (breakdownModalLocal ? rows.find((r) => r._local === breakdownModalLocal) ?? null : null),
-    [breakdownModalLocal, rows],
+  const grandTotal = useMemo(() => {
+    let l = 0, mt = 0, e = 0;
+    for (const it of items) { l += it.laborAmount; mt += it.materialAmount; e += it.equipmentAmount; }
+    return { labor: l, material: mt, equipment: e, total: l + mt + e };
+  }, [items]);
+
+  const stageComponents = useMemo(
+    () => components.filter((c) => c.stage === activeStage).sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt)),
+    [components, activeStage],
   );
 
-  function updateRow(local: string, patch: Partial<ItemRow>) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r._local !== local) return r;
-        const next = { ...r, ...patch };
-        const qty = effectiveQty(next);
-        next.amount = Math.round(qty * next.unitPrice);
-        return next;
-      }),
-    );
+  function toggleExpand(id: string) {
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
   }
 
-  function addRow(category: Category, phaseCode: PhaseCode) {
-    setRows((prev) => [...prev, emptyRow(category, phaseCode)]);
-    setActiveBranch({ phase: phaseCode, category });
-  }
-
-  function removeRow(local: string) {
-    setRows((prev) => prev.filter((r) => r._local !== local));
-  }
-
-  function addBreakdownToRow(local: string) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r._local !== local) return r;
-        const breakdown = [...r.breakdown, emptyBreakdown()];
-        const qty = sumBreakdown(breakdown);
-        return { ...r, breakdown, quantity: qty, amount: Math.round(qty * r.unitPrice) };
-      }),
-    );
-  }
-
-  function updateBreakdown(rowLocal: string, bLocal: string, patch: Partial<BreakdownRow>) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r._local !== rowLocal) return r;
-        const breakdown = r.breakdown.map((b) => (b._local === bLocal ? { ...b, ...patch } : b));
-        const qty = sumBreakdown(breakdown);
-        return { ...r, breakdown, quantity: qty, amount: Math.round(qty * r.unitPrice) };
-      }),
-    );
-  }
-
-  function removeBreakdown(rowLocal: string, bLocal: string) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r._local !== rowLocal) return r;
-        const breakdown = r.breakdown.filter((b) => b._local !== bLocal);
-        const qty = breakdown.length > 0 ? sumBreakdown(breakdown) : r.quantity;
-        return { ...r, breakdown, quantity: qty, amount: Math.round(qty * r.unitPrice) };
-      }),
-    );
-  }
-
-  function toggleBranch(phase: PhaseCode, cat: Category) {
-    setActiveBranch((prev) =>
-      prev && prev.phase === phase && prev.category === cat ? null : { phase, category: cat },
-    );
-  }
-
-  async function save() {
-    if (readOnly) return;
-    setSaving(true);
+  async function createComponent() {
+    if (!addingCompStage || !newCompName.trim()) return;
+    setSavingFlag(true);
     try {
-      const payload = {
-        note: note.trim() || null,
-        items: rows
-          .filter((r) => r.name.trim() && r.unit.trim() && effectiveQty(r) > 0 && r.unitPrice >= 0)
-          .map((r, idx) => ({
-            category: r.category,
-            phaseCode: r.phaseCode,
-            standardTaskId: r.standardTaskId,
-            name: r.name.trim(),
-            unit: r.unit.trim(),
-            quantity: effectiveQty(r),
-            unitPrice: r.unitPrice,
-            note: r.note?.trim() || null,
-            sortRank: idx,
-            breakdown: r.breakdown
-              .filter((b) => b.name.trim() && b.quantity > 0)
-              .map((b) => ({
-                name: b.name.trim(),
-                quantity: b.quantity,
-                note: b.note?.trim() || null,
-              })),
-          })),
-      };
-      const res = await fetch(`/api/projects/${projectId}/budget`, {
-        method: "PUT",
+      const res = await fetch(`/api/projects/${projectId}/budget/components`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          stage: addingCompStage,
+          name: newCompName.trim(),
+          floor: newCompFloor.trim() || null,
+        }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.message || "Lưu không thành công");
-        return;
-      }
-      toast.success("Đã lưu dự toán");
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Tạo cấu kiện thất bại"); return; }
+      toast.success("Đã thêm cấu kiện");
+      setAddingCompStage(null); setNewCompName(""); setNewCompFloor("");
       await load();
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSavingFlag(false); }
+  }
+
+  function startEditComponent(c: Component) {
+    setEditingComp(c.id); setEditCompName(c.name); setEditCompFloor(c.floor ?? "");
+  }
+
+  async function saveEditComponent() {
+    if (!editingComp || !editCompName.trim()) return;
+    setSavingFlag(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/budget/components/${editingComp}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editCompName.trim(), floor: editCompFloor.trim() || null }),
+      });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Sửa thất bại"); return; }
+      toast.success("Đã sửa");
+      setEditingComp(null);
+      await load();
+    } finally { setSavingFlag(false); }
+  }
+
+  async function deleteComponent(c: Component) {
+    const its = itemsByComp.get(c.id) ?? [];
+    const msg = its.length > 0
+      ? `Xóa cấu kiện "${c.name}"? Cấu kiện đang có ${its.length} công tác — phải xóa hết công tác trước.`
+      : `Xóa cấu kiện "${c.name}"?`;
+    if (!confirm(msg)) return;
+    setSavingFlag(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/budget/components/${c.id}`, { method: "DELETE" });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Xóa thất bại"); return; }
+      toast.success("Đã xóa");
+      await load();
+    } finally { setSavingFlag(false); }
+  }
+
+  async function deleteItem(it: Item) {
+    if (!confirm(`Xóa công tác "${it.name}" (${fmtVND(it.amount)}đ)?`)) return;
+    setSavingFlag(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/budget/items/${it.id}`, { method: "DELETE" });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Xóa thất bại"); return; }
+      toast.success("Đã xóa");
+      await load();
+    } finally { setSavingFlag(false); }
   }
 
   async function lockBudget() {
     if (!canLock || locked) return;
-    if (!confirm("Chốt dự toán? Sau khi chốt sẽ không thể sửa trực tiếp, mọi thay đổi phải qua đề xuất điều chỉnh.")) return;
+    if (!confirm("Chốt dự toán? Sau khi chốt sẽ không thể sửa trực tiếp.")) return;
     const res = await fetch(`/api/projects/${projectId}/budget/lock`, { method: "POST" });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.message || "Chốt thất bại");
-      return;
-    }
+    if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Chốt thất bại"); return; }
     toast.success("Đã chốt dự toán");
-    await load();
-  }
-
-  function addAmendmentRow(category: Category, phaseCode: PhaseCode) {
-    setAmendmentRows((prev) => [...prev, emptyAmendmentRow(category, phaseCode)]);
-  }
-  function updateAmendmentRow(local: string, patch: Partial<AmendmentEditRow>) {
-    setAmendmentRows((prev) => prev.map((r) => (r._local === local ? { ...r, ...patch } : r)));
-  }
-  function removeAmendmentRow(local: string) {
-    setAmendmentRows((prev) => prev.filter((r) => r._local !== local));
-  }
-
-  async function submitAmendment() {
-    if (!canPropose || !locked) return;
-    if (amendmentReason.trim().length < 3) {
-      toast.error("Lý do tối thiểu 3 ký tự");
-      return;
-    }
-    const items = amendmentRows
-      .filter((r) => r.name.trim() && r.unit.trim() && r.quantity !== 0)
-      .map((r) => ({
-        category: r.category,
-        phaseCode: r.phaseCode,
-        name: r.name.trim(),
-        unit: r.unit.trim(),
-        quantity: r.quantity,
-        unitPrice: r.unitPrice,
-        note: r.note?.trim() || null,
-      }));
-    if (items.length === 0) {
-      toast.error("Cần ít nhất 1 hạng mục điều chỉnh");
-      return;
-    }
-    const res = await fetch(`/api/projects/${projectId}/budget/amendments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: amendmentReason.trim(), items }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.message || "Gửi đề xuất thất bại");
-      return;
-    }
-    toast.success("Đã gửi đề xuất");
-    setShowAmendmentForm(false);
-    setAmendmentReason("");
-    setAmendmentRows([]);
-    await load();
-  }
-
-  async function decideAmendment(amendmentId: string, action: "approve" | "reject") {
-    let rejectReason: string | null = null;
-    if (action === "reject") {
-      const r = prompt("Lý do từ chối?");
-      if (r === null) return;
-      rejectReason = r;
-    } else {
-      if (!confirm("Duyệt điều chỉnh? Hệ thống sẽ cộng dồn delta vào dự toán hiện tại.")) return;
-    }
-    const res = await fetch(`/api/projects/${projectId}/budget/amendments/${amendmentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, rejectReason }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.message || "Thao tác thất bại");
-      return;
-    }
-    toast.success(action === "approve" ? "Đã duyệt" : "Đã từ chối");
     await load();
   }
 
@@ -517,736 +273,395 @@ export function ProjectBudgetClient({
 
   return (
     <div className="space-y-4">
-      {/* Card chính: 1 card tổng thông số + actions */}
+      {/* Header card */}
       <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4 ring-1 ring-orange-500/10">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-orange-400/80">Dự toán công trình</div>
-            <div className="mt-1 text-2xl font-bold text-[#f0f2ff] sm:text-3xl">{fmtVND(totals.total)}đ</div>
+            <div className="text-[10px] uppercase tracking-wider text-orange-400/80">Dự toán giá vốn · theo cấu kiện</div>
+            <div className="mt-1 text-2xl font-bold text-[#f0f2ff] sm:text-3xl">{fmtVND(grandTotal.total)}đ</div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-              {data?.budget ? (
-                locked ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 font-medium text-amber-300 ring-1 ring-amber-500/30">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
-                  </span>
-                )
-              ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 font-medium text-[#8892b0]">
-                  Chưa lập
+              {data?.budget ? (locked ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Đã chốt
                 </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 font-medium text-amber-300 ring-1 ring-amber-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Bản nháp
+                </span>
+              )) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#252840] px-2.5 py-0.5 font-medium text-[#8892b0]">Chưa lập</span>
               )}
               {contractValue !== null && contractValue > 0 && (
-                <span className="text-[#8892b0]">
-                  · {((totals.total / contractValue) * 100).toFixed(1)}% giá trị HĐ ({fmtVND(contractValue)}đ)
-                </span>
+                <span className="text-[#8892b0]">· {((grandTotal.total / contractValue) * 100).toFixed(1)}% giá trị HĐ ({fmtVND(contractValue)}đ)</span>
+              )}
+              {profitMarginPct !== null && profitMarginPct > 0 && (
+                <span className="text-[#8892b0]">· LN mục tiêu {profitMarginPct.toFixed(0)}%</span>
               )}
               {data?.budget?.lockedAt && (
-                <span className="text-[#8892b0]">
-                  · Chốt bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleDateString("vi-VN")}
-                </span>
+                <span className="text-[#8892b0]">· Chốt bởi {data.budget.lockedBy?.fullName} · {new Date(data.budget.lockedAt).toLocaleDateString("vi-VN")}</span>
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            {canEdit && !locked && (
-              <Button onClick={save} disabled={saving}>
-                {saving ? "Đang lưu…" : "Lưu dự toán"}
-              </Button>
-            )}
+          <div className="flex items-center gap-2">
             {canLock && !locked && data?.budget && (
-              <Button variant="outline" onClick={lockBudget}>
-                Chốt dự toán
-              </Button>
+              <Button onClick={lockBudget} size="sm" className="bg-emerald-600 hover:bg-emerald-500">Chốt dự toán</Button>
             )}
           </div>
         </div>
 
-        {/* 3 mini stats NC/VT/MM ngay trong card chính */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {BUDGET_CATEGORIES.map((cat) => {
-            const sum = totals[cat === "labor" ? "labor" : cat === "material" ? "material" : "equipment"];
-            const pct = totals.total > 0 ? (sum / totals.total) * 100 : 0;
-            const t = CAT_TONE[cat];
-            return (
-              <div key={cat} className={`rounded-xl ${t.bg} p-3 ring-1 ${t.ring}`}>
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] uppercase tracking-wider text-[#8892b0]">{CATEGORY_LABEL[cat]}</div>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold ${t.text} bg-[#0f1220]`}>
-                    {CAT_SHORT[cat]}
-                  </span>
-                </div>
-                <div className={`mt-1.5 text-base font-bold ${t.text} sm:text-lg`}>{fmtVND(sum)}đ</div>
-                <div className="mt-1 text-[10px] text-[#5a6080]">{pct.toFixed(1)}%</div>
-              </div>
-            );
-          })}
+        {/* 3 totals NC/VT/MM */}
+        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+          <div className="rounded-lg bg-blue-500/10 p-2 ring-1 ring-blue-500/20">
+            <div className="text-[10px] uppercase text-blue-300/70">Nhân công</div>
+            <div className="mt-0.5 font-semibold text-blue-200">{fmtVND(grandTotal.labor)}đ</div>
+          </div>
+          <div className="rounded-lg bg-emerald-500/10 p-2 ring-1 ring-emerald-500/20">
+            <div className="text-[10px] uppercase text-emerald-300/70">Vật tư</div>
+            <div className="mt-0.5 font-semibold text-emerald-200">{fmtVND(grandTotal.material)}đ</div>
+          </div>
+          <div className="rounded-lg bg-amber-500/10 p-2 ring-1 ring-amber-500/20">
+            <div className="text-[10px] uppercase text-amber-300/70">Máy móc</div>
+            <div className="mt-0.5 font-semibold text-amber-200">{fmtVND(grandTotal.equipment)}đ</div>
+          </div>
         </div>
       </div>
 
-      {/* Banner ngân sách dự toán (chi phí cho phép) */}
-      {contractValue && profitMarginPct !== null && (() => {
-        const cap = Math.round(contractValue * (1 - profitMarginPct / 100));
-        const used = totals.total;
-        const remaining = cap - used;
-        const pct = cap > 0 ? (used / cap) * 100 : 0;
-        const over = used > cap;
-        const warn = !over && pct >= 90;
-        const tone = over
-          ? { bg: "bg-rose-500/15", ring: "ring-rose-500/40", text: "text-rose-300", bar: "bg-rose-500" }
-          : warn
-            ? { bg: "bg-amber-500/15", ring: "ring-amber-500/40", text: "text-amber-300", bar: "bg-amber-500" }
-            : { bg: "bg-emerald-500/10", ring: "ring-emerald-500/30", text: "text-emerald-300", bar: "bg-emerald-500" };
-        return (
-          <div className={`rounded-xl ${tone.bg} p-3 ring-1 ${tone.ring}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className={`text-[11px] font-semibold uppercase tracking-wider ${tone.text}`}>
-                  {over ? "⚠ Vượt ngân sách" : warn ? "⚠ Sắp chạm ngân sách" : "Ngân sách dự toán"}
-                </div>
-                <div className="mt-0.5 text-xs text-[#c0c8e0]">
-                  Biên LN <span className={`font-semibold ${tone.text}`}>{profitMarginPct}%</span> · Trần chi phí{" "}
-                  <span className={`font-bold ${tone.text}`}>{fmtVND(cap)}đ</span> ({(100 - profitMarginPct).toFixed(0)}% HD)
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={`text-base font-bold ${tone.text}`}>
-                  {over ? "+" : ""}{fmtVND(Math.abs(remaining))}đ
-                </div>
-                <div className="text-[10px] text-[#8892b0]">{over ? "vượt trần" : "còn lại"}</div>
-              </div>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#0f1220] ring-1 ring-[#252840]">
-              <div
-                className={`h-full ${tone.bar} transition-all`}
-                style={{ width: `${Math.min(100, pct).toFixed(1)}%` }}
-              />
-            </div>
-            <div className="mt-1 flex justify-between text-[10px] text-[#5a6080]">
-              <span>Đã lập: {fmtVND(used)}đ ({pct.toFixed(1)}%)</span>
-              <span>Trần: {fmtVND(cap)}đ</span>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 9 card giai đoạn */}
-      <div className="space-y-1.5">
-        {PHASE_CODES.map((phase) => {
-          const phaseTotal = BUDGET_CATEGORIES.reduce(
-            (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.sum ?? 0),
-            0,
-          );
-          const phaseCount = BUDGET_CATEGORIES.reduce(
-            (s, cat) => s + (phaseStats.get(`${phase}|${cat}`)?.count ?? 0),
-            0,
-          );
-          const activeCat = activeBranch?.phase === phase ? activeBranch.category : null;
-
+      {/* Stage tabs */}
+      <div className="grid grid-cols-4 gap-2">
+        {BUDGET_STAGES.map((s) => {
+          const t = stageTotals.get(s)!;
+          const tone = STAGE_TONE[s];
+          const active = activeStage === s;
           return (
-            <section
-              key={phase}
-              data-phase-section={phase}
-              className="rounded-xl border border-[#252840] bg-[#1a1d2e]"
+            <button
+              key={s}
+              onClick={() => setActiveStage(s)}
+              className={`rounded-2xl border p-3 text-left transition ${
+                active
+                  ? `border-transparent ${tone.activeBg} ring-2 ${tone.ring}`
+                  : `border-[#252840] bg-[#1a1d2e] hover:${tone.bg} hover:ring-1 hover:${tone.ring}`
+              }`}
             >
-              {/* Phase header */}
-              <div className="flex items-center justify-between gap-2 border-b border-[#252840] px-2.5 py-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[11px] font-mono font-bold text-orange-300 ring-1 ring-orange-500/30">
-                    {phase}
-                  </span>
-                  <span className="truncate text-xs font-semibold text-[#f0f2ff]">
-                    {PHASE_CODE_LABEL[phase].replace(/^\d+\s*·\s*/, "")}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 text-[11px]">
-                  <span className="text-[#5a6080]">{phaseCount} hm</span>
-                  <span className="font-semibold text-orange-300">{fmtVND(phaseTotal)}đ</span>
-                </div>
-              </div>
-
-              {/* 3 nhánh NC / VT / MM */}
-              <div className="grid grid-cols-3 gap-1.5 p-1.5">
-                {BUDGET_CATEGORIES.map((cat) => {
-                  const st = phaseStats.get(`${phase}|${cat}`) ?? { sum: 0, count: 0 };
-                  const active = activeCat === cat;
-                  const t = CAT_TONE[cat];
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => toggleBranch(phase, cat)}
-                      className={`flex items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-left transition ring-1 ${
-                        active ? `${t.activeBg} ring-2 ${t.activeRing}` : `${t.bg} ${t.ring} hover:ring-2`
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.text}`}>
-                          {CAT_SHORT[cat]}
-                        </span>
-                        <span className="text-[9px] text-[#5a6080]">{st.count}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className={`text-xs font-bold ${t.text}`}>{fmtVND(st.sum)}đ</span>
-                        <span className={`text-[9px] ${active ? "text-white" : "text-[#5a6080]"}`}>
-                          {active ? "▴" : "▾"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Expanded task list */}
-              {activeCat && (
-                <BranchTasks
-                  phase={phase}
-                  category={activeCat}
-                  rows={rowsByKey.get(`${phase}|${activeCat}`) ?? []}
-                  readOnly={readOnly}
-                  onAdd={() => addRow(activeCat, phase)}
-                  onUpdate={(local, patch) => updateRow(local, patch)}
-                  onRemove={(local) => removeRow(local)}
-                  onOpenBreakdown={(local) => setBreakdownModalLocal(local)}
-                />
-              )}
-            </section>
+              <div className={`text-[10px] uppercase tracking-wider ${tone.text}`}>{s}</div>
+              <div className="mt-0.5 text-sm font-semibold text-[#f0f2ff]">{STAGE_LABEL[s]}</div>
+              <div className="mt-1 text-[11px] text-[#8892b0]">{t.compCount} cấu kiện · {t.itemCount} công tác</div>
+              <div className="mt-1 text-sm font-bold text-[#f0f2ff]">{fmtVND(t.total)}đ</div>
+            </button>
           );
         })}
       </div>
 
-      {!readOnly && (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-          <label className="text-[10px] uppercase tracking-wide text-[#5a6080]">Ghi chú dự toán</label>
-          <textarea
-            className="mt-1 w-full rounded-lg bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ghi chú chung về dự toán…"
-          />
-        </div>
-      )}
+      {/* Stage description */}
+      <div className="rounded-xl bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] ring-1 ring-[#252840]">
+        <span className={STAGE_TONE[activeStage].text}>{activeStage} — {STAGE_LABEL[activeStage]}</span> · {STAGE_DESCRIPTION[activeStage]}
+      </div>
 
-      {/* Amendments */}
-      {locked && (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-[#f0f2ff]">Đề xuất điều chỉnh</div>
-            {canPropose && !showAmendmentForm && (
-              <Button variant="outline" onClick={() => setShowAmendmentForm(true)}>
-                + Tạo đề xuất
-              </Button>
-            )}
+      {/* Components list for active stage */}
+      <div className="space-y-3">
+        {stageComponents.length === 0 && addingCompStage !== activeStage && (
+          <div className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/50 p-6 text-center text-sm text-[#8892b0]">
+            Chưa có cấu kiện cho stage <span className={STAGE_TONE[activeStage].text}>{STAGE_LABEL[activeStage]}</span>
           </div>
+        )}
 
-          {showAmendmentForm && canPropose && (
-            <div className="mt-3 rounded-xl bg-[#0f1220] p-3 ring-1 ring-[#252840]">
-              <label className="text-xs text-[#8892b0]">Lý do điều chỉnh *</label>
-              <textarea
-                className="mt-1 w-full rounded-lg bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                rows={2}
-                value={amendmentReason}
-                onChange={(e) => setAmendmentReason(e.target.value)}
-                placeholder="VD: Chủ nhà yêu cầu bổ sung lan can…"
-              />
-              <div className="mt-3 space-y-2">
-                {amendmentRows.map((r) => (
-                  <div key={r._local} className="rounded-lg bg-[#1a1d2e] p-2 ring-1 ring-[#252840]">
-                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                      <select
-                        className="rounded bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                        value={r.category}
-                        onChange={(e) => updateAmendmentRow(r._local, { category: e.target.value as Category })}
-                      >
-                        {BUDGET_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>
-                            {CATEGORY_LABEL[c]}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className="rounded bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                        value={r.phaseCode}
-                        onChange={(e) => updateAmendmentRow(r._local, { phaseCode: e.target.value as PhaseCode })}
-                      >
-                        {PHASE_CODES.map((c) => (
-                          <option key={c} value={c}>
-                            {c} · {PHASE_CODE_SHORT[c]}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        className="rounded bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                        value={r.unit}
-                        onChange={(e) => updateAmendmentRow(r._local, { unit: e.target.value })}
-                        placeholder="ĐV"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`Xoá dòng điều chỉnh "${r.name || "(chưa có tên)"}"?`)) {
-                            removeAmendmentRow(r._local);
-                          }
-                        }}
-                        className="rounded bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
-                      >
-                        Xoá dòng
-                      </button>
-                    </div>
+        {stageComponents.map((c) => {
+          const ct = compTotals.get(c.id) ?? { labor: 0, material: 0, equipment: 0, total: 0, count: 0 };
+          const its = itemsByComp.get(c.id) ?? [];
+          const isExpanded = expanded.has(c.id);
+          const isEditing = editingComp === c.id;
+          return (
+            <div key={c.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
+              <div className="flex items-center gap-2 p-3">
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(c.id)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
+                  aria-label={isExpanded ? "Thu gọn" : "Mở rộng"}
+                >
+                  {isExpanded ? "▾" : "▸"}
+                </button>
+
+                {isEditing ? (
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
                     <input
-                      className="mt-1.5 w-full rounded bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                      value={r.name}
-                      onChange={(e) => updateAmendmentRow(r._local, { name: e.target.value })}
-                      placeholder="Tên hạng mục điều chỉnh"
+                      value={editCompName}
+                      onChange={(e) => setEditCompName(e.target.value)}
+                      className="min-w-[180px] flex-1 rounded-md bg-[#0f1220] px-2 py-1 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                      placeholder="Tên cấu kiện"
                     />
-                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                      <input
-                        type="number"
-                        step="0.001"
-                        className="rounded bg-[#0f1220] px-2 py-1 text-right text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                        value={r.quantity || ""}
-                        onChange={(e) => updateAmendmentRow(r._local, { quantity: Number(e.target.value) || 0 })}
-                        placeholder="KL (âm = giảm)"
-                      />
-                      <input
-                        type="number"
-                        step="1000"
-                        className="rounded bg-[#0f1220] px-2 py-1 text-right text-xs text-[#f0f2ff] ring-1 ring-[#252840]"
-                        value={r.unitPrice || ""}
-                        onChange={(e) => updateAmendmentRow(r._local, { unitPrice: Math.round(Number(e.target.value) || 0) })}
-                        placeholder="Đơn giá"
-                      />
-                      <div className="flex items-center justify-end rounded bg-[#0f1220] px-2 py-1 text-right text-xs font-semibold text-orange-300 ring-1 ring-[#252840]">
-                        {fmtVND(Math.round(r.quantity * r.unitPrice))}đ
+                    <input
+                      value={editCompFloor}
+                      onChange={(e) => setEditCompFloor(e.target.value)}
+                      className="w-20 rounded-md bg-[#0f1220] px-2 py-1 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                      placeholder="Tầng"
+                    />
+                    <Button size="sm" onClick={saveEditComponent} disabled={savingFlag} className="bg-emerald-600 hover:bg-emerald-500">Lưu</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingComp(null)}>Hủy</Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-[#f0f2ff]">{c.name}</span>
+                        {c.floor && (
+                          <span className="inline-flex shrink-0 items-center rounded bg-[#252840] px-1.5 py-0.5 text-[10px] font-medium text-[#8892b0]">
+                            {c.floor}
+                          </span>
+                        )}
+                        <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${STAGE_TONE[c.stage].text} ${STAGE_TONE[c.stage].bg}`}>
+                          {c.stage}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-[#8892b0]">{ct.count} công tác</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-[#f0f2ff]">{fmtVND(ct.total)}đ</div>
+                      <div className="text-[10px] text-[#8892b0]">
+                        NC {fmtVND(ct.labor)} · VT {fmtVND(ct.material)} · MM {fmtVND(ct.equipment)}
                       </div>
                     </div>
-                  </div>
-                ))}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => addAmendmentRow("labor", "02")}
-                    className="w-full rounded-lg border border-dashed border-orange-500/40 bg-orange-500/5 px-2 py-1.5 text-xs font-medium text-orange-300 hover:bg-orange-500/10"
-                  >
-                    + Thêm dòng điều chỉnh
-                  </button>
+                    {!readOnly && (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEditComponent(c)}
+                          className="rounded-md p-1.5 text-xs text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
+                          title="Sửa cấu kiện"
+                        >✎</button>
+                        <button
+                          type="button"
+                          onClick={() => deleteComponent(c)}
+                          className="rounded-md p-1.5 text-xs text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300"
+                          title="Xóa cấu kiện"
+                        >✕</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {isExpanded && (
+                <div className="border-t border-[#252840] bg-[#0f1220]/40">
+                  {its.length === 0 && addingItemComp !== c.id && (
+                    <div className="px-4 py-3 text-xs text-[#8892b0]">Chưa có công tác. {!readOnly && "Bấm + để thêm."}</div>
+                  )}
+                  {its.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[#1a1d2e]/60 text-[10px] uppercase tracking-wider text-[#8892b0]">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Công tác</th>
+                            <th className="px-2 py-2 text-center">ĐV</th>
+                            <th className="px-2 py-2 text-right">KL</th>
+                            <th className="px-2 py-2 text-right text-blue-300">Giá NC</th>
+                            <th className="px-2 py-2 text-right text-emerald-300">Giá VT</th>
+                            <th className="px-2 py-2 text-right text-amber-300">Giá MM</th>
+                            <th className="px-2 py-2 text-right">Tổng</th>
+                            {!readOnly && <th className="px-2 py-2 w-16"></th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {its.map((it) =>
+                            editingItem === it.id ? (
+                              <ItemEditRow
+                                key={it.id}
+                                projectId={projectId}
+                                componentId={c.id}
+                                item={it}
+                                onDone={async () => { setEditingItem(null); await load(); }}
+                                onCancel={() => setEditingItem(null)}
+                              />
+                            ) : (
+                              <tr key={it.id} className="border-t border-[#252840] hover:bg-[#1a1d2e]/40">
+                                <td className="px-3 py-2 text-[#f0f2ff]">{it.name}{it.note && <div className="text-[10px] text-[#8892b0]">{it.note}</div>}</td>
+                                <td className="px-2 py-2 text-center text-[#8892b0]">{it.unit}</td>
+                                <td className="px-2 py-2 text-right text-[#f0f2ff]">{it.quantity.toLocaleString("vi-VN")}</td>
+                                <td className="px-2 py-2 text-right text-blue-200">{fmtVND(it.laborUnitPrice)}</td>
+                                <td className="px-2 py-2 text-right text-emerald-200">{fmtVND(it.materialUnitPrice)}</td>
+                                <td className="px-2 py-2 text-right text-amber-200">{fmtVND(it.equipmentUnitPrice)}</td>
+                                <td className="px-2 py-2 text-right font-semibold text-[#f0f2ff]">{fmtVND(it.amount)}đ</td>
+                                {!readOnly && (
+                                  <td className="px-2 py-2 text-right">
+                                    <div className="inline-flex items-center gap-1">
+                                      <button onClick={() => setEditingItem(it.id)} className="rounded p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]" title="Sửa">✎</button>
+                                      <button onClick={() => deleteItem(it)} className="rounded p-1 text-[#8892b0] hover:bg-rose-500/20 hover:text-rose-300" title="Xóa">✕</button>
+                                    </div>
+                                  </td>
+                                )}
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {addingItemComp === c.id ? (
+                    <ItemEditRow
+                      projectId={projectId}
+                      componentId={c.id}
+                      item={null}
+                      asNewRow
+                      onDone={async () => { setAddingItemComp(null); await load(); }}
+                      onCancel={() => setAddingItemComp(null)}
+                    />
+                  ) : (
+                    !readOnly && (
+                      <div className="border-t border-[#252840] px-3 py-2">
+                        <Button size="sm" variant="outline" onClick={() => setAddingItemComp(c.id)} className="text-xs">+ Thêm công tác</Button>
+                      </div>
+                    )
+                  )}
                 </div>
-              </div>
-              <div className="mt-3 flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAmendmentForm(false);
-                    setAmendmentReason("");
-                    setAmendmentRows([]);
-                  }}
-                >
-                  Hủy
-                </Button>
-                <Button onClick={submitAmendment}>Gửi đề xuất</Button>
-              </div>
+              )}
             </div>
-          )}
+          );
+        })}
 
-          <div className="mt-3 space-y-2">
-            {(data?.budget?.amendments ?? []).length === 0 ? (
-              <div className="text-xs text-[#5a6080]">Chưa có đề xuất nào.</div>
-            ) : (
-              data!.budget!.amendments.map((a) => (
-                <div key={a.id} className="rounded-xl bg-[#0f1220] p-3 ring-1 ring-[#252840]">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          a.status === "approved"
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : a.status === "rejected"
-                              ? "bg-rose-500/15 text-rose-300"
-                              : "bg-amber-500/15 text-amber-300"
-                        }`}
-                      >
-                        {a.status === "approved" ? "Đã duyệt" : a.status === "rejected" ? "Từ chối" : "Chờ duyệt"}
-                      </span>
-                      <span className="text-xs text-[#8892b0]">
-                        {a.proposedBy.fullName} · {new Date(a.createdAt).toLocaleString("vi-VN")}
-                      </span>
-                    </div>
-                    <div className={`text-sm font-bold ${a.deltaAmount >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
-                      {a.deltaAmount >= 0 ? "+" : ""}
-                      {fmtVND(a.deltaAmount)}đ
-                    </div>
-                  </div>
-                  <div className="mt-1 text-sm text-[#f0f2ff]">{a.reason}</div>
-                  <div className="mt-2 text-xs text-[#8892b0]">
-                    NC {a.deltaLabor >= 0 ? "+" : ""}
-                    {fmtVND(a.deltaLabor)} · VT {a.deltaMaterial >= 0 ? "+" : ""}
-                    {fmtVND(a.deltaMaterial)} · MM {a.deltaEquipment >= 0 ? "+" : ""}
-                    {fmtVND(a.deltaEquipment)}
-                  </div>
-                  {a.items.length > 0 && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-[#8892b0]">Chi tiết ({a.items.length})</summary>
-                      <ul className="mt-1 space-y-0.5 text-xs text-[#f0f2ff]">
-                        {a.items.map((it) => (
-                          <li key={it.id}>
-                            <span className="text-[#8892b0]">
-                              [{CATEGORY_LABEL[it.category]} · {it.phaseCode} {PHASE_CODE_SHORT[it.phaseCode]}]
-                            </span>{" "}
-                            {it.name}: {it.quantity} {it.unit} × {fmtVND(it.unitPrice)} = {fmtVND(it.amount)}đ
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                  {a.status === "rejected" && a.rejectReason && (
-                    <div className="mt-1 text-xs text-rose-300">Lý do từ chối: {a.rejectReason}</div>
-                  )}
-                  {a.status === "approved" && a.approvedBy && (
-                    <div className="mt-1 text-xs text-emerald-300">
-                      Duyệt bởi {a.approvedBy.fullName}
-                      {a.approvedAt && ` · ${new Date(a.approvedAt).toLocaleString("vi-VN")}`}
-                    </div>
-                  )}
-                  {a.status === "draft" && canApprove && (
-                    <div className="mt-2 flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => decideAmendment(a.id, "reject")}>
-                        Từ chối
-                      </Button>
-                      <Button onClick={() => decideAmendment(a.id, "approve")}>Duyệt</Button>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
+        {/* Add component form */}
+        {addingCompStage === activeStage ? (
+          <div className="rounded-2xl border border-dashed border-orange-500/40 bg-[#1a1d2e] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={newCompName}
+                onChange={(e) => setNewCompName(e.target.value)}
+                placeholder="Tên cấu kiện (vd: Móng, Cột T1, Tường bao T2…)"
+                className="min-w-[200px] flex-1 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+                autoFocus
+              />
+              <input
+                value={newCompFloor}
+                onChange={(e) => setNewCompFloor(e.target.value)}
+                placeholder="Tầng (T1/T2/ST… để trống nếu không tầng)"
+                className="w-56 rounded-md bg-[#0f1220] px-3 py-1.5 text-sm text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500"
+              />
+              <Button size="sm" onClick={createComponent} disabled={savingFlag || !newCompName.trim()} className="bg-orange-600 hover:bg-orange-500">Tạo</Button>
+              <Button size="sm" variant="outline" onClick={() => { setAddingCompStage(null); setNewCompName(""); setNewCompFloor(""); }}>Hủy</Button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Modal sub-task */}
-      {modalRow && (
-        <BreakdownModal
-          row={modalRow}
-          readOnly={readOnly}
-          onClose={() => setBreakdownModalLocal(null)}
-          onAdd={() => addBreakdownToRow(modalRow._local!)}
-          onUpdate={(bLocal, patch) => updateBreakdown(modalRow._local!, bLocal, patch)}
-          onRemove={(bLocal) => removeBreakdown(modalRow._local!, bLocal)}
-        />
-      )}
-    </div>
-  );
-}
-
-type BranchTasksProps = {
-  phase: PhaseCode;
-  category: Category;
-  rows: ItemRow[];
-  readOnly: boolean;
-  onAdd: () => void;
-  onUpdate: (local: string, patch: Partial<ItemRow>) => void;
-  onRemove: (local: string) => void;
-  onOpenBreakdown: (local: string) => void;
-};
-
-function BranchTasks({ phase, category, rows, readOnly, onAdd, onUpdate, onRemove, onOpenBreakdown }: BranchTasksProps) {
-  const t = CAT_TONE[category];
-  return (
-    <div className={`border-t border-[#252840] ${t.bg} px-3 py-3`}>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-[11px] uppercase tracking-wider text-[#8892b0]">
-          <span className={t.text}>{CAT_SHORT[category]}</span> trong{" "}
-          <span className="text-[#c0c8e0]">{phase} {PHASE_CODE_SHORT[phase]}</span> — {rows.length} hạng mục
-        </div>
-      </div>
-      {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220]/50 px-3 py-4 text-center text-xs text-[#5a6080]">
-          Chưa có hạng mục.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {rows.map((r) => (
-            <TaskRow
-              key={r._local}
-              row={r}
-              readOnly={readOnly}
-              onUpdate={(patch) => onUpdate(r._local!, patch)}
-              onRemove={() => onRemove(r._local!)}
-              onOpenBreakdown={() => onOpenBreakdown(r._local!)}
-            />
-          ))}
-        </div>
-      )}
-      {!readOnly && (
-        <button
-          type="button"
-          onClick={onAdd}
-          className={`mt-2 w-full rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium ${t.text} ${t.ring} ${t.bg} hover:opacity-90`}
-        >
-          + Thêm hạng mục {CAT_SHORT[category]} vào {PHASE_CODE_SHORT[phase]}
-        </button>
-      )}
-    </div>
-  );
-}
-
-type TaskRowProps = {
-  row: ItemRow;
-  readOnly: boolean;
-  onUpdate: (patch: Partial<ItemRow>) => void;
-  onRemove: () => void;
-  onOpenBreakdown: () => void;
-};
-
-function TaskRow({ row, readOnly, onUpdate, onRemove, onOpenBreakdown }: TaskRowProps) {
-  const hasBreakdown = row.breakdown.length > 0;
-  const qty = effectiveQty(row);
-  const amount = Math.round(qty * row.unitPrice);
-
-  return (
-    <div className="rounded-lg bg-[#0f1220] p-2 ring-1 ring-[#252840]">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onOpenBreakdown}
-          className={`shrink-0 grid h-7 w-7 place-items-center rounded text-xs ${
-            hasBreakdown
-              ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/40"
-              : "bg-[#1a1d2e] text-[#5a6080] ring-1 ring-[#252840] hover:text-orange-300"
-          }`}
-          title={hasBreakdown ? `${row.breakdown.length} công tác con` : "Mở để thêm công tác con"}
-        >
-          {hasBreakdown ? row.breakdown.length : "+"}
-        </button>
-        <div className="min-w-0 flex-1">
-          {readOnly ? (
-            <button
-              type="button"
-              onClick={onOpenBreakdown}
-              className="block w-full truncate text-left text-sm font-medium text-[#f0f2ff] hover:text-orange-300"
-            >
-              {row.name || "(chưa có tên)"}
-            </button>
-          ) : (
-            <input
-              className="w-full rounded bg-[#1a1d2e] px-2 py-1 text-sm font-medium text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-              value={row.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              placeholder="Tên hạng mục"
-            />
-          )}
-        </div>
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm(`Xoá hạng mục "${row.name || "(chưa có tên)"}"? Hành động này sẽ xoá luôn cả công tác con khi bấm Lưu.`)) {
-                onRemove();
-              }
-            }}
-            className="shrink-0 rounded bg-rose-500/10 px-1.5 py-1 text-[10px] font-medium text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
-            title="Xoá hạng mục"
-          >
-            ×
-          </button>
+        ) : (
+          !readOnly && (
+            <Button onClick={() => setAddingCompStage(activeStage)} variant="outline" className="w-full border-dashed">
+              + Thêm cấu kiện vào stage {STAGE_LABEL[activeStage]}
+            </Button>
+          )
         )}
       </div>
-      <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-        <Cell label="ĐV">
-          {readOnly ? (
-            <span className="text-xs text-[#f0f2ff]">{row.unit}</span>
-          ) : (
-            <input
-              className="w-full bg-transparent text-xs text-[#f0f2ff] outline-none"
-              value={row.unit}
-              onChange={(e) => onUpdate({ unit: e.target.value })}
-              placeholder="m³"
-            />
-          )}
-        </Cell>
-        <Cell label={hasBreakdown ? "KL (tự cộng)" : "KL"}>
-          {readOnly || hasBreakdown ? (
-            <span
-              className={`text-xs ${hasBreakdown ? "text-orange-300" : "text-[#f0f2ff]"}`}
-              title={hasBreakdown ? "Tự cộng từ công tác con" : undefined}
-            >
-              {qty}
-            </span>
-          ) : (
-            <input
-              type="number"
-              step="0.001"
-              className="w-full bg-transparent text-right text-xs text-[#f0f2ff] outline-none"
-              value={row.quantity || ""}
-              onChange={(e) => onUpdate({ quantity: Number(e.target.value) || 0 })}
-            />
-          )}
-        </Cell>
-        <Cell label="Đơn giá">
-          {readOnly ? (
-            <span className="text-xs text-[#f0f2ff]">{fmtVND(row.unitPrice)}</span>
-          ) : (
-            <input
-              type="number"
-              step="1000"
-              className="w-full bg-transparent text-right text-xs text-[#f0f2ff] outline-none"
-              value={row.unitPrice || ""}
-              onChange={(e) => onUpdate({ unitPrice: Math.round(Number(e.target.value) || 0) })}
-            />
-          )}
-        </Cell>
-        <Cell label="Thành tiền" emphasize>
-          <span className="text-xs font-semibold text-orange-300">{fmtVND(amount)}đ</span>
-        </Cell>
-      </div>
+
+      {locked && (
+        <div className="rounded-xl bg-emerald-500/5 p-3 text-xs text-emerald-200/80 ring-1 ring-emerald-500/20">
+          Dự toán đã chốt — chỉ xem. Để chỉnh sửa phải tạo phiếu điều chỉnh (chức năng đang hoàn thiện).
+        </div>
+      )}
     </div>
   );
 }
 
-function Cell({ label, children, emphasize }: { label: string; children: React.ReactNode; emphasize?: boolean }) {
-  return (
-    <div
-      className={`rounded px-1.5 py-0.5 ring-1 ${
-        emphasize ? "bg-orange-500/5 ring-orange-500/30" : "bg-[#1a1d2e] ring-[#252840]"
-      }`}
-    >
-      <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">{label}</div>
-      <div className="text-right">{children}</div>
-    </div>
-  );
-}
-
-type BreakdownModalProps = {
-  row: ItemRow;
-  readOnly: boolean;
-  onClose: () => void;
-  onAdd: () => void;
-  onUpdate: (bLocal: string, patch: Partial<BreakdownRow>) => void;
-  onRemove: (bLocal: string) => void;
+// ============================================================
+// ItemEditRow: dùng cho cả add (asNewRow) và edit
+// ============================================================
+type ItemEditRowProps = {
+  projectId: string;
+  componentId: string;
+  item: Item | null;
+  asNewRow?: boolean;
+  onDone: () => Promise<void> | void;
+  onCancel: () => void;
 };
 
-function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: BreakdownModalProps) {
-  const qty = effectiveQty(row);
-  const amount = Math.round(qty * row.unitPrice);
-  return (
-    <div
-      data-budget-modal
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#252840] p-4">
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider text-[#5a6080]">
-              Công tác con · {row.phaseCode} {PHASE_CODE_SHORT[row.phaseCode]} · {CATEGORY_LABEL[row.category]}
-            </div>
-            <div className="mt-0.5 truncate text-base font-semibold text-[#f0f2ff]">{row.name || "(chưa có tên)"}</div>
-            <div className="mt-1 text-xs text-[#8892b0]">
-              Tổng KL: <span className="font-semibold text-orange-300">{qty}</span> {row.unit} · Thành tiền:{" "}
-              <span className="font-semibold text-orange-300">{fmtVND(amount)}đ</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded bg-[#0f1220] px-2 py-1 text-sm text-[#8892b0] ring-1 ring-[#252840] hover:text-white"
-          >
-            ✕
-          </button>
-        </div>
+function ItemEditRow({ projectId, componentId, item, asNewRow, onDone, onCancel }: ItemEditRowProps) {
+  const [name, setName] = useState(item?.name ?? "");
+  const [unit, setUnit] = useState(item?.unit ?? "");
+  const [quantity, setQuantity] = useState<string>(item ? String(item.quantity) : "");
+  const [labor, setLabor] = useState<string>(item ? String(item.laborUnitPrice) : "0");
+  const [material, setMaterial] = useState<string>(item ? String(item.materialUnitPrice) : "0");
+  const [equipment, setEquipment] = useState<string>(item ? String(item.equipmentUnitPrice) : "0");
+  const [note, setNote] = useState(item?.note ?? "");
+  const [saving, setSaving] = useState(false);
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {row.breakdown.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220] px-3 py-6 text-center text-xs text-[#5a6080]">
-              Chưa có công tác con. Nhập trực tiếp KL ở dòng cha, hoặc thêm con bên dưới.
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {row.breakdown.map((b, idx) => (
-                <div key={b._local} className="rounded-lg bg-[#0f1220] p-2 ring-1 ring-[#252840]">
-                  <div className="flex items-center gap-2">
-                    <span className="shrink-0 text-[10px] text-[#5a6080]">#{idx + 1}</span>
-                    {readOnly ? (
-                      <span className="flex-1 truncate text-sm text-[#f0f2ff]">{b.name}</span>
-                    ) : (
-                      <input
-                        className="flex-1 rounded bg-[#1a1d2e] px-2 py-1 text-sm text-[#f0f2ff] outline-none ring-1 ring-[#252840] focus:ring-orange-500"
-                        value={b.name}
-                        onChange={(e) => onUpdate(b._local, { name: e.target.value })}
-                        placeholder="Tên công tác con (VD: Trục A / Cọc 1)"
-                      />
-                    )}
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`Xoá công tác con "${b.name || "(chưa có tên)"}"?`)) {
-                            onRemove(b._local);
-                          }
-                        }}
-                        className="shrink-0 rounded bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
-                        title="Xoá công tác con"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                    <div className="rounded bg-[#1a1d2e] px-2 py-1 ring-1 ring-[#252840]">
-                      <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">Khối lượng</div>
-                      {readOnly ? (
-                        <div className="text-right text-xs text-[#f0f2ff]">{b.quantity} {row.unit}</div>
-                      ) : (
-                        <input
-                          type="number"
-                          step="0.001"
-                          className="w-full bg-transparent text-right text-xs text-[#f0f2ff] outline-none"
-                          value={b.quantity || ""}
-                          onChange={(e) => onUpdate(b._local, { quantity: Number(e.target.value) || 0 })}
-                        />
-                      )}
-                    </div>
-                    <div className="rounded bg-[#1a1d2e] px-2 py-1 ring-1 ring-[#252840]">
-                      <div className="text-[9px] uppercase tracking-wide text-[#5a6080]">Ghi chú</div>
-                      {readOnly ? (
-                        <div className="text-[11px] text-[#8892b0]">{b.note || "—"}</div>
-                      ) : (
-                        <input
-                          className="w-full bg-transparent text-[11px] text-[#f0f2ff] outline-none"
-                          value={b.note ?? ""}
-                          onChange={(e) => onUpdate(b._local, { note: e.target.value })}
-                          placeholder="(tuỳ chọn)"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {!readOnly && (
-            <button
-              type="button"
-              onClick={onAdd}
-              className="mt-2 w-full rounded-lg border border-dashed border-orange-500/40 bg-orange-500/5 px-3 py-2 text-xs font-medium text-orange-300 hover:bg-orange-500/10"
-            >
-              + Thêm công tác con
-            </button>
-          )}
-        </div>
+  const qty = Number(quantity) || 0;
+  const lp = Number(labor) || 0;
+  const mp = Number(material) || 0;
+  const ep = Number(equipment) || 0;
+  const total = Math.round(qty * lp) + Math.round(qty * mp) + Math.round(qty * ep);
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-[#252840] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button onClick={onClose}>Xong</Button>
+  async function save() {
+    if (!name.trim() || !unit.trim() || qty <= 0) {
+      toast.error("Cần tên + đơn vị + khối lượng > 0");
+      return;
+    }
+    setSaving(true);
+    try {
+      const url = item
+        ? `/api/projects/${projectId}/budget/items/${item.id}`
+        : `/api/projects/${projectId}/budget/items`;
+      const method = item ? "PATCH" : "POST";
+      const body = {
+        ...(item ? {} : { componentId }),
+        name: name.trim(),
+        unit: unit.trim(),
+        quantity: qty,
+        laborUnitPrice: lp,
+        materialUnitPrice: mp,
+        equipmentUnitPrice: ep,
+        note: note.trim() || null,
+      };
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || "Lưu thất bại");
+        return;
+      }
+      toast.success(item ? "Đã sửa" : "Đã thêm");
+      await onDone();
+    } finally { setSaving(false); }
+  }
+
+  const inputCls = "w-full rounded-md bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] ring-1 ring-[#252840] focus:outline-none focus:ring-orange-500";
+
+  if (asNewRow) {
+    return (
+      <div className="border-t border-orange-500/30 bg-orange-500/5 p-3">
+        <div className="grid grid-cols-12 gap-2">
+          <input className={`${inputCls} col-span-5`} placeholder="Tên công tác" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <input className={`${inputCls} col-span-1`} placeholder="ĐV" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <input className={`${inputCls} col-span-2`} placeholder="KL" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="NC" type="number" value={labor} onChange={(e) => setLabor(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="VT" type="number" value={material} onChange={(e) => setMaterial(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="MM" type="number" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
+          <div className="col-span-1 flex items-center justify-end text-xs font-semibold text-[#f0f2ff]">{fmtVND(total)}</div>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input className={`${inputCls} flex-1`} placeholder="Ghi chú (tùy chọn)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button size="sm" onClick={save} disabled={saving} className="bg-orange-600 hover:bg-orange-500">Thêm</Button>
+          <Button size="sm" variant="outline" onClick={onCancel}>Hủy</Button>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <tr className="border-t border-orange-500/30 bg-orange-500/5">
+      <td colSpan={8} className="p-3">
+        <div className="grid grid-cols-12 gap-2">
+          <input className={`${inputCls} col-span-5`} placeholder="Tên công tác" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <input className={`${inputCls} col-span-1`} placeholder="ĐV" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <input className={`${inputCls} col-span-2`} placeholder="KL" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="NC" type="number" value={labor} onChange={(e) => setLabor(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="VT" type="number" value={material} onChange={(e) => setMaterial(e.target.value)} />
+          <input className={`${inputCls} col-span-1`} placeholder="MM" type="number" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
+          <div className="col-span-1 flex items-center justify-end text-xs font-semibold text-[#f0f2ff]">{fmtVND(total)}</div>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input className={`${inputCls} flex-1`} placeholder="Ghi chú" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button size="sm" onClick={save} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">Lưu</Button>
+          <Button size="sm" variant="outline" onClick={onCancel}>Hủy</Button>
+        </div>
+      </td>
+    </tr>
   );
 }
