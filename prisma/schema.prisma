@@ -693,6 +693,7 @@ model Project {
   materialProposals         MaterialProposal[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
+  projectComponents         ProjectComponent[]
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
   workOrderOutputs          WorkOrderOutput[]
@@ -2870,6 +2871,14 @@ enum BudgetPhase {
   mai
 }
 
+// 4 stage chuẩn cho dự toán theo cấu kiện (SOP-47)
+enum BudgetStage {
+  CB // Chuẩn bị
+  N  // Ngầm
+  T  // Thô
+  HT // Hoàn thiện
+}
+
 enum BudgetStatus {
   draft
   locked
@@ -2910,14 +2919,14 @@ model ProjectBudgetItem {
   id             String         @id @default(uuid()) @db.Uuid
   budgetId       String         @map("budget_id") @db.Uuid
   category       BudgetCategory
-  phase          BudgetPhase // DEPRECATED — giữ tạm cho compat; truy vấn mới dùng phaseCode
-  phaseCode      String         @default("02") @map("phase_code") @db.VarChar(2) // "01".."09" khớp StandardTaskCatalog
-  standardTaskId String?        @map("standard_task_id") @db.Uuid
+  phase          BudgetPhase // DEPRECATED — giữ tạm cho compat; truy vấn mới dùng stage
+  phaseCode      String         @default("02") @map("phase_code") @db.VarChar(2) // DEPRECATED — dùng stage
+  standardTaskId String?        @map("standard_task_id") @db.Uuid // DEPRECATED — mã catalog không còn cố định
   name           String
   unit           String         @db.VarChar(20)
   quantity       Decimal        @db.Decimal(14, 3)
-  unitPrice      BigInt         @map("unit_price")
-  amount         BigInt
+  unitPrice      BigInt         @map("unit_price") // DEPRECATED — dùng laborUnitPrice/materialUnitPrice/equipmentUnitPrice
+  amount         BigInt // tổng giá vốn item = labor + material + equipment (khi dùng model mới)
   note           String?
   sortRank       Float          @default(0) @map("sort_rank")
   qcChecklist    Json?          @map("qc_checklist")
@@ -2925,14 +2934,46 @@ model ProjectBudgetItem {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
+  // Cấu kiện-centric model (SOP-47 v2)
+  componentId        String?      @map("component_id") @db.Uuid
+  stage              BudgetStage?
+  laborUnitPrice     BigInt       @default(0) @map("labor_unit_price")
+  laborAmount        BigInt       @default(0) @map("labor_amount")
+  materialUnitPrice  BigInt       @default(0) @map("material_unit_price")
+  materialAmount     BigInt       @default(0) @map("material_amount")
+  equipmentUnitPrice BigInt       @default(0) @map("equipment_unit_price")
+  equipmentAmount    BigInt       @default(0) @map("equipment_amount")
+
   budget       ProjectBudget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   standardTask StandardTaskCatalog? @relation(fields: [standardTaskId], references: [id], onDelete: SetNull)
+  component    ProjectComponent?    @relation(fields: [componentId], references: [id], onDelete: SetNull)
   workOrders   WorkOrder[]
 
   @@index([budgetId, category, phaseCode])
   @@index([budgetId, category, phase])
   @@index([standardTaskId])
+  @@index([componentId])
+  @@index([budgetId, stage])
   @@map("project_budget_items")
+}
+
+// Cấu kiện vật lý (móng, cột T1, tường bao T2…) — đơn vị bóc KL & dự toán
+model ProjectComponent {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @map("project_id") @db.Uuid
+  stage     BudgetStage
+  name      String
+  floor     String?     @db.VarChar(8) // T1/T2/ST/M…; null cho cấu kiện không tầng
+  sortOrder Int         @default(0) @map("sort_order")
+  note      String?
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   ProjectBudgetItem[]
+
+  @@index([projectId, stage, sortOrder])
+  @@map("project_components")
 }
 
 model ProjectBudgetAmendment {

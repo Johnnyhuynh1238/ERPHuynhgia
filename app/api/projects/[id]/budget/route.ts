@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BudgetCategory, BudgetPhase, BudgetStatus, Prisma } from "@prisma/client";
+import { BudgetCategory, BudgetPhase, BudgetStage, BudgetStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -57,9 +57,31 @@ type SerializedItem = {
   note: string | null;
   sortRank: number;
   breakdown: SerializedBreakdownItem[];
+  // SOP-47 v2: cấu kiện-centric
+  componentId: string | null;
+  stage: BudgetStage | null;
+  laborUnitPrice: number;
+  laborAmount: number;
+  materialUnitPrice: number;
+  materialAmount: number;
+  equipmentUnitPrice: number;
+  equipmentAmount: number;
 };
 
-type SerializedAmendmentItem = Omit<SerializedItem, "sortRank" | "breakdown" | "standardTaskId">;
+type SerializedAmendmentItem = Omit<
+  SerializedItem,
+  | "sortRank"
+  | "breakdown"
+  | "standardTaskId"
+  | "componentId"
+  | "stage"
+  | "laborUnitPrice"
+  | "laborAmount"
+  | "materialUnitPrice"
+  | "materialAmount"
+  | "equipmentUnitPrice"
+  | "equipmentAmount"
+>;
 
 function normalizeBreakdown(raw: Prisma.JsonValue | null | undefined): SerializedBreakdownItem[] {
   if (!Array.isArray(raw)) return [];
@@ -90,6 +112,14 @@ function serializeItem(item: {
   note: string | null;
   sortRank: number;
   breakdown: Prisma.JsonValue | null;
+  componentId: string | null;
+  stage: BudgetStage | null;
+  laborUnitPrice: bigint;
+  laborAmount: bigint;
+  materialUnitPrice: bigint;
+  materialAmount: bigint;
+  equipmentUnitPrice: bigint;
+  equipmentAmount: bigint;
 }): SerializedItem {
   return {
     id: item.id,
@@ -105,6 +135,14 @@ function serializeItem(item: {
     note: item.note,
     sortRank: item.sortRank,
     breakdown: normalizeBreakdown(item.breakdown),
+    componentId: item.componentId,
+    stage: item.stage,
+    laborUnitPrice: Number(item.laborUnitPrice),
+    laborAmount: Number(item.laborAmount),
+    materialUnitPrice: Number(item.materialUnitPrice),
+    materialAmount: Number(item.materialAmount),
+    equipmentUnitPrice: Number(item.equipmentUnitPrice),
+    equipmentAmount: Number(item.equipmentAmount),
   };
 }
 
@@ -147,10 +185,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   });
   if (!project) return NextResponse.json({ message: "Không có quyền hoặc dự án không tồn tại" }, { status: 403 });
 
+  const components = await prisma.projectComponent.findMany({
+    where: { projectId: params.id },
+    orderBy: [{ stage: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
   const budget = await prisma.projectBudget.findUnique({
     where: { projectId: params.id },
     include: {
-      items: { orderBy: [{ category: "asc" }, { phaseCode: "asc" }, { sortRank: "asc" }] },
+      items: { orderBy: [{ stage: "asc" }, { sortRank: "asc" }, { category: "asc" }] },
       createdBy: { select: { id: true, fullName: true } },
       lockedBy: { select: { id: true, fullName: true } },
       amendments: {
@@ -169,6 +212,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       ...project,
       contractValue: project.contractValue ? Number(project.contractValue) : null,
     },
+    components: components.map((c) => ({
+      id: c.id,
+      stage: c.stage,
+      name: c.name,
+      floor: c.floor,
+      sortOrder: c.sortOrder,
+      note: c.note,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })),
     budget: budget
       ? {
           id: budget.id,

@@ -1,6 +1,28 @@
 export const BUDGET_CATEGORIES = ["labor", "material", "equipment"] as const;
 export const BUDGET_PHASES = ["mong", "than", "mai"] as const;
 
+// 4 stage chuẩn cho dự toán theo cấu kiện (SOP-47 v2)
+export const BUDGET_STAGES = ["CB", "N", "T", "HT"] as const;
+export type BudgetStageCode = (typeof BUDGET_STAGES)[number];
+
+export const STAGE_LABEL: Record<BudgetStageCode, string> = {
+  CB: "Chuẩn bị",
+  N: "Ngầm",
+  T: "Thô",
+  HT: "Hoàn thiện",
+};
+
+export const STAGE_DESCRIPTION: Record<BudgetStageCode, string> = {
+  CB: "Lán trại, điện nước thi công, mặt bằng",
+  N: "Móng, bể phốt, ngầm MEP, đất đắp",
+  T: "Cột, dầm, sàn, cầu thang, tường bao, mái, MEP thân",
+  HT: "Tô trát, chống thấm, ốp lát, trần, sơn, cửa, MEP nổi, bàn giao",
+};
+
+export function isBudgetStage(value: unknown): value is BudgetStageCode {
+  return typeof value === "string" && (BUDGET_STAGES as readonly string[]).includes(value);
+}
+
 export const CATEGORY_LABEL: Record<(typeof BUDGET_CATEGORIES)[number], string> = {
   labor: "Nhân công",
   material: "Vật tư",
@@ -115,6 +137,62 @@ export function canLockBudget(user: UserCtx): boolean {
 
 export function canProposeAmendment(user: UserCtx): boolean {
   return EDITOR_ROLES.includes(user.role);
+}
+
+type PrismaTx = {
+  projectBudgetItem: {
+    aggregate: (args: {
+      where: { budgetId: string };
+      _sum: { laborAmount: true; materialAmount: true; equipmentAmount: true; amount: true };
+    }) => Promise<{
+      _sum: {
+        laborAmount: bigint | null;
+        materialAmount: bigint | null;
+        equipmentAmount: bigint | null;
+        amount: bigint | null;
+      };
+    }>;
+  };
+  projectBudget: {
+    update: (args: {
+      where: { id: string };
+      data: {
+        totalLabor: bigint;
+        totalMaterial: bigint;
+        totalEquipment: bigint;
+        totalAmount: bigint;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+// Tính lại tổng budget từ 3 cột giá NC/VT/MM mới (SOP-47 v2).
+// Legacy items có laborAmount/materialAmount/equipmentAmount = 0 sẽ contribute 0;
+// dùng sau khi đã migrate hết items sang model cấu kiện.
+export async function recomputeBudgetTotals(tx: PrismaTx, budgetId: string) {
+  const agg = await tx.projectBudgetItem.aggregate({
+    where: { budgetId },
+    _sum: { laborAmount: true, materialAmount: true, equipmentAmount: true, amount: true },
+  });
+  const labor = agg._sum.laborAmount ?? BigInt(0);
+  const material = agg._sum.materialAmount ?? BigInt(0);
+  const equipment = agg._sum.equipmentAmount ?? BigInt(0);
+  const total = agg._sum.amount ?? BigInt(0);
+  await tx.projectBudget.update({
+    where: { id: budgetId },
+    data: {
+      totalLabor: labor,
+      totalMaterial: material,
+      totalEquipment: equipment,
+      totalAmount: total,
+    },
+  });
+  return {
+    totalLabor: Number(labor),
+    totalMaterial: Number(material),
+    totalEquipment: Number(equipment),
+    totalAmount: Number(total),
+  };
 }
 
 export function canApproveAmendment(user: UserCtx): boolean {
