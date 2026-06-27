@@ -96,7 +96,8 @@ export function ProjectBudgetClient({
 }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
-  const [activeStage, setActiveStage] = useState<BudgetStageCode>("N");
+  const [view, setView] = useState<"overview" | BudgetStageCode>("overview");
+  const activeStage: BudgetStageCode = view === "overview" ? "N" : view;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // forms
@@ -326,37 +327,76 @@ export function ProjectBudgetClient({
         </div>
       </div>
 
-      {/* Stage tabs */}
-      <div className="grid grid-cols-4 gap-2">
-        {BUDGET_STAGES.map((s) => {
-          const t = stageTotals.get(s)!;
-          const tone = STAGE_TONE[s];
-          const active = activeStage === s;
-          return (
-            <button
-              key={s}
-              onClick={() => setActiveStage(s)}
-              className={`rounded-2xl border p-3 text-left transition ${
-                active
-                  ? `border-transparent ${tone.activeBg} ring-2 ${tone.ring}`
-                  : `border-[#252840] bg-[#1a1d2e] hover:${tone.bg} hover:ring-1 hover:${tone.ring}`
-              }`}
-            >
-              <div className={`text-[10px] uppercase tracking-wider ${tone.text}`}>{s}</div>
-              <div className="mt-0.5 text-sm font-semibold text-[#f0f2ff]">{STAGE_LABEL[s]}</div>
-              <div className="mt-1 text-[11px] text-[#8892b0]">{t.compCount} cấu kiện · {t.itemCount} công tác</div>
-              <div className="mt-1 text-sm font-bold text-[#f0f2ff]">{fmtVND(t.total)}đ</div>
-            </button>
-          );
-        })}
-      </div>
+      {/* OVERVIEW: 4 stage cards lớn */}
+      {view === "overview" && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {BUDGET_STAGES.map((s) => {
+            const t = stageTotals.get(s)!;
+            const tone = STAGE_TONE[s];
+            return (
+              <button
+                key={s}
+                onClick={() => setView(s)}
+                className={`group rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-left transition hover:border-transparent hover:${tone.activeBg} hover:ring-2 hover:${tone.ring}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center justify-center rounded-lg ${tone.bg} px-2 py-0.5 text-xs font-bold ${tone.text} ring-1 ${tone.ring}`}>
+                        {s}
+                      </span>
+                      <span className="text-base font-semibold text-[#f0f2ff]">{STAGE_LABEL[s]}</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-[#8892b0]">{STAGE_DESCRIPTION[s]}</p>
+                    <div className="mt-3 text-[11px] text-[#8892b0]">{t.compCount} cấu kiện · {t.itemCount} công tác</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-xl font-bold text-[#f0f2ff]">{fmtVND(t.total)}<span className="text-sm">đ</span></div>
+                    <div className="mt-2 space-y-0.5 text-[10px]">
+                      <div className="text-blue-300">NC <span className="font-semibold">{fmtVND(t.labor)}</span></div>
+                      <div className="text-emerald-300">VT <span className="font-semibold">{fmtVND(t.material)}</span></div>
+                      <div className="text-amber-300">MM <span className="font-semibold">{fmtVND(t.equipment)}</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-1 text-xs text-[#8892b0] transition group-hover:text-[#f0f2ff]">
+                  Mở chi tiết <span className="transition group-hover:translate-x-0.5">→</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Stage description */}
-      <div className="rounded-xl bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] ring-1 ring-[#252840]">
-        <span className={STAGE_TONE[activeStage].text}>{activeStage} — {STAGE_LABEL[activeStage]}</span> · {STAGE_DESCRIPTION[activeStage]}
-      </div>
+      {/* STAGE DETAIL: back + stage info */}
+      {view !== "overview" && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setView("overview")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#252840] px-3 py-1.5 text-xs font-medium text-[#f0f2ff] hover:bg-[#2f334a]"
+            >
+              ← Quay lại tổng quan
+            </button>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center justify-center rounded-md ${STAGE_TONE[activeStage].bg} px-2 py-0.5 font-bold ${STAGE_TONE[activeStage].text} ring-1 ${STAGE_TONE[activeStage].ring}`}>
+                {activeStage}
+              </span>
+              <span className="text-sm font-semibold text-[#f0f2ff]">{STAGE_LABEL[activeStage]}</span>
+              <span className="text-[#8892b0]">·</span>
+              <span className="font-bold text-[#f0f2ff]">{fmtVND(stageTotals.get(activeStage)!.total)}đ</span>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0] ring-1 ring-[#252840]">
+            {STAGE_DESCRIPTION[activeStage]}
+          </div>
+        </>
+      )}
 
       {/* Components list for active stage */}
+      {view !== "overview" && (
       <div className="space-y-3">
         {stageComponents.length === 0 && addingCompStage !== activeStage && (
           <div className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e]/50 p-6 text-center text-sm text-[#8892b0]">
@@ -547,6 +587,7 @@ export function ProjectBudgetClient({
           )
         )}
       </div>
+      )}
 
       {locked && (
         <div className="rounded-xl bg-emerald-500/5 p-3 text-xs text-emerald-200/80 ring-1 ring-emerald-500/20">
