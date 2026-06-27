@@ -25,7 +25,7 @@ type Txn = {
   amount: number;
   occurredAt: string;
   balanceAfter: number;
-  refType: "opening" | "expense" | "sub_payment" | "material_proposal" | "payment_schedule";
+  refType: "opening" | "expense" | "sub_payment" | "material_proposal" | "payment_schedule" | "receipt";
   refId: string | null;
   note: string | null;
   createdAt: string;
@@ -56,6 +56,7 @@ const REFTYPE_LABEL: Record<Txn["refType"], string> = {
   sub_payment: "TT thầu phụ",
   material_proposal: "Đề xuất vật tư",
   payment_schedule: "Thu chủ nhà",
+  receipt: "Lệnh thu",
 };
 const REFTYPE_CHIP: Record<Txn["refType"], string> = {
   opening: "bg-slate-500/15 text-slate-300",
@@ -63,6 +64,7 @@ const REFTYPE_CHIP: Record<Txn["refType"], string> = {
   sub_payment: "bg-purple-500/15 text-purple-300",
   material_proposal: "bg-cyan-500/15 text-cyan-300",
   payment_schedule: "bg-emerald-500/15 text-emerald-300",
+  receipt: "bg-green-500/15 text-green-300",
 };
 
 export function TreasuryClient({
@@ -229,6 +231,7 @@ export function TreasuryClient({
         >
           <option value="">Mọi loại</option>
           <option value="payment_schedule">Thu chủ nhà</option>
+          <option value="receipt">Lệnh thu</option>
           <option value="expense">Lệnh chi</option>
           <option value="sub_payment">TT thầu phụ</option>
           <option value="material_proposal">Đề xuất vật tư</option>

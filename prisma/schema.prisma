@@ -391,6 +391,20 @@ enum CashTxnRefType {
   sub_payment
   material_proposal
   payment_schedule
+  receipt
+}
+
+enum ReceiptSource {
+  customer
+  loan
+  advance_return
+  other
+}
+
+enum ReceiptStatus {
+  pending
+  received
+  cancelled
 }
 
 enum ExpenseStatus {
@@ -418,117 +432,120 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  managedProjects                 Project[]                   @relation("ProjectManager")
-  engineeredProjects              Project[]                   @relation("MainEngineer")
-  assignedEngineerFor             Task[]                      @relation("AssignedEngineer")
-  assignedForemanFor              Task[]                      @relation("AssignedForeman")
-  taskLogs                        TaskLog[]
-  taskPhotos                      TaskPhoto[]
-  qcItems                         QcItem[]
-  qcProgressUpdates               QcProgress[]                @relation("QcProgressUpdatedBy")
-  qcPhotos                        QcPhoto[]
-  qcLogs                          QcLog[]
-  qcReviews                       QcReview[]
-  taskQcLogs                      TaskQcLog[]                 @relation("TaskQcLogChecker")
-  taskProgressHistories           TaskProgressHistory[]       @relation("TaskProgressUpdatedBy")
-  taskQcResultsChecked            TaskQcResult[]              @relation("TaskQcResultCheckedBy")
-  taskActivityLogs                TaskActivityLog[]           @relation("TaskActivityActor")
-  internalApprovedTasks           Task[]                      @relation("TaskInternalApprover")
-  projectMembers                  ProjectMember[]
-  addedProjectMembers             ProjectMember[]             @relation("ProjectMemberAddedBy")
-  projectAssignments              ProjectMemberAssignment[]   @relation("ProjectAssignmentUser")
-  projectAssignmentsAssigned      ProjectMemberAssignment[]   @relation("ProjectAssignmentAssigner")
-  declaredSiteRestDays            SiteRestDay[]
-  morningCheckins                 MorningCheckin[]            @relation("MorningCheckinUser")
-  morningReports                  MorningReport[]
-  eveningReports                  EveningReport[]
-  technicalReportCreator          TaskTechnicalReport[]       @relation("TechReportCreator")
-  technicalReportUpdater          TaskTechnicalReport[]       @relation("TechReportUpdater")
-  materialReportCreator           TaskMaterialReport[]        @relation("MatReportCreator")
-  materialReportUpdater           TaskMaterialReport[]        @relation("MatReportUpdater")
-  laborReportCreator              TaskLaborReport[]           @relation("LaborReportCreator")
-  laborReportUpdater              TaskLaborReport[]           @relation("LaborReportUpdater")
-  equipmentReportCreator          TaskEquipmentReport[]       @relation("EquipReportCreator")
-  equipmentReportUpdater          TaskEquipmentReport[]       @relation("EquipReportUpdater")
-  technicalAttachmentsUploaded    TaskTechnicalAttachment[]
-  reportPhotosUploaded            TaskReportPhoto[]
-  kpiSnapshots                    KpiSnapshot[]
-  engineerSalaryConfig            EngineerSalaryConfig?       @relation("EngineerSalary")
-  engineerSalaryUpdated           EngineerSalaryConfig[]      @relation("EngineerSalaryUpdater")
-  engineerSalaryHistory           EngineerSalaryHistory[]     @relation("EngineerSalaryChanger")
-  engineerKpiMonthly              EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyUser")
-  engineerKpiMonthlyRated         EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyRater")
-  engineerKpiMonthlyFinalized     EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyFinalizer")
-  kpiSettingsChanged              KpiSettings[]               @relation("KpiSettingsChanger")
-  customerTaskRatings             CustomerTaskRating[]        @relation("KsRatedTask")
-  customerKsRatings               CustomerKsRating[]          @relation("KsRatedDirectly")
-  customerCommentsAuthored        CustomerComment[]           @relation("CustomerCommentAuthor")
-  customerCommentReplies          CustomerCommentReply[]
-  projectDrawingsUploaded         ProjectDrawing[]            @relation("ProjectDrawingUploader")
-  projectDocumentsUploaded        ProjectDocument[]           @relation("ProjectDocumentUploader")
-  projectDocumentAccessGranted    ProjectDocumentAccess[]     @relation("ProjectDocumentAccessGrantor")
-  projectDocumentAccessUser       ProjectDocumentAccess[]     @relation("ProjectDocumentAccessUser")
-  paymentSchedulesCreated         PaymentSchedule[]           @relation("PaymentScheduleCreator")
-  projectChangeDraftsCreated      ProjectChangeDraft[]        @relation("ProjectChangeDraftCreator")
-  projectChangeDraftsUpdated      ProjectChangeDraft[]        @relation("ProjectChangeDraftUpdater")
-  projectDraftFilesUploaded       ProjectDraftFile[]          @relation("ProjectDraftFileUploader")
-  projectAiAudits                 ProjectAiAudit[]            @relation("ProjectAiAuditActor")
-  subcontractorsCreated           Subcontractor[]             @relation("SubcontractorCreator")
-  subContractsCreated             SubContract[]               @relation("SubContractCreator")
-  subContractFiles                SubContractFile[]
-  subPaymentsRequested            SubPayment[]                @relation("SubPaymentRequester")
-  subPaymentsApproved             SubPayment[]                @relation("SubPaymentApprover")
-  subPaymentsPaid                 SubPayment[]                @relation("SubPaymentPayer")
-  subEvaluations                  SubEvaluation[]
-  createdProjectPhases            ProjectPhase[]
-  createdQcChecklistTemplates     QcChecklistTemplate[]
-  assignedTptcAssignments         TptcAssignment[]            @relation("TptcAssignmentAssignee")
-  createdTptcAssignments          TptcAssignment[]            @relation("TptcAssignmentAssigner")
-  tptcDailyStatuses               TptcAssignmentDailyStatus[]
-  taskDailyAssignments            TaskDailyAssignment[]
-  dailyReportSubmissions          DailyReportSubmission[]
-  designPhotoGroupsCreated        DesignPhotoGroup[]          @relation("DesignPhotoGroupCreator")
-  designPhotoGroupAccess          DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessUser")
-  designPhotoGroupAccessGranted   DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessGrantor")
-  designPhotosUploaded            DesignPhoto[]               @relation("DesignPhotoUploader")
-  staffNotifications              StaffNotification[]         @relation("StaffNotificationRecipient")
-  staffNotificationsActed         StaffNotification[]         @relation("StaffNotificationActor")
-  customerNotificationsActed      CustomerNotification[]      @relation("CustomerNotificationActor")
-  pushSubscriptions               PushSubscription[]
-  pushSendLogs                    PushSendLog[]
-  projectActivityLogs             ProjectActivityLog[]        @relation("ProjectActivityActor")
-  ksAttendances                   KsAttendance[]              @relation("KsAttendanceUser")
-  shiftAssignments                UserShiftAssignment[]       @relation("UserShiftAssignmentUser")
-  workersCreated                  Worker[]                    @relation("WorkerCreatedBy")
-  workerAttendancesMarked         WorkerAttendance[]          @relation("WorkerAttendanceMarkedBy")
-  workOrdersCreated               WorkOrder[]                 @relation("WorkOrderCreatedBy")
-  workerTimesheetsCreated         WorkerTimesheet[]           @relation("WorkerTimesheetCreatedBy")
-  workOrderOutputsCreated         WorkOrderOutput[]           @relation("WorkOrderOutputCreatedBy")
-  workOrderOutputsApproved        WorkOrderOutput[]           @relation("WorkOrderOutputApprovedBy")
-  workOrderOutputPhotosUploaded   WorkOrderOutputPhoto[]      @relation("WorkOrderOutputPhotoUploadedBy")
-  workOrderOutputQcChecksDone     WorkOrderOutputQcCheck[]    @relation("WorkOrderOutputQcCheckCheckedBy")
-  workerQcIssuesCreated           WorkerQcIssue[]             @relation("WorkerQcIssueCreatedBy")
-  weeklyPayrollsClosed            WeeklyPayroll[]             @relation("WeeklyPayrollClosedBy")
-  weeklyPayrollsReadied           WeeklyPayroll[]             @relation("WeeklyPayrollReadiedBy")
-  weeklyPayrollsPaid              WeeklyPayroll[]             @relation("WeeklyPayrollPaidBy")
-  weeklyPayrollAdjustmentsCreated WeeklyPayrollAdjustment[]   @relation("WeeklyPayrollAdjustmentCreatedBy")
-  gradeRatesCreated               GradeRate[]                 @relation("GradeRateCreatedBy")
-  gradeHistoryProposed            GradeHistory[]              @relation("GradeHistoryProposer")
-  gradeHistoryApproved            GradeHistory[]              @relation("GradeHistoryApprover")
-  workerDocsUploaded              WorkerDoc[]                 @relation("WorkerDocUploader")
-  materialProposalsCreated        MaterialProposal[]          @relation("MatProposalKs")
-  materialProposalsProcessed      MaterialProposal[]          @relation("MatProposalProcessor")
-  materialProposalCommentsAuthored MaterialProposalComment[]  @relation("MatProposalCommentAuthor")
-  projectBudgetsCreated           ProjectBudget[]             @relation("ProjectBudgetCreator")
-  projectBudgetsLocked            ProjectBudget[]             @relation("ProjectBudgetLocker")
-  projectBudgetAmendmentsProposed ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentProposer")
-  projectBudgetAmendmentsApproved ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentApprover")
-  companyCashOpeningSet           CompanyCash[]               @relation("CompanyCashOpeningSetter")
-  expensesCreated                 Expense[]                   @relation("ExpenseCreator")
-  expensesPaid                    Expense[]                   @relation("ExpensePayer")
-  expensesCancelled               Expense[]                   @relation("ExpenseCanceller")
-  expensesTptcApproved            Expense[]                   @relation("ExpenseTptcApprover")
-  cashTransactionsCreated         CashTransaction[]           @relation("CashTransactionCreator")
+  managedProjects                  Project[]                   @relation("ProjectManager")
+  engineeredProjects               Project[]                   @relation("MainEngineer")
+  assignedEngineerFor              Task[]                      @relation("AssignedEngineer")
+  assignedForemanFor               Task[]                      @relation("AssignedForeman")
+  taskLogs                         TaskLog[]
+  taskPhotos                       TaskPhoto[]
+  qcItems                          QcItem[]
+  qcProgressUpdates                QcProgress[]                @relation("QcProgressUpdatedBy")
+  qcPhotos                         QcPhoto[]
+  qcLogs                           QcLog[]
+  qcReviews                        QcReview[]
+  taskQcLogs                       TaskQcLog[]                 @relation("TaskQcLogChecker")
+  taskProgressHistories            TaskProgressHistory[]       @relation("TaskProgressUpdatedBy")
+  taskQcResultsChecked             TaskQcResult[]              @relation("TaskQcResultCheckedBy")
+  taskActivityLogs                 TaskActivityLog[]           @relation("TaskActivityActor")
+  internalApprovedTasks            Task[]                      @relation("TaskInternalApprover")
+  projectMembers                   ProjectMember[]
+  addedProjectMembers              ProjectMember[]             @relation("ProjectMemberAddedBy")
+  projectAssignments               ProjectMemberAssignment[]   @relation("ProjectAssignmentUser")
+  projectAssignmentsAssigned       ProjectMemberAssignment[]   @relation("ProjectAssignmentAssigner")
+  declaredSiteRestDays             SiteRestDay[]
+  morningCheckins                  MorningCheckin[]            @relation("MorningCheckinUser")
+  morningReports                   MorningReport[]
+  eveningReports                   EveningReport[]
+  technicalReportCreator           TaskTechnicalReport[]       @relation("TechReportCreator")
+  technicalReportUpdater           TaskTechnicalReport[]       @relation("TechReportUpdater")
+  materialReportCreator            TaskMaterialReport[]        @relation("MatReportCreator")
+  materialReportUpdater            TaskMaterialReport[]        @relation("MatReportUpdater")
+  laborReportCreator               TaskLaborReport[]           @relation("LaborReportCreator")
+  laborReportUpdater               TaskLaborReport[]           @relation("LaborReportUpdater")
+  equipmentReportCreator           TaskEquipmentReport[]       @relation("EquipReportCreator")
+  equipmentReportUpdater           TaskEquipmentReport[]       @relation("EquipReportUpdater")
+  technicalAttachmentsUploaded     TaskTechnicalAttachment[]
+  reportPhotosUploaded             TaskReportPhoto[]
+  kpiSnapshots                     KpiSnapshot[]
+  engineerSalaryConfig             EngineerSalaryConfig?       @relation("EngineerSalary")
+  engineerSalaryUpdated            EngineerSalaryConfig[]      @relation("EngineerSalaryUpdater")
+  engineerSalaryHistory            EngineerSalaryHistory[]     @relation("EngineerSalaryChanger")
+  engineerKpiMonthly               EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyUser")
+  engineerKpiMonthlyRated          EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyRater")
+  engineerKpiMonthlyFinalized      EngineerKpiMonthly[]        @relation("EngineerKpiMonthlyFinalizer")
+  kpiSettingsChanged               KpiSettings[]               @relation("KpiSettingsChanger")
+  customerTaskRatings              CustomerTaskRating[]        @relation("KsRatedTask")
+  customerKsRatings                CustomerKsRating[]          @relation("KsRatedDirectly")
+  customerCommentsAuthored         CustomerComment[]           @relation("CustomerCommentAuthor")
+  customerCommentReplies           CustomerCommentReply[]
+  projectDrawingsUploaded          ProjectDrawing[]            @relation("ProjectDrawingUploader")
+  projectDocumentsUploaded         ProjectDocument[]           @relation("ProjectDocumentUploader")
+  projectDocumentAccessGranted     ProjectDocumentAccess[]     @relation("ProjectDocumentAccessGrantor")
+  projectDocumentAccessUser        ProjectDocumentAccess[]     @relation("ProjectDocumentAccessUser")
+  paymentSchedulesCreated          PaymentSchedule[]           @relation("PaymentScheduleCreator")
+  projectChangeDraftsCreated       ProjectChangeDraft[]        @relation("ProjectChangeDraftCreator")
+  projectChangeDraftsUpdated       ProjectChangeDraft[]        @relation("ProjectChangeDraftUpdater")
+  projectDraftFilesUploaded        ProjectDraftFile[]          @relation("ProjectDraftFileUploader")
+  projectAiAudits                  ProjectAiAudit[]            @relation("ProjectAiAuditActor")
+  subcontractorsCreated            Subcontractor[]             @relation("SubcontractorCreator")
+  subContractsCreated              SubContract[]               @relation("SubContractCreator")
+  subContractFiles                 SubContractFile[]
+  subPaymentsRequested             SubPayment[]                @relation("SubPaymentRequester")
+  subPaymentsApproved              SubPayment[]                @relation("SubPaymentApprover")
+  subPaymentsPaid                  SubPayment[]                @relation("SubPaymentPayer")
+  subEvaluations                   SubEvaluation[]
+  createdProjectPhases             ProjectPhase[]
+  createdQcChecklistTemplates      QcChecklistTemplate[]
+  assignedTptcAssignments          TptcAssignment[]            @relation("TptcAssignmentAssignee")
+  createdTptcAssignments           TptcAssignment[]            @relation("TptcAssignmentAssigner")
+  tptcDailyStatuses                TptcAssignmentDailyStatus[]
+  taskDailyAssignments             TaskDailyAssignment[]
+  dailyReportSubmissions           DailyReportSubmission[]
+  designPhotoGroupsCreated         DesignPhotoGroup[]          @relation("DesignPhotoGroupCreator")
+  designPhotoGroupAccess           DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessUser")
+  designPhotoGroupAccessGranted    DesignPhotoGroupAccess[]    @relation("DesignPhotoGroupAccessGrantor")
+  designPhotosUploaded             DesignPhoto[]               @relation("DesignPhotoUploader")
+  staffNotifications               StaffNotification[]         @relation("StaffNotificationRecipient")
+  staffNotificationsActed          StaffNotification[]         @relation("StaffNotificationActor")
+  customerNotificationsActed       CustomerNotification[]      @relation("CustomerNotificationActor")
+  pushSubscriptions                PushSubscription[]
+  pushSendLogs                     PushSendLog[]
+  projectActivityLogs              ProjectActivityLog[]        @relation("ProjectActivityActor")
+  ksAttendances                    KsAttendance[]              @relation("KsAttendanceUser")
+  shiftAssignments                 UserShiftAssignment[]       @relation("UserShiftAssignmentUser")
+  workersCreated                   Worker[]                    @relation("WorkerCreatedBy")
+  workerAttendancesMarked          WorkerAttendance[]          @relation("WorkerAttendanceMarkedBy")
+  workOrdersCreated                WorkOrder[]                 @relation("WorkOrderCreatedBy")
+  workerTimesheetsCreated          WorkerTimesheet[]           @relation("WorkerTimesheetCreatedBy")
+  workOrderOutputsCreated          WorkOrderOutput[]           @relation("WorkOrderOutputCreatedBy")
+  workOrderOutputsApproved         WorkOrderOutput[]           @relation("WorkOrderOutputApprovedBy")
+  workOrderOutputPhotosUploaded    WorkOrderOutputPhoto[]      @relation("WorkOrderOutputPhotoUploadedBy")
+  workOrderOutputQcChecksDone      WorkOrderOutputQcCheck[]    @relation("WorkOrderOutputQcCheckCheckedBy")
+  workerQcIssuesCreated            WorkerQcIssue[]             @relation("WorkerQcIssueCreatedBy")
+  weeklyPayrollsClosed             WeeklyPayroll[]             @relation("WeeklyPayrollClosedBy")
+  weeklyPayrollsReadied            WeeklyPayroll[]             @relation("WeeklyPayrollReadiedBy")
+  weeklyPayrollsPaid               WeeklyPayroll[]             @relation("WeeklyPayrollPaidBy")
+  weeklyPayrollAdjustmentsCreated  WeeklyPayrollAdjustment[]   @relation("WeeklyPayrollAdjustmentCreatedBy")
+  gradeRatesCreated                GradeRate[]                 @relation("GradeRateCreatedBy")
+  gradeHistoryProposed             GradeHistory[]              @relation("GradeHistoryProposer")
+  gradeHistoryApproved             GradeHistory[]              @relation("GradeHistoryApprover")
+  workerDocsUploaded               WorkerDoc[]                 @relation("WorkerDocUploader")
+  materialProposalsCreated         MaterialProposal[]          @relation("MatProposalKs")
+  materialProposalsProcessed       MaterialProposal[]          @relation("MatProposalProcessor")
+  materialProposalCommentsAuthored MaterialProposalComment[]   @relation("MatProposalCommentAuthor")
+  projectBudgetsCreated            ProjectBudget[]             @relation("ProjectBudgetCreator")
+  projectBudgetsLocked             ProjectBudget[]             @relation("ProjectBudgetLocker")
+  projectBudgetAmendmentsProposed  ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentProposer")
+  projectBudgetAmendmentsApproved  ProjectBudgetAmendment[]    @relation("ProjectBudgetAmendmentApprover")
+  companyCashOpeningSet            CompanyCash[]               @relation("CompanyCashOpeningSetter")
+  expensesCreated                  Expense[]                   @relation("ExpenseCreator")
+  expensesPaid                     Expense[]                   @relation("ExpensePayer")
+  expensesCancelled                Expense[]                   @relation("ExpenseCanceller")
+  expensesTptcApproved             Expense[]                   @relation("ExpenseTptcApprover")
+  receiptsCreated                  Receipt[]                   @relation("ReceiptCreator")
+  receiptsReceived                 Receipt[]                   @relation("ReceiptReceiver")
+  receiptsCancelled                Receipt[]                   @relation("ReceiptCanceller")
+  cashTransactionsCreated          CashTransaction[]           @relation("CashTransactionCreator")
 
   @@map("users")
 }
@@ -683,6 +700,7 @@ model Project {
   weeklyPayrolls            WeeklyPayroll[]
   weeklyPayrollAdjustments  WeeklyPayrollAdjustment[]
   expenses                  Expense[]
+  receipts                  Receipt[]
   cashTransactions          CashTransaction[]
 
   @@index([status])
@@ -785,9 +803,9 @@ model StandardTaskCatalog {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates    TaskTemplate[]      @relation("TemplateStdCatalog")
-  tasks        Task[]              @relation("TaskStdCatalog")
-  budgetItems  ProjectBudgetItem[]
+  templates   TaskTemplate[]      @relation("TemplateStdCatalog")
+  tasks       Task[]              @relation("TaskStdCatalog")
+  budgetItems ProjectBudgetItem[]
 
   @@unique([phaseCode, taskCode])
   @@index([phaseCode, displayOrder])
@@ -2489,6 +2507,9 @@ enum StaffNotificationKind {
   expense_ks_request
   expense_tptc_approved
   expense_tptc_rejected
+  receipt_new
+  receipt_received
+  receipt_cancelled
 }
 
 enum MaterialProposalStatus {
@@ -2654,9 +2675,9 @@ model MaterialProposal {
   processedAt   DateTime?              @map("processed_at")
   processedBy   String?                @map("processed_by") @db.Uuid
 
-  ks        User    @relation("MatProposalKs", fields: [ksId], references: [id])
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  processor User?   @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
+  ks        User                      @relation("MatProposalKs", fields: [ksId], references: [id])
+  project   Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processor User?                     @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
   comments  MaterialProposalComment[]
 
   @@index([projectId, status])
@@ -3306,49 +3327,84 @@ model ExpenseCategory {
 /// Lệnh chi do admin tạo trực tiếp, không qua workflow KS đề xuất.
 /// pending → KT đánh dấu đã chi → paid (đồng thời tạo CashTransaction).
 model Expense {
-  id              String        @id @default(uuid()) @db.Uuid
-  code            String        @unique
-  projectId       String?       @map("project_id") @db.Uuid
-  categoryId      String        @map("category_id") @db.Uuid
-  amount          Decimal       @db.Decimal(18, 2)
-  payee           String?
-  paymentMethod   String?       @map("payment_method")
-  note            String?       @db.Text
-  attachmentUrl   String?       @map("attachment_url")
-  status          ExpenseStatus @default(pending)
-  createdBy       String        @map("created_by") @db.Uuid
-  createdAt       DateTime      @default(now()) @map("created_at")
-  paidBy          String?       @map("paid_by") @db.Uuid
-  paidAt          DateTime?     @map("paid_at")
-  paidAmount      Decimal?      @map("paid_amount") @db.Decimal(18, 2)
-  paidNote        String?       @map("paid_note") @db.Text
-  paidReceiptUrl  String?       @map("paid_receipt_url")
-  cancelledBy     String?       @map("cancelled_by") @db.Uuid
-  cancelledAt     DateTime?     @map("cancelled_at")
-  cancelledReason String?         @map("cancelled_reason") @db.Text
-  priority        ExpensePriority @default(normal)
-  nextReminderAt  DateTime?       @map("next_reminder_at")
-  payeeBankBin       String?  @map("payee_bank_bin")        @db.VarChar(20)
-  payeeAccountNumber String?  @map("payee_account_number")  @db.VarChar(40)
-  payeeAccountName   String?  @map("payee_account_name")    @db.VarChar(200)
-  payeeQrUrl         String?  @map("payee_qr_url")
+  id                 String          @id @default(uuid()) @db.Uuid
+  code               String          @unique
+  projectId          String?         @map("project_id") @db.Uuid
+  categoryId         String          @map("category_id") @db.Uuid
+  amount             Decimal         @db.Decimal(18, 2)
+  payee              String?
+  paymentMethod      String?         @map("payment_method")
+  note               String?         @db.Text
+  attachmentUrl      String?         @map("attachment_url")
+  status             ExpenseStatus   @default(pending)
+  createdBy          String          @map("created_by") @db.Uuid
+  createdAt          DateTime        @default(now()) @map("created_at")
+  paidBy             String?         @map("paid_by") @db.Uuid
+  paidAt             DateTime?       @map("paid_at")
+  paidAmount         Decimal?        @map("paid_amount") @db.Decimal(18, 2)
+  paidNote           String?         @map("paid_note") @db.Text
+  paidReceiptUrl     String?         @map("paid_receipt_url")
+  cancelledBy        String?         @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime?       @map("cancelled_at")
+  cancelledReason    String?         @map("cancelled_reason") @db.Text
+  priority           ExpensePriority @default(normal)
+  nextReminderAt     DateTime?       @map("next_reminder_at")
+  payeeBankBin       String?         @map("payee_bank_bin") @db.VarChar(20)
+  payeeAccountNumber String?         @map("payee_account_number") @db.VarChar(40)
+  payeeAccountName   String?         @map("payee_account_name") @db.VarChar(200)
+  payeeQrUrl         String?         @map("payee_qr_url")
 
-  tptcApprovedBy   String?   @map("tptc_approved_by") @db.Uuid
-  tptcApprovedAt   DateTime? @map("tptc_approved_at")
-  tptcRejectedReason String? @map("tptc_rejected_reason") @db.Text
+  tptcApprovedBy     String?   @map("tptc_approved_by") @db.Uuid
+  tptcApprovedAt     DateTime? @map("tptc_approved_at")
+  tptcRejectedReason String?   @map("tptc_rejected_reason") @db.Text
 
-  project   Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  category  ExpenseCategory @relation(fields: [categoryId], references: [id])
-  creator   User            @relation("ExpenseCreator", fields: [createdBy], references: [id])
-  payer     User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
-  canceller User?           @relation("ExpenseCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
-  tptcApprover User?        @relation("ExpenseTptcApprover", fields: [tptcApprovedBy], references: [id], onDelete: SetNull)
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id])
+  creator      User            @relation("ExpenseCreator", fields: [createdBy], references: [id])
+  payer        User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
+  canceller    User?           @relation("ExpenseCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
+  tptcApprover User?           @relation("ExpenseTptcApprover", fields: [tptcApprovedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([categoryId, createdAt(sort: Desc)])
   @@index([nextReminderAt])
   @@map("expenses")
+}
+
+/// Lệnh thu do admin tạo: thu từ khách / vay / hoàn ứng / khác.
+/// pending → KT đánh dấu đã thu → received (đồng thời tạo CashTransaction direction=in).
+model Receipt {
+  id                 String        @id @default(uuid()) @db.Uuid
+  code               String        @unique
+  source             ReceiptSource
+  projectId          String?       @map("project_id") @db.Uuid
+  amount             Decimal       @db.Decimal(18, 2)
+  payer              String?
+  paymentMethod      String?       @map("payment_method")
+  note               String?       @db.Text
+  attachmentUrl      String?       @map("attachment_url")
+  status             ReceiptStatus @default(pending)
+  createdBy          String        @map("created_by") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at")
+  receivedBy         String?       @map("received_by") @db.Uuid
+  receivedAt         DateTime?     @map("received_at")
+  receivedAmount     Decimal?      @map("received_amount") @db.Decimal(18, 2)
+  receivedNote       String?       @map("received_note") @db.Text
+  receivedReceiptUrl String?       @map("received_receipt_url")
+  cancelledBy        String?       @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime?     @map("cancelled_at")
+  cancelledReason    String?       @map("cancelled_reason") @db.Text
+
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  creator   User     @relation("ReceiptCreator", fields: [createdBy], references: [id])
+  receiver  User?    @relation("ReceiptReceiver", fields: [receivedBy], references: [id], onDelete: SetNull)
+  canceller User?    @relation("ReceiptCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([source, createdAt(sort: Desc)])
+  @@map("receipts")
 }
 
 /// Nhật ký mọi giao dịch thu/chi.

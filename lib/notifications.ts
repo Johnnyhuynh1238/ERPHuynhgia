@@ -1165,6 +1165,134 @@ export async function notifyExpenseTptcRejected(input: {
   });
 }
 
+async function writeReceiptStaffNotif(input: {
+  recipients: string[];
+  actorUserId: string;
+  actorName: string;
+  kind: StaffNotificationKind;
+  title: string;
+  body: string;
+  link: string;
+  receiptId: string;
+  tag: string;
+}) {
+  const ids = Array.from(
+    new Set(input.recipients.filter((id) => id && id !== input.actorUserId)),
+  );
+  if (!ids.length) return;
+
+  await prisma.staffNotification.createMany({
+    data: ids.map((recipientId) => ({
+      recipientId,
+      projectId: null,
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      link: input.link,
+      actorUserId: input.actorUserId,
+      actorName: input.actorName,
+      refType: "receipt",
+      refId: input.receiptId,
+    })),
+  });
+
+  await pushStaffNotification({
+    recipientIds: ids,
+    actorUserId: input.actorUserId,
+    title: input.title,
+    body: input.body,
+    link: input.link,
+    tag: input.tag,
+  });
+}
+
+const RECEIPT_SOURCE_LABEL: Record<string, string> = {
+  customer: "Khách",
+  loan: "Vay",
+  advance_return: "Hoàn ứng",
+  other: "Khác",
+};
+
+/**
+ * Event — Admin tạo lệnh thu mới. Recipients: tất cả kế toán + admin khác.
+ */
+export async function notifyReceiptCreated(input: {
+  receiptId: string;
+  code: string;
+  amount: number;
+  source: string;
+  payer: string | null;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["accountant", "admin"]);
+  const sourceLabel = RECEIPT_SOURCE_LABEL[input.source] || input.source;
+  const where = input.projectLabel ? ` cho ${input.projectLabel}` : "";
+  await writeReceiptStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_new",
+    title: `Lệnh thu mới ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${sourceLabel}${input.payer ? ` · ${input.payer}` : ""}${where}`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-new-${input.receiptId}`,
+  });
+}
+
+/**
+ * Event — KT đánh dấu đã thu. Recipients: admin.
+ */
+export async function notifyReceiptReceived(input: {
+  receiptId: string;
+  code: string;
+  receivedAmount: number;
+  sourceLabel: string;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["admin"]);
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeReceiptStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_received",
+    title: `KT ${input.actorName} đã thu ${input.code} — ${fmtVndShort(input.receivedAmount)}`,
+    body: `${input.sourceLabel}${where}`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-received-${input.receiptId}`,
+  });
+}
+
+/**
+ * Event — Admin huỷ lệnh thu. Recipients: tất cả kế toán.
+ */
+export async function notifyReceiptCancelled(input: {
+  receiptId: string;
+  code: string;
+  reason: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["accountant"]);
+  await writeReceiptStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_cancelled",
+    title: `Admin huỷ lệnh thu ${input.code}`,
+    body: `Lý do: ${input.reason}`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-cancelled-${input.receiptId}`,
+  });
+}
+
 /**
  * Wrapper an toàn: gọi từ route handler sau khi DB commit thành công.
  * Lỗi notif không làm fail request gốc.

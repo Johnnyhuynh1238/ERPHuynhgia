@@ -12,6 +12,7 @@ const REFTYPE_SET = new Set<CashTxnRefType>([
   "sub_payment",
   "material_proposal",
   "payment_schedule",
+  "receipt",
 ]);
 
 function buildWhere(url: URL): Prisma.CashTransactionWhereInput {
@@ -45,6 +46,7 @@ const REFTYPE_LABEL: Record<CashTxnRefType, string> = {
   sub_payment: "TT thầu phụ",
   material_proposal: "Đề xuất vật tư",
   payment_schedule: "Thu chủ nhà",
+  receipt: "Lệnh thu",
 };
 
 function csvEscape(v: string | number | null | undefined) {
