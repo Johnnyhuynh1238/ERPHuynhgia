@@ -1140,10 +1140,10 @@ function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: B
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[#252840] p-4">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#252840] p-4">
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-wider text-[#5a6080]">
               Công tác con · {row.phaseCode} {PHASE_CODE_SHORT[row.phaseCode]} · {CATEGORY_LABEL[row.category]}
@@ -1163,7 +1163,7 @@ function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: B
           </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {row.breakdown.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[#252840] bg-[#0f1220] px-3 py-6 text-center text-xs text-[#5a6080]">
               Chưa có công tác con. Nhập trực tiếp KL ở dòng cha, hoặc thêm con bên dưới.
@@ -1243,7 +1243,7 @@ function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: B
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#252840] p-3">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-[#252840] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button onClick={onClose}>Xong</Button>
         </div>
       </div>
