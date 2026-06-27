@@ -787,10 +787,14 @@ export function ProjectBudgetClient({
                       />
                       <button
                         type="button"
-                        onClick={() => removeAmendmentRow(r._local)}
+                        onClick={() => {
+                          if (window.confirm(`Xoá dòng điều chỉnh "${r.name || "(chưa có tên)"}"?`)) {
+                            removeAmendmentRow(r._local);
+                          }
+                        }}
                         className="rounded bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
                       >
-                        Xóa dòng
+                        Xoá dòng
                       </button>
                     </div>
                     <input
@@ -1038,9 +1042,13 @@ function TaskRow({ row, readOnly, onUpdate, onRemove, onOpenBreakdown }: TaskRow
         {!readOnly && (
           <button
             type="button"
-            onClick={onRemove}
+            onClick={() => {
+              if (window.confirm(`Xoá hạng mục "${row.name || "(chưa có tên)"}"? Hành động này sẽ xoá luôn cả công tác con khi bấm Lưu.`)) {
+                onRemove();
+              }
+            }}
             className="shrink-0 rounded bg-rose-500/10 px-1.5 py-1 text-[10px] font-medium text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
-            title="Xóa hạng mục"
+            title="Xoá hạng mục"
           >
             ×
           </button>
@@ -1179,8 +1187,13 @@ function BreakdownModal({ row, readOnly, onClose, onAdd, onUpdate, onRemove }: B
                     {!readOnly && (
                       <button
                         type="button"
-                        onClick={() => onRemove(b._local)}
+                        onClick={() => {
+                          if (window.confirm(`Xoá công tác con "${b.name || "(chưa có tên)"}"?`)) {
+                            onRemove(b._local);
+                          }
+                        }}
                         className="shrink-0 rounded bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20"
+                        title="Xoá công tác con"
                       >
                         ×
                       </button>
