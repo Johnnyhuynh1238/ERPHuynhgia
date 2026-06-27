@@ -13,6 +13,7 @@ const schema = z.object({
   receiptUrl: z.string().trim().min(1, "Bắt buộc upload chứng từ").optional(),
   paymentMethod: z.string().trim().min(1, "Phương thức thanh toán là bắt buộc"),
   note: z.string().trim().max(3000).nullable().optional(),
+  accountId: z.string().uuid("Tài khoản quỹ không hợp lệ"),
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -115,6 +116,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       occurredAt: paidDate,
       refType: "sub_payment",
       refId: row.id,
+      accountId: payload.accountId,
       projectId: row.subContract.projectId,
       categoryId: null,
       note: `TT thầu phụ ${row.code} (HĐ ${row.subContract.code}) [${payload.paymentMethod}]${payload.note ? ` — ${payload.note}` : ""}`,

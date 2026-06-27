@@ -13,6 +13,7 @@ const schema = z.object({
   receivedAmount: z.coerce.number().positive("Số tiền đã thu phải > 0"),
   receivedReceiptUrl: z.string().trim().max(500).optional().nullable(),
   receivedNote: z.string().trim().max(2000).optional().nullable(),
+  accountId: z.string().uuid("Tài khoản quỹ không hợp lệ"),
 });
 
 function atUtcDate(s: string) {
@@ -69,6 +70,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         occurredAt: receivedAt,
         refType: "receipt",
         refId: receipt.id,
+        accountId: data.accountId,
         projectId: receipt.projectId,
         note: `${receipt.code} — ${SOURCE_LABEL[receipt.source] || receipt.source}${receipt.payer ? ` / ${receipt.payer}` : ""}${data.receivedNote ? ` — ${data.receivedNote}` : ""}`,
         createdBy: user.id,

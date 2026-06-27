@@ -392,6 +392,12 @@ enum CashTxnRefType {
   material_proposal
   payment_schedule
   receipt
+  transfer
+}
+
+enum CashAccountKind {
+  cash
+  bank
 }
 
 enum ReceiptSource {
@@ -548,6 +554,25 @@ model User {
   cashTransactionsCreated          CashTransaction[]           @relation("CashTransactionCreator")
 
   @@map("users")
+}
+
+model CashAccount {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique
+  name           String
+  kind           CashAccountKind
+  openingBalance Decimal         @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  currentBalance Decimal         @default(0) @map("current_balance") @db.Decimal(18, 2)
+  sortOrder      Int             @default(0) @map("sort_order")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  cashTransactions        CashTransaction[] @relation("CashTransactionAccount")
+  cashTransactionsCounter CashTransaction[] @relation("CashTransactionCounterAccount")
+
+  @@index([active, sortOrder])
+  @@map("cash_accounts")
 }
 
 model KsAttendance {
@@ -2874,8 +2899,8 @@ enum BudgetPhase {
 // 4 stage chuẩn cho dự toán theo cấu kiện (SOP-47)
 enum BudgetStage {
   CB // Chuẩn bị
-  N  // Ngầm
-  T  // Thô
+  N // Ngầm
+  T // Thô
   HT // Hoàn thiện
 }
 
@@ -3451,27 +3476,32 @@ model Receipt {
 /// Nhật ký mọi giao dịch thu/chi.
 /// balanceAfter lưu sẵn để query nhanh + audit (không tính lại từ tổng).
 model CashTransaction {
-  id           String           @id @default(uuid()) @db.Uuid
-  direction    CashTxnDirection
-  amount       Decimal          @db.Decimal(18, 2)
-  occurredAt   DateTime         @map("occurred_at")
-  balanceAfter Decimal          @map("balance_after") @db.Decimal(18, 2)
-  refType      CashTxnRefType   @map("ref_type")
-  refId        String?          @map("ref_id") @db.Uuid
-  projectId    String?          @map("project_id") @db.Uuid
-  categoryId   String?          @map("category_id") @db.Uuid
-  note         String?          @db.Text
-  createdBy    String           @map("created_by") @db.Uuid
-  createdAt    DateTime         @default(now()) @map("created_at")
+  id               String           @id @default(uuid()) @db.Uuid
+  direction        CashTxnDirection
+  amount           Decimal          @db.Decimal(18, 2)
+  occurredAt       DateTime         @map("occurred_at")
+  balanceAfter     Decimal          @map("balance_after") @db.Decimal(18, 2)
+  refType          CashTxnRefType   @map("ref_type")
+  refId            String?          @map("ref_id") @db.Uuid
+  accountId        String           @map("account_id") @db.Uuid
+  counterAccountId String?          @map("counter_account_id") @db.Uuid
+  projectId        String?          @map("project_id") @db.Uuid
+  categoryId       String?          @map("category_id") @db.Uuid
+  note             String?          @db.Text
+  createdBy        String           @map("created_by") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at")
 
-  project  Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  category ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  creator  User             @relation("CashTransactionCreator", fields: [createdBy], references: [id])
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category       ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  creator        User             @relation("CashTransactionCreator", fields: [createdBy], references: [id])
+  account        CashAccount      @relation("CashTransactionAccount", fields: [accountId], references: [id])
+  counterAccount CashAccount?     @relation("CashTransactionCounterAccount", fields: [counterAccountId], references: [id], onDelete: SetNull)
 
   @@index([occurredAt(sort: Desc)])
   @@index([refType, refId])
   @@index([projectId, occurredAt])
   @@index([categoryId, occurredAt])
   @@index([createdAt(sort: Desc)])
+  @@index([accountId, occurredAt(sort: Desc)])
   @@map("cash_transactions")
 }

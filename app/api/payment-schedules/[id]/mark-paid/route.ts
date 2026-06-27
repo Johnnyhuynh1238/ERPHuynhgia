@@ -12,6 +12,7 @@ const markPaidSchema = z.object({
   paidAmount: z.coerce.number().positive("Số tiền thu phải lớn hơn 0"),
   receiptUrl: z.string().trim().min(1, "Biên lai là bắt buộc"),
   paymentNote: z.string().trim().optional(),
+  accountId: z.string().uuid("Tài khoản quỹ không hợp lệ"),
 });
 
 function canEdit(role: UserRole) {
@@ -66,6 +67,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       occurredAt: paidAt,
       refType: "payment_schedule",
       refId: upd.id,
+      accountId: payload.accountId,
       projectId: upd.projectId,
       categoryId: null,
       note: `Thu đợt TT #${upd.installmentNo} "${upd.description}"${payload.paymentNote ? ` — ${payload.paymentNote}` : ""}`,

@@ -39,6 +39,12 @@ export async function POST(request: Request) {
   const openingDate = atUtcDate(parsed.data.openingDate);
   const amount = new Prisma.Decimal(parsed.data.openingBalance);
 
+  // Số dư đầu kỳ được gán vào tài khoản "Tiền mặt" (CASH).
+  const cashAccount = await prisma.cashAccount.findUnique({ where: { code: "CASH" } });
+  if (!cashAccount) {
+    return NextResponse.json({ message: "Thiếu tài khoản Tiền mặt — chạy migration trước" }, { status: 500 });
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const c = await tx.companyCash.update({
       where: { id: cash.id },
@@ -53,6 +59,13 @@ export async function POST(request: Request) {
         initialized: true,
       },
     });
+    await tx.cashAccount.update({
+      where: { id: cashAccount.id },
+      data: {
+        openingBalance: amount,
+        currentBalance: amount,
+      },
+    });
     // Ghi 1 dòng cash_txn "opening" để bảng nhật ký luôn có dòng đầu (direction=in)
     if (amount.gt(0)) {
       await tx.cashTransaction.create({
@@ -63,6 +76,7 @@ export async function POST(request: Request) {
           balanceAfter: amount,
           refType: "opening",
           refId: null,
+          accountId: cashAccount.id,
           projectId: null,
           categoryId: null,
           note: parsed.data.openingNote?.trim() || "Khởi tạo số dư đầu kỳ",

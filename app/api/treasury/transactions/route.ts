@@ -13,6 +13,7 @@ const REFTYPE_SET = new Set<CashTxnRefType>([
   "material_proposal",
   "payment_schedule",
   "receipt",
+  "transfer",
 ]);
 
 function buildWhere(url: URL): Prisma.CashTransactionWhereInput {
@@ -25,6 +26,8 @@ function buildWhere(url: URL): Prisma.CashTransactionWhereInput {
   if (refType && REFTYPE_SET.has(refType as CashTxnRefType)) {
     where.refType = refType as CashTxnRefType;
   }
+  const accountId = url.searchParams.get("accountId");
+  if (accountId) where.accountId = accountId;
   const projectId = url.searchParams.get("projectId");
   if (projectId === "none") where.projectId = null;
   else if (projectId) where.projectId = projectId;
@@ -47,6 +50,7 @@ const REFTYPE_LABEL: Record<CashTxnRefType, string> = {
   material_proposal: "Đề xuất vật tư",
   payment_schedule: "Thu chủ nhà",
   receipt: "Lệnh thu",
+  transfer: "Chuyển quỹ",
 };
 
 function csvEscape(v: string | number | null | undefined) {
@@ -72,10 +76,12 @@ export async function GET(request: Request) {
         project: { select: { code: true, name: true } },
         category: { select: { name: true } },
         creator: { select: { fullName: true } },
+        account: { select: { name: true } },
+        counterAccount: { select: { name: true } },
       },
       take: 5000,
     });
-    const header = "Ngày,Loại,Hướng,Dự án,Danh mục,Mô tả,Thu,Chi,Số dư sau,Người ghi";
+    const header = "Ngày,Loại,Hướng,Tài khoản,Dự án,Danh mục,Mô tả,Thu,Chi,Số dư sau,Người ghi";
     const lines = rows.map((r) => {
       const d = r.occurredAt.toISOString().slice(0, 10);
       const direction = r.direction === "in" ? "Thu" : "Chi";
@@ -87,7 +93,10 @@ export async function GET(request: Request) {
       const outCol = r.direction === "out" ? amt : "";
       const after = Number(r.balanceAfter);
       const who = r.creator?.fullName ?? "";
-      return [d, REFTYPE_LABEL[r.refType], direction, project, category, note, inCol, outCol, after, who]
+      const acc = r.counterAccount
+        ? `${r.account.name} ↔ ${r.counterAccount.name}`
+        : r.account.name;
+      return [d, REFTYPE_LABEL[r.refType], direction, acc, project, category, note, inCol, outCol, after, who]
         .map(csvEscape)
         .join(",");
     });
@@ -112,6 +121,8 @@ export async function GET(request: Request) {
         project: { select: { id: true, code: true, name: true } },
         category: { select: { id: true, code: true, name: true } },
         creator: { select: { id: true, fullName: true } },
+        account: { select: { id: true, name: true, kind: true } },
+        counterAccount: { select: { id: true, name: true, kind: true } },
       },
       skip: (page - 1) * pageSize,
       take: pageSize,

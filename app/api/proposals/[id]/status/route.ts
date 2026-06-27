@@ -18,6 +18,7 @@ const bodySchema = z.discriminatedUnion("action", [
     paymentMethod: z.enum(["cash", "transfer", "debt"]),
     paymentNote: z.string().trim().max(500).optional(),
     paidAmount: z.coerce.number().positive("Số tiền đã chi phải lớn hơn 0"),
+    accountId: z.string().uuid("Tài khoản quỹ không hợp lệ").optional(),
   }),
 ]);
 
@@ -161,9 +162,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
     return NextResponse.json({ ok: true });
   } else if (action === "mark_paid") {
-    const paidAmount = parsed.data.paidAmount;
-    const paymentMethod = parsed.data.paymentMethod;
-    const paymentNote = parsed.data.paymentNote || null;
+    const payData = parsed.data;
+    const paidAmount = payData.paidAmount;
+    const paymentMethod = payData.paymentMethod;
+    const paymentNote = payData.paymentNote || null;
+    const accountId = payData.accountId;
     const isDebt = paymentMethod === "debt";
 
     await prisma.$transaction(async (tx) => {
@@ -179,12 +182,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
       // Công nợ (debt) chưa xuất quỹ thực → không ghi cash_txn
       if (!isDebt) {
+        if (!accountId) {
+          throw new Error("Thiếu tài khoản quỹ khi thanh toán không phải công nợ");
+        }
         await recordCashTxn(tx, {
           direction: "out",
           amount: paidAmount,
           occurredAt: now,
           refType: "material_proposal",
           refId: proposal.id,
+          accountId,
           projectId: proposal.projectId,
           categoryId: null,
           note: `Chi vật tư đề xuất "${proposal.description.slice(0, 80)}" [${paymentMethod}]${paymentNote ? ` — ${paymentNote}` : ""}`,
