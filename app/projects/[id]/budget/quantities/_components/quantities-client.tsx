@@ -29,6 +29,14 @@ type Item = {
   quantity: number;
   note: string | null;
   sortRank: number;
+  normCode: string | null;
+};
+
+type NormSuggestion = {
+  code: string;
+  name: string;
+  unit: string;
+  category: string | null;
 };
 
 type Props = {
@@ -67,6 +75,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
         quantity: number;
         note: string | null;
         sortRank: number;
+        normCode?: string | null;
       }>;
       setItems(
         rawItems
@@ -80,6 +89,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
             quantity: it.quantity,
             note: it.note,
             sortRank: it.sortRank,
+            normCode: it.normCode ?? null,
           })),
       );
     } catch (e) {
@@ -189,6 +199,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
     unit: string;
     quantity: number;
     note: string | null;
+    normCode: string | null;
   }) {
     if (!canEdit) return;
     setSavingId(payload.itemId ?? "new");
@@ -206,6 +217,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
           unit: payload.unit,
           quantity: payload.quantity,
           note: payload.note,
+          normCode: payload.normCode,
         }),
       });
       if (!r.ok) {
@@ -381,9 +393,14 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                           <div key={it.id} className={`flex items-start justify-between gap-2 px-3 py-2 ${idx > 0 ? "border-t border-[#252840]" : ""}`}>
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-[12px] font-medium text-zinc-100">{it.name}</div>
-                              <div className="text-[10px] text-zinc-500">
-                                {it.quantity.toLocaleString("vi-VN")} {it.unit}
-                                {it.note ? ` · ${it.note}` : ""}
+                              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+                                <span>{it.quantity.toLocaleString("vi-VN")} {it.unit}</span>
+                                {it.normCode && (
+                                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-sky-300">
+                                    ĐM {it.normCode}
+                                  </span>
+                                )}
+                                {it.note ? <span>· {it.note}</span> : null}
                               </div>
                             </div>
                             {canEdit && (
@@ -413,7 +430,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                         initial={editingItem.item}
                         componentId={c.id}
                         saving={savingId === (editingItem.item?.id ?? "new")}
-                        onSave={(name, unit, qty, note) =>
+                        onSave={(name, unit, qty, note, normCode) =>
                           saveItem({
                             componentId: c.id,
                             itemId: editingItem.item?.id ?? null,
@@ -421,6 +438,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                             unit,
                             quantity: qty,
                             note,
+                            normCode,
                           })
                         }
                         onCancel={() => setEditingItem(null)}
@@ -525,13 +543,49 @@ function ItemForm({
   initial: Item | null;
   componentId: string;
   saving: boolean;
-  onSave: (name: string, unit: string, qty: number, note: string | null) => void;
+  onSave: (name: string, unit: string, qty: number, note: string | null, normCode: string | null) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [unit, setUnit] = useState(initial?.unit ?? "m³");
   const [qtyStr, setQtyStr] = useState(initial ? String(initial.quantity) : "");
   const [note, setNote] = useState(initial?.note ?? "");
+  const [normCode, setNormCode] = useState<string | null>(initial?.normCode ?? null);
+
+  const [normQuery, setNormQuery] = useState("");
+  const [normSuggests, setNormSuggests] = useState<NormSuggestion[]>([]);
+  const [normLoading, setNormLoading] = useState(false);
+  const [normPickerOpen, setNormPickerOpen] = useState(false);
+
+  // Debounced search
+  useEffect(() => {
+    if (!normPickerOpen) return;
+    const q = normQuery.trim();
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setNormLoading(true);
+      try {
+        const r = await fetch(`/api/norms${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (cancelled) return;
+        setNormSuggests((data.norms ?? []).slice(0, 30));
+      } finally {
+        if (!cancelled) setNormLoading(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [normQuery, normPickerOpen]);
+
+  function pickNorm(n: NormSuggestion) {
+    setNormCode(n.code);
+    setUnit(n.unit);
+    if (!name.trim()) setName(n.name);
+    setNormPickerOpen(false);
+  }
 
   const qtyNum = Number(qtyStr.replace(",", "."));
   const invalid = qtyStr.trim() === "" || !isFinite(qtyNum) || qtyNum < 0 || !name.trim() || !unit.trim();
@@ -547,6 +601,32 @@ function ItemForm({
           className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
         />
       </div>
+
+      <div>
+        <label className="text-[10px] text-zinc-500">Định mức (tuỳ chọn)</label>
+        {normCode ? (
+          <div className="mt-0.5 flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-2 py-1.5">
+            <span className="rounded bg-sky-500/30 px-1.5 py-0.5 font-mono text-[10px] text-sky-100">{normCode}</span>
+            <span className="flex-1 text-[11px] text-sky-200">Đã gắn định mức · hao phí auto từ bảng ĐM</span>
+            <button
+              type="button"
+              onClick={() => setNormCode(null)}
+              className="text-[10px] text-sky-300 underline hover:text-sky-100"
+            >
+              Bỏ gắn
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setNormPickerOpen(true); setNormQuery(""); }}
+            className="mt-0.5 w-full rounded-lg border border-dashed border-sky-500/40 bg-sky-500/5 px-2 py-1.5 text-left text-[11px] text-sky-300 hover:bg-sky-500/10"
+          >
+            + Chọn định mức từ bảng ĐM…
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="text-[10px] text-zinc-500">Đơn vị</label>
@@ -586,11 +666,83 @@ function ItemForm({
         </button>
         <button
           disabled={invalid || saving}
-          onClick={() => onSave(name.trim(), unit.trim(), qtyNum, note.trim() || null)}
+          onClick={() => onSave(name.trim(), unit.trim(), qtyNum, note.trim() || null, normCode)}
           className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
+      </div>
+
+      {normPickerOpen && (
+        <NormPickerModal
+          query={normQuery}
+          onQueryChange={setNormQuery}
+          loading={normLoading}
+          suggests={normSuggests}
+          onPick={pickNorm}
+          onClose={() => setNormPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function NormPickerModal({
+  query,
+  onQueryChange,
+  loading,
+  suggests,
+  onPick,
+  onClose,
+}: {
+  query: string;
+  onQueryChange: (v: string) => void;
+  loading: boolean;
+  suggests: NormSuggestion[];
+  onPick: (n: NormSuggestion) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-hidden rounded-2xl border border-[#252840] bg-[#0f1220]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-[#252840] p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-zinc-100">Chọn định mức</div>
+            <button onClick={onClose} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+              Đóng
+            </button>
+          </div>
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Tìm mã hoặc tên định mức…"
+            className="mt-2 w-full rounded-lg border border-[#252840] bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-sky-500/40 focus:outline-none"
+          />
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto p-2">
+          {loading && <div className="p-3 text-center text-xs text-zinc-500">Đang tìm…</div>}
+          {!loading && suggests.length === 0 && (
+            <div className="p-3 text-center text-xs text-zinc-500">Không có định mức khớp</div>
+          )}
+          {suggests.map((n) => (
+            <button
+              key={n.code}
+              type="button"
+              onClick={() => onPick(n)}
+              className="mb-1 flex w-full items-start gap-2 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left hover:border-sky-500/40 hover:bg-sky-500/5"
+            >
+              <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">{n.code}</span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-medium text-zinc-100">{n.name}</div>
+                <div className="text-[10px] text-zinc-500">/ {n.unit}</div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

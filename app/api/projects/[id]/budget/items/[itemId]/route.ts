@@ -25,6 +25,7 @@ const patchSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   sortRank: z.coerce.number().optional(),
   breakdown: z.array(breakdownSchema).max(200).optional().nullable(),
+  normCode: z.string().trim().max(32).optional().nullable(),
 });
 
 async function loadItem(projectId: string, itemId: string, userId: string, role: string) {
@@ -134,6 +135,9 @@ export async function PATCH(
           ? { note: body.note?.trim() ? body.note.trim() : null }
           : {}),
         ...(body.sortRank !== undefined ? { sortRank: body.sortRank } : {}),
+        ...(body.normCode !== undefined
+          ? { normCode: body.normCode?.trim() ? body.normCode.trim() : null }
+          : {}),
         breakdown:
           breakdown && breakdown.length > 0
             ? (breakdown as unknown as Prisma.InputJsonValue)
@@ -171,6 +175,7 @@ export async function PATCH(
       amount: Number(updated.amount),
       note: updated.note,
       sortRank: updated.sortRank,
+      normCode: updated.normCode,
     },
   });
 }

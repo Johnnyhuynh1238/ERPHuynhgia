@@ -66,6 +66,7 @@ type SerializedItem = {
   materialAmount: number;
   equipmentUnitPrice: number;
   equipmentAmount: number;
+  normCode: string | null;
 };
 
 type SerializedAmendmentItem = Omit<
@@ -81,6 +82,7 @@ type SerializedAmendmentItem = Omit<
   | "materialAmount"
   | "equipmentUnitPrice"
   | "equipmentAmount"
+  | "normCode"
 >;
 
 function normalizeBreakdown(raw: Prisma.JsonValue | null | undefined): SerializedBreakdownItem[] {
@@ -120,6 +122,7 @@ function serializeItem(item: {
   materialAmount: bigint;
   equipmentUnitPrice: bigint;
   equipmentAmount: bigint;
+  normCode: string | null;
 }): SerializedItem {
   return {
     id: item.id,
@@ -143,6 +146,7 @@ function serializeItem(item: {
     materialAmount: Number(item.materialAmount),
     equipmentUnitPrice: Number(item.equipmentUnitPrice),
     equipmentAmount: Number(item.equipmentAmount),
+    normCode: item.normCode,
   };
 }
 

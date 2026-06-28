@@ -25,6 +25,7 @@ const createSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   sortRank: z.coerce.number().optional(),
   breakdown: z.array(breakdownSchema).max(200).optional().nullable(),
+  normCode: z.string().trim().max(32).optional().nullable(),
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -119,6 +120,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           materialAmount: BigInt(materialAmount),
           equipmentUnitPrice: BigInt(body.equipmentUnitPrice),
           equipmentAmount: BigInt(equipmentAmount),
+          normCode: body.normCode?.trim() ? body.normCode.trim() : null,
         },
       });
 
@@ -159,6 +161,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       amount: Number(item.amount),
       note: item.note,
       sortRank: item.sortRank,
+      normCode: item.normCode,
     },
   }, { status: 201 });
 }
