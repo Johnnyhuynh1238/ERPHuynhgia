@@ -27,13 +27,6 @@ type Item = {
   name: string;
   unit: string;
   quantity: number;
-  laborUnitPrice: number;
-  laborAmount: number;
-  materialUnitPrice: number;
-  materialAmount: number;
-  equipmentUnitPrice: number;
-  equipmentAmount: number;
-  amount: number;
   note: string | null;
   sortRank: number;
 };
@@ -72,19 +65,12 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
         name: string;
         unit: string;
         quantity: number;
-        laborUnitPrice: number;
-        laborAmount: number;
-        materialUnitPrice: number;
-        materialAmount: number;
-        equipmentUnitPrice: number;
-        equipmentAmount: number;
-        amount: number;
         note: string | null;
         sortRank: number;
       }>;
       setItems(
         rawItems
-          .filter((it): it is Item => it.componentId !== null && it.stage !== null)
+          .filter((it) => it.componentId !== null && it.stage !== null)
           .map((it) => ({
             id: it.id,
             componentId: it.componentId as string,
@@ -92,13 +78,6 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
             name: it.name,
             unit: it.unit,
             quantity: it.quantity,
-            laborUnitPrice: it.laborUnitPrice,
-            laborAmount: it.laborAmount,
-            materialUnitPrice: it.materialUnitPrice,
-            materialAmount: it.materialAmount,
-            equipmentUnitPrice: it.equipmentUnitPrice,
-            equipmentAmount: it.equipmentAmount,
-            amount: it.amount,
             note: it.note,
             sortRank: it.sortRank,
           })),
@@ -130,17 +109,14 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
   }, [items]);
 
   const stageStats = useMemo(() => {
-    const out: Record<BudgetStage, { components: number; items: number; amount: number }> = {
-      CB: { components: 0, items: 0, amount: 0 },
-      N: { components: 0, items: 0, amount: 0 },
-      T: { components: 0, items: 0, amount: 0 },
-      HT: { components: 0, items: 0, amount: 0 },
+    const out: Record<BudgetStage, { components: number; items: number }> = {
+      CB: { components: 0, items: 0 },
+      N: { components: 0, items: 0 },
+      T: { components: 0, items: 0 },
+      HT: { components: 0, items: 0 },
     };
     for (const c of components) out[c.stage].components++;
-    for (const it of items) {
-      out[it.stage].items++;
-      out[it.stage].amount += it.amount;
-    }
+    for (const it of items) out[it.stage].items++;
     return out;
   }, [components, items]);
 
@@ -305,13 +281,8 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
 
       {/* Stage summary */}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-        <div className="flex items-baseline justify-between">
-          <div className="text-xs text-zinc-400">
-            <span className="text-zinc-200">Stage {stage} — {STAGE_LABEL[stage]}</span>
-          </div>
-          <div className="font-mono text-sm font-semibold text-emerald-300">
-            {stageStats[stage].amount > 0 ? stageStats[stage].amount.toLocaleString("vi-VN") + " đ" : "—"}
-          </div>
+        <div className="text-xs text-zinc-400">
+          <span className="text-zinc-200">Stage {stage} — {STAGE_LABEL[stage]}</span>
         </div>
         <div className="mt-1 text-[11px] text-zinc-500">
           {stageStats[stage].components} cấu kiện · {stageStats[stage].items} công tác
@@ -351,7 +322,6 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
             const its = itemsByComponent.get(c.id) ?? [];
             const open = openComponentId === c.id;
             const editing = editingComponentId === c.id;
-            const sumAmt = its.reduce((s, x) => s + x.amount, 0);
             return (
               <div key={c.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
                 <button
@@ -368,12 +338,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                       {its.length === 0 ? "Chưa có công tác" : `${its.length} công tác`}
                     </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="font-mono text-[12px] font-semibold text-emerald-300">
-                      {sumAmt > 0 ? sumAmt.toLocaleString("vi-VN") : "—"}
-                    </div>
-                    <div className="text-[10px] text-zinc-600">{open ? "▲" : "▼"}</div>
-                  </div>
+                  <div className="shrink-0 text-[11px] text-zinc-500">{open ? "▲" : "▼"}</div>
                 </button>
 
                 {open && (
