@@ -3,28 +3,26 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { normCategoryLabel } from "@/lib/budget-suggested-components";
 
-type CatalogTask = {
-  id: string;
-  phaseCode: string;
-  phaseName: string;
-  taskCode: string;
-  taskName: string;
-  groupLabel: string | null;
-};
-
-type MaterialItem = { name: string; unit: string; qty: number; note?: string | null };
-type MachineItem = { name: string; hours: number; note?: string | null };
+type MaterialItem = { name: string; unit: string; qtyPerUnit: number; note?: string | null };
+type LaborItem = { grade: string; qtyPerUnit: number; note?: string | null };
+type MachineItem = { name: string; qtyPerUnit: number; note?: string | null };
 
 type Norm = {
-  id: string;
-  standardTaskId: string;
+  code: string;
+  name: string;
   unit: string;
+  category: string | null;
   materialItems: MaterialItem[];
-  laborHours: number;
-  laborGrade: string | null;
+  laborItems: LaborItem[];
   machineItems: MachineItem[];
+  kMaterial: number;
+  kLabor: number;
+  kMachine: number;
+  source: string | null;
   note: string | null;
+  usageCount: number;
 };
 
 type Props = {
@@ -34,28 +32,22 @@ type Props = {
   canEdit: boolean;
 };
 
-const UNIT_SUGGEST = ["m³", "m²", "md", "kg", "tấn", "công", "bộ", "cái", "viên", "lít"];
-const GRADE_SUGGEST = ["3/7", "3.5/7", "4/7", "4.5/7"];
-
 export function NormsClient({ projectId, projectName, projectCode, canEdit }: Props) {
   const [loading, setLoading] = useState(true);
-  const [catalog, setCatalog] = useState<CatalogTask[]>([]);
-  const [byTask, setByTask] = useState<Record<string, Norm>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [norms, setNorms] = useState<Norm[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [phaseFilter, setPhaseFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [openCode, setOpenCode] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/projects/${projectId}/budget/norms`);
-      if (!r.ok) throw new Error("Tải thất bại");
+      const r = await fetch(`/api/norms?usage=1&projectId=${encodeURIComponent(projectId)}`);
+      if (!r.ok) throw new Error("Tải định mức thất bại");
       const data = await r.json();
-      setCatalog(data.catalog);
-      const map: Record<string, Norm> = {};
-      for (const n of data.norms as Norm[]) map[n.standardTaskId] = n;
-      setByTask(map);
+      setNorms(data.norms as Norm[]);
+      setCategories(data.categories as string[]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
     } finally {
@@ -63,68 +55,37 @@ export function NormsClient({ projectId, projectName, projectCode, canEdit }: Pr
     }
   }, [projectId]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const phases = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of catalog) seen.set(c.phaseCode, c.phaseName);
-    return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [catalog]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return catalog.filter((c) => {
-      if (phaseFilter !== "all" && c.phaseCode !== phaseFilter) return false;
+    return norms.filter((n) => {
+      if (categoryFilter !== "all" && (n.category ?? "") !== categoryFilter) return false;
       if (!q) return true;
-      return c.taskName.toLowerCase().includes(q) || c.taskCode.toLowerCase().includes(q);
+      return (
+        n.code.toLowerCase().includes(q) ||
+        n.name.toLowerCase().includes(q)
+      );
     });
-  }, [catalog, search, phaseFilter]);
+  }, [norms, search, categoryFilter]);
 
   const grouped = useMemo(() => {
-    const out: { phaseCode: string; phaseName: string; tasks: CatalogTask[] }[] = [];
-    let cur: { phaseCode: string; phaseName: string; tasks: CatalogTask[] } | null = null;
-    for (const c of filtered) {
-      if (!cur || cur.phaseCode !== c.phaseCode) {
-        cur = { phaseCode: c.phaseCode, phaseName: c.phaseName, tasks: [] };
-        out.push(cur);
-      }
-      cur.tasks.push(c);
+    const map = new Map<string, Norm[]>();
+    for (const n of filtered) {
+      const key = n.category ?? "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(n);
     }
-    return out;
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
-  const totalSet = Object.keys(byTask).length;
+  const openNorm = openCode ? norms.find((n) => n.code === openCode) ?? null : null;
 
-  async function saveOne(task: CatalogTask, payload: Omit<Norm, "id" | "standardTaskId">) {
-    if (!canEdit) return;
-    setSavingId(task.id);
-    try {
-      const r = await fetch(`/api/projects/${projectId}/budget/norms`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          standardTaskId: task.id,
-          ...payload,
-        }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.message || "Lưu thất bại");
-      }
-      const j = await r.json();
-      setByTask((prev) => {
-        const next = { ...prev };
-        if (j.deleted) delete next[task.id];
-        else next[task.id] = j;
-        return next;
-      });
-      toast.success("Đã lưu");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lỗi lưu");
-    } finally {
-      setSavingId(null);
-    }
-  }
+  const updateNormLocal = useCallback((code: string, patch: Partial<Norm>) => {
+    setNorms((prev) => prev.map((n) => (n.code === code ? { ...n, ...patch } : n)));
+  }, []);
 
   return (
     <div className="mx-auto max-w-3xl space-y-3 p-3 sm:p-4">
@@ -141,40 +102,41 @@ export function NormsClient({ projectId, projectName, projectCode, canEdit }: Pr
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-zinc-400">Đã set</span>
-          <span className="font-mono text-zinc-200">{totalSet}/{catalog.length} đầu việc</span>
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 text-[11px] text-zinc-400">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>Định mức dùng chung toàn hệ thống (nguồn: TT 12/2021 BXD)</span>
+          <span className="font-mono text-zinc-200">{norms.length} mã</span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-sky-500 transition-all"
-            style={{ width: catalog.length ? `${(totalSet / catalog.length) * 100}%` : "0%" }}
-          />
-        </div>
+        {canEdit ? (
+          <div className="mt-1 text-[10px] text-zinc-500">TPTC chỉnh hệ số K (VT/NC/MM) để khớp thực tế; hao phí gốc giữ nguyên.</div>
+        ) : (
+          <div className="mt-1 text-[10px] text-zinc-500">View-only — liên hệ TPTC để chỉnh hệ số K.</div>
+        )}
       </div>
 
       <div className="space-y-2">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm tên hoặc mã đầu việc…"
+          placeholder="Tìm mã hoặc tên định mức…"
           className="w-full rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/40 focus:outline-none"
         />
         <div className="flex flex-wrap gap-1.5">
           <button
-            onClick={() => setPhaseFilter("all")}
-            className={`rounded-full px-2.5 py-1 text-[11px] ${phaseFilter === "all" ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
+            type="button"
+            onClick={() => setCategoryFilter("all")}
+            className={`rounded-full px-2.5 py-1 text-[11px] ${categoryFilter === "all" ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
           >
-            Tất cả GĐ
+            Tất cả
           </button>
-          {phases.map(([code]) => (
+          {categories.map((c) => (
             <button
-              key={code}
-              onClick={() => setPhaseFilter(code)}
-              className={`rounded-full px-2.5 py-1 text-[11px] ${phaseFilter === code ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
+              key={c}
+              type="button"
+              onClick={() => setCategoryFilter(c)}
+              className={`rounded-full px-2.5 py-1 text-[11px] ${categoryFilter === c ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
             >
-              GĐ {code}
+              {normCategoryLabel(c)}
             </button>
           ))}
         </div>
@@ -183,271 +145,361 @@ export function NormsClient({ projectId, projectName, projectCode, canEdit }: Pr
       {loading ? (
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-zinc-500">Đang tải…</div>
       ) : grouped.length === 0 ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-zinc-500">Không có đầu việc khớp</div>
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-zinc-500">Không có định mức khớp</div>
       ) : (
-        grouped.map((g) => (
-          <section key={g.phaseCode} className="space-y-1.5">
+        grouped.map(([cat, list]) => (
+          <section key={cat || "khac"} className="space-y-1.5">
             <div className="px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              GĐ {g.phaseCode} — {g.phaseName}
+              {normCategoryLabel(cat)} <span className="text-zinc-600">· {list.length}</span>
             </div>
             <div className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
-              {g.tasks.map((t, i) => {
-                const n = byTask[t.id];
-                const open = openTaskId === t.id;
-                const matCount = n?.materialItems.length ?? 0;
-                const machCount = n?.machineItems.length ?? 0;
-                return (
-                  <div key={t.id} className={`${i > 0 ? "border-t border-[#252840]" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenTaskId(open ? null : t.id)}
-                      className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left active:bg-zinc-800/40"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-medium text-zinc-100">{t.taskName}</div>
-                        <div className="text-[10px] text-zinc-500">{t.phaseCode}-{t.taskCode}</div>
-                        {n && (
-                          <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
-                            {matCount > 0 && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">{matCount} VT</span>}
-                            {n.laborHours > 0 && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-200">{n.laborHours} công</span>}
-                            {machCount > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-200">{machCount} máy</span>}
-                          </div>
-                        )}
-                      </div>
-                      <div className="shrink-0 text-right">
-                        {n ? (
-                          <div className="text-[10px] text-zinc-500">/ {n.unit}</div>
-                        ) : (
-                          <div className="text-[11px] text-zinc-600">Chưa set</div>
-                        )}
-                      </div>
-                    </button>
-                    {open && (
-                      <NormForm
-                        task={t}
-                        initial={n ?? null}
-                        canEdit={canEdit}
-                        saving={savingId === t.id}
-                        onSave={(payload) => saveOne(t, payload)}
-                        onClose={() => setOpenTaskId(null)}
-                      />
-                    )}
+              {list.map((n, i) => (
+                <button
+                  key={n.code}
+                  type="button"
+                  onClick={() => setOpenCode(n.code)}
+                  className={`flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left active:bg-zinc-800/40 ${i > 0 ? "border-t border-[#252840]" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">{n.code}</span>
+                      <span className="text-[10px] text-zinc-500">/ {n.unit}</span>
+                      {n.usageCount > 0 && (
+                        <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">
+                          {n.usageCount} công tác
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 truncate text-[13px] font-medium text-zinc-100">{n.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
+                      <KBadge label="VT" value={n.kMaterial} tone="emerald" />
+                      <KBadge label="NC" value={n.kLabor} tone="amber" />
+                      <KBadge label="MM" value={n.kMachine} tone="violet" />
+                    </div>
                   </div>
-                );
-              })}
+                </button>
+              ))}
             </div>
           </section>
         ))
+      )}
+
+      {openNorm && (
+        <NormDetailSheet
+          norm={openNorm}
+          canEdit={canEdit}
+          onClose={() => setOpenCode(null)}
+          onPatched={(patch) => updateNormLocal(openNorm.code, patch)}
+        />
       )}
     </div>
   );
 }
 
-function NormForm({
-  task,
-  initial,
-  canEdit,
-  saving,
-  onSave,
-  onClose,
-}: {
-  task: CatalogTask;
-  initial: Norm | null;
-  canEdit: boolean;
-  saving: boolean;
-  onSave: (p: { unit: string; materialItems: MaterialItem[]; laborHours: number; laborGrade: string | null; machineItems: MachineItem[]; note: string | null }) => void;
-  onClose: () => void;
-}) {
-  const [unit, setUnit] = useState(initial?.unit ?? "m³");
-  const [materials, setMaterials] = useState<MaterialItem[]>(initial?.materialItems ?? []);
-  const [laborHoursStr, setLaborHoursStr] = useState(initial ? String(initial.laborHours) : "");
-  const [laborGrade, setLaborGrade] = useState(initial?.laborGrade ?? "");
-  const [machines, setMachines] = useState<MachineItem[]>(initial?.machineItems ?? []);
-  const [note, setNote] = useState(initial?.note ?? "");
-
+function KBadge({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "violet" }) {
+  const active = Math.abs(value - 1) > 1e-6;
+  const base =
+    tone === "emerald"
+      ? active
+        ? "bg-emerald-500/25 text-emerald-200 ring-1 ring-emerald-500/40"
+        : "bg-emerald-500/10 text-emerald-300/70"
+      : tone === "amber"
+        ? active
+          ? "bg-amber-500/25 text-amber-200 ring-1 ring-amber-500/40"
+          : "bg-amber-500/10 text-amber-300/70"
+        : active
+          ? "bg-violet-500/25 text-violet-200 ring-1 ring-violet-500/40"
+          : "bg-violet-500/10 text-violet-300/70";
   return (
-    <div className="space-y-3 border-t border-[#252840] bg-zinc-950/30 px-3 py-3">
-      <div>
-        <label className="text-[10px] text-zinc-500">Đơn vị công tác (per đơn vị)</label>
-        <input
-          list={`unit-norm-${task.id}`}
-          value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          disabled={!canEdit}
-          className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-        />
-        <datalist id={`unit-norm-${task.id}`}>
-          {UNIT_SUGGEST.map((u) => <option key={u} value={u} />)}
-        </datalist>
-      </div>
+    <span className={`rounded px-1.5 py-0.5 font-mono ${base}`}>
+      K_{label} ×{value.toFixed(2)}
+    </span>
+  );
+}
 
-      {/* Vật tư */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-emerald-300">🧱 Vật tư</span>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setMaterials([...materials, { name: "", unit: "kg", qty: 0 }])}
-              className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200 hover:bg-emerald-500/30"
-            >
-              + Thêm
-            </button>
-          )}
-        </div>
-        {materials.length === 0 && <div className="text-[10px] text-zinc-600">Chưa có vật tư</div>}
-        {materials.map((m, idx) => (
-          <div key={idx} className="grid grid-cols-12 gap-1.5">
-            <input
-              value={m.name}
-              onChange={(e) => setMaterials(materials.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-              placeholder="Tên VT"
-              disabled={!canEdit}
-              className="col-span-6 rounded border border-[#252840] bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100"
-            />
-            <input
-              inputMode="decimal"
-              value={String(m.qty)}
-              onChange={(e) => setMaterials(materials.map((x, i) => i === idx ? { ...x, qty: Number(e.target.value.replace(",", ".")) || 0 } : x))}
-              placeholder="0"
-              disabled={!canEdit}
-              className="col-span-3 rounded border border-[#252840] bg-zinc-900 px-1.5 py-1 text-right font-mono text-[12px] text-zinc-100"
-            />
-            <input
-              value={m.unit}
-              onChange={(e) => setMaterials(materials.map((x, i) => i === idx ? { ...x, unit: e.target.value } : x))}
-              placeholder="kg"
-              disabled={!canEdit}
-              className="col-span-2 rounded border border-[#252840] bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100"
-            />
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setMaterials(materials.filter((_, i) => i !== idx))}
-                className="col-span-1 rounded bg-rose-500/15 text-[12px] text-rose-300 hover:bg-rose-500/25"
-              >
-                ×
-              </button>
-            )}
+function NormDetailSheet({
+  norm,
+  canEdit,
+  onClose,
+  onPatched,
+}: {
+  norm: Norm;
+  canEdit: boolean;
+  onClose: () => void;
+  onPatched: (patch: Partial<Norm>) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#1a1d2e] p-4 sm:max-w-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">{norm.code}</span>
+              <span className="text-[10px] text-zinc-500">/ {norm.unit}</span>
+              {norm.category && (
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                  {normCategoryLabel(norm.category)}
+                </span>
+              )}
+            </div>
+            <div className="mt-1 text-sm font-semibold text-zinc-100">{norm.name}</div>
+            {norm.source && <div className="mt-0.5 text-[10px] text-zinc-500">Nguồn: {norm.source}</div>}
           </div>
-        ))}
-      </div>
-
-      {/* Nhân công */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-[10px] text-zinc-500">👷 Công / đơn vị</label>
-          <input
-            inputMode="decimal"
-            value={laborHoursStr}
-            onChange={(e) => setLaborHoursStr(e.target.value)}
-            placeholder="0"
-            disabled={!canEdit}
-            className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-zinc-500">Bậc thợ</label>
-          <input
-            list={`grade-${task.id}`}
-            value={laborGrade}
-            onChange={(e) => setLaborGrade(e.target.value)}
-            placeholder="3/7"
-            disabled={!canEdit}
-            className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-          />
-          <datalist id={`grade-${task.id}`}>
-            {GRADE_SUGGEST.map((g) => <option key={g} value={g} />)}
-          </datalist>
-        </div>
-      </div>
-
-      {/* Máy */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-violet-300">🚜 Máy thi công</span>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setMachines([...machines, { name: "", hours: 0 }])}
-              className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-200 hover:bg-violet-500/30"
-            >
-              + Thêm
-            </button>
-          )}
-        </div>
-        {machines.length === 0 && <div className="text-[10px] text-zinc-600">Chưa có máy</div>}
-        {machines.map((m, idx) => (
-          <div key={idx} className="grid grid-cols-12 gap-1.5">
-            <input
-              value={m.name}
-              onChange={(e) => setMachines(machines.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-              placeholder="Tên máy"
-              disabled={!canEdit}
-              className="col-span-8 rounded border border-[#252840] bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100"
-            />
-            <input
-              inputMode="decimal"
-              value={String(m.hours)}
-              onChange={(e) => setMachines(machines.map((x, i) => i === idx ? { ...x, hours: Number(e.target.value.replace(",", ".")) || 0 } : x))}
-              placeholder="ca"
-              disabled={!canEdit}
-              className="col-span-3 rounded border border-[#252840] bg-zinc-900 px-1.5 py-1 text-right font-mono text-[12px] text-zinc-100"
-            />
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setMachines(machines.filter((_, i) => i !== idx))}
-                className="col-span-1 rounded bg-rose-500/15 text-[12px] text-rose-300 hover:bg-rose-500/25"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <label className="text-[10px] text-zinc-500">Ghi chú</label>
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          disabled={!canEdit}
-          placeholder="Nguồn định mức 1776 / nội bộ…"
-          className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
-        />
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
-        >
-          Đóng
-        </button>
-        {canEdit && (
           <button
             type="button"
-            disabled={saving}
-            onClick={() => {
-              const cleanMats = materials.filter((m) => m.name.trim());
-              const cleanMachs = machines.filter((m) => m.name.trim());
-              const laborHours = Number(laborHoursStr.replace(",", ".")) || 0;
-              onSave({
-                unit: unit.trim(),
-                materialItems: cleanMats,
-                laborHours,
-                laborGrade: laborGrade.trim() || null,
-                machineItems: cleanMachs,
-                note: note.trim() || null,
-              });
-            }}
-            className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white shadow hover:bg-orange-600 disabled:opacity-50"
+            onClick={onClose}
+            className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
           >
-            {saving ? "Đang lưu…" : "Lưu"}
+            Đóng
           </button>
+        </div>
+
+        <KEditor norm={norm} canEdit={canEdit} onPatched={onPatched} />
+
+        <BreakdownSection
+          title="Vật tư"
+          tone="emerald"
+          k={norm.kMaterial}
+          unit={norm.unit}
+          rows={(norm.materialItems ?? []).map((m) => ({
+            primary: m.name,
+            unit: m.unit,
+            qty: Number(m.qtyPerUnit),
+            note: m.note ?? null,
+          }))}
+        />
+        <BreakdownSection
+          title="Nhân công"
+          tone="amber"
+          k={norm.kLabor}
+          unit={norm.unit}
+          rows={(norm.laborItems ?? []).map((l) => ({
+            primary: `Bậc ${l.grade}`,
+            unit: "công",
+            qty: Number(l.qtyPerUnit),
+            note: l.note ?? null,
+          }))}
+        />
+        <BreakdownSection
+          title="Máy thi công"
+          tone="violet"
+          k={norm.kMachine}
+          unit={norm.unit}
+          rows={(norm.machineItems ?? []).map((m) => ({
+            primary: m.name,
+            unit: "ca",
+            qty: Number(m.qtyPerUnit),
+            note: m.note ?? null,
+          }))}
+        />
+
+        {norm.note && (
+          <div className="mt-3 rounded-xl border border-[#252840] bg-[#11131f] p-2.5 text-[11px] text-zinc-400">
+            <div className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Ghi chú</div>
+            {norm.note}
+          </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function KEditor({
+  norm,
+  canEdit,
+  onPatched,
+}: {
+  norm: Norm;
+  canEdit: boolean;
+  onPatched: (patch: Partial<Norm>) => void;
+}) {
+  const [vt, setVt] = useState(norm.kMaterial.toString());
+  const [nc, setNc] = useState(norm.kLabor.toString());
+  const [mm, setMm] = useState(norm.kMachine.toString());
+  const [saving, setSaving] = useState<null | "vt" | "nc" | "mm">(null);
+
+  useEffect(() => {
+    setVt(norm.kMaterial.toString());
+    setNc(norm.kLabor.toString());
+    setMm(norm.kMachine.toString());
+  }, [norm.code, norm.kMaterial, norm.kLabor, norm.kMachine]);
+
+  async function save(field: "vt" | "nc" | "mm", raw: string, currentValue: number) {
+    if (!canEdit) return;
+    const v = Number(raw.replace(",", "."));
+    if (!Number.isFinite(v) || v < 0 || v > 10) {
+      toast.error("Hệ số K phải nằm trong [0, 10]");
+      if (field === "vt") setVt(currentValue.toString());
+      else if (field === "nc") setNc(currentValue.toString());
+      else setMm(currentValue.toString());
+      return;
+    }
+    if (Math.abs(v - currentValue) < 1e-6) return;
+    setSaving(field);
+    try {
+      const body =
+        field === "vt"
+          ? { kMaterial: v }
+          : field === "nc"
+            ? { kLabor: v }
+            : { kMachine: v };
+      const r = await fetch(`/api/norms/${encodeURIComponent(norm.code)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.message || "Lưu thất bại");
+      }
+      const patch: Partial<Norm> =
+        field === "vt"
+          ? { kMaterial: v }
+          : field === "nc"
+            ? { kLabor: v }
+            : { kMachine: v };
+      onPatched(patch);
+      toast.success("Đã lưu hệ số K");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi lưu");
+      if (field === "vt") setVt(currentValue.toString());
+      else if (field === "nc") setNc(currentValue.toString());
+      else setMm(currentValue.toString());
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div className="mb-3 grid grid-cols-3 gap-2">
+      <KInput
+        label="K_VT"
+        tone="emerald"
+        value={vt}
+        onChange={setVt}
+        onCommit={() => save("vt", vt, norm.kMaterial)}
+        disabled={!canEdit}
+        saving={saving === "vt"}
+      />
+      <KInput
+        label="K_NC"
+        tone="amber"
+        value={nc}
+        onChange={setNc}
+        onCommit={() => save("nc", nc, norm.kLabor)}
+        disabled={!canEdit}
+        saving={saving === "nc"}
+      />
+      <KInput
+        label="K_MM"
+        tone="violet"
+        value={mm}
+        onChange={setMm}
+        onCommit={() => save("mm", mm, norm.kMachine)}
+        disabled={!canEdit}
+        saving={saving === "mm"}
+      />
+    </div>
+  );
+}
+
+function KInput({
+  label,
+  tone,
+  value,
+  onChange,
+  onCommit,
+  disabled,
+  saving,
+}: {
+  label: string;
+  tone: "emerald" | "amber" | "violet";
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  disabled: boolean;
+  saving: boolean;
+}) {
+  const ring =
+    tone === "emerald"
+      ? "focus:border-emerald-500/50 focus:ring-emerald-500/30"
+      : tone === "amber"
+        ? "focus:border-amber-500/50 focus:ring-amber-500/30"
+        : "focus:border-violet-500/50 focus:ring-violet-500/30";
+  return (
+    <label className="block rounded-xl border border-[#252840] bg-[#11131f] p-2">
+      <div className="flex items-center justify-between text-[10px] text-zinc-500">
+        <span>{label}</span>
+        {saving && <span className="text-orange-300">…</span>}
+      </div>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onCommit}
+        disabled={disabled}
+        className={`mt-0.5 w-full rounded bg-transparent text-center font-mono text-sm text-zinc-100 outline-none ${ring} disabled:text-zinc-400`}
+      />
+    </label>
+  );
+}
+
+function BreakdownSection({
+  title,
+  tone,
+  k,
+  unit,
+  rows,
+}: {
+  title: string;
+  tone: "emerald" | "amber" | "violet";
+  k: number;
+  unit: string;
+  rows: { primary: string; unit: string; qty: number; note: string | null }[];
+}) {
+  if (rows.length === 0) return null;
+  const kActive = Math.abs(k - 1) > 1e-6;
+  const accent =
+    tone === "emerald"
+      ? "text-emerald-300"
+      : tone === "amber"
+        ? "text-amber-300"
+        : "text-violet-300";
+  return (
+    <div className="mt-3 rounded-xl border border-[#252840] bg-[#11131f] p-2.5">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className={`font-medium ${accent}`}>{title}</span>
+        <span className="text-[10px] text-zinc-500">
+          hao phí cho 1 {unit}
+          {kActive ? <span className="ml-1 text-zinc-400">· đã × K {k.toFixed(2)}</span> : null}
+        </span>
+      </div>
+      <div className="mt-1.5 divide-y divide-[#252840]">
+        {rows.map((r, i) => {
+          const effective = r.qty * k;
+          return (
+            <div key={i} className="flex items-baseline justify-between gap-2 py-1.5 text-[12px]">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-zinc-200">{r.primary}</div>
+                {r.note && <div className="text-[10px] text-zinc-500">{r.note}</div>}
+              </div>
+              <div className="shrink-0 text-right font-mono">
+                <div className="text-zinc-400">
+                  {r.qty} {r.unit}
+                </div>
+                {kActive && (
+                  <div className={accent}>
+                    → {Number(effective.toFixed(4))} {r.unit}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

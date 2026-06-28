@@ -49,3 +49,22 @@ export const STAGE_LABEL: Record<BudgetStage, string> = {
 };
 
 export const STAGE_ORDER: BudgetStage[] = ["CB", "N", "T", "HT"];
+
+export const NORM_CATEGORY_LABEL: Record<string, string> = {
+  be_tong: "Bê tông",
+  cot_thep: "Cốt thép",
+  cop_pha: "Cốp pha",
+  xay: "Xây",
+  to_trat: "Tô trát",
+  op_lat: "Ốp lát",
+  son: "Sơn",
+  tran: "Trần",
+  chong_tham: "Chống thấm",
+  cua: "Cửa & cơ khí",
+  mep: "MEP",
+};
+
+export function normCategoryLabel(category: string | null | undefined): string {
+  if (!category) return "Khác";
+  return NORM_CATEGORY_LABEL[category] ?? category;
+}
