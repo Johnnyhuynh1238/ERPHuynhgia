@@ -718,6 +718,8 @@ model Project {
   materialProposals         MaterialProposal[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
+  budgetQuantities          ProjectBudgetQuantity[]
+  budgetNorms               ProjectBudgetNorm[]
   projectComponents         ProjectComponent[]
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
@@ -829,9 +831,11 @@ model StandardTaskCatalog {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates   TaskTemplate[]      @relation("TemplateStdCatalog")
-  tasks       Task[]              @relation("TaskStdCatalog")
-  budgetItems ProjectBudgetItem[]
+  templates        TaskTemplate[]          @relation("TemplateStdCatalog")
+  tasks            Task[]                  @relation("TaskStdCatalog")
+  budgetItems      ProjectBudgetItem[]
+  budgetQuantities ProjectBudgetQuantity[]
+  budgetNorms      ProjectBudgetNorm[]
 
   @@unique([phaseCode, taskCode])
   @@index([phaseCode, displayOrder])
@@ -2994,11 +2998,57 @@ model ProjectComponent {
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
 
-  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items   ProjectBudgetItem[]
+  project          Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items            ProjectBudgetItem[]
+  budgetQuantities ProjectBudgetQuantity[]
 
   @@index([projectId, stage, sortOrder])
   @@map("project_components")
+}
+
+// ──────────────────────────── M2 v3: Dự toán theo trình tự KL × ĐM × ĐG ────────────────────────────
+
+// Khối lượng bóc tách per (project, component?, standardTask)
+model ProjectBudgetQuantity {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  componentId    String?  @map("component_id") @db.Uuid
+  standardTaskId String   @map("standard_task_id") @db.Uuid
+  unit           String   @db.VarChar(20)
+  quantity       Decimal  @db.Decimal(14, 3)
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  component    ProjectComponent?   @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  standardTask StandardTaskCatalog @relation(fields: [standardTaskId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, componentId, standardTaskId])
+  @@index([projectId])
+  @@map("project_budget_quantities")
+}
+
+// Định mức hao phí VT/NC/M per 1 đơn vị công tác — snapshot per project
+model ProjectBudgetNorm {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  standardTaskId String   @map("standard_task_id") @db.Uuid
+  unit           String   @db.VarChar(20)
+  materialItems  Json     @default("[]") @map("material_items") @db.JsonB // [{name, unit, qty, note?}]
+  laborHours     Decimal  @default(0) @map("labor_hours") @db.Decimal(10, 4) // công/đơn vị
+  laborGrade     String?  @map("labor_grade") @db.VarChar(20)
+  machineItems   Json     @default("[]") @map("machine_items") @db.JsonB // [{name, hours, note?}]
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  standardTask StandardTaskCatalog @relation(fields: [standardTaskId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, standardTaskId])
+  @@index([projectId])
+  @@map("project_budget_norms")
 }
 
 model ProjectBudgetAmendment {
