@@ -32,14 +32,6 @@ type ProjectsResponse = {
   };
 };
 
-function fmtDate(dateIso: string) {
-  const d = new Date(dateIso);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = d.getUTCFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
 function statusChip(status: ProjectItem["status"]) {
   if (status === "in_progress") return "bg-blue-500/15 text-blue-300";
   if (status === "completed") return "bg-emerald-500/15 text-emerald-300";
@@ -82,12 +74,15 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
     setPage(1);
   }, [status, managerId, engineerId]);
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const canViewAllProjects =
     currentRole === "admin" ||
     currentRole === "accountant" ||
     currentRole === "construction_manager";
 
-  const canProposeMaterials = currentRole === "engineer" || currentRole === "admin";
+  const activeFilterCount =
+    (search ? 1 : 0) + (status !== "all" ? 1 : 0) + (managerId ? 1 : 0) + (engineerId ? 1 : 0);
 
   async function loadProjects() {
     setLoading(true);
@@ -130,49 +125,86 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-bold text-[#f0f2ff]">Danh sách dự án</h1>
-          {currentRole === "admin" || currentRole === "construction_manager" ? (
-            <Link href="/projects/new">
-              <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]">Tạo mới</Button>
-            </Link>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Bộ lọc"
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={`relative flex h-9 w-9 items-center justify-center rounded-xl border text-lg transition ${
+                filtersOpen || activeFilterCount > 0
+                  ? "border-[#f97316] bg-[#f97316]/10 text-[#fb923c]"
+                  : "border-[#2d3249] bg-[#13151f] text-[#8892b0] hover:text-[#f0f2ff]"
+              }`}
+            >
+              <span aria-hidden>⌕</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-bold text-black">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {currentRole === "admin" || currentRole === "construction_manager" ? (
+              <Link href="/projects/new">
+                <Button className="h-9 bg-[#f97316] text-black hover:bg-[#fb923c]">Tạo mới</Button>
+              </Link>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-3 grid gap-2">
-          <input
-            placeholder="Tìm mã / tên / chủ nhà / địa chỉ"
-            className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
+        {filtersOpen && (
+          <div className="mt-3 grid gap-2">
+            <input
+              placeholder="Tìm mã / tên / chủ nhà / địa chỉ"
+              className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
 
-          <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">Tất cả trạng thái</option>
-            <option value="planning">Planning</option>
-            <option value="in_progress">Đang thi công</option>
-            <option value="completed">Hoàn thành</option>
-            <option value="paused">Tạm ngưng</option>
-          </select>
+            <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="all">Tất cả trạng thái</option>
+              <option value="planning">Planning</option>
+              <option value="in_progress">Đang thi công</option>
+              <option value="completed">Hoàn thành</option>
+              <option value="paused">Tạm ngưng</option>
+            </select>
 
-          {canViewAllProjects ? (
-            <>
-              <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-                <option value="">Tất cả GĐ Thi Công</option>
-                {projectManagers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.fullName}</option>
-                ))}
-              </select>
+            {canViewAllProjects ? (
+              <>
+                <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+                  <option value="">Tất cả GĐ Thi Công</option>
+                  {projectManagers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.fullName}</option>
+                  ))}
+                </select>
 
-              <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={engineerId} onChange={(e) => setEngineerId(e.target.value)}>
-                <option value="">Tất cả KS chính</option>
-                {mainEngineers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.fullName}</option>
-                ))}
-              </select>
-            </>
-          ) : null}
-        </div>
+                <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={engineerId} onChange={(e) => setEngineerId(e.target.value)}>
+                  <option value="">Tất cả KS chính</option>
+                  {mainEngineers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.fullName}</option>
+                  ))}
+                </select>
+              </>
+            ) : null}
+
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                  setStatus("all");
+                  setManagerId("");
+                  setEngineerId("");
+                }}
+                className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-xs text-[#8892b0] hover:text-[#f0f2ff]"
+              >
+                Xoá bộ lọc
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -185,54 +217,27 @@ export function ProjectsClient({ currentRole }: { currentRole: string }) {
           </div>
         ) : (
           projects.map((project, idx) => (
-            <div
+            <Link
               key={project.id}
-              className={`rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up delay-${(idx % 6) + 1}`}
+              href={`/projects/${project.id}`}
+              className={`block rounded-xl border border-[#252840] bg-[#1a1d2e] p-3 slide-up delay-${(idx % 6) + 1} transition hover:border-[#f97316]/40`}
             >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <Link href={`/projects/${project.id}`}>
-                  <div className="text-xs text-[#8892b0]">{project.code}</div>
-                  <div className="text-sm font-bold text-[#f0f2ff] hover:text-[#fb923c]">{project.name}</div>
-                </Link>
-                <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusChip(project.status)}`}>{statusLabel(project.status)}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] text-[#8892b0]">{project.code}</div>
+                  <div className="truncate text-sm font-semibold text-[#f0f2ff]">{project.name}</div>
+                  <div className="truncate text-[11px] text-[#8892b0]">{project.address}</div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusChip(project.status)}`}>{statusLabel(project.status)}</span>
               </div>
 
-              <div className="text-xs text-[#8892b0]">{project.address}</div>
-
-              <div className="mt-3 flex flex-col gap-1.5">
-                <Link
-                  href={`/projects/${project.id}/tasks`}
-                  className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
-                >
-                  <span>📋 Tiến độ</span>
-                  <span>›</span>
-                </Link>
-                <Link
-                  href={`/projects/${project.id}/construction-log`}
-                  className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
-                >
-                  <span>📓 Nhật ký</span>
-                  <span>›</span>
-                </Link>
-                {canProposeMaterials && (
-                  <Link
-                    href={`/projects/${project.id}/material-proposals`}
-                    className="flex w-full items-center justify-between rounded-[10px] border border-[#2d3249] bg-[#13151f] px-[14px] py-[10px] text-[13px] font-semibold text-[#8892b0] transition hover:bg-[#1f2436] active:scale-[0.97]"
-                  >
-                    <span>📦 Đề xuất vật tư</span>
-                    <span>›</span>
-                  </Link>
-                )}
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1 flex-1 rounded-full bg-[#252840]">
+                  <div className="h-1 rounded-full bg-[#f97316]" style={{ width: `${Math.max(0, Math.min(100, project.progressPercent))}%` }} />
+                </div>
+                <span className="text-[10px] text-[#8892b0]">{Math.round(project.progressPercent)}%</span>
               </div>
-
-              <div className="mt-2 flex items-center justify-between text-[11px] text-[#8892b0]">
-                <span>Khởi công: {fmtDate(project.startDate)}</span>
-                <span>{Math.round(project.progressPercent)}%</span>
-              </div>
-              <div className="mt-2 h-1.5 rounded-full bg-[#252840]">
-                <div className="h-1.5 rounded-full bg-[#f97316]" style={{ width: `${Math.max(0, Math.min(100, project.progressPercent))}%` }} />
-              </div>
-            </div>
+            </Link>
           ))
         )}
       </div>
