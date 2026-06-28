@@ -157,18 +157,10 @@ export function BudgetHubClient({
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-3 sm:p-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dự toán</div>
-          <h1 className="text-base font-semibold text-zinc-100 sm:text-lg">{projectName}</h1>
-          <div className="text-xs text-zinc-500">{projectCode}</div>
-        </div>
-        <Link
-          href={`/projects/${projectId}/budget/legacy`}
-          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800"
-        >
-          Chế độ cũ
-        </Link>
+      <div>
+        <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dự toán</div>
+        <h1 className="text-base font-semibold text-zinc-100 sm:text-lg">{projectName}</h1>
+        <div className="text-xs text-zinc-500">{projectCode}</div>
       </div>
 
       {/* Card tổng */}
