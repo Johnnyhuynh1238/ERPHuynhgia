@@ -3,23 +3,39 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { BudgetStage } from "@prisma/client";
+import {
+  STAGE_LABEL,
+  STAGE_ORDER,
+  SUGGESTED_COMPONENTS,
+  type SuggestedComponent,
+} from "@/lib/budget-suggested-components";
 
-type CatalogTask = {
+type Component = {
   id: string;
-  phaseCode: string;
-  phaseName: string;
-  taskCode: string;
-  taskName: string;
-  groupLabel: string | null;
+  stage: BudgetStage;
+  name: string;
+  floor: string | null;
+  sortOrder: number;
+  note: string | null;
 };
 
-type Quantity = {
+type Item = {
   id: string;
-  standardTaskId: string;
-  componentId: string | null;
+  componentId: string;
+  stage: BudgetStage;
+  name: string;
   unit: string;
   quantity: number;
+  laborUnitPrice: number;
+  laborAmount: number;
+  materialUnitPrice: number;
+  materialAmount: number;
+  equipmentUnitPrice: number;
+  equipmentAmount: number;
+  amount: number;
   note: string | null;
+  sortRank: number;
 };
 
 type Props = {
@@ -33,25 +49,60 @@ const UNIT_SUGGEST = ["m³", "m²", "md", "kg", "tấn", "công", "bộ", "cái"
 
 export function QuantitiesClient({ projectId, projectName, projectCode, canEdit }: Props) {
   const [loading, setLoading] = useState(true);
-  const [catalog, setCatalog] = useState<CatalogTask[]>([]);
-  const [byTask, setByTask] = useState<Record<string, Quantity>>({});
+  const [stage, setStage] = useState<BudgetStage>("T");
+  const [components, setComponents] = useState<Component[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [openComponentId, setOpenComponentId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<{ componentId: string; item: Item | null } | null>(null);
+  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [phaseFilter, setPhaseFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/projects/${projectId}/budget/quantities`);
-      if (!r.ok) throw new Error("Tải thất bại");
-      const data = await r.json();
-      setCatalog(data.catalog);
-      const map: Record<string, Quantity> = {};
-      for (const q of data.quantities as Quantity[]) {
-        if (q.componentId === null) map[q.standardTaskId] = q;
-      }
-      setByTask(map);
+      const rs = await fetch(`/api/projects/${projectId}/budget`);
+      if (!rs.ok) throw new Error("Tải dữ liệu thất bại");
+      const ds = await rs.json();
+      setComponents(ds.components ?? []);
+      const rawItems = (ds.budget?.items ?? []) as Array<{
+        id: string;
+        componentId: string | null;
+        stage: BudgetStage | null;
+        name: string;
+        unit: string;
+        quantity: number;
+        laborUnitPrice: number;
+        laborAmount: number;
+        materialUnitPrice: number;
+        materialAmount: number;
+        equipmentUnitPrice: number;
+        equipmentAmount: number;
+        amount: number;
+        note: string | null;
+        sortRank: number;
+      }>;
+      setItems(
+        rawItems
+          .filter((it): it is Item => it.componentId !== null && it.stage !== null)
+          .map((it) => ({
+            id: it.id,
+            componentId: it.componentId as string,
+            stage: it.stage as BudgetStage,
+            name: it.name,
+            unit: it.unit,
+            quantity: it.quantity,
+            laborUnitPrice: it.laborUnitPrice,
+            laborAmount: it.laborAmount,
+            materialUnitPrice: it.materialUnitPrice,
+            materialAmount: it.materialAmount,
+            equipmentUnitPrice: it.equipmentUnitPrice,
+            equipmentAmount: it.equipmentAmount,
+            amount: it.amount,
+            note: it.note,
+            sortRank: it.sortRank,
+          })),
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
     } finally {
@@ -61,71 +112,157 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
 
   useEffect(() => { load(); }, [load]);
 
-  const phases = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of catalog) seen.set(c.phaseCode, c.phaseName);
-    return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [catalog]);
+  const componentsByStage = useMemo(() => {
+    const map: Record<BudgetStage, Component[]> = { CB: [], N: [], T: [], HT: [] };
+    for (const c of components) map[c.stage].push(c);
+    return map;
+  }, [components]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return catalog.filter((c) => {
-      if (phaseFilter !== "all" && c.phaseCode !== phaseFilter) return false;
-      if (!q) return true;
-      return (
-        c.taskName.toLowerCase().includes(q) ||
-        c.taskCode.toLowerCase().includes(q) ||
-        c.phaseName.toLowerCase().includes(q)
-      );
-    });
-  }, [catalog, search, phaseFilter]);
+  const itemsByComponent = useMemo(() => {
+    const map = new Map<string, Item[]>();
+    for (const it of items) {
+      const arr = map.get(it.componentId) ?? [];
+      arr.push(it);
+      map.set(it.componentId, arr);
+    }
+    map.forEach((arr) => arr.sort((a, b) => a.sortRank - b.sortRank));
+    return map;
+  }, [items]);
 
-  const grouped = useMemo(() => {
-    const out: { phaseCode: string; phaseName: string; tasks: CatalogTask[] }[] = [];
-    let cur: { phaseCode: string; phaseName: string; tasks: CatalogTask[] } | null = null;
-    for (const c of filtered) {
-      if (!cur || cur.phaseCode !== c.phaseCode) {
-        cur = { phaseCode: c.phaseCode, phaseName: c.phaseName, tasks: [] };
-        out.push(cur);
-      }
-      cur.tasks.push(c);
+  const stageStats = useMemo(() => {
+    const out: Record<BudgetStage, { components: number; items: number; amount: number }> = {
+      CB: { components: 0, items: 0, amount: 0 },
+      N: { components: 0, items: 0, amount: 0 },
+      T: { components: 0, items: 0, amount: 0 },
+      HT: { components: 0, items: 0, amount: 0 },
+    };
+    for (const c of components) out[c.stage].components++;
+    for (const it of items) {
+      out[it.stage].items++;
+      out[it.stage].amount += it.amount;
     }
     return out;
-  }, [filtered]);
+  }, [components, items]);
 
-  const totalWithQty = Object.keys(byTask).length;
+  const visibleComponents = componentsByStage[stage];
 
-  async function saveOne(task: CatalogTask, unit: string, quantity: number, note: string | null) {
+  async function addComponent(name: string, floor: string | null, fromSuggested?: SuggestedComponent) {
     if (!canEdit) return;
-    setSavingId(task.id);
     try {
-      const r = await fetch(`/api/projects/${projectId}/budget/quantities`, {
-        method: "PUT",
+      const r = await fetch(`/api/projects/${projectId}/budget/components`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, name, floor }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.message || "Tạo cấu kiện thất bại");
+      }
+      const j = await r.json();
+      setComponents((prev) => [...prev, j.component]);
+      toast.success("Đã thêm cấu kiện" + (fromSuggested ? " (gợi ý)" : ""));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi tạo cấu kiện");
+    }
+  }
+
+  async function patchComponent(c: Component, name: string, floor: string | null, note: string | null) {
+    if (!canEdit) return;
+    setSavingId(c.id);
+    try {
+      const r = await fetch(`/api/projects/${projectId}/budget/components/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, floor, note }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.message || "Sửa cấu kiện thất bại");
+      }
+      const j = await r.json();
+      setComponents((prev) => prev.map((x) => (x.id === c.id ? j.component : x)));
+      toast.success("Đã lưu cấu kiện");
+      setEditingComponentId(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi sửa cấu kiện");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteComponent(c: Component) {
+    if (!canEdit) return;
+    if (!window.confirm(`Xoá cấu kiện "${c.name}"?`)) return;
+    try {
+      const r = await fetch(`/api/projects/${projectId}/budget/components/${c.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.message || "Xoá thất bại");
+      }
+      setComponents((prev) => prev.filter((x) => x.id !== c.id));
+      toast.success("Đã xoá");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi xoá");
+    }
+  }
+
+  async function saveItem(payload: {
+    componentId: string;
+    itemId: string | null;
+    name: string;
+    unit: string;
+    quantity: number;
+    note: string | null;
+  }) {
+    if (!canEdit) return;
+    setSavingId(payload.itemId ?? "new");
+    try {
+      const url = payload.itemId
+        ? `/api/projects/${projectId}/budget/items/${payload.itemId}`
+        : `/api/projects/${projectId}/budget/items`;
+      const method = payload.itemId ? "PATCH" : "POST";
+      const r = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          standardTaskId: task.id,
-          componentId: null,
-          unit,
-          quantity,
-          note,
+          componentId: payload.componentId,
+          name: payload.name,
+          unit: payload.unit,
+          quantity: payload.quantity,
+          note: payload.note,
         }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j.message || "Lưu thất bại");
+        throw new Error(j.message || "Lưu công tác thất bại");
       }
       const j = await r.json();
-      setByTask((prev) => {
-        const next = { ...prev };
-        if (j.deleted) delete next[task.id];
-        else next[task.id] = j;
-        return next;
+      setItems((prev) => {
+        if (payload.itemId) return prev.map((x) => (x.id === payload.itemId ? j.item : x));
+        return [...prev, j.item];
       });
-      toast.success("Đã lưu");
+      toast.success("Đã lưu công tác");
+      setEditingItem(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lỗi lưu");
+      toast.error(e instanceof Error ? e.message : "Lỗi lưu công tác");
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function deleteItem(it: Item) {
+    if (!canEdit) return;
+    if (!window.confirm(`Xoá công tác "${it.name}"?`)) return;
+    try {
+      const r = await fetch(`/api/projects/${projectId}/budget/items/${it.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.message || "Xoá thất bại");
+      }
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+      toast.success("Đã xoá");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi xoá");
     }
   }
 
@@ -145,142 +282,316 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-zinc-400">Đã nhập</span>
-          <span className="font-mono text-zinc-200">{totalWithQty}/{catalog.length} đầu việc</span>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-sky-500 transition-all"
-            style={{ width: catalog.length ? `${(totalWithQty / catalog.length) * 100}%` : "0%" }}
-          />
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="space-y-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm tên hoặc mã đầu việc…"
-          className="w-full rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/40 focus:outline-none"
-        />
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setPhaseFilter("all")}
-            className={`rounded-full px-2.5 py-1 text-[11px] ${phaseFilter === "all" ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
-          >
-            Tất cả GĐ
-          </button>
-          {phases.map(([code, name]) => (
+      {/* Stage tabs */}
+      <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-1.5">
+        {STAGE_ORDER.map((s) => {
+          const st = stageStats[s];
+          const active = s === stage;
+          return (
             <button
-              key={code}
-              onClick={() => setPhaseFilter(code)}
-              className={`rounded-full px-2.5 py-1 text-[11px] ${phaseFilter === code ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40" : "bg-zinc-800 text-zinc-400"}`}
+              key={s}
+              onClick={() => setStage(s)}
+              className={`rounded-xl px-2 py-2 text-center transition ${active ? "bg-orange-500/20 ring-1 ring-orange-500/40" : "hover:bg-zinc-800/40"}`}
             >
-              GĐ {code}
+              <div className={`text-[10px] font-medium uppercase tracking-wide ${active ? "text-orange-200" : "text-zinc-500"}`}>{s}</div>
+              <div className={`mt-0.5 text-[11px] font-medium leading-tight ${active ? "text-zinc-100" : "text-zinc-300"}`}>{STAGE_LABEL[s]}</div>
+              <div className="mt-1 text-[9.5px] text-zinc-500">
+                {st.components} ck · {st.items} ct
+              </div>
             </button>
-          ))}
+          );
+        })}
+      </div>
+
+      {/* Stage summary */}
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+        <div className="flex items-baseline justify-between">
+          <div className="text-xs text-zinc-400">
+            <span className="text-zinc-200">Stage {stage} — {STAGE_LABEL[stage]}</span>
+          </div>
+          <div className="font-mono text-sm font-semibold text-emerald-300">
+            {stageStats[stage].amount > 0 ? stageStats[stage].amount.toLocaleString("vi-VN") + " đ" : "—"}
+          </div>
+        </div>
+        <div className="mt-1 text-[11px] text-zinc-500">
+          {stageStats[stage].components} cấu kiện · {stageStats[stage].items} công tác
         </div>
       </div>
 
-      {/* List */}
+      {/* Add component buttons */}
+      {canEdit && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="flex-1 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2 text-xs font-medium text-orange-200 hover:bg-orange-500/20"
+          >
+            + Cấu kiện chuẩn (gợi ý SOP 47)
+          </button>
+          <button
+            onClick={() => addComponent(`Cấu kiện ${stage}`, null)}
+            className="rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+          >
+            + Tự đặt tên
+          </button>
+        </div>
+      )}
+
+      {/* Components list */}
       {loading ? (
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-zinc-500">
           Đang tải…
         </div>
-      ) : grouped.length === 0 ? (
+      ) : visibleComponents.length === 0 ? (
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-zinc-500">
-          Không có đầu việc khớp
+          Chưa có cấu kiện ở stage {stage}. Bấm “+ Cấu kiện chuẩn” để thêm nhanh.
         </div>
       ) : (
-        grouped.map((g) => (
-          <section key={g.phaseCode} className="space-y-1.5">
-            <div className="px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              GĐ {g.phaseCode} — {g.phaseName}
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
-              {g.tasks.map((t, i) => {
-                const q = byTask[t.id];
-                const open = openTaskId === t.id;
-                return (
-                  <div key={t.id} className={`${i > 0 ? "border-t border-[#252840]" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenTaskId(open ? null : t.id)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left active:bg-zinc-800/40"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-medium text-zinc-100">{t.taskName}</div>
-                        <div className="text-[10px] text-zinc-500">{t.phaseCode}-{t.taskCode}{t.groupLabel ? ` · ${t.groupLabel}` : ""}</div>
+        <div className="space-y-2">
+          {visibleComponents.map((c) => {
+            const its = itemsByComponent.get(c.id) ?? [];
+            const open = openComponentId === c.id;
+            const editing = editingComponentId === c.id;
+            const sumAmt = its.reduce((s, x) => s + x.amount, 0);
+            return (
+              <div key={c.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e]">
+                <button
+                  type="button"
+                  onClick={() => setOpenComponentId(open ? null : c.id)}
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left active:bg-zinc-800/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-medium text-zinc-100">
+                      {c.name}
+                      {c.floor && <span className="ml-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-200">T{c.floor}</span>}
+                    </div>
+                    <div className="text-[10px] text-zinc-500">
+                      {its.length === 0 ? "Chưa có công tác" : `${its.length} công tác`}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-[12px] font-semibold text-emerald-300">
+                      {sumAmt > 0 ? sumAmt.toLocaleString("vi-VN") : "—"}
+                    </div>
+                    <div className="text-[10px] text-zinc-600">{open ? "▲" : "▼"}</div>
+                  </div>
+                </button>
+
+                {open && (
+                  <div className="space-y-2 border-t border-[#252840] bg-zinc-950/30 px-3 py-3">
+                    {/* Edit component header */}
+                    {canEdit && (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setEditingComponentId(editing ? null : c.id)}
+                          className="text-[11px] text-zinc-400 hover:text-zinc-200"
+                        >
+                          {editing ? "Đóng sửa" : "Sửa cấu kiện"}
+                        </button>
+                        <span className="text-zinc-700">·</span>
+                        <button
+                          onClick={() => deleteComponent(c)}
+                          className="text-[11px] text-rose-400 hover:text-rose-300"
+                        >
+                          Xoá
+                        </button>
                       </div>
-                      {q ? (
-                        <div className="shrink-0 text-right">
-                          <div className="font-mono text-[13px] font-semibold text-emerald-300">{q.quantity.toLocaleString("vi-VN")}</div>
-                          <div className="text-[10px] text-zinc-500">{q.unit}</div>
-                        </div>
-                      ) : (
-                        <div className="shrink-0 text-[11px] text-zinc-600">Chưa nhập</div>
-                      )}
-                    </button>
-                    {open && (
-                      <TaskQtyForm
-                        task={t}
-                        initial={q ?? null}
-                        canEdit={canEdit}
-                        saving={savingId === t.id}
-                        onSave={(unit, qty, note) => saveOne(t, unit, qty, note)}
-                        onClose={() => setOpenTaskId(null)}
+                    )}
+                    {editing && (
+                      <ComponentForm
+                        component={c}
+                        saving={savingId === c.id}
+                        onSave={(name, floor, note) => patchComponent(c, name, floor, note)}
+                        onCancel={() => setEditingComponentId(null)}
                       />
                     )}
+
+                    {/* Items list */}
+                    {its.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-zinc-700 px-3 py-4 text-center text-[11px] text-zinc-500">
+                        Chưa có công tác nào
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-[#252840]">
+                        {its.map((it, idx) => (
+                          <div key={it.id} className={`flex items-start justify-between gap-2 px-3 py-2 ${idx > 0 ? "border-t border-[#252840]" : ""}`}>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[12px] font-medium text-zinc-100">{it.name}</div>
+                              <div className="text-[10px] text-zinc-500">
+                                {it.quantity.toLocaleString("vi-VN")} {it.unit}
+                                {it.note ? ` · ${it.note}` : ""}
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                  onClick={() => setEditingItem({ componentId: c.id, item: it })}
+                                  className="rounded-md border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  onClick={() => deleteItem(it)}
+                                  className="rounded-md border border-rose-500/40 px-2 py-0.5 text-[10px] text-rose-300 hover:bg-rose-500/10"
+                                >
+                                  Xoá
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add / edit item form */}
+                    {canEdit && editingItem?.componentId === c.id && (
+                      <ItemForm
+                        initial={editingItem.item}
+                        componentId={c.id}
+                        saving={savingId === (editingItem.item?.id ?? "new")}
+                        onSave={(name, unit, qty, note) =>
+                          saveItem({
+                            componentId: c.id,
+                            itemId: editingItem.item?.id ?? null,
+                            name,
+                            unit,
+                            quantity: qty,
+                            note,
+                          })
+                        }
+                        onCancel={() => setEditingItem(null)}
+                      />
+                    )}
+                    {canEdit && editingItem?.componentId !== c.id && (
+                      <button
+                        onClick={() => setEditingItem({ componentId: c.id, item: null })}
+                        className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-[11px] text-zinc-400 hover:bg-zinc-800/40"
+                      >
+                        + Thêm công tác
+                      </button>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        ))
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Suggested picker */}
+      {pickerOpen && (
+        <SuggestedPicker
+          stage={stage}
+          existingNames={new Set(componentsByStage[stage].map((c) => c.name))}
+          onPick={(sug) => addComponent(sug.name, null, sug)}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
   );
 }
 
-function TaskQtyForm({
-  task,
-  initial,
-  canEdit,
+function ComponentForm({
+  component,
   saving,
   onSave,
-  onClose,
+  onCancel,
 }: {
-  task: CatalogTask;
-  initial: Quantity | null;
-  canEdit: boolean;
+  component: Component;
   saving: boolean;
-  onSave: (unit: string, qty: number, note: string | null) => void;
-  onClose: () => void;
+  onSave: (name: string, floor: string | null, note: string | null) => void;
+  onCancel: () => void;
 }) {
+  const [name, setName] = useState(component.name);
+  const [floor, setFloor] = useState(component.floor ?? "");
+  const [note, setNote] = useState(component.note ?? "");
+
+  return (
+    <div className="space-y-2 rounded-lg border border-[#252840] bg-zinc-900/40 p-3">
+      <div>
+        <label className="text-[10px] text-zinc-500">Tên cấu kiện</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-zinc-500">Tầng (tuỳ chọn)</label>
+          <input
+            value={floor}
+            onChange={(e) => setFloor(e.target.value)}
+            placeholder="VD: T1, ST"
+            className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-zinc-500">Ghi chú</label>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={onCancel} className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800">
+          Huỷ
+        </button>
+        <button
+          disabled={saving || !name.trim()}
+          onClick={() => onSave(name.trim(), floor.trim() || null, note.trim() || null)}
+          className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+        >
+          {saving ? "Đang lưu…" : "Lưu"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ItemForm({
+  initial,
+  componentId,
+  saving,
+  onSave,
+  onCancel,
+}: {
+  initial: Item | null;
+  componentId: string;
+  saving: boolean;
+  onSave: (name: string, unit: string, qty: number, note: string | null) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
   const [unit, setUnit] = useState(initial?.unit ?? "m³");
   const [qtyStr, setQtyStr] = useState(initial ? String(initial.quantity) : "");
   const [note, setNote] = useState(initial?.note ?? "");
 
   const qtyNum = Number(qtyStr.replace(",", "."));
-  const invalid = qtyStr.trim() !== "" && (!isFinite(qtyNum) || qtyNum < 0);
+  const invalid = qtyStr.trim() === "" || !isFinite(qtyNum) || qtyNum < 0 || !name.trim() || !unit.trim();
 
   return (
-    <div className="space-y-2 border-t border-[#252840] bg-zinc-950/30 px-3 py-3">
+    <div className="space-y-2 rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
+      <div>
+        <label className="text-[10px] text-zinc-500">Tên công tác</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="VD: Đổ bê tông cột"
+          className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
+        />
+      </div>
       <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-1">
+        <div>
           <label className="text-[10px] text-zinc-500">Đơn vị</label>
           <input
-            list={`unit-${task.id}`}
+            list={`unit-${componentId}`}
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            disabled={!canEdit}
             className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
           />
-          <datalist id={`unit-${task.id}`}>
+          <datalist id={`unit-${componentId}`}>
             {UNIT_SUGGEST.map((u) => <option key={u} value={u} />)}
           </datalist>
         </div>
@@ -290,9 +601,8 @@ function TaskQtyForm({
             inputMode="decimal"
             value={qtyStr}
             onChange={(e) => setQtyStr(e.target.value)}
-            disabled={!canEdit}
             placeholder="0"
-            className={`mt-0.5 w-full rounded-lg border bg-zinc-900 px-2 py-1.5 text-right font-mono text-base text-zinc-100 ${invalid ? "border-rose-500/60" : "border-[#252840]"}`}
+            className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-base text-zinc-100"
           />
         </div>
       </div>
@@ -301,32 +611,77 @@ function TaskQtyForm({
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          disabled={!canEdit}
-          placeholder="VD: bóc theo bản vẽ KT-03"
+          placeholder="VD: theo bản vẽ KT-03"
           className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
         />
       </div>
       <div className="flex justify-end gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
-        >
-          Đóng
+        <button onClick={onCancel} className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800">
+          Huỷ
         </button>
-        {canEdit && (
-          <button
-            type="button"
-            disabled={invalid || saving}
-            onClick={() => {
-              const v = qtyStr.trim() === "" ? 0 : qtyNum;
-              onSave(unit.trim(), v, note.trim() || null);
-            }}
-            className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white shadow hover:bg-orange-600 disabled:opacity-50"
-          >
-            {saving ? "Đang lưu…" : "Lưu"}
+        <button
+          disabled={invalid || saving}
+          onClick={() => onSave(name.trim(), unit.trim(), qtyNum, note.trim() || null)}
+          className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+        >
+          {saving ? "Đang lưu…" : "Lưu"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SuggestedPicker({
+  stage,
+  existingNames,
+  onPick,
+  onClose,
+}: {
+  stage: BudgetStage;
+  existingNames: Set<string>;
+  onPick: (sug: SuggestedComponent) => void;
+  onClose: () => void;
+}) {
+  const list = SUGGESTED_COMPONENTS.filter((s) => s.stage === stage);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-2xl border border-[#252840] bg-[#0f1220]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+          <div>
+            <div className="text-xs text-zinc-500">Cấu kiện chuẩn — SOP 47</div>
+            <div className="text-sm font-semibold text-zinc-100">Stage {stage} — {STAGE_LABEL[stage]}</div>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+            Đóng
           </button>
-        )}
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto p-3">
+          {list.map((s) => {
+            const used = existingNames.has(s.name);
+            return (
+              <button
+                key={s.name}
+                disabled={used}
+                onClick={() => { onPick(s); onClose(); }}
+                className={`mb-1.5 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition ${used ? "border-zinc-800 bg-zinc-900/40 opacity-50" : "border-[#252840] bg-[#1a1d2e] hover:border-orange-500/40 hover:bg-orange-500/5"}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-medium text-zinc-100">{s.name}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-zinc-500">
+                    {s.hasFloor && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-200">Có tầng</span>}
+                    {s.optional && <span className="rounded bg-zinc-700/40 px-1.5 py-0.5 text-zinc-400">tuỳ chọn</span>}
+                  </div>
+                </div>
+                <div className="shrink-0 text-[11px] text-zinc-400">
+                  {used ? "Đã thêm" : "Thêm →"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

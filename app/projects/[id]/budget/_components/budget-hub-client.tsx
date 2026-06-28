@@ -10,7 +10,8 @@ type Props = {
   profitMarginPct: number | null;
   canEdit: boolean;
   catalogTaskCount: number;
-  quantityCount: number;
+  componentCount: number;
+  itemCount: number;
   normCount: number;
   totalLabor: number;
   totalMaterial: number;
@@ -62,14 +63,15 @@ export function BudgetHubClient({
   contractValue,
   profitMarginPct,
   catalogTaskCount,
-  quantityCount,
+  componentCount,
+  itemCount,
   normCount,
   totalLabor,
   totalMaterial,
   totalEquipment,
   totalAmount,
 }: Props) {
-  const klStatus: IconStatus = quantityCount === 0 ? "empty" : quantityCount >= catalogTaskCount ? "done" : "partial";
+  const klStatus: IconStatus = itemCount === 0 ? "empty" : itemCount >= 20 ? "done" : "partial";
   const dmStatus: IconStatus = normCount === 0 ? "empty" : normCount >= catalogTaskCount ? "done" : "partial";
 
   const sections: Section[] = [
@@ -81,7 +83,7 @@ export function BudgetHubClient({
           key: "kl",
           emoji: "📐",
           label: "Khối lượng",
-          sublabel: `${quantityCount}/${catalogTaskCount} đầu việc`,
+          sublabel: componentCount === 0 ? "Chưa có cấu kiện" : `${componentCount} cấu kiện · ${itemCount} công tác`,
           href: `/projects/${projectId}/budget/quantities`,
           status: klStatus,
         },

@@ -28,12 +28,14 @@ export default async function ProjectBudgetHubPage({ params }: { params: { id: s
 
   const [
     catalogTaskCount,
-    quantityCount,
+    componentCount,
+    itemCount,
     normCount,
     budget,
   ] = await Promise.all([
     prisma.standardTaskCatalog.count({ where: { retiredAt: null } }),
-    prisma.projectBudgetQuantity.count({ where: { projectId: project.id } }),
+    prisma.projectComponent.count({ where: { projectId: project.id } }),
+    prisma.projectBudgetItem.count({ where: { budget: { projectId: project.id } } }),
     prisma.projectBudgetNorm.count({ where: { projectId: project.id } }),
     prisma.projectBudget.findUnique({
       where: { projectId: project.id },
@@ -50,7 +52,8 @@ export default async function ProjectBudgetHubPage({ params }: { params: { id: s
       profitMarginPct={project.profitMarginPct ? Number(project.profitMarginPct) : null}
       canEdit={canEditBudget({ id: user.id, role: user.role })}
       catalogTaskCount={catalogTaskCount}
-      quantityCount={quantityCount}
+      componentCount={componentCount}
+      itemCount={itemCount}
       normCount={normCount}
       totalLabor={budget ? Number(budget.totalLabor) : 0}
       totalMaterial={budget ? Number(budget.totalMaterial) : 0}
