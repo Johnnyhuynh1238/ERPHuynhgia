@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { TaskRow } from "../_lib/by-task";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/budget-suggested-components";
 import type { BudgetStage } from "@prisma/client";
@@ -413,34 +414,24 @@ function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
 }
 
 function TaskFormulaModal({ r, projectId, onClose }: { r: TaskRow; projectId: string; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    const scrollY = window.scrollY;
-    const body = document.body;
-    const prev = {
-      overflow: body.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
-    };
-    body.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.width = "100%";
+    setMounted(true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => {
-      body.style.overflow = prev.overflow;
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.width = prev.width;
-      window.scrollTo(0, scrollY);
+      document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4" onClick={onClose}>
       <div
         className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#252840] bg-[#10131f]"
@@ -563,7 +554,8 @@ function TaskFormulaModal({ r, projectId, onClose }: { r: TaskRow; projectId: st
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
