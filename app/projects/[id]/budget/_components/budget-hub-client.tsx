@@ -117,12 +117,33 @@ export function BudgetHubClient({
       ],
     },
     {
-      title: "3. Tổng hợp (tự động)",
-      hint: "Tính từ Khối lượng × Định mức × Đơn giá",
+      title: "3. Tổng hợp hao phí (tự động)",
+      hint: "Khối lượng × Định mức = số lượng VT/NC/MM cần",
       icons: [
-        { key: "thvt",  emoji: "📦", label: "Tổng hợp VT",  sublabel: totalMaterial  > 0 ? fmtShort(totalMaterial)  : "—", status: totalMaterial  > 0 ? "auto" : "soon" },
-        { key: "thnc",  emoji: "👥", label: "Tổng hợp NC",  sublabel: totalLabor     > 0 ? fmtShort(totalLabor)     : "—", status: totalLabor     > 0 ? "auto" : "soon" },
-        { key: "thmtc", emoji: "🏗", label: "Tổng hợp MTC", sublabel: totalEquipment > 0 ? fmtShort(totalEquipment) : "—", status: totalEquipment > 0 ? "auto" : "soon" },
+        {
+          key: "thvt",
+          emoji: "📦",
+          label: "Hao phí VT",
+          sublabel: itemsWithNormCount > 0 ? "Vật tư cần mua" : "Cần gắn ĐM trước",
+          href: `/projects/${projectId}/budget/totals?tab=vt`,
+          status: itemsWithNormCount > 0 ? "auto" : "soon",
+        },
+        {
+          key: "thnc",
+          emoji: "👥",
+          label: "Hao phí NC",
+          sublabel: itemsWithNormCount > 0 ? "Công thợ theo bậc" : "Cần gắn ĐM trước",
+          href: `/projects/${projectId}/budget/totals?tab=nc`,
+          status: itemsWithNormCount > 0 ? "auto" : "soon",
+        },
+        {
+          key: "thmtc",
+          emoji: "🏗",
+          label: "Hao phí MM",
+          sublabel: itemsWithNormCount > 0 ? "Ca máy thi công" : "Cần gắn ĐM trước",
+          href: `/projects/${projectId}/budget/totals?tab=mm`,
+          status: itemsWithNormCount > 0 ? "auto" : "soon",
+        },
       ],
     },
     {
