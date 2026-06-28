@@ -83,41 +83,21 @@ export function BudgetHubClient({
 
   const sections: Section[] = [
     {
-      title: "1. Cơ sở",
-      hint: "Bóc khối lượng + định mức hao phí",
+      title: "1. Khối lượng dự án",
+      hint: "Bóc khối lượng + gắn định mức cho từng công tác",
       icons: [
         {
           key: "kl",
           emoji: "📐",
           label: "Khối lượng",
-          sublabel: componentCount === 0 ? "Chưa có cấu kiện" : `${componentCount} cấu kiện · ${itemCount} công tác`,
+          sublabel: componentCount === 0 ? "Chưa có cấu kiện" : `${componentCount} cấu kiện · ${itemsWithNormCount}/${itemCount} đã gắn ĐM`,
           href: `/projects/${projectId}/budget/quantities`,
-          status: klStatus,
-        },
-        {
-          key: "dm",
-          emoji: "📋",
-          label: "Bảng định mức",
-          sublabel:
-            itemCount === 0
-              ? `${normCount} mã ĐM có sẵn`
-              : `${itemsWithNormCount}/${itemCount} công tác đã gắn · ${normCount} mã`,
-          href: `/projects/${projectId}/budget/norms`,
-          status: dmStatus,
+          status: klStatus === "done" ? dmStatus : klStatus,
         },
       ],
     },
     {
-      title: "2. Đơn giá",
-      hint: "Bảng giá vật tư / nhân công / máy",
-      icons: [
-        { key: "dgvt", emoji: "🧱", label: "ĐG Vật tư",      sublabel: "Sắt, xi măng, cát…", status: "soon" },
-        { key: "dgnc", emoji: "👷", label: "ĐG Nhân công",   sublabel: "Theo bậc thợ",       status: "soon" },
-        { key: "dgmtc", emoji: "🚜", label: "ĐG Máy thi công", sublabel: "Ca máy",            status: "soon" },
-      ],
-    },
-    {
-      title: "3. Tổng hợp hao phí (tự động)",
+      title: "2. Tổng hợp hao phí (tự động)",
       hint: "Khối lượng × Định mức = số lượng VT/NC/MM cần",
       icons: [
         {
@@ -147,7 +127,7 @@ export function BudgetHubClient({
       ],
     },
     {
-      title: "4. Chi phí khác & Dự phòng",
+      title: "3. Chi phí khác & Dự phòng",
       hint: "Set % phân bổ và buffer trượt giá",
       icons: [
         { key: "cpk",  emoji: "🔧", label: "CP khác trực tiếp", sublabel: "Vận chuyển, ATLĐ…",       status: "soon" },
@@ -160,8 +140,7 @@ export function BudgetHubClient({
 
   const allInputIcons = [
     ...sections[0].icons,
-    ...sections[1].icons,
-    ...sections[3].icons,
+    ...sections[2].icons,
   ];
   const doneCount = allInputIcons.filter((i) => i.status === "done").length;
   const totalInput = allInputIcons.length;
@@ -178,10 +157,20 @@ export function BudgetHubClient({
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-3 sm:p-4">
       {/* Header */}
-      <div>
-        <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dự toán</div>
-        <h1 className="text-base font-semibold text-zinc-100 sm:text-lg">{projectName}</h1>
-        <div className="text-xs text-zinc-500">{projectCode}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dự toán</div>
+          <h1 className="text-base font-semibold text-zinc-100 sm:text-lg">{projectName}</h1>
+          <div className="text-xs text-zinc-500">{projectCode}</div>
+        </div>
+        <Link
+          href={`/projects/${projectId}/budget/catalog`}
+          title="Định mức + Đơn giá toàn hệ thống"
+          className="shrink-0 rounded-xl border border-[#252840] bg-[#1a1d2e] px-2.5 py-1.5 text-[11px] text-zinc-300 ring-1 ring-zinc-700 hover:border-sky-500/50 hover:text-sky-200"
+        >
+          <span className="block text-lg leading-none">🛠</span>
+          <span className="mt-0.5 block">Thư viện chung</span>
+        </Link>
       </div>
 
       {/* Card tổng */}

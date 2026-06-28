@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import type { ContribRow } from "../_lib/aggregate";
 
-type MaterialRow = { name: string; unit: string; total: number; contributions: ContribRow[] };
-type LaborRow = { grade: string; total: number; contributions: ContribRow[] };
-type MachineRow = { name: string; total: number; contributions: ContribRow[] };
+type MaterialRow = { name: string; unit: string; total: number; price: number | null; amount: number | null; contributions: ContribRow[] };
+type LaborRow = { grade: string; total: number; price: number | null; amount: number | null; contributions: ContribRow[] };
+type MachineRow = { name: string; total: number; price: number | null; amount: number | null; contributions: ContribRow[] };
 
 type Props = {
   projectId: string;
@@ -19,6 +19,15 @@ type Props = {
     machines: MachineRow[];
     itemsWithoutNorm: Array<{ id: string; stage: string | null; name: string; componentName: string }>;
     itemsWithNormNoData: Array<{ id: string; stage: string | null; name: string; componentName: string; normCode: string }>;
+    totals: {
+      materialAmount: number;
+      laborAmount: number;
+      machineAmount: number;
+      grandTotal: number;
+      materialsMissingPrice: number;
+      laborMissingPrice: number;
+      machinesMissingPrice: number;
+    };
     totalItems: number;
     itemsWithNorm: number;
   };
@@ -26,6 +35,15 @@ type Props = {
 
 const fmt = (n: number, digits = 3) =>
   n.toLocaleString("vi-VN", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+
+const fmtVND = (n: number) => n.toLocaleString("vi-VN");
+
+const fmtShort = (n: number) => {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(0) + "tr";
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + "k";
+  return n.toLocaleString("vi-VN");
+};
 
 export function TotalsClient({ projectId, projectName, projectCode, initialTab, data }: Props) {
   const [tab, setTab] = useState<"vt" | "nc" | "mm">(initialTab);
@@ -64,6 +82,29 @@ export function TotalsClient({ projectId, projectName, projectCode, initialTab, 
         <div className="text-xs text-zinc-500">{projectCode}</div>
       </div>
 
+      {data.totalItems > 0 && data.totals.grandTotal > 0 && (
+        <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#0f1220] p-4 ring-1 ring-orange-500/10">
+          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Giá vốn dự kiến (tự tính)</div>
+          <div className="mt-1 text-2xl font-bold text-zinc-100 sm:text-3xl">
+            {fmtVND(data.totals.grandTotal)} đ
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+            <div className="rounded-lg bg-emerald-500/10 px-2 py-1.5 ring-1 ring-emerald-500/30">
+              <div className="font-medium text-emerald-200">VT</div>
+              <div className="text-emerald-300/80">{fmtShort(data.totals.materialAmount)}</div>
+            </div>
+            <div className="rounded-lg bg-amber-500/10 px-2 py-1.5 ring-1 ring-amber-500/30">
+              <div className="font-medium text-amber-200">NC</div>
+              <div className="text-amber-300/80">{fmtShort(data.totals.laborAmount)}</div>
+            </div>
+            <div className="rounded-lg bg-violet-500/10 px-2 py-1.5 ring-1 ring-violet-500/30">
+              <div className="font-medium text-violet-200">MM</div>
+              <div className="text-violet-300/80">{fmtShort(data.totals.machineAmount)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {data.totalItems > 0 && (
         <div className="rounded-xl border border-[#252840] bg-[#1a1d2e] p-3 text-xs text-zinc-400">
           <div className="flex items-center justify-between">
@@ -74,6 +115,13 @@ export function TotalsClient({ projectId, projectName, projectCode, initialTab, 
               <span className="text-amber-400">⚠ {data.itemsWithoutNorm.length + data.itemsWithNormNoData.length} công tác bị bỏ qua</span>
             )}
           </div>
+          {(data.totals.materialsMissingPrice > 0 || data.totals.laborMissingPrice > 0 || data.totals.machinesMissingPrice > 0) && (
+            <div className="mt-1 text-amber-400/90">
+              ⚠ Thiếu đơn giá: {data.totals.materialsMissingPrice} VT · {data.totals.laborMissingPrice} bậc NC · {data.totals.machinesMissingPrice} máy
+              {" "}
+              (<Link href={`/projects/${projectId}/budget/prices`} className="underline hover:text-amber-300">sửa đơn giá</Link>)
+            </div>
+          )}
           {(data.itemsWithoutNorm.length > 0 || data.itemsWithNormNoData.length > 0) && (
             <details className="mt-2">
               <summary className="cursor-pointer text-amber-400/80">Xem danh sách công tác bỏ qua</summary>
@@ -122,10 +170,11 @@ export function TotalsClient({ projectId, projectName, projectCode, initialTab, 
             primary: r.name,
             secondary: r.unit,
             total: r.total,
+            price: r.price,
+            amount: r.amount,
             contributions: r.contributions,
           }))}
-          totalLabel="Tổng hao phí"
-          unitColumn
+          totalLabel="Hao phí"
           expanded={expanded}
           onToggle={toggle}
         />
@@ -139,10 +188,11 @@ export function TotalsClient({ projectId, projectName, projectCode, initialTab, 
             primary: `Bậc ${r.grade}/7`,
             secondary: "công",
             total: r.total,
+            price: r.price,
+            amount: r.amount,
             contributions: r.contributions,
           }))}
-          totalLabel="Tổng công"
-          unitColumn
+          totalLabel="Số công"
           expanded={expanded}
           onToggle={toggle}
         />
@@ -156,10 +206,11 @@ export function TotalsClient({ projectId, projectName, projectCode, initialTab, 
             primary: r.name,
             secondary: "ca",
             total: r.total,
+            price: r.price,
+            amount: r.amount,
             contributions: r.contributions,
           }))}
-          totalLabel="Tổng ca"
-          unitColumn
+          totalLabel="Số ca"
           expanded={expanded}
           onToggle={toggle}
         />
@@ -173,6 +224,8 @@ type Row = {
   primary: string;
   secondary: string;
   total: number;
+  price: number | null;
+  amount: number | null;
   contributions: ContribRow[];
 };
 
@@ -180,14 +233,12 @@ function Section({
   rows,
   empty,
   totalLabel,
-  unitColumn,
   expanded,
   onToggle,
 }: {
   rows: Row[];
   empty: string;
   totalLabel: string;
-  unitColumn: boolean;
   expanded: Set<string>;
   onToggle: (key: string) => void;
 }) {
@@ -205,8 +256,10 @@ function Section({
         <thead className="border-b border-[#252840] bg-[#0f1220] text-[11px] uppercase tracking-wide text-zinc-500">
           <tr>
             <th className="px-3 py-2 text-left">Loại</th>
-            {unitColumn && <th className="px-2 py-2 text-left">ĐV</th>}
-            <th className="px-3 py-2 text-right">{totalLabel}</th>
+            <th className="px-1 py-2 text-left">ĐV</th>
+            <th className="px-2 py-2 text-right">{totalLabel}</th>
+            <th className="px-2 py-2 text-right">Đơn giá</th>
+            <th className="px-3 py-2 text-right">Thành tiền (đ)</th>
           </tr>
         </thead>
         <tbody>
@@ -225,16 +278,24 @@ function Section({
                     </div>
                     <div className="text-[10px] text-zinc-500">{r.contributions.length} công tác đóng góp</div>
                   </td>
-                  {unitColumn && (
-                    <td className="px-2 py-2 text-xs text-zinc-400">{r.secondary}</td>
-                  )}
-                  <td className="px-3 py-2 text-right font-mono text-zinc-100">
+                  <td className="px-1 py-2 text-xs text-zinc-400">{r.secondary}</td>
+                  <td className="px-2 py-2 text-right font-mono text-zinc-100 text-xs">
                     {fmt(r.total)}
+                  </td>
+                  <td className="px-2 py-2 text-right font-mono text-xs">
+                    {r.price != null ? (
+                      <span className="text-zinc-300">{fmtVND(r.price)}</span>
+                    ) : (
+                      <span className="text-amber-400/80">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-100">
+                    {r.amount != null ? fmtVND(r.amount) : "—"}
                   </td>
                 </tr>
                 {isOpen && (
                   <tr className="bg-[#0f1220]/60">
-                    <td colSpan={unitColumn ? 3 : 2} className="px-3 py-2">
+                    <td colSpan={5} className="px-3 py-2">
                       <div className="space-y-1 text-xs">
                         {r.contributions.map((c, i) => (
                           <div key={`${r.key}-c-${i}`} className="flex items-center justify-between gap-2 text-zinc-300">

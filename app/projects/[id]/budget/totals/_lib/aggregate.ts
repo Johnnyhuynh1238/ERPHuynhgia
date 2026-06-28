@@ -19,16 +19,22 @@ export type AggregatedMaterial = {
   name: string;
   unit: string;
   total: number;
+  price: number | null;
+  amount: number | null;
   contributions: ContribRow[];
 };
 export type AggregatedLabor = {
   grade: string;
   total: number;
+  price: number | null;
+  amount: number | null;
   contributions: ContribRow[];
 };
 export type AggregatedMachine = {
   name: string;
   total: number;
+  price: number | null;
+  amount: number | null;
   contributions: ContribRow[];
 };
 
@@ -55,6 +61,9 @@ export type AggregateInput = {
       kMachine: Prisma.Decimal | number;
     }
   >;
+  priceMaterials?: Map<string, number>; // key: name__unit
+  priceLabor?: Map<string, number>; // key: grade
+  priceMachines?: Map<string, number>; // key: name
 };
 
 function toNumber(v: Prisma.Decimal | number | undefined | null): number {
@@ -118,6 +127,15 @@ export type AggregateResult = {
     componentName: string;
     normCode: string;
   }>;
+  totals: {
+    materialAmount: number;
+    laborAmount: number;
+    machineAmount: number;
+    grandTotal: number;
+    materialsMissingPrice: number;
+    laborMissingPrice: number;
+    machinesMissingPrice: number;
+  };
 };
 
 export function aggregateConsumption(input: AggregateInput): AggregateResult {
@@ -181,7 +199,14 @@ export function aggregateConsumption(input: AggregateInput): AggregateResult {
         existing.total += contrib;
         existing.contributions.push(row);
       } else {
-        materials.set(key, { name: m.name, unit: m.unit, total: contrib, contributions: [row] });
+        materials.set(key, {
+          name: m.name,
+          unit: m.unit,
+          total: contrib,
+          price: null,
+          amount: null,
+          contributions: [row],
+        });
       }
     }
 
@@ -202,7 +227,13 @@ export function aggregateConsumption(input: AggregateInput): AggregateResult {
         existing.total += contrib;
         existing.contributions.push(row);
       } else {
-        labor.set(l.grade, { grade: l.grade, total: contrib, contributions: [row] });
+        labor.set(l.grade, {
+          grade: l.grade,
+          total: contrib,
+          price: null,
+          amount: null,
+          contributions: [row],
+        });
       }
     }
 
@@ -223,14 +254,58 @@ export function aggregateConsumption(input: AggregateInput): AggregateResult {
         existing.total += contrib;
         existing.contributions.push(row);
       } else {
-        machines.set(mm.name, { name: mm.name, total: contrib, contributions: [row] });
+        machines.set(mm.name, {
+          name: mm.name,
+          total: contrib,
+          price: null,
+          amount: null,
+          contributions: [row],
+        });
       }
     }
   }
 
-  const sortedMaterials = Array.from(materials.values()).sort((a, b) => b.total - a.total);
+  let materialAmount = 0;
+  let laborAmount = 0;
+  let machineAmount = 0;
+  let materialsMissingPrice = 0;
+  let laborMissingPrice = 0;
+  let machinesMissingPrice = 0;
+
+  materials.forEach((row, key) => {
+    const price = input.priceMaterials?.get(key);
+    if (price != null) {
+      row.price = price;
+      row.amount = Math.round(row.total * price);
+      materialAmount += row.amount;
+    } else {
+      materialsMissingPrice++;
+    }
+  });
+  labor.forEach((row, key) => {
+    const price = input.priceLabor?.get(key);
+    if (price != null) {
+      row.price = price;
+      row.amount = Math.round(row.total * price);
+      laborAmount += row.amount;
+    } else {
+      laborMissingPrice++;
+    }
+  });
+  machines.forEach((row, key) => {
+    const price = input.priceMachines?.get(key);
+    if (price != null) {
+      row.price = price;
+      row.amount = Math.round(row.total * price);
+      machineAmount += row.amount;
+    } else {
+      machinesMissingPrice++;
+    }
+  });
+
+  const sortedMaterials = Array.from(materials.values()).sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
   const sortedLabor = Array.from(labor.values()).sort((a, b) => a.grade.localeCompare(b.grade));
-  const sortedMachines = Array.from(machines.values()).sort((a, b) => b.total - a.total);
+  const sortedMachines = Array.from(machines.values()).sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
 
   return {
     materials: sortedMaterials,
@@ -238,5 +313,14 @@ export function aggregateConsumption(input: AggregateInput): AggregateResult {
     machines: sortedMachines,
     itemsWithoutNorm,
     itemsWithNormNoData,
+    totals: {
+      materialAmount,
+      laborAmount,
+      machineAmount,
+      grandTotal: materialAmount + laborAmount + machineAmount,
+      materialsMissingPrice,
+      laborMissingPrice,
+      machinesMissingPrice,
+    },
   };
 }

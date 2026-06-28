@@ -3035,6 +3035,51 @@ model Norm {
   @@map("norms")
 }
 
+// Global price catalog — admin chỉnh khi tạo dự án mới
+model MaterialPrice {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  unit      String    @db.VarChar(20)
+  price     BigInt
+  source    String?   @db.VarChar(255)
+  note      String?
+  retiredAt DateTime? @map("retired_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([name, unit])
+  @@index([retiredAt])
+  @@map("material_prices")
+}
+
+model LaborPrice {
+  id        String    @id @default(uuid()) @db.Uuid
+  grade     String    @unique @db.VarChar(16)
+  price     BigInt
+  source    String?   @db.VarChar(255)
+  note      String?
+  retiredAt DateTime? @map("retired_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([retiredAt])
+  @@map("labor_prices")
+}
+
+model MachinePrice {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique @db.VarChar(255)
+  price     BigInt
+  source    String?   @db.VarChar(255)
+  note      String?
+  retiredAt DateTime? @map("retired_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([retiredAt])
+  @@map("machine_prices")
+}
+
 model ProjectBudgetAmendment {
   id             String          @id @default(uuid()) @db.Uuid
   budgetId       String          @map("budget_id") @db.Uuid

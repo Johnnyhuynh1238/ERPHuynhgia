@@ -56,24 +56,32 @@ export default async function BudgetTotalsPage({
     new Set(items.map((it) => it.normCode).filter((c): c is string => !!c)),
   );
 
-  const norms = normCodes.length
-    ? await prisma.norm.findMany({
-        where: { code: { in: normCodes } },
-        select: {
-          code: true,
-          name: true,
-          unit: true,
-          materialItems: true,
-          laborItems: true,
-          machineItems: true,
-          kMaterial: true,
-          kLabor: true,
-          kMachine: true,
-        },
-      })
-    : [];
+  const [norms, materialPrices, laborPrices, machinePrices] = await Promise.all([
+    normCodes.length
+      ? prisma.norm.findMany({
+          where: { code: { in: normCodes } },
+          select: {
+            code: true,
+            name: true,
+            unit: true,
+            materialItems: true,
+            laborItems: true,
+            machineItems: true,
+            kMaterial: true,
+            kLabor: true,
+            kMachine: true,
+          },
+        })
+      : Promise.resolve([]),
+    prisma.materialPrice.findMany({ where: { retiredAt: null }, select: { name: true, unit: true, price: true } }),
+    prisma.laborPrice.findMany({ where: { retiredAt: null }, select: { grade: true, price: true } }),
+    prisma.machinePrice.findMany({ where: { retiredAt: null }, select: { name: true, price: true } }),
+  ]);
 
   const normsByCode = new Map(norms.map((n) => [n.code, n]));
+  const priceMaterials = new Map(materialPrices.map((p) => [`${p.name}__${p.unit}`, Number(p.price)]));
+  const priceLabor = new Map(laborPrices.map((p) => [p.grade, Number(p.price)]));
+  const priceMachines = new Map(machinePrices.map((p) => [p.name, Number(p.price)]));
 
   const aggregated = aggregateConsumption({
     budgetItems: items.map((it) => ({
@@ -85,6 +93,9 @@ export default async function BudgetTotalsPage({
       component: it.component,
     })),
     normsByCode,
+    priceMaterials,
+    priceLabor,
+    priceMachines,
   });
 
   const initialTab = ["vt", "nc", "mm"].includes(searchParams?.tab ?? "")
@@ -103,6 +114,7 @@ export default async function BudgetTotalsPage({
         machines: aggregated.machines,
         itemsWithoutNorm: aggregated.itemsWithoutNorm,
         itemsWithNormNoData: aggregated.itemsWithNormNoData,
+        totals: aggregated.totals,
         totalItems: items.length,
         itemsWithNorm: items.filter((it) => it.normCode).length,
       }}
