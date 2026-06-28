@@ -40,9 +40,11 @@ export default async function BudgetByTaskPage({
         select: {
           id: true,
           name: true,
+          unit: true,
           stage: true,
           quantity: true,
           normCode: true,
+          directUnitPrice: true,
           sortRank: true,
           component: { select: { name: true, sortOrder: true } },
         },
@@ -54,7 +56,7 @@ export default async function BudgetByTaskPage({
     new Set(items.map((it) => it.normCode).filter((c): c is string => !!c)),
   );
 
-  const [norms, materialPrices, laborPrices, machinePrices] = await Promise.all([
+  const [norms, materialPrices, laborPrices, machinePrices, mePrices] = await Promise.all([
     normCodes.length
       ? prisma.norm.findMany({
           where: { code: { in: normCodes } },
@@ -74,27 +76,32 @@ export default async function BudgetByTaskPage({
     prisma.materialPrice.findMany({ where: { retiredAt: null }, select: { name: true, unit: true, price: true } }),
     prisma.laborPrice.findMany({ where: { retiredAt: null }, select: { grade: true, price: true } }),
     prisma.machinePrice.findMany({ where: { retiredAt: null }, select: { name: true, price: true } }),
+    prisma.mePrice.findMany({ where: { retiredAt: null }, select: { name: true, unit: true, price: true } }),
   ]);
 
   const normsByCode = new Map(norms.map((n) => [n.code, n]));
   const priceMaterials = new Map(materialPrices.map((p) => [`${p.name}__${p.unit}`, Number(p.price)]));
   const priceLabor = new Map(laborPrices.map((p) => [p.grade, Number(p.price)]));
   const priceMachines = new Map(machinePrices.map((p) => [p.name, Number(p.price)]));
+  const priceMe = new Map(mePrices.map((p) => [`${p.name.toLowerCase()}__${p.unit.toLowerCase()}`, Number(p.price)]));
 
   const result = computeByTask({
     budgetItems: items.map((it) => ({
       id: it.id,
       name: it.name,
+      unit: it.unit,
       stage: it.stage,
       sortRank: it.sortRank,
       quantity: it.quantity,
       normCode: it.normCode,
+      directUnitPrice: it.directUnitPrice,
       component: it.component,
     })),
     normsByCode,
     priceMaterials,
     priceLabor,
     priceMachines,
+    priceMe,
   });
 
   return (

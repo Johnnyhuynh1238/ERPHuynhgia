@@ -2896,12 +2896,13 @@ enum BudgetPhase {
   mai
 }
 
-// 4 stage chuẩn cho dự toán theo cấu kiện (SOP-47)
+// 5 stage chuẩn cho dự toán theo cấu kiện (SOP-47)
 enum BudgetStage {
   CB // Chuẩn bị
   N // Ngầm
   T // Thô
   HT // Hoàn thiện
+  ME // M&E (điện nước, chống sét, thiết bị) — giá tra từ MePrice, không qua định mức
 }
 
 enum BudgetStatus {
@@ -2972,6 +2973,10 @@ model ProjectBudgetItem {
   // Định mức gắn vào công tác (global Norm.code) — dùng để tính hao phí VT/NC/MM
   normCode String? @map("norm_code") @db.VarChar(32)
 
+  // Đơn giá trực tiếp (VND/đơn vị) — dùng cho item không qua định mức (sheet 6 cửa, item lump-sum).
+  // Khi != null: amount = quantity × directUnitPrice, bỏ qua norm + MePrice.
+  directUnitPrice BigInt? @map("direct_unit_price")
+
   budget       ProjectBudget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   standardTask StandardTaskCatalog? @relation(fields: [standardTaskId], references: [id], onDelete: SetNull)
   component    ProjectComponent?    @relation(fields: [componentId], references: [id], onDelete: SetNull)
@@ -3033,6 +3038,26 @@ model Norm {
   @@index([category])
   @@index([retiredAt])
   @@map("norms")
+}
+
+// Bảng giá M&E (thiết bị điện nước, chống sét…) — đơn vị bộ/cái/m, không qua định mức
+model MePrice {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  unit      String    @db.VarChar(20)
+  price     BigInt
+  brand     String?   @db.VarChar(128) // Hãng/model: Inax, Panasonic, Cadivi…
+  category  String?   @db.VarChar(64) // nuoc / dien / dien_nhe / dieu_hoa / chong_set
+  source    String?   @db.VarChar(255)
+  note      String?
+  retiredAt DateTime? @map("retired_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([name, unit])
+  @@index([category])
+  @@index([retiredAt])
+  @@map("me_prices")
 }
 
 // Global price catalog — admin chỉnh khi tạo dự án mới

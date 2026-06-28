@@ -130,7 +130,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
   useEffect(() => { load(); }, [load]);
 
   const componentsByStage = useMemo(() => {
-    const map: Record<BudgetStage, Component[]> = { CB: [], N: [], T: [], HT: [] };
+    const map: Record<BudgetStage, Component[]> = { CB: [], N: [], T: [], HT: [], ME: [] };
     for (const c of components) map[c.stage].push(c);
     return map;
   }, [components]);
@@ -152,6 +152,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       N: { components: 0, items: 0 },
       T: { components: 0, items: 0 },
       HT: { components: 0, items: 0 },
+      ME: { components: 0, items: 0 },
     };
     for (const c of components) out[c.stage].components++;
     for (const it of items) out[it.stage].items++;

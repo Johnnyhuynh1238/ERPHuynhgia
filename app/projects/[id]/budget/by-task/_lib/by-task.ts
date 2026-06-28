@@ -26,9 +26,12 @@ export type MachineLine = {
   amount: number | null;
 };
 
+export type PriceSource = "norm" | "me" | "direct" | "none";
+
 export type TaskRow = {
   id: string;
   name: string;
+  unit: string;
   stage: string | null;
   componentName: string;
   componentSort: number;
@@ -39,6 +42,9 @@ export type TaskRow = {
   normUnit: string | null;
   hasNorm: boolean;
   hasNormData: boolean;
+  priceSource: PriceSource;
+  directUnitPrice: number | null;
+  mePrice: number | null;
   materialLines: MaterialLine[];
   laborLines: LaborLine[];
   machineLines: MachineLine[];
@@ -55,10 +61,12 @@ export type ByTaskInput = {
   budgetItems: Array<{
     id: string;
     name: string;
+    unit: string;
     stage: string | null;
     sortRank: number;
     quantity: Prisma.Decimal | number;
     normCode: string | null;
+    directUnitPrice: Prisma.Decimal | number | bigint | null;
     component: { name: string; sortOrder: number } | null;
   }>;
   normsByCode: Map<
@@ -78,6 +86,8 @@ export type ByTaskInput = {
   priceMaterials: Map<string, number>;
   priceLabor: Map<string, number>;
   priceMachines: Map<string, number>;
+  // Map key = `${name.toLowerCase()}__${unit.toLowerCase()}` → price VND
+  priceMe: Map<string, number>;
 };
 
 export type ByTaskResult = {
@@ -90,10 +100,15 @@ export type ByTaskResult = {
   };
 };
 
-function toNumber(v: Prisma.Decimal | number | undefined | null): number {
+function toNumber(v: Prisma.Decimal | number | bigint | undefined | null): number {
   if (v == null) return 0;
   if (typeof v === "number") return v;
+  if (typeof v === "bigint") return Number(v);
   return Number(v);
+}
+
+function meKey(name: string, unit: string): string {
+  return `${name.trim().toLowerCase()}__${unit.trim().toLowerCase()}`;
 }
 
 function parseMaterialItems(v: unknown): Array<{ name: string; unit: string; qtyPerUnit: number }> {
@@ -150,6 +165,8 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
     const componentName = item.component?.name ?? "—";
     const componentSort = item.component?.sortOrder ?? 9999;
     const norm = item.normCode ? input.normsByCode.get(item.normCode) ?? null : null;
+    const directPrice = item.directUnitPrice != null ? toNumber(item.directUnitPrice) : null;
+    const meHit = item.stage === "ME" ? input.priceMe.get(meKey(item.name, item.unit)) ?? null : null;
 
     const materialLines: MaterialLine[] = [];
     const laborLines: LaborLine[] = [];
@@ -161,8 +178,17 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
     let laborHasMissing = false;
     let machineHasMissing = false;
     let hasNormData = false;
+    let priceSource: PriceSource = "none";
 
-    if (norm) {
+    // Priority: directUnitPrice > ME lookup > norm computation
+    if (directPrice != null && directPrice > 0) {
+      priceSource = "direct";
+      materialAmount = Math.round(qty * directPrice);
+    } else if (meHit != null && meHit > 0) {
+      priceSource = "me";
+      materialAmount = Math.round(qty * meHit);
+    } else if (norm) {
+      priceSource = "norm";
       const mats = parseMaterialItems(norm.materialItems);
       const labs = parseLaborItems(norm.laborItems);
       const macs = parseMachineItems(norm.machineItems);
@@ -205,6 +231,7 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
     rows.push({
       id: item.id,
       name: item.name,
+      unit: item.unit,
       stage: item.stage,
       componentName,
       componentSort,
@@ -215,6 +242,9 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
       normUnit: norm?.unit ?? null,
       hasNorm: !!norm,
       hasNormData,
+      priceSource,
+      directUnitPrice: directPrice,
+      mePrice: meHit,
       materialLines,
       laborLines,
       machineLines,

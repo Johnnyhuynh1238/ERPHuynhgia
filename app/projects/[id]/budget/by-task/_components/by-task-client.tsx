@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import type { TaskRow } from "../_lib/by-task";
 
@@ -346,21 +347,26 @@ function BadgeRow({ badges }: { badges?: Badge[] }) {
   );
 }
 
+function priceSourceLabel(src: TaskRow["priceSource"]): { label: string; color: string } | null {
+  if (src === "direct") return { label: "Giá nhập tay", color: "text-sky-300" };
+  if (src === "me") return { label: "Giá ME", color: "text-violet-300" };
+  if (src === "none") return { label: "Chưa có giá", color: "text-amber-400" };
+  return null;
+}
+
 function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
-  const canExpand = r.hasNorm && r.hasNormData;
   const hasMissing = r.materialHasMissing || r.laborHasMissing || r.machineHasMissing;
   const badges: Badge[] = [
     { tone: "stage", label: r.stage ?? "—" },
     { tone: "comp", label: r.componentName },
   ];
+  const srcInfo = priceSourceLabel(r.priceSource);
+  const unitLabel = r.normUnit ?? r.unit ?? "";
   return (
     <button
       type="button"
-      onClick={canExpand ? onOpen : undefined}
-      disabled={!canExpand}
-      className={`block w-full overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 text-left ring-1 ring-zinc-800 ${
-        canExpand ? "active:bg-[#1d2238]" : "cursor-default opacity-90"
-      }`}
+      onClick={onOpen}
+      className="block w-full overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 text-left ring-1 ring-zinc-800 active:bg-[#1d2238]"
     >
       <BadgeRow badges={badges} />
       <div className="flex items-baseline justify-between gap-2">
@@ -370,11 +376,11 @@ function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
             <div className="mt-0.5 text-[10px] text-zinc-500">
               ĐM {r.normCode}{r.normUnit ? ` · ${r.normUnit}` : ""}
             </div>
-          ) : (
-            <div className="mt-0.5 text-[10px] text-amber-400">⚠ Chưa gắn ĐM</div>
-          )}
+          ) : srcInfo ? (
+            <div className={`mt-0.5 text-[10px] ${srcInfo.color}`}>● {srcInfo.label}</div>
+          ) : null}
           <div className="mt-0.5 text-[10px] text-zinc-500">
-            KL: <span className="font-mono text-zinc-300">{fmtNum(r.quantity)}</span> {r.normUnit ?? ""}
+            KL: <span className="font-mono text-zinc-300">{fmtNum(r.quantity)}</span> {unitLabel}
           </div>
         </div>
         <div className="shrink-0 text-right">
@@ -384,11 +390,13 @@ function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
           {hasMissing && <div className="text-[10px] text-amber-300">⚠ thiếu giá</div>}
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
-        <Cell tone="vt" label="📦 VT" amount={r.materialAmount} grand={r.totalAmount} />
-        <Cell tone="nc" label="👥 NC" amount={r.laborAmount} grand={r.totalAmount} />
-        <Cell tone="mm" label="🏗 MM" amount={r.machineAmount} grand={r.totalAmount} />
-      </div>
+      {r.priceSource === "norm" && (
+        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
+          <Cell tone="vt" label="📦 VT" amount={r.materialAmount} grand={r.totalAmount} />
+          <Cell tone="nc" label="👥 NC" amount={r.laborAmount} grand={r.totalAmount} />
+          <Cell tone="mm" label="🏗 MM" amount={r.machineAmount} grand={r.totalAmount} />
+        </div>
+      )}
     </button>
   );
 }
@@ -452,9 +460,16 @@ function TaskFormulaModal({ r, projectId, onClose }: { r: TaskRow; projectId: st
         </div>
 
         <div className="space-y-3 px-4 py-3 text-[11px]">
-          <div className="text-[10px] text-zinc-500">
-            Công thức: <span className="font-mono text-zinc-400">KL × ĐM × K = Hao phí</span> → <span className="font-mono text-zinc-400">× Đơn giá = Thành tiền</span>
-          </div>
+          {/* Direct price editor — for items with no norm or ME / direct source */}
+          {r.priceSource !== "norm" && (
+            <DirectPriceEditor projectId={projectId} item={r} />
+          )}
+
+          {r.priceSource === "norm" && (
+            <div className="text-[10px] text-zinc-500">
+              Công thức: <span className="font-mono text-zinc-400">KL × ĐM × K = Hao phí</span> → <span className="font-mono text-zinc-400">× Đơn giá = Thành tiền</span>
+            </div>
+          )}
 
           {r.materialLines.length > 0 && (
             <FormulaGroup
@@ -598,6 +613,76 @@ function FormulaGroup({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function DirectPriceEditor({ projectId, item }: { projectId: string; item: TaskRow }) {
+  const router = useRouter();
+  const initial = item.directUnitPrice ?? item.mePrice ?? 0;
+  const [val, setVal] = useState<string>(initial > 0 ? String(initial) : "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const numVal = Number(val.replace(/[^\d]/g, ""));
+  const preview = Number.isFinite(numVal) && numVal > 0 ? Math.round(item.quantity * numVal) : 0;
+
+  async function save() {
+    setSaving(true);
+    setErr(null);
+    const res = await fetch(`/api/projects/${projectId}/budget/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ directUnitPrice: numVal > 0 ? numVal : null }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({ message: "Lỗi" }));
+      setErr(j.message ?? "Lỗi");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3">
+      <div className="mb-2 flex items-center justify-between text-[11px] text-sky-200">
+        <span className="font-semibold">💰 Đơn giá trực tiếp</span>
+        {item.priceSource === "me" && !item.directUnitPrice && (
+          <span className="text-[10px] text-violet-300">đang dùng giá ME</span>
+        )}
+      </div>
+      <div className="space-y-2 text-[11px]">
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-zinc-400">Đơn giá (đ/{item.unit}):</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            placeholder="0"
+            className="w-32 rounded-md border border-[#252840] bg-[#10131f] px-2 py-1 text-right font-mono text-[12px] text-zinc-100 focus:border-sky-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="rounded-md bg-sky-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-sky-500 disabled:opacity-60"
+          >
+            {saving ? "Đang lưu…" : "Lưu"}
+          </button>
+        </div>
+        {numVal > 0 && (
+          <div className="text-[11px] text-zinc-300">
+            <span className="font-mono">{fmtNum(item.quantity)}</span> × <span className="font-mono">{fmtVND(numVal)}</span> = <span className="font-mono font-bold text-sky-200">{fmtVND(preview)} đ</span>
+          </div>
+        )}
+        {err && <div className="text-[11px] text-amber-300">⚠ {err}</div>}
+        {item.directUnitPrice == null && item.mePrice == null && (
+          <div className="text-[10px] text-zinc-500">
+            Item này chưa có đơn giá. Nhập đơn giá để tính thành tiền.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

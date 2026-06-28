@@ -46,9 +46,10 @@ export const STAGE_LABEL: Record<BudgetStage, string> = {
   N: "Ngầm",
   T: "Thô",
   HT: "Hoàn thiện",
+  ME: "M&E",
 };
 
-export const STAGE_ORDER: BudgetStage[] = ["CB", "N", "T", "HT"];
+export const STAGE_ORDER: BudgetStage[] = ["CB", "N", "T", "HT", "ME"];
 
 export const NORM_CATEGORY_LABEL: Record<string, string> = {
   be_tong: "Bê tông",

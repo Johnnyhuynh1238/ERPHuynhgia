@@ -42,3 +42,6 @@ backups/*.sql.gz
 
 .deploy.lock
 .serena/
+
+# deploy snapshots
+/.deploy-backups/

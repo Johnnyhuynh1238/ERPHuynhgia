@@ -26,6 +26,7 @@ const patchSchema = z.object({
   sortRank: z.coerce.number().optional(),
   breakdown: z.array(breakdownSchema).max(200).optional().nullable(),
   normCode: z.string().trim().max(32).optional().nullable(),
+  directUnitPrice: z.coerce.number().int().min(0).max(10_000_000_000).optional().nullable(),
 });
 
 async function loadItem(projectId: string, itemId: string, userId: string, role: string) {
@@ -137,6 +138,9 @@ export async function PATCH(
         ...(body.sortRank !== undefined ? { sortRank: body.sortRank } : {}),
         ...(body.normCode !== undefined
           ? { normCode: body.normCode?.trim() ? body.normCode.trim() : null }
+          : {}),
+        ...(body.directUnitPrice !== undefined
+          ? { directUnitPrice: body.directUnitPrice == null ? null : BigInt(body.directUnitPrice) }
           : {}),
         breakdown:
           breakdown && breakdown.length > 0
