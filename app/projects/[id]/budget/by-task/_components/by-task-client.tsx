@@ -414,22 +414,36 @@ function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
 
 function TaskFormulaModal({ r, projectId, onClose }: { r: TaskRow; projectId: string; onClose: () => void }) {
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      window.scrollTo(0, scrollY);
       window.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#10131f] sm:rounded-2xl"
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#252840] bg-[#10131f]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
