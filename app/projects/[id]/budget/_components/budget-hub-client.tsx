@@ -127,7 +127,21 @@ export function BudgetHubClient({
       ],
     },
     {
-      title: "3. Chi phí khác & Dự phòng",
+      title: "3. Giá theo công tác",
+      hint: "Bảng giá chi tiết VT + NC + MM cho từng công tác",
+      icons: [
+        {
+          key: "btask",
+          emoji: "📑",
+          label: "Giá theo công tác",
+          sublabel: itemsWithNormCount > 0 ? "Bảng giá từng công tác" : "Cần gắn ĐM trước",
+          href: `/projects/${projectId}/budget/by-task`,
+          status: itemsWithNormCount > 0 ? "auto" : "soon",
+        },
+      ],
+    },
+    {
+      title: "4. Chi phí khác & Dự phòng",
       hint: "Set % phân bổ và buffer trượt giá",
       icons: [
         { key: "cpk",  emoji: "🔧", label: "CP khác trực tiếp", sublabel: "Vận chuyển, ATLĐ…",       status: "soon" },
@@ -140,7 +154,7 @@ export function BudgetHubClient({
 
   const allInputIcons = [
     ...sections[0].icons,
-    ...sections[2].icons,
+    ...sections[3].icons,
   ];
   const doneCount = allInputIcons.filter((i) => i.status === "done").length;
   const totalInput = allInputIcons.length;
