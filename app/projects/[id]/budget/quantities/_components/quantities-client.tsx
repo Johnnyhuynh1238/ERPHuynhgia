@@ -618,7 +618,7 @@ function ItemForm({
         if (!r.ok) return;
         const data = await r.json();
         if (cancelled) return;
-        setNormSuggests((data.norms ?? []).slice(0, 30));
+        setNormSuggests((data.norms ?? []).slice(0, 200));
       } finally {
         if (!cancelled) setNormLoading(false);
       }
