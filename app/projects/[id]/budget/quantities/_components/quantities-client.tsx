@@ -56,11 +56,30 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
   const [stage, setStage] = useState<BudgetStage>("T");
   const [components, setComponents] = useState<Component[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [normsByCode, setNormsByCode] = useState<Map<string, NormSuggestion>>(new Map());
   const [openComponentId, setOpenComponentId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<{ componentId: string; item: Item | null } | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/norms`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (cancelled) return;
+        const m = new Map<string, NormSuggestion>();
+        for (const n of (data.norms ?? []) as NormSuggestion[]) {
+          m.set(n.code, { code: n.code, name: n.name, unit: n.unit, category: n.category ?? null });
+        }
+        setNormsByCode(m);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -405,8 +424,14 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
                                 <span>{it.quantity.toLocaleString("vi-VN")} {it.unit}</span>
                                 {it.normCode && (
-                                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-sky-300">
-                                    ĐM {it.normCode}
+                                  <span
+                                    title={normsByCode.get(it.normCode)?.name ?? it.normCode}
+                                    className="inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300"
+                                  >
+                                    <span className="font-mono">ĐM {it.normCode}</span>
+                                    {normsByCode.get(it.normCode) && (
+                                      <span className="max-w-[180px] truncate text-sky-200/90">· {normsByCode.get(it.normCode)!.name}</span>
+                                    )}
                                   </span>
                                 )}
                                 {it.note ? <span>· {it.note}</span> : null}
@@ -473,6 +498,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
               initial={editingItem.item}
               componentId={editingItem.componentId}
               saving={savingId === (editingItem.item?.id ?? "new")}
+              normsByCode={normsByCode}
               onSave={(name, unit, qty, note, normCode) =>
                 saveItem({
                   componentId: editingItem.componentId,
@@ -557,12 +583,14 @@ function ItemForm({
   initial,
   componentId,
   saving,
+  normsByCode,
   onSave,
   onCancel,
 }: {
   initial: Item | null;
   componentId: string;
   saving: boolean;
+  normsByCode: Map<string, NormSuggestion>;
   onSave: (name: string, unit: string, qty: number, note: string | null, normCode: string | null) => void;
   onCancel: () => void;
 }) {
@@ -625,17 +653,43 @@ function ItemForm({
       <div>
         <label className="text-[10px] text-zinc-500">Định mức (tuỳ chọn)</label>
         {normCode ? (
-          <div className="mt-0.5 flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-2 py-1.5">
-            <span className="rounded bg-sky-500/30 px-1.5 py-0.5 font-mono text-[10px] text-sky-100">{normCode}</span>
-            <span className="flex-1 text-[11px] text-sky-200">Đã gắn định mức · hao phí auto từ bảng ĐM</span>
-            <button
-              type="button"
-              onClick={() => setNormCode(null)}
-              className="text-[10px] text-sky-300 underline hover:text-sky-100"
-            >
-              Bỏ gắn
-            </button>
-          </div>
+          (() => {
+            const ni = normsByCode.get(normCode);
+            return (
+              <div className="mt-0.5 rounded-lg border border-sky-500/40 bg-sky-500/10 p-2">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-sky-500/30 px-1.5 py-0.5 font-mono text-[10px] text-sky-100">{normCode}</span>
+                  <span className="flex-1 text-[11px] text-sky-100">
+                    {ni ? ni.name : <span className="italic text-sky-300/70">Mã không có trong bảng ĐM</span>}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setNormCode(null)}
+                    className="text-[10px] text-sky-300 underline hover:text-sky-100"
+                  >
+                    Bỏ gắn
+                  </button>
+                </div>
+                {ni && (
+                  <div className="mt-1 text-[10px] text-sky-300/80">
+                    Đơn vị ĐM: <span className="font-mono">{ni.unit}</span>
+                    {ni.unit !== unit && (
+                      <span className="ml-2 text-amber-300">⚠ khác đơn vị công tác ({unit})</span>
+                    )}
+                  </div>
+                )}
+                <div className="mt-1.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setNormPickerOpen(true); setNormQuery(""); }}
+                    className="text-[10px] text-sky-300 underline hover:text-sky-100"
+                  >
+                    Đổi ĐM khác
+                  </button>
+                </div>
+              </div>
+            );
+          })()
         ) : (
           <button
             type="button"
