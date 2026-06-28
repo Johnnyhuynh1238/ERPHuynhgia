@@ -718,7 +718,6 @@ model Project {
   materialProposals         MaterialProposal[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
-  budgetNorms               ProjectBudgetNorm[]
   projectComponents         ProjectComponent[]
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
@@ -833,7 +832,6 @@ model StandardTaskCatalog {
   templates        TaskTemplate[]          @relation("TemplateStdCatalog")
   tasks            Task[]                  @relation("TaskStdCatalog")
   budgetItems      ProjectBudgetItem[]
-  budgetNorms      ProjectBudgetNorm[]
 
   @@unique([phaseCode, taskCode])
   @@index([phaseCode, displayOrder])
@@ -2971,9 +2969,13 @@ model ProjectBudgetItem {
   equipmentUnitPrice BigInt       @default(0) @map("equipment_unit_price")
   equipmentAmount    BigInt       @default(0) @map("equipment_amount")
 
+  // Định mức gắn vào công tác (global Norm.code) — dùng để tính hao phí VT/NC/MM
+  normCode String? @map("norm_code") @db.VarChar(32)
+
   budget       ProjectBudget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   standardTask StandardTaskCatalog? @relation(fields: [standardTaskId], references: [id], onDelete: SetNull)
   component    ProjectComponent?    @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  norm         Norm?                @relation(fields: [normCode], references: [code], onDelete: SetNull)
   workOrders   WorkOrder[]
 
   @@index([budgetId, category, phaseCode])
@@ -2981,6 +2983,7 @@ model ProjectBudgetItem {
   @@index([standardTaskId])
   @@index([componentId])
   @@index([budgetId, stage])
+  @@index([normCode])
   @@map("project_budget_items")
 }
 
@@ -3003,28 +3006,33 @@ model ProjectComponent {
   @@map("project_components")
 }
 
-// ──────────────────────────── M2 v3: Định mức (KL bóc theo cấu kiện qua ProjectBudgetItem — SOP 47) ────────────────────────────
+// ──────────────────────────── M2 v4: Định mức GLOBAL (SOP 47 — số liệu chung, K chỉnh sau) ────────────────────────────
 
-// Định mức hao phí VT/NC/M per 1 đơn vị công tác — snapshot per project
-model ProjectBudgetNorm {
-  id             String   @id @default(uuid()) @db.Uuid
-  projectId      String   @map("project_id") @db.Uuid
-  standardTaskId String   @map("standard_task_id") @db.Uuid
-  unit           String   @db.VarChar(20)
-  materialItems  Json     @default("[]") @map("material_items") @db.JsonB // [{name, unit, qty, note?}]
-  laborHours     Decimal  @default(0) @map("labor_hours") @db.Decimal(10, 4) // công/đơn vị
-  laborGrade     String?  @map("labor_grade") @db.VarChar(20)
-  machineItems   Json     @default("[]") @map("machine_items") @db.JsonB // [{name, hours, note?}]
-  note           String?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+// Định mức hao phí VT/NC/MM per 1 đơn vị công tác — GLOBAL (không buộc project),
+// nguồn nhà nước (TT 12/13 BXD), K điều chỉnh khớp thực tế.
+model Norm {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique @db.VarChar(32) // VD: "AF.11110" — mã công bố
+  name          String // Tên công tác chuẩn
+  unit          String   @db.VarChar(20) // m³, m², md, kg, tấn, công, ca…
+  category      String?  @db.VarChar(64) // be_tong / cot_thep / cop_pha / xay / to_trat / op_lat / son / tran / chong_tham / khac
+  materialItems Json     @default("[]") @map("material_items") @db.JsonB // [{name, unit, qtyPerUnit, note?}]
+  laborItems    Json     @default("[]") @map("labor_items") @db.JsonB // [{grade, hoursPerUnit, note?}] — bậc thợ, công/đv
+  machineItems  Json     @default("[]") @map("machine_items") @db.JsonB // [{name, hoursPerUnit, note?}] — loại máy, ca/đv
+  kMaterial     Decimal  @default(1) @map("k_material") @db.Decimal(8, 4) // hệ số VT
+  kLabor        Decimal  @default(1) @map("k_labor") @db.Decimal(8, 4) // hệ số NC
+  kMachine      Decimal  @default(1) @map("k_machine") @db.Decimal(8, 4) // hệ số MM
+  source        String?  @db.VarChar(255) // VD: "TT 12/2021 BXD"
+  note          String?
+  retiredAt     DateTime? @map("retired_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  standardTask StandardTaskCatalog @relation(fields: [standardTaskId], references: [id], onDelete: Restrict)
+  budgetItems ProjectBudgetItem[]
 
-  @@unique([projectId, standardTaskId])
-  @@index([projectId])
-  @@map("project_budget_norms")
+  @@index([category])
+  @@index([retiredAt])
+  @@map("norms")
 }
 
 model ProjectBudgetAmendment {

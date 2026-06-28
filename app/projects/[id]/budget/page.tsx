@@ -36,7 +36,7 @@ export default async function ProjectBudgetHubPage({ params }: { params: { id: s
     prisma.standardTaskCatalog.count({ where: { retiredAt: null } }),
     prisma.projectComponent.count({ where: { projectId: project.id } }),
     prisma.projectBudgetItem.count({ where: { budget: { projectId: project.id } } }),
-    prisma.projectBudgetNorm.count({ where: { projectId: project.id } }),
+    prisma.norm.count({ where: { retiredAt: null } }),
     prisma.projectBudget.findUnique({
       where: { projectId: project.id },
       select: { totalLabor: true, totalMaterial: true, totalEquipment: true, totalAmount: true },
