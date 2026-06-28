@@ -42,11 +42,11 @@ export const SUGGESTED_COMPONENTS: SuggestedComponent[] = [
 ];
 
 export const STAGE_LABEL: Record<BudgetStage, string> = {
-  CB: "Chuẩn bị",
+  CB: "Chuẩn Bị",
   N: "Ngầm",
   T: "Thô",
-  HT: "Hoàn thiện",
-  ME: "M&E",
+  HT: "Hoàn Thiện",
+  ME: "ME",
 };
 
 export const STAGE_ORDER: BudgetStage[] = ["CB", "N", "T", "HT", "ME"];

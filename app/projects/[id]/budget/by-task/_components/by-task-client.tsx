@@ -4,6 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import type { TaskRow } from "../_lib/by-task";
+import { STAGE_LABEL, STAGE_ORDER } from "@/lib/budget-suggested-components";
+import type { BudgetStage } from "@prisma/client";
+
+function stageIdx(s: string | null | undefined): number {
+  const i = STAGE_ORDER.indexOf(s as BudgetStage);
+  return i === -1 ? 999 : i;
+}
+function stageLabel(s: string | null | undefined): string {
+  if (!s) return "—";
+  return STAGE_LABEL[s as BudgetStage] ?? s;
+}
 
 type Props = {
   projectId: string;
@@ -89,7 +100,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
     }
     return Array.from(m.values())
       .map((a) => ({ ...a, componentCount: a._compSet.size }))
-      .sort((a, b) => a.stage.localeCompare(b.stage));
+      .sort((a, b) => stageIdx(a.stage) - stageIdx(b.stage));
   }, [rows]);
 
   const byComp = useMemo<CompAgg[]>(() => {
@@ -120,7 +131,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
       if (r.materialHasMissing || r.laborHasMissing || r.machineHasMissing) agg.hasMissing = true;
     }
     return Array.from(m.values()).sort((a, b) => {
-      if (a.stage !== b.stage) return a.stage.localeCompare(b.stage);
+      if (a.stage !== b.stage) return stageIdx(a.stage) - stageIdx(b.stage);
       return a.componentSort - b.componentSort;
     });
   }, [rows]);
@@ -182,7 +193,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
           {byStage.map((s) => (
             <AggCard
               key={s.stage}
-              title={s.stage}
+              title={stageLabel(s.stage)}
               meta={`${s.componentCount} cấu kiện · ${s.taskCount} công tác`}
               grand={grandTotal}
               materialAmount={s.materialAmount}
@@ -202,7 +213,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
             <AggCard
               key={`${c.stage}__${c.componentName}`}
               title={c.componentName}
-              badges={[{ tone: "stage", label: c.stage }]}
+              badges={[{ tone: "stage", label: stageLabel(c.stage) }]}
               meta={`${c.taskCount} công tác`}
               grand={grandTotal}
               materialAmount={c.materialAmount}
@@ -357,7 +368,7 @@ function priceSourceLabel(src: TaskRow["priceSource"]): { label: string; color: 
 function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
   const hasMissing = r.materialHasMissing || r.laborHasMissing || r.machineHasMissing;
   const badges: Badge[] = [
-    { tone: "stage", label: r.stage ?? "—" },
+    { tone: "stage", label: stageLabel(r.stage) },
     { tone: "comp", label: r.componentName },
   ];
   const srcInfo = priceSourceLabel(r.priceSource);
@@ -425,7 +436,7 @@ function TaskFormulaModal({ r, projectId, onClose }: { r: TaskRow; projectId: st
         <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-[#252840] bg-[#10131f] px-4 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap gap-1">
-              <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-medium text-sky-200 ring-1 ring-sky-500/30">🏗 {r.stage ?? "—"}</span>
+              <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-medium text-sky-200 ring-1 ring-sky-500/30">🏗 {stageLabel(r.stage)}</span>
               <span className="rounded-full bg-zinc-700/40 px-1.5 py-0.5 text-[9px] font-medium text-zinc-300 ring-1 ring-zinc-700">🧱 {r.componentName}</span>
             </div>
             <h2 className="mt-1 text-[14px] font-semibold leading-tight text-zinc-100">{r.name}</h2>
