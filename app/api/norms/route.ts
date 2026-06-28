@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { canViewBudget } from "@/lib/project-budget";
+import { canEditBudget, canViewBudget } from "@/lib/project-budget";
+
+const NORM_CATEGORIES = [
+  "be_tong", "cot_thep", "cop_pha", "xay", "to_trat",
+  "op_lat", "son", "tran", "chong_tham", "cua", "mep", "khac",
+] as const;
+
+const createSchema = z.object({
+  code: z.string().trim().regex(/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/, "Mã ĐM: 2-4 chữ + dấu chấm + 2-8 ký tự (VD: BT.1140)").max(32),
+  name: z.string().trim().min(1, "Tên ĐM bắt buộc").max(255),
+  unit: z.string().trim().min(1, "Đơn vị bắt buộc").max(20),
+  category: z.enum(NORM_CATEGORIES).optional().nullable(),
+  source: z.string().trim().max(255).optional().nullable(),
+});
 
 type NormSerialized = {
   code: string;
@@ -90,5 +104,52 @@ export async function GET(request: Request) {
   return NextResponse.json({
     norms: data,
     categories: categories.map((c) => c.category).filter((c): c is string => c != null),
+  });
+}
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
+  if (!canEditBudget({ id: user.id, role: user.role })) {
+    return NextResponse.json({ message: "Chỉ TPTC/admin được tạo ĐM" }, { status: 403 });
+  }
+
+  const parsed = createSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const exists = await prisma.norm.findUnique({ where: { code: body.code } });
+  if (exists) {
+    return NextResponse.json({ message: `Mã ĐM "${body.code}" đã tồn tại` }, { status: 409 });
+  }
+
+  const norm = await prisma.norm.create({
+    data: {
+      code: body.code,
+      name: body.name,
+      unit: body.unit,
+      category: body.category ?? null,
+      source: body.source?.trim() ? body.source.trim() : null,
+    },
+  });
+
+  return NextResponse.json({
+    norm: {
+      code: norm.code,
+      name: norm.name,
+      unit: norm.unit,
+      category: norm.category,
+      materialItems: norm.materialItems,
+      laborItems: norm.laborItems,
+      machineItems: norm.machineItems,
+      kMaterial: Number(norm.kMaterial),
+      kLabor: Number(norm.kLabor),
+      kMachine: Number(norm.kMachine),
+      source: norm.source,
+      note: norm.note,
+      usageCount: 0,
+    },
   });
 }

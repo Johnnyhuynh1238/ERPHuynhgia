@@ -209,9 +209,6 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
     quantity: number;
     note: string | null;
     normCode: string | null;
-    laborUnitPrice: number;
-    materialUnitPrice: number;
-    equipmentUnitPrice: number;
   }) {
     if (!canEdit) return;
     setSavingId(payload.itemId ?? "new");
@@ -230,9 +227,6 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
           quantity: payload.quantity,
           note: payload.note,
           normCode: payload.normCode,
-          laborUnitPrice: payload.laborUnitPrice,
-          materialUnitPrice: payload.materialUnitPrice,
-          equipmentUnitPrice: payload.equipmentUnitPrice,
         }),
       });
       if (!r.ok) {
@@ -479,7 +473,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
               initial={editingItem.item}
               componentId={editingItem.componentId}
               saving={savingId === (editingItem.item?.id ?? "new")}
-              onSave={(name, unit, qty, note, normCode, laborUnitPrice, materialUnitPrice, equipmentUnitPrice) =>
+              onSave={(name, unit, qty, note, normCode) =>
                 saveItem({
                   componentId: editingItem.componentId,
                   itemId: editingItem.item?.id ?? null,
@@ -488,9 +482,6 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                   quantity: qty,
                   note,
                   normCode,
-                  laborUnitPrice,
-                  materialUnitPrice,
-                  equipmentUnitPrice,
                 })
               }
               onCancel={() => setEditingItem(null)}
@@ -572,16 +563,7 @@ function ItemForm({
   initial: Item | null;
   componentId: string;
   saving: boolean;
-  onSave: (
-    name: string,
-    unit: string,
-    qty: number,
-    note: string | null,
-    normCode: string | null,
-    laborUnitPrice: number,
-    materialUnitPrice: number,
-    equipmentUnitPrice: number,
-  ) => void;
+  onSave: (name: string, unit: string, qty: number, note: string | null, normCode: string | null) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -589,9 +571,6 @@ function ItemForm({
   const [qtyStr, setQtyStr] = useState(initial ? String(initial.quantity) : "");
   const [note, setNote] = useState(initial?.note ?? "");
   const [normCode, setNormCode] = useState<string | null>(initial?.normCode ?? null);
-  const [laborStr, setLaborStr] = useState(initial?.laborUnitPrice ? String(initial.laborUnitPrice) : "");
-  const [materialStr, setMaterialStr] = useState(initial?.materialUnitPrice ? String(initial.materialUnitPrice) : "");
-  const [equipmentStr, setEquipmentStr] = useState(initial?.equipmentUnitPrice ? String(initial.equipmentUnitPrice) : "");
 
   const [normQuery, setNormQuery] = useState("");
   const [normSuggests, setNormSuggests] = useState<NormSuggestion[]>([]);
@@ -629,9 +608,6 @@ function ItemForm({
   }
 
   const qtyNum = Number(qtyStr.replace(",", "."));
-  const laborNum = Math.max(0, Math.round(Number(laborStr.replace(/[.,\s]/g, "")) || 0));
-  const materialNum = Math.max(0, Math.round(Number(materialStr.replace(/[.,\s]/g, "")) || 0));
-  const equipmentNum = Math.max(0, Math.round(Number(equipmentStr.replace(/[.,\s]/g, "")) || 0));
   const invalid = qtyStr.trim() === "" || !isFinite(qtyNum) || qtyNum < 0 || !name.trim() || !unit.trim();
 
   return (
@@ -671,48 +647,6 @@ function ItemForm({
         )}
       </div>
 
-      {!normCode && (
-        <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
-          <div className="text-[10px] font-medium text-amber-200">Đơn giá thủ công (vì không có ĐM)</div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[10px] text-zinc-500">NC (đ/{unit || "đv"})</label>
-              <input
-                inputMode="numeric"
-                value={laborStr}
-                onChange={(e) => setLaborStr(e.target.value)}
-                placeholder="0"
-                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-zinc-500">VT (đ/{unit || "đv"})</label>
-              <input
-                inputMode="numeric"
-                value={materialStr}
-                onChange={(e) => setMaterialStr(e.target.value)}
-                placeholder="0"
-                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-zinc-500">MM (đ/{unit || "đv"})</label>
-              <input
-                inputMode="numeric"
-                value={equipmentStr}
-                onChange={(e) => setEquipmentStr(e.target.value)}
-                placeholder="0"
-                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
-              />
-            </div>
-          </div>
-          {(laborNum + materialNum + equipmentNum) > 0 && qtyNum > 0 && (
-            <div className="text-right text-[10px] text-amber-200">
-              Thành tiền: <span className="font-mono">{((laborNum + materialNum + equipmentNum) * qtyNum).toLocaleString("vi-VN")} đ</span>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="grid grid-cols-3 gap-2">
         <div>
@@ -753,18 +687,7 @@ function ItemForm({
         </button>
         <button
           disabled={invalid || saving}
-          onClick={() =>
-            onSave(
-              name.trim(),
-              unit.trim(),
-              qtyNum,
-              note.trim() || null,
-              normCode,
-              normCode ? 0 : laborNum,
-              normCode ? 0 : materialNum,
-              normCode ? 0 : equipmentNum,
-            )
-          }
+          onClick={() => onSave(name.trim(), unit.trim(), qtyNum, note.trim() || null, normCode)}
           className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
         >
           {saving ? "Đang lưu…" : "Lưu"}
@@ -779,11 +702,28 @@ function ItemForm({
           suggests={normSuggests}
           onPick={pickNorm}
           onClose={() => setNormPickerOpen(false)}
+          initialName={name}
+          initialUnit={unit}
         />
       )}
     </div>
   );
 }
+
+const NORM_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: "be_tong", label: "Bê tông" },
+  { value: "cot_thep", label: "Cốt thép" },
+  { value: "cop_pha", label: "Cốp pha" },
+  { value: "xay", label: "Xây" },
+  { value: "to_trat", label: "Tô trát" },
+  { value: "op_lat", label: "Ốp lát" },
+  { value: "son", label: "Sơn" },
+  { value: "tran", label: "Trần" },
+  { value: "chong_tham", label: "Chống thấm" },
+  { value: "cua", label: "Cửa & cơ khí" },
+  { value: "mep", label: "MEP" },
+  { value: "khac", label: "Khác" },
+];
 
 function NormPickerModal({
   query,
@@ -792,6 +732,8 @@ function NormPickerModal({
   suggests,
   onPick,
   onClose,
+  initialName,
+  initialUnit,
 }: {
   query: string;
   onQueryChange: (v: string) => void;
@@ -799,48 +741,176 @@ function NormPickerModal({
   suggests: NormSuggestion[];
   onPick: (n: NormSuggestion) => void;
   onClose: () => void;
+  initialName: string;
+  initialUnit: string;
 }) {
+  const [mode, setMode] = useState<"search" | "create">("search");
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState(initialName);
+  const [newUnit, setNewUnit] = useState(initialUnit);
+  const [newCategory, setNewCategory] = useState<string>("khac");
+  const [creating, setCreating] = useState(false);
+
+  async function createNorm() {
+    const code = newCode.trim().toUpperCase();
+    const name = newName.trim();
+    const unit = newUnit.trim();
+    if (!code || !name || !unit) {
+      toast.error("Mã, tên, đơn vị bắt buộc");
+      return;
+    }
+    setCreating(true);
+    try {
+      const r = await fetch("/api/norms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, name, unit, category: newCategory }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.message || "Tạo ĐM thất bại");
+      toast.success(`Đã tạo ĐM ${j.norm.code}`);
+      onPick({ code: j.norm.code, name: j.norm.name, unit: j.norm.unit, category: j.norm.category });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi tạo ĐM");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full max-w-md overflow-hidden rounded-2xl border border-[#252840] bg-[#0f1220]"
+        className="max-h-[90vh] w-full max-w-md overflow-hidden rounded-2xl border border-[#252840] bg-[#0f1220]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-[#252840] p-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-zinc-100">Chọn định mức</div>
+            <div className="text-sm font-semibold text-zinc-100">
+              {mode === "search" ? "Chọn định mức" : "Tạo định mức mới"}
+            </div>
             <button onClick={onClose} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
               Đóng
             </button>
           </div>
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Tìm mã hoặc tên định mức…"
-            className="mt-2 w-full rounded-lg border border-[#252840] bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-sky-500/40 focus:outline-none"
-          />
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto p-2">
-          {loading && <div className="p-3 text-center text-xs text-zinc-500">Đang tìm…</div>}
-          {!loading && suggests.length === 0 && (
-            <div className="p-3 text-center text-xs text-zinc-500">Không có định mức khớp</div>
-          )}
-          {suggests.map((n) => (
+
+          {mode === "search" ? (
+            <>
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+                placeholder="Tìm mã hoặc tên định mức…"
+                className="mt-2 w-full rounded-lg border border-[#252840] bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-sky-500/40 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setMode("create")}
+                className="mt-2 w-full rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 px-3 py-1.5 text-[11px] text-emerald-300 hover:bg-emerald-500/10"
+              >
+                + Tạo ĐM mới (vào bảng ĐM toàn cục)
+              </button>
+            </>
+          ) : (
             <button
-              key={n.code}
               type="button"
-              onClick={() => onPick(n)}
-              className="mb-1 flex w-full items-start gap-2 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left hover:border-sky-500/40 hover:bg-sky-500/5"
+              onClick={() => setMode("search")}
+              className="mt-2 text-[11px] text-sky-300 underline hover:text-sky-100"
             >
-              <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">{n.code}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-medium text-zinc-100">{n.name}</div>
-                <div className="text-[10px] text-zinc-500">/ {n.unit}</div>
-              </div>
+              ← Quay lại tìm ĐM có sẵn
             </button>
-          ))}
+          )}
         </div>
+
+        {mode === "search" ? (
+          <div className="max-h-[60vh] overflow-y-auto p-2">
+            {loading && <div className="p-3 text-center text-xs text-zinc-500">Đang tìm…</div>}
+            {!loading && suggests.length === 0 && (
+              <div className="p-3 text-center text-xs text-zinc-500">
+                Không có ĐM khớp. Bấm &ldquo;+ Tạo ĐM mới&rdquo; ở trên để thêm vào bảng ĐM.
+              </div>
+            )}
+            {suggests.map((n) => (
+              <button
+                key={n.code}
+                type="button"
+                onClick={() => onPick(n)}
+                className="mb-1 flex w-full items-start gap-2 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left hover:border-sky-500/40 hover:bg-sky-500/5"
+              >
+                <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">{n.code}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12px] font-medium text-zinc-100">{n.name}</div>
+                  <div className="text-[10px] text-zinc-500">/ {n.unit}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2 p-3">
+            <div>
+              <label className="text-[10px] text-zinc-500">Mã ĐM</label>
+              <input
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                placeholder="VD: BT.1140"
+                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
+              />
+              <div className="mt-1 text-[10px] text-zinc-500">
+                2-4 chữ + dấu chấm + 2-8 ký tự (BT=bê tông, TH=thép, CP=cốp pha, XY=xây, TR=trát, TM=chống thấm…)
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500">Tên ĐM</label>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="VD: Bê tông lót móng M100"
+                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-zinc-500">Đơn vị</label>
+                <input
+                  value={newUnit}
+                  onChange={(e) => setNewUnit(e.target.value)}
+                  placeholder="m³, m², kg, công…"
+                  className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500">Nhóm</label>
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                >
+                  {NORM_CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-700 bg-zinc-900/40 p-2 text-[10px] text-zinc-400">
+              ĐM sau khi tạo sẽ có sẵn trong bảng ĐM toàn cục để dùng cho các công tác sau.
+              Hao phí chi tiết (VT/NC/MM) có thể bổ sung sau ở màn Định mức.
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setMode("search")}
+                className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+              >
+                Huỷ
+              </button>
+              <button
+                disabled={creating || !newCode.trim() || !newName.trim() || !newUnit.trim()}
+                onClick={createNorm}
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {creating ? "Đang tạo…" : "Tạo & gắn"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
