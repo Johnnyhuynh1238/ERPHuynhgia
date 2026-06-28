@@ -30,6 +30,9 @@ type Item = {
   note: string | null;
   sortRank: number;
   normCode: string | null;
+  laborUnitPrice: number;
+  materialUnitPrice: number;
+  equipmentUnitPrice: number;
 };
 
 type NormSuggestion = {
@@ -76,6 +79,9 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
         note: string | null;
         sortRank: number;
         normCode?: string | null;
+        laborUnitPrice?: number;
+        materialUnitPrice?: number;
+        equipmentUnitPrice?: number;
       }>;
       setItems(
         rawItems
@@ -90,6 +96,9 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
             note: it.note,
             sortRank: it.sortRank,
             normCode: it.normCode ?? null,
+            laborUnitPrice: it.laborUnitPrice ?? 0,
+            materialUnitPrice: it.materialUnitPrice ?? 0,
+            equipmentUnitPrice: it.equipmentUnitPrice ?? 0,
           })),
       );
     } catch (e) {
@@ -200,6 +209,9 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
     quantity: number;
     note: string | null;
     normCode: string | null;
+    laborUnitPrice: number;
+    materialUnitPrice: number;
+    equipmentUnitPrice: number;
   }) {
     if (!canEdit) return;
     setSavingId(payload.itemId ?? "new");
@@ -218,6 +230,9 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
           quantity: payload.quantity,
           note: payload.note,
           normCode: payload.normCode,
+          laborUnitPrice: payload.laborUnitPrice,
+          materialUnitPrice: payload.materialUnitPrice,
+          equipmentUnitPrice: payload.equipmentUnitPrice,
         }),
       });
       if (!r.ok) {
@@ -424,27 +439,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
                       </div>
                     )}
 
-                    {/* Add / edit item form */}
-                    {canEdit && editingItem?.componentId === c.id && (
-                      <ItemForm
-                        initial={editingItem.item}
-                        componentId={c.id}
-                        saving={savingId === (editingItem.item?.id ?? "new")}
-                        onSave={(name, unit, qty, note, normCode) =>
-                          saveItem({
-                            componentId: c.id,
-                            itemId: editingItem.item?.id ?? null,
-                            name,
-                            unit,
-                            quantity: qty,
-                            note,
-                            normCode,
-                          })
-                        }
-                        onCancel={() => setEditingItem(null)}
-                      />
-                    )}
-                    {canEdit && editingItem?.componentId !== c.id && (
+                    {canEdit && (
                       <button
                         onClick={() => setEditingItem({ componentId: c.id, item: null })}
                         className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-[11px] text-zinc-400 hover:bg-zinc-800/40"
@@ -468,6 +463,40 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
           onPick={(sug) => addComponent(sug.name, null, sug)}
           onClose={() => setPickerOpen(false)}
         />
+      )}
+
+      {/* Item form modal */}
+      {canEdit && editingItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3"
+          onClick={() => setEditingItem(null)}
+        >
+          <div
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-[#252840] bg-[#1a1d2e] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ItemForm
+              initial={editingItem.item}
+              componentId={editingItem.componentId}
+              saving={savingId === (editingItem.item?.id ?? "new")}
+              onSave={(name, unit, qty, note, normCode, laborUnitPrice, materialUnitPrice, equipmentUnitPrice) =>
+                saveItem({
+                  componentId: editingItem.componentId,
+                  itemId: editingItem.item?.id ?? null,
+                  name,
+                  unit,
+                  quantity: qty,
+                  note,
+                  normCode,
+                  laborUnitPrice,
+                  materialUnitPrice,
+                  equipmentUnitPrice,
+                })
+              }
+              onCancel={() => setEditingItem(null)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
@@ -543,7 +572,16 @@ function ItemForm({
   initial: Item | null;
   componentId: string;
   saving: boolean;
-  onSave: (name: string, unit: string, qty: number, note: string | null, normCode: string | null) => void;
+  onSave: (
+    name: string,
+    unit: string,
+    qty: number,
+    note: string | null,
+    normCode: string | null,
+    laborUnitPrice: number,
+    materialUnitPrice: number,
+    equipmentUnitPrice: number,
+  ) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -551,6 +589,9 @@ function ItemForm({
   const [qtyStr, setQtyStr] = useState(initial ? String(initial.quantity) : "");
   const [note, setNote] = useState(initial?.note ?? "");
   const [normCode, setNormCode] = useState<string | null>(initial?.normCode ?? null);
+  const [laborStr, setLaborStr] = useState(initial?.laborUnitPrice ? String(initial.laborUnitPrice) : "");
+  const [materialStr, setMaterialStr] = useState(initial?.materialUnitPrice ? String(initial.materialUnitPrice) : "");
+  const [equipmentStr, setEquipmentStr] = useState(initial?.equipmentUnitPrice ? String(initial.equipmentUnitPrice) : "");
 
   const [normQuery, setNormQuery] = useState("");
   const [normSuggests, setNormSuggests] = useState<NormSuggestion[]>([]);
@@ -588,10 +629,13 @@ function ItemForm({
   }
 
   const qtyNum = Number(qtyStr.replace(",", "."));
+  const laborNum = Math.max(0, Math.round(Number(laborStr.replace(/[.,\s]/g, "")) || 0));
+  const materialNum = Math.max(0, Math.round(Number(materialStr.replace(/[.,\s]/g, "")) || 0));
+  const equipmentNum = Math.max(0, Math.round(Number(equipmentStr.replace(/[.,\s]/g, "")) || 0));
   const invalid = qtyStr.trim() === "" || !isFinite(qtyNum) || qtyNum < 0 || !name.trim() || !unit.trim();
 
   return (
-    <div className="space-y-2 rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
+    <div className="space-y-2 p-3">
       <div>
         <label className="text-[10px] text-zinc-500">Tên công tác</label>
         <input
@@ -626,6 +670,49 @@ function ItemForm({
           </button>
         )}
       </div>
+
+      {!normCode && (
+        <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
+          <div className="text-[10px] font-medium text-amber-200">Đơn giá thủ công (vì không có ĐM)</div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[10px] text-zinc-500">NC (đ/{unit || "đv"})</label>
+              <input
+                inputMode="numeric"
+                value={laborStr}
+                onChange={(e) => setLaborStr(e.target.value)}
+                placeholder="0"
+                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500">VT (đ/{unit || "đv"})</label>
+              <input
+                inputMode="numeric"
+                value={materialStr}
+                onChange={(e) => setMaterialStr(e.target.value)}
+                placeholder="0"
+                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500">MM (đ/{unit || "đv"})</label>
+              <input
+                inputMode="numeric"
+                value={equipmentStr}
+                onChange={(e) => setEquipmentStr(e.target.value)}
+                placeholder="0"
+                className="mt-0.5 w-full rounded-lg border border-[#252840] bg-zinc-900 px-2 py-1.5 text-right font-mono text-sm text-zinc-100 placeholder:text-zinc-600"
+              />
+            </div>
+          </div>
+          {(laborNum + materialNum + equipmentNum) > 0 && qtyNum > 0 && (
+            <div className="text-right text-[10px] text-amber-200">
+              Thành tiền: <span className="font-mono">{((laborNum + materialNum + equipmentNum) * qtyNum).toLocaleString("vi-VN")} đ</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <div>
@@ -666,7 +753,18 @@ function ItemForm({
         </button>
         <button
           disabled={invalid || saving}
-          onClick={() => onSave(name.trim(), unit.trim(), qtyNum, note.trim() || null, normCode)}
+          onClick={() =>
+            onSave(
+              name.trim(),
+              unit.trim(),
+              qtyNum,
+              note.trim() || null,
+              normCode,
+              normCode ? 0 : laborNum,
+              normCode ? 0 : materialNum,
+              normCode ? 0 : equipmentNum,
+            )
+          }
           className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
         >
           {saving ? "Đang lưu…" : "Lưu"}
