@@ -71,10 +71,54 @@ type CompAgg = {
 export function ByTaskClient({ projectId, projectName, projectCode, rows, totals }: Props) {
   const [view, setView] = useState<ViewMode>("gd");
   const [popupTask, setPopupTask] = useState<TaskRow | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filter, setFilter] = useState<{ stage: string | null; componentName: string | null }>({
+    stage: null,
+    componentName: null,
+  });
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (filter.stage && (r.stage ?? "—") !== filter.stage) return false;
+      if (filter.componentName && r.componentName !== filter.componentName) return false;
+      return true;
+    });
+  }, [rows, filter.stage, filter.componentName]);
+
+  const componentsForFilter = useMemo(() => {
+    const m = new Map<string, { name: string; stage: string; sort: number }>();
+    for (const r of rows) {
+      if (filter.stage && (r.stage ?? "—") !== filter.stage) continue;
+      const key = `${r.stage ?? "—"}__${r.componentName}`;
+      if (!m.has(key)) {
+        m.set(key, { name: r.componentName, stage: r.stage ?? "—", sort: r.componentSort });
+      }
+    }
+    return Array.from(m.values()).sort((a, b) => {
+      if (a.stage !== b.stage) return stageIdx(a.stage) - stageIdx(b.stage);
+      return a.sort - b.sort;
+    });
+  }, [rows, filter.stage]);
+
+  const activeFilterCount = (filter.stage ? 1 : 0) + (filter.componentName ? 1 : 0);
+
+  function clearFilter() {
+    setFilter({ stage: null, componentName: null });
+  }
+
+  function drillToCk(stage: string) {
+    setFilter({ stage, componentName: null });
+    setView("ck");
+  }
+
+  function drillToCt(stage: string, componentName: string) {
+    setFilter({ stage, componentName });
+    setView("ct");
+  }
 
   const byStage = useMemo<StageAgg[]>(() => {
     const m = new Map<string, StageAgg & { _compSet: Set<string> }>();
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const stage = r.stage ?? "—";
       let agg = m.get(stage);
       if (!agg) {
@@ -102,11 +146,11 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
     return Array.from(m.values())
       .map((a) => ({ ...a, componentCount: a._compSet.size }))
       .sort((a, b) => stageIdx(a.stage) - stageIdx(b.stage));
-  }, [rows]);
+  }, [filteredRows]);
 
   const byComp = useMemo<CompAgg[]>(() => {
     const m = new Map<string, CompAgg>();
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const stage = r.stage ?? "—";
       const key = `${stage}__${r.componentName}`;
       let agg = m.get(key);
@@ -135,10 +179,10 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
       if (a.stage !== b.stage) return stageIdx(a.stage) - stageIdx(b.stage);
       return a.componentSort - b.componentSort;
     });
-  }, [rows]);
+  }, [filteredRows]);
 
-  const taskCount = rows.length;
-  const withMissing = rows.filter((r) => r.materialHasMissing || r.laborHasMissing || r.machineHasMissing).length;
+  const taskCount = filteredRows.length;
+  const withMissing = filteredRows.filter((r) => r.materialHasMissing || r.laborHasMissing || r.machineHasMissing).length;
   const grandTotal = totals.grandTotal;
 
   return (
@@ -181,12 +225,91 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
         </div>
       </div>
 
-      {/* Tab pills */}
-      <div className="flex gap-1.5 rounded-xl border border-[#252840] bg-[#1a1d2e] p-1">
-        <TabBtn active={view === "gd"} onClick={() => setView("gd")}>🏗 Giai đoạn</TabBtn>
-        <TabBtn active={view === "ck"} onClick={() => setView("ck")}>🧱 Cấu kiện</TabBtn>
-        <TabBtn active={view === "ct"} onClick={() => setView("ct")}>📑 Công tác</TabBtn>
+      {/* Tab pills + filter icon */}
+      <div className="flex items-center gap-1.5">
+        <div className="flex flex-1 gap-1.5 rounded-xl border border-[#252840] bg-[#1a1d2e] p-1">
+          <TabBtn active={view === "gd"} onClick={() => setView("gd")}>🏗 Giai đoạn</TabBtn>
+          <TabBtn active={view === "ck"} onClick={() => setView("ck")}>🧱 Cấu kiện</TabBtn>
+          <TabBtn active={view === "ct"} onClick={() => setView("ct")}>📑 Công tác</TabBtn>
+        </div>
+        <button
+          type="button"
+          onClick={() => setFilterOpen((v) => !v)}
+          className={`relative shrink-0 rounded-xl border p-2 text-sm transition ${
+            activeFilterCount > 0
+              ? "border-sky-500/50 bg-sky-500/10 text-sky-200"
+              : "border-[#252840] bg-[#1a1d2e] text-zinc-400 hover:text-zinc-200"
+          }`}
+          aria-label="Bộ lọc"
+        >
+          ⚲
+          {activeFilterCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* Filter panel */}
+      {filterOpen && (
+        <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 ring-1 ring-sky-500/10">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-sky-200">Bộ lọc</div>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilter}
+                className="text-[10px] text-sky-300 underline hover:text-sky-100"
+              >
+                Xoá bộ lọc
+              </button>
+            )}
+          </div>
+          <div className="mt-2">
+            <div className="text-[10px] text-zinc-400">Giai đoạn</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {STAGE_ORDER.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setFilter((f) => ({ stage: f.stage === s ? null : s, componentName: null }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 transition ${
+                    filter.stage === s
+                      ? "bg-sky-500/30 text-sky-100 ring-sky-500/50"
+                      : "bg-zinc-700/30 text-zinc-300 ring-zinc-700 hover:bg-zinc-700/50"
+                  }`}
+                >
+                  {STAGE_LABEL[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {componentsForFilter.length > 0 && (
+            <div className="mt-2">
+              <div className="text-[10px] text-zinc-400">
+                Cấu kiện {filter.stage ? `(${STAGE_LABEL[filter.stage as BudgetStage] ?? filter.stage})` : "(tất cả)"}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {componentsForFilter.map((c) => (
+                  <button
+                    key={`${c.stage}__${c.name}`}
+                    type="button"
+                    onClick={() => setFilter((f) => ({ ...f, componentName: f.componentName === c.name ? null : c.name }))}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 transition ${
+                      filter.componentName === c.name
+                        ? "bg-sky-500/30 text-sky-100 ring-sky-500/50"
+                        : "bg-zinc-700/30 text-zinc-300 ring-zinc-700 hover:bg-zinc-700/50"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Body theo view */}
       {view === "gd" && (
@@ -202,6 +325,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
               machineAmount={s.machineAmount}
               totalAmount={s.totalAmount}
               hasMissing={s.hasMissing}
+              onClick={() => drillToCk(s.stage)}
             />
           ))}
           {byStage.length === 0 && <EmptyState />}
@@ -222,6 +346,7 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
               machineAmount={c.machineAmount}
               totalAmount={c.totalAmount}
               hasMissing={c.hasMissing}
+              onClick={() => drillToCt(c.stage, c.componentName)}
             />
           ))}
           {byComp.length === 0 && <EmptyState />}
@@ -230,10 +355,10 @@ export function ByTaskClient({ projectId, projectName, projectCode, rows, totals
 
       {view === "ct" && (
         <div className="space-y-2">
-          {rows.map((r) => (
+          {filteredRows.map((r) => (
             <TaskCard key={r.id} r={r} onOpen={() => setPopupTask(r)} />
           ))}
-          {rows.length === 0 && <EmptyState />}
+          {filteredRows.length === 0 && <EmptyState />}
         </div>
       )}
 
@@ -300,6 +425,7 @@ function AggCard({
   machineAmount,
   totalAmount,
   hasMissing,
+  onClick,
 }: {
   title: string;
   badges?: Badge[];
@@ -310,10 +436,13 @@ function AggCard({
   machineAmount: number;
   totalAmount: number;
   hasMissing: boolean;
+  onClick?: () => void;
 }) {
   const pct = grand > 0 ? Math.round((totalAmount / grand) * 100) : 0;
-  return (
-    <div className="overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 ring-1 ring-zinc-800">
+  const baseCls = "block w-full overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 text-left ring-1 ring-zinc-800";
+  const clickableCls = "active:bg-[#1d2238] hover:border-sky-500/40";
+  const body = (
+    <>
       <BadgeRow badges={badges} />
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -335,8 +464,16 @@ function AggCard({
         <Cell tone="nc" label="👥 NC" amount={laborAmount} grand={totalAmount} />
         <Cell tone="mm" label="🏗 MM" amount={machineAmount} grand={totalAmount} />
       </div>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${baseCls} ${clickableCls}`}>
+        {body}
+      </button>
+    );
+  }
+  return <div className={baseCls}>{body}</div>;
 }
 
 function BadgeRow({ badges }: { badges?: Badge[] }) {

@@ -1,4 +1,10 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, BudgetStage } from "@prisma/client";
+import { STAGE_ORDER } from "@/lib/budget-suggested-components";
+
+function stageIdx(s: string | null | undefined): number {
+  const i = STAGE_ORDER.indexOf(s as BudgetStage);
+  return i === -1 ? 999 : i;
+}
 
 export type MaterialLine = {
   name: string;
@@ -259,7 +265,9 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
   }
 
   rows.sort((a, b) => {
-    if (a.stage !== b.stage) return (a.stage ?? "").localeCompare(b.stage ?? "");
+    const sa = stageIdx(a.stage);
+    const sb = stageIdx(b.stage);
+    if (sa !== sb) return sa - sb;
     if (a.componentSort !== b.componentSort) return a.componentSort - b.componentSort;
     return a.sortRank - b.sortRank;
   });
