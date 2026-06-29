@@ -21,6 +21,11 @@ export function DashboardLoaderClient() {
         return;
       }
 
+      if (typeof json.landing === "string" && json.landing.startsWith("/")) {
+        router.replace(json.landing);
+        return;
+      }
+
       if (json.role === "admin") {
         router.replace("/admin/dashboard");
         return;
