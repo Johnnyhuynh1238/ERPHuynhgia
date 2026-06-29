@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Props = {
   projectId: string;
@@ -269,9 +272,93 @@ export function BudgetHubClient({
         </section>
       ))}
 
+      <ExcelToolbar projectId={projectId} itemCount={itemCount} />
+
       <div className="pt-2 text-center text-[11px] text-zinc-600">
         Anh nhập đủ 4 nhóm là dự toán tự ra số.
       </div>
     </div>
+  );
+}
+
+function ExcelToolbar({ projectId, itemCount }: { projectId: string; itemCount: number }) {
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (itemCount > 0) {
+      const ok = window.confirm(
+        `Dự án đang có ${itemCount} công tác. Upload sẽ XOÁ TOÀN BỘ và thay bằng file Excel. Tiếp tục?`,
+      );
+      if (!ok) {
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(`/api/projects/${projectId}/budget/import-excel`, {
+        method: "POST",
+        body: fd,
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errs = Array.isArray(j.errors) ? "\n" + j.errors.slice(0, 5).join("\n") : "";
+        toast.error((j.message ?? "Lỗi import") + errs);
+        return;
+      }
+      toast.success(`Import thành công: ${j.componentCount} cấu kiện, ${j.itemCount} công tác`);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi mạng");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-baseline gap-2 px-1">
+        <h2 className="text-sm font-semibold text-zinc-200">Excel</h2>
+        <span className="text-[11px] text-zinc-500">Tải mẫu, điền offline, upload lại</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <a
+          href="/api/budget/excel-template"
+          className="flex flex-col items-center justify-center rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 ring-1 ring-emerald-500/30 transition active:scale-95 hover:border-emerald-500/50"
+        >
+          <span className="text-3xl leading-none">📥</span>
+          <span className="mt-2 text-[12px] font-medium text-zinc-100">Tải mẫu Excel</span>
+          <span className="mt-0.5 text-[10px] text-zinc-400">5 sheet · có công thức</span>
+        </a>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="flex flex-col items-center justify-center rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 ring-1 ring-sky-500/30 transition active:scale-95 hover:border-sky-500/50 disabled:opacity-60"
+        >
+          <span className="text-3xl leading-none">📤</span>
+          <span className="mt-2 text-[12px] font-medium text-zinc-100">
+            {uploading ? "Đang upload…" : "Upload Excel"}
+          </span>
+          <span className="mt-0.5 text-[10px] text-zinc-400">
+            {itemCount > 0 ? "⚠ Sẽ ghi đè budget hiện tại" : "Tạo budget từ file"}
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx"
+          className="hidden"
+          onChange={onUpload}
+        />
+      </div>
+    </section>
   );
 }
