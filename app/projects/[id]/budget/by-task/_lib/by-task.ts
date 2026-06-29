@@ -51,6 +51,9 @@ export type TaskRow = {
   priceSource: PriceSource;
   directUnitPrice: number | null;
   mePrice: number | null;
+  materialUnitPrice: number;
+  laborUnitPrice: number;
+  equipmentUnitPrice: number;
   materialLines: MaterialLine[];
   laborLines: LaborLine[];
   machineLines: MachineLine[];
@@ -73,6 +76,9 @@ export type ByTaskInput = {
     quantity: Prisma.Decimal | number;
     normCode: string | null;
     directUnitPrice: Prisma.Decimal | number | bigint | null;
+    materialUnitPrice: Prisma.Decimal | number | bigint | null;
+    laborUnitPrice: Prisma.Decimal | number | bigint | null;
+    equipmentUnitPrice: Prisma.Decimal | number | bigint | null;
     component: { name: string; sortOrder: number } | null;
   }>;
   normsByCode: Map<
@@ -173,6 +179,10 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
     const norm = item.normCode ? input.normsByCode.get(item.normCode) ?? null : null;
     const directPrice = item.directUnitPrice != null ? toNumber(item.directUnitPrice) : null;
     const meHit = item.stage === "ME" ? input.priceMe.get(meKey(item.name, item.unit)) ?? null : null;
+    const matUP = toNumber(item.materialUnitPrice);
+    const labUP = toNumber(item.laborUnitPrice);
+    const eqUP = toNumber(item.equipmentUnitPrice);
+    const hasSplitDirect = matUP > 0 || labUP > 0 || eqUP > 0;
 
     const materialLines: MaterialLine[] = [];
     const laborLines: LaborLine[] = [];
@@ -186,8 +196,13 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
     let hasNormData = false;
     let priceSource: PriceSource = "none";
 
-    // Priority: directUnitPrice > ME lookup > norm computation
-    if (directPrice != null && directPrice > 0) {
+    // Priority: split direct (VT/NC/MM) > legacy single directUnitPrice > ME lookup > norm computation
+    if (hasSplitDirect) {
+      priceSource = "direct";
+      materialAmount = Math.round(qty * matUP);
+      laborAmount = Math.round(qty * labUP);
+      machineAmount = Math.round(qty * eqUP);
+    } else if (directPrice != null && directPrice > 0) {
       priceSource = "direct";
       materialAmount = Math.round(qty * directPrice);
     } else if (meHit != null && meHit > 0) {
@@ -251,6 +266,9 @@ export function computeByTask(input: ByTaskInput): ByTaskResult {
       priceSource,
       directUnitPrice: directPrice,
       mePrice: meHit,
+      materialUnitPrice: matUP,
+      laborUnitPrice: labUP,
+      equipmentUnitPrice: eqUP,
       materialLines,
       laborLines,
       machineLines,

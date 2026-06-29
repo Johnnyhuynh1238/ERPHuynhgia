@@ -539,7 +539,7 @@ function TaskCard({ r, onOpen }: { r: TaskRow; onOpen: () => void }) {
           {hasMissing && <div className="text-[10px] text-amber-300">⚠ thiếu giá</div>}
         </div>
       </div>
-      {r.priceSource === "norm" && (
+      {r.totalAmount > 0 && (r.priceSource === "norm" || (r.priceSource === "direct" && (r.laborAmount > 0 || r.machineAmount > 0))) && (
         <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
           <Cell tone="vt" label="📦 VT" amount={r.materialAmount} grand={r.totalAmount} />
           <Cell tone="nc" label="👥 NC" amount={r.laborAmount} grand={r.totalAmount} />
@@ -773,12 +773,19 @@ function FormulaGroup({
 
 function DirectPriceEditor({ projectId, item }: { projectId: string; item: TaskRow }) {
   const router = useRouter();
-  const initial = item.directUnitPrice ?? item.mePrice ?? 0;
-  const [val, setVal] = useState<string>(initial > 0 ? String(initial) : "");
+  const initVT = item.materialUnitPrice > 0 ? String(item.materialUnitPrice) : "";
+  const initNC = item.laborUnitPrice > 0 ? String(item.laborUnitPrice) : "";
+  const initMM = item.equipmentUnitPrice > 0 ? String(item.equipmentUnitPrice) : "";
+  const [vt, setVt] = useState<string>(initVT);
+  const [nc, setNc] = useState<string>(initNC);
+  const [mm, setMm] = useState<string>(initMM);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const numVal = Number(val.replace(/[^\d]/g, ""));
-  const preview = Number.isFinite(numVal) && numVal > 0 ? Math.round(item.quantity * numVal) : 0;
+  const numVt = Number(vt.replace(/[^\d]/g, "")) || 0;
+  const numNc = Number(nc.replace(/[^\d]/g, "")) || 0;
+  const numMm = Number(mm.replace(/[^\d]/g, "")) || 0;
+  const sumUnit = numVt + numNc + numMm;
+  const preview = sumUnit > 0 ? Math.round(item.quantity * sumUnit) : 0;
 
   async function save() {
     setSaving(true);
@@ -786,7 +793,12 @@ function DirectPriceEditor({ projectId, item }: { projectId: string; item: TaskR
     const res = await fetch(`/api/projects/${projectId}/budget/items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ directUnitPrice: numVal > 0 ? numVal : null }),
+      body: JSON.stringify({
+        materialUnitPrice: numVt,
+        laborUnitPrice: numNc,
+        equipmentUnitPrice: numMm,
+        directUnitPrice: null,
+      }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -800,22 +812,22 @@ function DirectPriceEditor({ projectId, item }: { projectId: string; item: TaskR
   return (
     <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3">
       <div className="mb-2 flex items-center justify-between text-[11px] text-sky-200">
-        <span className="font-semibold">💰 Đơn giá trực tiếp</span>
-        {item.priceSource === "me" && !item.directUnitPrice && (
+        <span className="font-semibold">💰 Đơn giá trực tiếp (VT / NC / MM)</span>
+        {item.priceSource === "me" && sumUnit === 0 && (
           <span className="text-[10px] text-violet-300">đang dùng giá ME</span>
         )}
       </div>
       <div className="space-y-2 text-[11px]">
-        <div className="flex items-center gap-2">
-          <span className="shrink-0 text-zinc-400">Đơn giá (đ/{item.unit}):</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            placeholder="0"
-            className="w-32 rounded-md border border-[#252840] bg-[#10131f] px-2 py-1 text-right font-mono text-[12px] text-zinc-100 focus:border-sky-500 focus:outline-none"
-          />
+        <PriceRow tone="vt" label="📦 Vật tư" unit={item.unit} value={vt} onChange={setVt} />
+        <PriceRow tone="nc" label="👥 Nhân công" unit={item.unit} value={nc} onChange={setNc} />
+        <PriceRow tone="mm" label="🏗 Máy móc" unit={item.unit} value={mm} onChange={setMm} />
+        <div className="flex items-center justify-between border-t border-sky-500/20 pt-2">
+          <div className="text-[11px] text-zinc-300">
+            Tổng: <span className="font-mono font-semibold text-sky-200">{fmtVND(sumUnit)}</span> đ/{item.unit}
+            {preview > 0 && (
+              <> · KL × ĐG = <span className="font-mono font-bold text-sky-200">{fmtVND(preview)}</span> đ</>
+            )}
+          </div>
           <button
             type="button"
             onClick={save}
@@ -825,18 +837,41 @@ function DirectPriceEditor({ projectId, item }: { projectId: string; item: TaskR
             {saving ? "Đang lưu…" : "Lưu"}
           </button>
         </div>
-        {numVal > 0 && (
-          <div className="text-[11px] text-zinc-300">
-            <span className="font-mono">{fmtNum(item.quantity)}</span> × <span className="font-mono">{fmtVND(numVal)}</span> = <span className="font-mono font-bold text-sky-200">{fmtVND(preview)} đ</span>
-          </div>
-        )}
         {err && <div className="text-[11px] text-amber-300">⚠ {err}</div>}
-        {item.directUnitPrice == null && item.mePrice == null && (
+        {sumUnit === 0 && item.mePrice == null && (
           <div className="text-[10px] text-zinc-500">
-            Item này chưa có đơn giá. Nhập đơn giá để tính thành tiền.
+            Item này chưa có đơn giá. Nhập đơn giá VT/NC/MM (bỏ trống = 0) để tính thành tiền.
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PriceRow({ tone, label, unit, value, onChange }: {
+  tone: "vt" | "nc" | "mm";
+  label: string;
+  unit: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const cls = tone === "vt"
+    ? "border-emerald-500/30 text-emerald-200"
+    : tone === "nc"
+      ? "border-amber-500/30 text-amber-200"
+      : "border-violet-500/30 text-violet-200";
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`w-24 shrink-0 text-[11px] ${cls.split(" ")[1]}`}>{label}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+        className={`flex-1 rounded-md border bg-[#10131f] px-2 py-1 text-right font-mono text-[12px] text-zinc-100 focus:outline-none ${cls.split(" ")[0]}`}
+      />
+      <span className="shrink-0 text-[10px] text-zinc-500">đ/{unit}</span>
     </div>
   );
 }
