@@ -213,7 +213,6 @@ export async function getCustomerPortalOverview(projectId: string) {
       totalCount,
     },
     team: [
-      { ...project.projectManager, role: "TPTC" },
       { ...project.mainEngineer, role: "Kỹ sư" },
     ],
   };
