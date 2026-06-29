@@ -396,9 +396,9 @@ export async function GET() {
   }
 
   if (user.role === UserRole.engineer) {
-    // KS Phúc (DA-2026-002 a Ngân) đi flow /ks-ql, không vào dashboard cũ.
+    // KS Phúc (DA-2026-002 a Ngân — giao khoán) đi flow /ks-ql/sub, không vào dashboard cũ.
     if (user.id === "aa42319b-e694-4be2-bae0-faef83601ab5") {
-      return NextResponse.json({ role: user.role, landing: "/ks-ql/today" });
+      return NextResponse.json({ role: user.role, landing: "/ks-ql/sub" });
     }
     const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });
 

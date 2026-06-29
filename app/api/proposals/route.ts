@@ -7,10 +7,19 @@ import { prisma } from "@/lib/prisma";
 import { notifyMaterialProposalNew } from "@/lib/notify-material-proposal";
 import { parseProposalItems } from "@/lib/parse-proposal-items";
 
+const structuredItemSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  unit: z.string().trim().min(1).max(20),
+  qty: z.number().positive(),
+  taskIds: z.array(z.string().uuid()).default([]),
+  note: z.string().trim().max(500).optional(),
+});
+
 const createSchema = z.object({
   projectId: z.string().uuid(),
-  description: z.string().trim().min(2).max(2000),
-});
+  description: z.string().trim().min(2).max(2000).optional(),
+  items: z.array(structuredItemSchema).min(1).max(50).optional(),
+}).refine((v) => v.description || v.items, { message: "description hoặc items bắt buộc" });
 
 const ALLOWED_CREATE_ROLES = new Set<string>([UserRole.engineer, UserRole.admin]);
 
@@ -34,7 +43,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "validation", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { projectId, description } = parsed.data;
+  const { projectId, items: structuredItems } = parsed.data;
+  // Khi có items có cấu trúc (flow Phúc — dự án subcontract): tự sinh description tóm tắt.
+  // Khi không có items: dùng description KS gõ tay (flow cũ).
+  const description =
+    parsed.data.description ||
+    (structuredItems
+      ? structuredItems
+          .map((it) => `${it.name} ${it.qty} ${it.unit}${it.note ? ` (${it.note})` : ""}`)
+          .join("; ")
+      : "");
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, ...buildProjectAccessWhere({ id: user.id, role: user.role }) },
@@ -51,6 +69,7 @@ export async function POST(request: Request) {
         ksId: user.id,
         projectId: project.id,
         description,
+        parsedItems: structuredItems ? structuredItems : undefined,
       },
       select: { id: true, createdAt: true },
     }),
@@ -68,18 +87,21 @@ export async function POST(request: Request) {
     console.error("[proposals.POST] notify failed", err);
   });
 
-  // Fire-and-forget: parse description thành items, lưu vào parsed_items
-  parseProposalItems(description)
-    .then((items) => {
-      if (!items) return;
-      return prisma.materialProposal.update({
-        where: { id: proposal.id },
-        data: { parsedItems: items },
+  // Chỉ chạy AI parse khi KS gõ description tự do (flow cũ). Khi đã có structured items,
+  // parsedItems đã được lưu đầy đủ ở trên.
+  if (!structuredItems) {
+    parseProposalItems(description)
+      .then((aiItems) => {
+        if (!aiItems) return;
+        return prisma.materialProposal.update({
+          where: { id: proposal.id },
+          data: { parsedItems: aiItems },
+        });
+      })
+      .catch((err) => {
+        console.error("[proposals.POST] parse failed", err?.message || err);
       });
-    })
-    .catch((err) => {
-      console.error("[proposals.POST] parse failed", err?.message || err);
-    });
+  }
 
   return NextResponse.json({ id: proposal.id, createdAt: proposal.createdAt }, { status: 201 });
 }

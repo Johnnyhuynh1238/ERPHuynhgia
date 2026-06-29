@@ -54,6 +54,11 @@ enum ProjectStatus {
   paused
 }
 
+enum ProjectLaborMode {
+  self       // Trực thầu — kiểm soát NC chặt (chấm công, payroll tuần)
+  subcontract // Giao khoán — chỉ kiểm soát VT/tiến độ/QC
+}
+
 enum TaskPhase {
   P1_CHUAN_BI
   P2_MONG
@@ -677,6 +682,7 @@ model Project {
   projectManagerId       String        @map("project_manager_id") @db.Uuid
   mainEngineerId         String        @map("main_engineer_id") @db.Uuid
   status                 ProjectStatus @default(planning)
+  laborMode              ProjectLaborMode @default(self) @map("labor_mode")
   notes                  String?
   contractMeta           Json?         @map("contract_meta")
   createdAt              DateTime      @default(now()) @map("created_at")
