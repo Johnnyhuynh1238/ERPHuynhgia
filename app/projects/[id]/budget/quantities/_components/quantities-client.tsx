@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BudgetStage } from "@prisma/client";
@@ -52,6 +53,7 @@ type Props = {
 const UNIT_SUGGEST = ["m³", "m²", "md", "kg", "tấn", "công", "bộ", "cái", "viên", "lít"];
 
 export function QuantitiesClient({ projectId, projectName, projectCode, canEdit }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState<BudgetStage>("T");
   const [components, setComponents] = useState<Component[]>([]);
@@ -176,6 +178,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       const j = await r.json();
       setComponents((prev) => [...prev, j.component]);
       toast.success("Đã thêm cấu kiện" + (fromSuggested ? " (gợi ý)" : ""));
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tạo cấu kiện");
     }
@@ -198,6 +201,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       setComponents((prev) => prev.map((x) => (x.id === c.id ? j.component : x)));
       toast.success("Đã lưu cấu kiện");
       setEditingComponentId(null);
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi sửa cấu kiện");
     } finally {
@@ -216,6 +220,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       }
       setComponents((prev) => prev.filter((x) => x.id !== c.id));
       toast.success("Đã xoá");
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi xoá");
     }
@@ -260,6 +265,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       });
       toast.success("Đã lưu công tác");
       setEditingItem(null);
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi lưu công tác");
     } finally {
@@ -278,6 +284,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
       }
       setItems((prev) => prev.filter((x) => x.id !== it.id));
       toast.success("Đã xoá");
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi xoá");
     }
