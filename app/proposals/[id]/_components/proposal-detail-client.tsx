@@ -1,11 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Download } from "lucide-react";
 import { ProposalComments } from "./proposal-comments";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
-type ParsedItem = { ten: string; sl: number; dvt: string };
+// Legacy format (AI parse): {ten, sl, dvt}. New format (Phúc giao khoán): {name, qty, unit, task}.
+type ParsedItem =
+  | { ten: string; sl: number; dvt: string; task?: never; name?: never; qty?: never; unit?: never }
+  | { name: string; qty: number; unit: string; task?: string; ten?: never; sl?: never; dvt?: never };
+
+type NormalizedItem = { name: string; qty: number; unit: string; task: string };
+
+function normalizeItem(it: ParsedItem): NormalizedItem {
+  if ("name" in it && it.name !== undefined) {
+    return { name: it.name, qty: it.qty ?? 0, unit: it.unit ?? "", task: it.task ?? "" };
+  }
+  return { name: it.ten ?? "", qty: it.sl ?? 0, unit: it.dvt ?? "", task: "" };
+}
+
+function poCode(id: string) {
+  return `PO-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
 
 type Proposal = {
   id: string;
@@ -159,22 +176,8 @@ export function ProposalDetailClient({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="text-xs uppercase tracking-wide text-[#8892b0]">Nội dung KS đề xuất</div>
-        <div className="mt-2 whitespace-pre-wrap text-[14px] text-[#f0f2ff]">{proposal.description}</div>
-        {proposal.parsedItems && proposal.parsedItems.length > 0 && (
-          <div className="mt-3">
-            <div className="text-xs uppercase tracking-wide text-[#8892b0]">Items đã tách</div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {proposal.parsedItems.map((it, i) => (
-                <span key={i} className="rounded-md bg-[#13151f] px-2 py-1 text-xs text-[#f0f2ff]">
-                  {it.ten} · <span className="font-semibold text-[#fb923c]">{it.sl}</span> {it.dvt}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <ProposalItemsCard proposal={proposal} />
+
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="text-xs uppercase tracking-wide text-[#8892b0]">Timeline</div>
@@ -404,6 +407,178 @@ export function ProposalDetailClient({
       </div>
 
       <ProposalComments proposalId={proposal.id} currentUserId={currentUserId} />
+    </div>
+  );
+}
+
+function ProposalItemsCard({ proposal }: { proposal: Proposal }) {
+  const poRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+  const items: NormalizedItem[] = (proposal.parsedItems || []).map(normalizeItem);
+  const hasItems = items.length > 0;
+  const code = poCode(proposal.id);
+
+  async function downloadPo() {
+    if (!poRef.current) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(poRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      const link = document.createElement("a");
+      link.download = `${code}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-[#8892b0]">Vật tư đề xuất</div>
+            <div className="mt-0.5 text-[11px] text-[#5a627a]">Mã PO: {code}</div>
+          </div>
+          {hasItems && (
+            <button
+              type="button"
+              onClick={downloadPo}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {downloading ? "Đang tạo..." : "Tải PO gửi NCC"}
+            </button>
+          )}
+        </div>
+
+        {hasItems ? (
+          <div className="overflow-x-auto rounded-xl border border-[#252840]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#13151f] text-left text-[11px] uppercase tracking-wide text-[#8892b0]">
+                  <th className="px-3 py-2 w-10">#</th>
+                  <th className="px-3 py-2">Chủng loại</th>
+                  <th className="px-3 py-2 text-right w-20">SL</th>
+                  <th className="px-3 py-2 w-16">ĐVT</th>
+                  <th className="px-3 py-2">Dùng cho công tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, i) => (
+                  <tr key={i} className="border-t border-[#252840] text-[#f0f2ff]">
+                    <td className="px-3 py-2 text-[#8892b0]">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium">{it.name || "—"}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-[#fb923c]">{it.qty.toLocaleString("vi-VN")}</td>
+                    <td className="px-3 py-2">{it.unit}</td>
+                    <td className="px-3 py-2 text-[#8892b0]">{it.task || <span className="text-[#5a627a]">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="whitespace-pre-wrap rounded-xl border border-[#252840] bg-[#13151f] px-3 py-2.5 text-[14px] text-[#f0f2ff]">
+            {proposal.description}
+          </div>
+        )}
+      </div>
+
+      {hasItems && (
+        <PurchaseOrderTemplate poRef={poRef} code={code} items={items} proposal={proposal} />
+      )}
+    </>
+  );
+}
+
+function PurchaseOrderTemplate({
+  poRef,
+  code,
+  items,
+  proposal,
+}: {
+  poRef: React.RefObject<HTMLDivElement>;
+  code: string;
+  items: NormalizedItem[];
+  proposal: Proposal;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: "-9999px",
+        width: "800px",
+        background: "#ffffff",
+        color: "#0f1320",
+      }}
+    >
+      <div
+        ref={poRef}
+        style={{
+          padding: "40px",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+          background: "#ffffff",
+          color: "#0f1320",
+        }}
+      >
+        <div style={{ textAlign: "center", borderBottom: "3px solid #ff8a3d", paddingBottom: "16px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "20px", fontWeight: 700, color: "#ff8a3d", letterSpacing: "1px" }}>
+            HUỲNH GIA 6 DECOR
+          </div>
+          <div style={{ fontSize: "24px", fontWeight: 800, marginTop: "8px", color: "#0f1320" }}>
+            ĐƠN ĐẶT HÀNG VẬT TƯ
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", fontSize: "14px" }}>
+          <div>
+            <div><strong>Mã PO:</strong> {code}</div>
+            <div><strong>Ngày:</strong> {new Date().toLocaleDateString("vi-VN")}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div><strong>Công trình:</strong> {proposal.project.code}</div>
+          </div>
+        </div>
+
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", marginBottom: "32px" }}>
+          <thead>
+            <tr style={{ background: "#fff3e6", borderBottom: "2px solid #ff8a3d" }}>
+              <th style={{ padding: "10px 8px", textAlign: "left", width: "40px" }}>STT</th>
+              <th style={{ padding: "10px 8px", textAlign: "left" }}>Chủng loại vật tư</th>
+              <th style={{ padding: "10px 8px", textAlign: "right", width: "100px" }}>Số lượng</th>
+              <th style={{ padding: "10px 8px", textAlign: "left", width: "80px" }}>Đơn vị</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: "10px 8px" }}>{i + 1}</td>
+                <td style={{ padding: "10px 8px", fontWeight: 500 }}>{it.name}</td>
+                <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600 }}>{it.qty.toLocaleString("vi-VN")}</td>
+                <td style={{ padding: "10px 8px" }}>{it.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "40px", fontSize: "13px" }}>
+          <div style={{ textAlign: "center", width: "45%" }}>
+            <div style={{ fontWeight: 600, marginBottom: "60px" }}>NHÀ CUNG CẤP</div>
+            <div style={{ borderTop: "1px solid #0f1320", paddingTop: "4px", color: "#666" }}>(Ký, ghi rõ họ tên)</div>
+          </div>
+          <div style={{ textAlign: "center", width: "45%" }}>
+            <div style={{ fontWeight: 600, marginBottom: "60px" }}>BÊN ĐẶT HÀNG</div>
+            <div style={{ borderTop: "1px solid #0f1320", paddingTop: "4px", color: "#666" }}>(Ký, ghi rõ họ tên)</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

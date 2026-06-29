@@ -76,7 +76,7 @@ export default async function ProposeListPage({ params }: { params: { projectId:
           return (
             <Link
               key={p.id}
-              href={`/proposals/${p.id}`}
+              href={`/ks-ql/sub/${project.id}/material/propose/${p.id}`}
               className="block rounded-2xl border-2 border-[#252840] bg-[#13151f] px-5 py-4 transition hover:border-[#ff8a3d]/40"
             >
               <div className="mb-1 flex items-center justify-between gap-2">
