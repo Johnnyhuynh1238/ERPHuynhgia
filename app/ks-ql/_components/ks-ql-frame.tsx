@@ -46,6 +46,11 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
     TABS.findIndex((t) => isTabActive(pathname, t.href)),
   );
 
+  // Flow giao khoán (KS Phúc) dùng SubLayout riêng — bỏ frame cũ để không đè lên.
+  if (pathname.startsWith("/ks-ql/sub")) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-[#0d0b09] text-[#f5ede4]">
       <div
