@@ -4,34 +4,31 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, Check } from "lucide-react";
 import { toast } from "sonner";
-import { MaterialPicker, type PickedMaterial } from "./material-picker";
-import { TaskPicker, type PickedTask } from "./task-picker";
 
 type CardState = {
   cid: string;
   name: string;
-  unit: string;
   qty: string;
-  budgetQty: number | null;
-  tasks: PickedTask[];
+  unit: string;
+  task: string;
 };
 
 function makeBlankCard(): CardState {
   return {
     cid: crypto.randomUUID(),
     name: "",
-    unit: "",
     qty: "",
-    budgetQty: null,
-    tasks: [],
+    unit: "",
+    task: "",
   };
 }
+
+const COMMON_UNITS = ["bao", "tấn", "kg", "viên", "cây", "m", "m2", "m3", "lít", "can", "thùng", "cuộn", "tấm", "hộp"];
 
 export function ProposeForm({ projectId, projectName }: { projectId: string; projectName: string }) {
   const router = useRouter();
   const [cards, setCards] = useState<CardState[]>([makeBlankCard()]);
   const [submitting, setSubmitting] = useState(false);
-  const [pickerFor, setPickerFor] = useState<{ cid: string; kind: "material" | "tasks" } | null>(null);
 
   function update(cid: string, patch: Partial<CardState>) {
     setCards((prev) => prev.map((c) => (c.cid === cid ? { ...c, ...patch } : c)));
@@ -43,16 +40,9 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
     setCards((prev) => (prev.length <= 1 ? prev : prev.filter((c) => c.cid !== cid)));
   }
 
-  function pickedMaterial(cid: string, m: PickedMaterial) {
-    update(cid, { name: m.name, unit: m.unit, budgetQty: m.budgetQty });
-    setPickerFor(null);
-  }
-  function pickedTasks(cid: string, tasks: PickedTask[]) {
-    update(cid, { tasks });
-    setPickerFor(null);
-  }
-
-  const allValid = cards.every((c) => c.name.trim() && c.unit.trim() && Number(c.qty) > 0);
+  const allValid = cards.every(
+    (c) => c.name.trim() && c.unit.trim() && Number(c.qty) > 0 && c.task.trim(),
+  );
 
   async function submit() {
     if (!allValid) {
@@ -62,9 +52,9 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
     setSubmitting(true);
     const items = cards.map((c) => ({
       name: c.name.trim(),
-      unit: c.unit.trim(),
       qty: Number(c.qty),
-      taskIds: c.tasks.map((t) => t.id),
+      unit: c.unit.trim(),
+      task: c.task.trim(),
     }));
     const res = await fetch("/api/proposals", {
       method: "POST",
@@ -119,20 +109,16 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                 ) : null}
               </div>
 
-              <label className="mb-1 block text-sm text-[#8892b0]">Loại vật tư</label>
-              <button
-                type="button"
-                onClick={() => setPickerFor({ cid: c.cid, kind: "material" })}
-                className="mb-4 w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-left text-lg text-[#f5ede4] hover:border-[#ff8a3d]/40"
-              >
-                {c.name ? (
-                  <span>{c.name}</span>
-                ) : (
-                  <span className="text-[#5b6481]">Chọn loại vật tư…</span>
-                )}
-              </button>
+              <label className="mb-1 block text-sm text-[#8892b0]">Chủng loại</label>
+              <input
+                type="text"
+                value={c.name}
+                onChange={(e) => update(c.cid, { name: e.target.value })}
+                placeholder="VD: Xi măng PC40"
+                className="mb-4 w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+              />
 
-              <div className="mb-4 grid grid-cols-[1fr_100px] gap-3">
+              <div className="mb-4 grid grid-cols-[1fr_140px] gap-3">
                 <div>
                   <label className="mb-1 block text-sm text-[#8892b0]">Số lượng</label>
                   <input
@@ -141,47 +127,35 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                     value={c.qty}
                     onChange={(e) => update(c.cid, { qty: e.target.value })}
                     placeholder="0"
-                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-xl text-[#f5ede4]"
+                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-xl text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm text-[#8892b0]">Đơn vị</label>
-                  <div className="rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-center text-lg text-[#8892b0]">
-                    {c.unit || "—"}
-                  </div>
+                  <input
+                    type="text"
+                    list={`units-${c.cid}`}
+                    value={c.unit}
+                    onChange={(e) => update(c.cid, { unit: e.target.value })}
+                    placeholder="bao"
+                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-3 py-3 text-center text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+                  />
+                  <datalist id={`units-${c.cid}`}>
+                    {COMMON_UNITS.map((u) => (
+                      <option key={u} value={u} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 
-              {c.budgetQty !== null && Number(c.qty) > 0 ? (
-                <BudgetCompare qty={Number(c.qty)} budgetQty={c.budgetQty} />
-              ) : null}
-
-              <label className="mb-1 mt-1 block text-sm text-[#8892b0]">Dùng cho công tác</label>
-              <button
-                type="button"
-                onClick={() => setPickerFor({ cid: c.cid, kind: "tasks" })}
-                className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-left text-base text-[#f5ede4] hover:border-[#ff8a3d]/40"
-              >
-                {c.tasks.length === 0 ? (
-                  <span className="text-[#5b6481]">Chọn công tác…</span>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {c.tasks.slice(0, 4).map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-block rounded-full bg-[#ff8a3d]/20 px-2.5 py-1 text-xs text-[#ff8a3d]"
-                      >
-                        {t.name}
-                      </span>
-                    ))}
-                    {c.tasks.length > 4 ? (
-                      <span className="inline-block rounded-full bg-[#252840] px-2.5 py-1 text-xs text-[#8892b0]">
-                        +{c.tasks.length - 4}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
-              </button>
+              <label className="mb-1 block text-sm text-[#8892b0]">Dùng cho công tác</label>
+              <input
+                type="text"
+                value={c.task}
+                onChange={(e) => update(c.cid, { task: e.target.value })}
+                placeholder="VD: Đổ cột tầng trệt"
+                className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+              />
             </div>
           ))}
 
@@ -209,46 +183,6 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
           </div>
         </div>
       </div>
-
-      {pickerFor?.kind === "material" ? (
-        <MaterialPicker
-          projectId={projectId}
-          onPick={(m) => pickedMaterial(pickerFor.cid, m)}
-          onClose={() => setPickerFor(null)}
-        />
-      ) : null}
-
-      {pickerFor?.kind === "tasks" ? (
-        <TaskPicker
-          projectId={projectId}
-          initial={cards.find((c) => c.cid === pickerFor.cid)?.tasks ?? []}
-          onConfirm={(tasks) => pickedTasks(pickerFor.cid, tasks)}
-          onClose={() => setPickerFor(null)}
-        />
-      ) : null}
     </div>
-  );
-}
-
-function BudgetCompare({ qty, budgetQty }: { qty: number; budgetQty: number }) {
-  if (budgetQty <= 0) return null;
-  const pct = Math.round((qty / budgetQty) * 100);
-  let tone: "ok" | "warn" | "danger" = "ok";
-  let text = `Dự toán: ${budgetQty.toLocaleString("vi-VN")} · Đề xuất ${pct}% dự toán`;
-  if (pct > 110) {
-    tone = "danger";
-    text = `⚠ Vượt dự toán: ${pct}% (dự toán ${budgetQty.toLocaleString("vi-VN")})`;
-  } else if (pct > 90) {
-    tone = "warn";
-    text = `Sát ngưỡng dự toán: ${pct}% (dự toán ${budgetQty.toLocaleString("vi-VN")})`;
-  }
-  const color =
-    tone === "danger"
-      ? "bg-[#D26B6B]/15 text-[#D26B6B] border-[#D26B6B]/40"
-      : tone === "warn"
-        ? "bg-[#E0B855]/15 text-[#E0B855] border-[#E0B855]/40"
-        : "bg-[#6FA677]/15 text-[#6FA677] border-[#6FA677]/40";
-  return (
-    <div className={`mb-4 rounded-xl border-2 px-3 py-2 text-sm ${color}`}>{text}</div>
   );
 }

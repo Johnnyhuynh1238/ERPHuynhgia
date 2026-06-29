@@ -9,10 +9,9 @@ import { parseProposalItems } from "@/lib/parse-proposal-items";
 
 const structuredItemSchema = z.object({
   name: z.string().trim().min(1).max(255),
-  unit: z.string().trim().min(1).max(20),
   qty: z.number().positive(),
-  taskIds: z.array(z.string().uuid()).default([]),
-  note: z.string().trim().max(500).optional(),
+  unit: z.string().trim().min(1).max(50),
+  task: z.string().trim().min(1).max(500),
 });
 
 const createSchema = z.object({
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
     parsed.data.description ||
     (structuredItems
       ? structuredItems
-          .map((it) => `${it.name} ${it.qty} ${it.unit}${it.note ? ` (${it.note})` : ""}`)
+          .map((it) => `${it.name} ${it.qty} ${it.unit} — ${it.task}`)
           .join("; ")
       : "");
 
