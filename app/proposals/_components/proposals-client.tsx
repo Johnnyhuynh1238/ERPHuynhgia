@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import {
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  HardHat,
+  Loader2,
+  PackageCheck,
+  ShoppingCart,
+  Truck,
+  UserCircle2,
+  Wallet,
+} from "lucide-react";
 
 type ParsedItem = { ten: string; sl: number; dvt: string };
 
@@ -64,6 +75,35 @@ const ORDER_CHIP: Record<ProposalRow["orderStatus"], string> = {
   paid: "bg-emerald-600/25 text-emerald-200",
 };
 
+const ORDER_ICON: Record<ProposalRow["orderStatus"], JSX.Element> = {
+  not_ordered: <ShoppingCart className="h-3 w-3" />,
+  ordered: <Truck className="h-3 w-3" />,
+  received: <PackageCheck className="h-3 w-3" />,
+  paid: <Wallet className="h-3 w-3" />,
+};
+
+const ORDER_STRIPE: Record<ProposalRow["orderStatus"], string> = {
+  not_ordered: "bg-slate-500",
+  ordered: "bg-cyan-400",
+  received: "bg-emerald-400",
+  paid: "bg-emerald-500",
+};
+
+const STATUS_FILTERS: { key: "all" | ProposalRow["status"]; label: string }[] = [
+  { key: "all", label: "Tất cả duyệt" },
+  { key: "pending", label: "Chờ duyệt" },
+  { key: "accepted", label: "Đã duyệt" },
+  { key: "declined", label: "Từ chối" },
+];
+
+const ORDER_FILTERS: { key: "all" | ProposalRow["orderStatus"]; label: string }[] = [
+  { key: "all", label: "Tất cả đơn" },
+  { key: "not_ordered", label: "Chưa đặt" },
+  { key: "ordered", label: "Đã đặt" },
+  { key: "received", label: "Đã nhận" },
+  { key: "paid", label: "Đã TT" },
+];
+
 export function ProposalsClient({
   currentRole,
   projectId,
@@ -114,147 +154,188 @@ export function ProposalsClient({
   }, [page, status, orderStatus, projectId]);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <h1 className="text-xl font-bold text-[#f0f2ff]">
-          {scopedToProject ? "Nhật ký đề xuất của dự án" : "Nhật ký đề xuất vật tư"}
-        </h1>
-        <p className="mt-1 text-xs text-[#8892b0]">
-          {scopedToProject
-            ? "Lịch sử đề xuất vật tư của dự án này. Bấm vào dòng để xem chi tiết."
-            : isAccountantView
-            ? "Tất cả đề xuất từ kỹ sư công trình. Bấm vào dòng để xử lý."
-            : "Đề xuất anh đã gửi cho kế toán. Bấm vào dòng để xem chi tiết."}
-        </p>
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#13151f] p-4 slide-up">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ff8a3d]/15 text-[#fb923c]">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base font-bold text-[#f0f2ff]">
+              {scopedToProject ? "Đề xuất của dự án" : "Đề xuất vật tư"}
+            </h1>
+            <p className="mt-0.5 text-[11px] text-[#8892b0]">
+              {scopedToProject
+                ? "Lịch sử đề xuất vật tư của dự án này."
+                : isAccountantView
+                ? "Tất cả đề xuất từ kỹ sư công trình."
+                : "Đề xuất anh đã gửi cho kế toán."}
+            </p>
+          </div>
+        </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <select
-            className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
-          >
-            <option value="all">Tất cả trạng thái duyệt</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="accepted">Đã duyệt</option>
-            <option value="declined">Từ chối</option>
-          </select>
-          <select
-            className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm text-[#f0f2ff]"
-            value={orderStatus}
-            onChange={(e) => setOrderStatus(e.target.value as any)}
-          >
-            <option value="all">Tất cả trạng thái đơn</option>
-            <option value="not_ordered">Chưa đặt NCC</option>
-            <option value="ordered">Đã đặt NCC</option>
-            <option value="received">Đã nhận hàng</option>
-            <option value="paid">Đã thanh toán</option>
-          </select>
+        <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatus(f.key)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${
+                status === f.key
+                  ? "bg-orange-500 text-[#0b0d16] font-semibold"
+                  : "border border-[#2d3249] bg-[#13151f] text-[#8892b0]"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="-mx-1 mt-1.5 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {ORDER_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setOrderStatus(f.key)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${
+                orderStatus === f.key
+                  ? "bg-cyan-500 text-[#0b0d16] font-semibold"
+                  : "border border-[#2d3249] bg-[#13151f] text-[#8892b0]"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 rounded-xl bg-[#13151f] px-3 py-2 text-[11px] uppercase tracking-wide text-[#8892b0]">
+          {loading ? "Đang tải…" : `${total} đề xuất`}
         </div>
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">
-          Đang tải dữ liệu...
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+          <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Đang tải dữ liệu…
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
-          <div className="mb-2 text-2xl">📋</div>
-          <div>Không có đề xuất phù hợp.</div>
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-8 text-center text-sm text-[#8892b0]">
+          <ClipboardList className="mx-auto mb-2 h-6 w-6 opacity-50" />
+          Không có đề xuất phù hợp.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#1a1d2e]">
-          <table className="w-full text-sm">
-            <thead className="bg-[#13151f] text-[11px] uppercase tracking-wide text-[#8892b0]">
-              <tr>
-                <th className="px-3 py-2 text-left">Thời gian</th>
-                {isAccountantView && <th className="px-3 py-2 text-left">KS</th>}
-                {!scopedToProject && <th className="px-3 py-2 text-left">Công trình</th>}
-                <th className="px-3 py-2 text-left">Đề xuất</th>
-                <th className="px-3 py-2 text-left">Duyệt</th>
-                <th className="px-3 py-2 text-left">Đơn hàng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((p) => (
-                <tr
-                  key={p.id}
-                  className="border-t border-[#252840] text-[#f0f2ff] transition hover:bg-[#1f2436]"
-                >
-                  <td className="px-3 py-2 align-top text-xs text-[#8892b0]">{fmtTime(p.createdAt)}</td>
-                  {isAccountantView && (
-                    <td className="px-3 py-2 align-top text-xs text-[#f0f2ff]">{p.ks.fullName}</td>
-                  )}
-                  {!scopedToProject && (
-                    <td className="px-3 py-2 align-top">
-                      <div className="text-xs text-[#8892b0]">{p.project.code}</div>
-                      <div className="text-[13px] font-medium">{p.project.name}</div>
-                    </td>
-                  )}
-                  <td className="px-3 py-2 align-top">
-                    <Link href={`/proposals/${p.id}`} className="block">
-                      <div className="text-[13px] text-[#f0f2ff] hover:text-[#fb923c]">
-                        {p.description.length > 80 ? `${p.description.slice(0, 77)}…` : p.description}
-                      </div>
-                      {p.parsedItems && p.parsedItems.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {p.parsedItems.slice(0, 4).map((it, i) => (
-                            <span
-                              key={i}
-                              className="rounded-md bg-[#13151f] px-1.5 py-0.5 text-[10px] text-[#8892b0]"
-                            >
-                              {it.ten} · {it.sl}{it.dvt}
-                            </span>
-                          ))}
-                          {p.parsedItems.length > 4 && (
-                            <span className="text-[10px] text-[#8892b0]">+{p.parsedItems.length - 4}</span>
-                          )}
-                        </div>
-                      )}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_CHIP[p.status]}`}
-                    >
-                      {STATUS_LABEL[p.status]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ORDER_CHIP[p.orderStatus]}`}
-                    >
-                      {ORDER_LABEL[p.orderStatus]}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {items.map((p) => (
+            <ProposalCard
+              key={p.id}
+              p={p}
+              isAccountantView={isAccountantView}
+              showProject={!scopedToProject}
+            />
+          ))}
         </div>
       )}
 
-      <div className="flex items-center justify-between rounded-2xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0]">
-        <div>{total ? `Tổng ${total} đề xuất` : "Không có đề xuất"}</div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="h-8 border-[#2d3249] bg-[#13151f]"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
-            Trước
-          </Button>
-          <span>{page}/{totalPages}</span>
-          <Button
-            variant="outline"
-            className="h-8 border-[#2d3249] bg-[#13151f]"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-          >
-            Sau
-          </Button>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-2xl border border-[#252840] bg-[#1a1d2e] px-3 py-2 text-xs text-[#8892b0]">
+          <div>{total ? `Tổng ${total}` : "—"}</div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-[#2d3249] bg-[#13151f] px-3 py-1.5 text-xs hover:text-[#f0f2ff] disabled:opacity-40"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Trước
+            </button>
+            <span className="tabular-nums">
+              {page}/{totalPages}
+            </span>
+            <button
+              type="button"
+              className="rounded-lg border border-[#2d3249] bg-[#13151f] px-3 py-1.5 text-xs hover:text-[#f0f2ff] disabled:opacity-40"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Sau
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+function ProposalCard({
+  p,
+  isAccountantView,
+  showProject,
+}: {
+  p: ProposalRow;
+  isAccountantView: boolean;
+  showProject: boolean;
+}) {
+  return (
+    <Link
+      href={`/proposals/${p.id}`}
+      className="relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 pl-4 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+    >
+      <span className={`absolute inset-y-0 left-0 w-1 ${ORDER_STRIPE[p.orderStatus]}`} />
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_CHIP[p.status]}`}
+        >
+          {STATUS_LABEL[p.status]}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${ORDER_CHIP[p.orderStatus]}`}
+        >
+          {ORDER_ICON[p.orderStatus]}
+          {ORDER_LABEL[p.orderStatus]}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-[#5a627a]">
+          <Clock className="h-3 w-3" />
+          {fmtTime(p.createdAt)}
+        </span>
+      </div>
+
+      {showProject && (
+        <div className="mt-1.5 flex items-start gap-1.5">
+          <HardHat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#fb923c]" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold text-[#f0f2ff]">{p.project.name}</div>
+            <div className="text-[10px] text-[#5a627a]">{p.project.code}</div>
+          </div>
+          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[#5a627a]" />
+        </div>
+      )}
+
+      <div className="mt-2 text-[12.5px] leading-snug text-[#cfd4e8] line-clamp-2">
+        {p.description}
+      </div>
+
+      {p.parsedItems && p.parsedItems.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {p.parsedItems.slice(0, 6).map((it, i) => (
+            <span
+              key={i}
+              className="rounded-md bg-[#0f1220] px-1.5 py-0.5 text-[10px] text-[#8892b0]"
+            >
+              <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
+              {it.dvt}
+            </span>
+          ))}
+          {p.parsedItems.length > 6 && (
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] text-[#5a627a]">
+              +{p.parsedItems.length - 6}
+            </span>
+          )}
+        </div>
+      )}
+
+      {isAccountantView && (
+        <div className="mt-2 flex items-center gap-1 text-[11px] text-[#8892b0]">
+          <UserCircle2 className="h-3 w-3" />
+          KS {p.ks.fullName}
+        </div>
+      )}
+    </Link>
   );
 }
