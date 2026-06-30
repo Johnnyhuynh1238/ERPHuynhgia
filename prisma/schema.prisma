@@ -2776,6 +2776,7 @@ model MaterialProposalItemDebt {
   unitPrice        Decimal   @map("unit_price") @db.Decimal(18, 2)
   qty              Decimal   @db.Decimal(18, 3)
   totalAmount      Decimal   @map("total_amount") @db.Decimal(18, 2)
+  note             String?   @db.Text
   recordedAt       DateTime  @default(now()) @map("recorded_at")
   recordedBy       String    @map("recorded_by") @db.Uuid
   paidAt           DateTime? @map("paid_at")

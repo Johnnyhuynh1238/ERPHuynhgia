@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { ProposalComments } from "./proposal-comments";
+import { ProposalKtItems } from "./proposal-kt-items";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 // Legacy format (AI parse): {ten, sl, dvt}. New format (Phúc giao khoán): {name, qty, unit, task}.
@@ -178,6 +179,13 @@ export function ProposalDetailClient({
 
       <ProposalItemsCard proposal={proposal} />
 
+      {isAccountantView && proposal.status === "accepted" && proposal.orderStatus !== "not_ordered" && (
+        <ProposalKtItems
+          proposalId={proposal.id}
+          currentUserRole={currentRole}
+          onProposalUpdated={reload}
+        />
+      )}
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="text-xs uppercase tracking-wide text-[#8892b0]">Timeline</div>
