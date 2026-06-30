@@ -508,6 +508,15 @@ function PurchaseOrderTemplate({
   items: NormalizedItem[];
   proposal: Proposal;
 }) {
+  const TERRA = "#A55A35";
+  const TERRA_LIGHT = "#D27A52";
+  const GOLD = "#C49A3A";
+  const CREAM = "#FAF6EE";
+  const CREAM_DEEP = "#F3EADA";
+  const INK = "#261C13";
+  const MUTED = "#7A6B55";
+  const today = new Date().toLocaleDateString("vi-VN");
+
   return (
     <div
       style={{
@@ -516,67 +525,189 @@ function PurchaseOrderTemplate({
         left: "-9999px",
         width: "800px",
         background: "#ffffff",
-        color: "#0f1320",
+        color: INK,
       }}
     >
       <div
         ref={poRef}
         style={{
-          padding: "40px",
+          padding: "36px 40px 32px",
           fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
           background: "#ffffff",
-          color: "#0f1320",
+          color: INK,
+          borderTop: `6px solid ${TERRA}`,
         }}
       >
-        <div style={{ textAlign: "center", borderBottom: "3px solid #ff8a3d", paddingBottom: "16px", marginBottom: "24px" }}>
-          <div style={{ fontSize: "20px", fontWeight: 700, color: "#ff8a3d", letterSpacing: "1px" }}>
-            HUỲNH GIA 6 DECOR
+        {/* HEADER: logo + company info */}
+        <div style={{ display: "flex", gap: "16px", alignItems: "center", paddingBottom: "18px", borderBottom: `1px solid ${CREAM_DEEP}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/a6-logo-256.png"
+            alt="Huỳnh Gia"
+            width={68}
+            height={68}
+            style={{ width: "68px", height: "68px", objectFit: "contain", flexShrink: 0 }}
+          />
+          <div style={{ flex: 1, lineHeight: 1.35 }}>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: GOLD, letterSpacing: "1.5px" }}>
+              CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG VÀ NỘI THẤT
+            </div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: TERRA, letterSpacing: "0.5px", marginTop: "2px" }}>
+              HUỲNH GIA
+            </div>
+            <div style={{ fontSize: "11px", color: MUTED, marginTop: "3px" }}>
+              2157 QL51, Ấp Phước Bình 1, Xã Phước Thái, Tỉnh Đồng Nai
+            </div>
+            <div style={{ fontSize: "11px", color: MUTED, marginTop: "1px" }}>
+              Hotline / Zalo: <span style={{ color: INK, fontWeight: 600 }}>0931 316 513</span>
+              <span style={{ margin: "0 6px", color: CREAM_DEEP }}>·</span>
+              <span style={{ color: INK, fontWeight: 600 }}>huynhgia6.com</span>
+            </div>
           </div>
-          <div style={{ fontSize: "24px", fontWeight: 800, marginTop: "8px", color: "#0f1320" }}>
+        </div>
+
+        {/* TITLE BAR */}
+        <div
+          style={{
+            marginTop: "20px",
+            background: `linear-gradient(135deg, ${TERRA} 0%, ${TERRA_LIGHT} 100%)`,
+            color: "#ffffff",
+            padding: "12px 18px",
+            borderRadius: "6px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "1px" }}>
             ĐƠN ĐẶT HÀNG VẬT TƯ
           </div>
+          <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.92 }}>
+            Số: {code}
+          </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", fontSize: "14px" }}>
+        {/* META INFO */}
+        <div
+          style={{
+            marginTop: "16px",
+            background: CREAM,
+            border: `1px solid ${CREAM_DEEP}`,
+            borderLeft: `3px solid ${GOLD}`,
+            padding: "12px 16px",
+            borderRadius: "4px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "6px 24px",
+            fontSize: "13px",
+          }}
+        >
           <div>
-            <div><strong>Mã PO:</strong> {code}</div>
-            <div><strong>Ngày:</strong> {new Date().toLocaleDateString("vi-VN")}</div>
+            <span style={{ color: MUTED }}>Ngày lập:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{today}</span>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div><strong>Công trình:</strong> {proposal.project.code}</div>
+          <div>
+            <span style={{ color: MUTED }}>Mã công trình:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{proposal.project.code}</span>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span style={{ color: MUTED }}>Công trình:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{proposal.project.name}</span>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span style={{ color: MUTED }}>Người phụ trách (KS):</span>{" "}
+            <span style={{ fontWeight: 600 }}>{proposal.ks.fullName}</span>
           </div>
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", marginBottom: "32px" }}>
+        {/* SUPPLIER ADDRESS BOX */}
+        <div style={{ marginTop: "14px", fontSize: "13px" }}>
+          <span style={{ color: MUTED }}>Kính gửi Quý Nhà cung cấp:</span>{" "}
+          <span style={{ borderBottom: `1px dotted ${MUTED}`, paddingBottom: "1px", display: "inline-block", minWidth: "320px" }}>
+            &nbsp;
+          </span>
+        </div>
+
+        {/* ITEMS TABLE */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", marginTop: "16px" }}>
           <thead>
-            <tr style={{ background: "#fff3e6", borderBottom: "2px solid #ff8a3d" }}>
-              <th style={{ padding: "10px 8px", textAlign: "left", width: "40px" }}>STT</th>
-              <th style={{ padding: "10px 8px", textAlign: "left" }}>Chủng loại vật tư</th>
-              <th style={{ padding: "10px 8px", textAlign: "right", width: "100px" }}>Số lượng</th>
-              <th style={{ padding: "10px 8px", textAlign: "left", width: "80px" }}>Đơn vị</th>
+            <tr style={{ background: TERRA, color: "#ffffff" }}>
+              <th style={{ padding: "10px 8px", textAlign: "center", width: "40px", fontWeight: 700 }}>STT</th>
+              <th style={{ padding: "10px 10px", textAlign: "left", fontWeight: 700 }}>Chủng loại vật tư</th>
+              <th style={{ padding: "10px 8px", textAlign: "right", width: "90px", fontWeight: 700 }}>Số lượng</th>
+              <th style={{ padding: "10px 8px", textAlign: "center", width: "70px", fontWeight: 700 }}>ĐVT</th>
+              <th style={{ padding: "10px 10px", textAlign: "left", width: "200px", fontWeight: 700 }}>Dùng cho công tác</th>
             </tr>
           </thead>
           <tbody>
             {items.map((it, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                <td style={{ padding: "10px 8px" }}>{i + 1}</td>
-                <td style={{ padding: "10px 8px", fontWeight: 500 }}>{it.name}</td>
-                <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600 }}>{it.qty.toLocaleString("vi-VN")}</td>
-                <td style={{ padding: "10px 8px" }}>{it.unit}</td>
+              <tr
+                key={i}
+                style={{
+                  background: i % 2 === 0 ? "#ffffff" : CREAM,
+                  borderBottom: `1px solid ${CREAM_DEEP}`,
+                }}
+              >
+                <td style={{ padding: "9px 8px", textAlign: "center", color: MUTED }}>{i + 1}</td>
+                <td style={{ padding: "9px 10px", fontWeight: 600 }}>{it.name}</td>
+                <td style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, color: TERRA }}>
+                  {it.qty.toLocaleString("vi-VN")}
+                </td>
+                <td style={{ padding: "9px 8px", textAlign: "center" }}>{it.unit}</td>
+                <td style={{ padding: "9px 10px", color: MUTED, fontSize: "12px" }}>
+                  {it.task || "—"}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "40px", fontSize: "13px" }}>
+        {/* NOTE */}
+        <div
+          style={{
+            marginTop: "18px",
+            padding: "10px 14px",
+            background: CREAM,
+            border: `1px dashed ${GOLD}`,
+            borderRadius: "4px",
+            fontSize: "12px",
+            color: MUTED,
+            lineHeight: 1.55,
+          }}
+        >
+          <span style={{ color: TERRA, fontWeight: 700 }}>Lưu ý: </span>
+          Vật tư giao đúng chủng loại, đủ số lượng. Hoá đơn / phiếu giao hàng vui lòng ghi rõ Mã PO
+          <span style={{ color: INK, fontWeight: 600 }}> {code}</span> để Huỳnh Gia đối chiếu thanh toán.
+        </div>
+
+        {/* SIGNATURE */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px", fontSize: "13px" }}>
           <div style={{ textAlign: "center", width: "45%" }}>
-            <div style={{ fontWeight: 600, marginBottom: "60px" }}>NHÀ CUNG CẤP</div>
-            <div style={{ borderTop: "1px solid #0f1320", paddingTop: "4px", color: "#666" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ fontWeight: 700, color: TERRA, marginBottom: "4px" }}>NHÀ CUNG CẤP</div>
+            <div style={{ fontSize: "11px", color: MUTED, fontStyle: "italic" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ height: "70px" }} />
           </div>
           <div style={{ textAlign: "center", width: "45%" }}>
-            <div style={{ fontWeight: 600, marginBottom: "60px" }}>BÊN ĐẶT HÀNG</div>
-            <div style={{ borderTop: "1px solid #0f1320", paddingTop: "4px", color: "#666" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ fontWeight: 700, color: TERRA, marginBottom: "4px" }}>ĐẠI DIỆN HUỲNH GIA</div>
+            <div style={{ fontSize: "11px", color: MUTED, fontStyle: "italic" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ height: "70px" }} />
           </div>
+        </div>
+
+        {/* FOOTER */}
+        <div
+          style={{
+            marginTop: "20px",
+            paddingTop: "10px",
+            borderTop: `1px solid ${CREAM_DEEP}`,
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "10px",
+            color: MUTED,
+          }}
+        >
+          <div>Huỳnh Gia · 14 năm xây nhà phố TP.HCM · 200+ công trình</div>
+          <div>{code} · {today}</div>
         </div>
       </div>
     </div>
