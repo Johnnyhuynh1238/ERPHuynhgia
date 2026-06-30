@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   CheckCircle2,
   ChevronRight,
@@ -672,15 +673,25 @@ function DebtModal({
   }
 
   const total = (Number(unitPrice.replace(/[^0-9.]/g, "")) || 0) * (Number(qty.replace(",", ".")) || 0);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  if (!mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#1a1d2e] p-4 sm:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#1a1d2e] p-4 sm:rounded-2xl"
       >
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -859,7 +870,8 @@ function DebtModal({
           <NewSupplierInline onClose={() => setShowNewSupplier(false)} onCreated={createSupplier} />
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -873,10 +885,19 @@ function NewSupplierInline({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-3">
-      <div className="w-full max-w-sm rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#1a1d2e] p-4 sm:rounded-2xl"
+      >
         <div className="mb-3 text-base font-bold text-[#f0f2ff]">Thêm NCC mới</div>
         <div className="space-y-2">
           <label className="block">
@@ -928,6 +949,7 @@ function NewSupplierInline({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
