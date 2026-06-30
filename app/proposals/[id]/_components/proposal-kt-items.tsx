@@ -715,7 +715,7 @@ function DebtModal({
         </div>
 
         <div className="space-y-2">
-          <label className="block">
+          <div className="block">
             <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">NCC *</div>
             <button
               type="button"
@@ -769,7 +769,7 @@ function DebtModal({
                 </button>
               </div>
             )}
-          </label>
+          </div>
 
           <label className="block">
             <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">
