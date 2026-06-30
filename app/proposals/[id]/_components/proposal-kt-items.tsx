@@ -190,43 +190,6 @@ export function ProposalKtItems({
           />
         </div>
 
-        {(canClose || canReopen) && (
-          <div className="mt-3 flex gap-2">
-            {canClose && (
-              <button
-                type="button"
-                onClick={closePo}
-                disabled={closing}
-                className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold transition disabled:opacity-50 ${
-                  readyToClose
-                    ? "bg-emerald-500 text-[#0b0d16] hover:bg-emerald-400 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.6)]"
-                    : "border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
-                }`}
-              >
-                {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                {readyToClose ? "Hoàn tất PO" : `Hoàn tất PO${allDebted ? "" : ` (còn ${summary.total - summary.debt} món chưa CN)`}`}
-              </button>
-            )}
-            {canReopen && (
-              <button
-                type="button"
-                onClick={reopenPo}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#2d3249] bg-[#0f1220] px-3 py-2.5 text-sm text-[#8892b0] hover:text-[#f0f2ff]"
-              >
-                <RotateCcw className="h-4 w-4" /> Mở lại PO
-              </button>
-            )}
-          </div>
-        )}
-
-        {closedAt && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              PO đã đóng lúc {new Date(closedAt).toLocaleString("vi-VN")}. KS không nhận thêm được.
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="space-y-2">
@@ -239,6 +202,89 @@ export function ProposalKtItems({
           />
         ))}
       </div>
+
+      {closedAt ? (
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-200">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-emerald-200">PO đã hoàn tất</div>
+              <div className="mt-0.5 text-[11px] text-emerald-300/80">
+                Lúc {new Date(closedAt).toLocaleString("vi-VN")}. Công nợ đã chuyển sang{" "}
+                <a href="/payables" className="underline">/payables</a> để tạo lệnh thanh toán.
+              </div>
+            </div>
+          </div>
+          {canReopen && (
+            <button
+              type="button"
+              onClick={reopenPo}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-xs text-[#8892b0] hover:text-[#f0f2ff]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Mở lại PO (admin)
+            </button>
+          )}
+        </div>
+      ) : canClose ? (
+        <div
+          className={`rounded-2xl border p-4 ${
+            readyToClose
+              ? "border-emerald-400/40 bg-emerald-500/5"
+              : "border-[#252840] bg-[#1a1d2e]"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                readyToClose
+                  ? "bg-emerald-500/20 text-emerald-200"
+                  : "bg-[#252840] text-[#8892b0]"
+              }`}
+            >
+              <Lock className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-[#f0f2ff]">Hoàn tất PO</div>
+              <div className="mt-0.5 text-[11px] text-[#8892b0]">Bước cuối — sau khi nhận đủ hàng & ghi xong CN tất cả món.</div>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-1 rounded-xl bg-[#0f1220] p-2.5 text-[11px] text-[#8892b0]">
+            <li className="flex items-start gap-1.5">
+              <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+              <span>KS không nhận thêm được hàng cho PO này.</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+              <span>KT không sửa được công nợ nữa (khoá sổ).</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                Công nợ chuyển sang <a href="/payables" className="underline">Công nợ NCC</a> để tạo lệnh thanh toán.
+              </span>
+            </li>
+          </ul>
+          <button
+            type="button"
+            onClick={closePo}
+            disabled={closing || !readyToClose}
+            className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold transition disabled:cursor-not-allowed ${
+              readyToClose
+                ? "bg-emerald-500 text-[#0b0d16] hover:bg-emerald-400 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.6)]"
+                : "bg-[#252840] text-[#5a627a]"
+            }`}
+          >
+            {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+            {readyToClose
+              ? "Hoàn tất PO"
+              : !allReceived
+                ? `Còn ${summary.total - summary.recv} món chưa nhận`
+                : `Còn ${summary.total - summary.debt} món chưa ghi CN`}
+          </button>
+        </div>
+      ) : null}
 
       {openSeq !== null && (
         <DebtModal
