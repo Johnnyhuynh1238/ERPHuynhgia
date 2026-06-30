@@ -680,7 +680,7 @@ function DetailPhotos({
               href={photoSrc(projectId, p.key)}
               target="_blank"
               rel="noreferrer"
-              className="relative aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1320]"
+              className="relative block aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1320]"
             >
               <Image
                 src={photoSrc(projectId, p.key)}
