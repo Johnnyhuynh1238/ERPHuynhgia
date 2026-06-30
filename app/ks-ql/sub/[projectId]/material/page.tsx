@@ -20,9 +20,19 @@ export default async function MaterialHubPage({ params }: { params: { projectId:
   });
   if (!project) notFound();
 
-  const pendingCount = await prisma.materialProposal.count({
-    where: { projectId: project.id, ksId: user.id, status: "pending" },
-  });
+  const [pendingCount, openReceiveCount] = await Promise.all([
+    prisma.materialProposal.count({
+      where: { projectId: project.id, ksId: user.id, status: "pending" },
+    }),
+    prisma.materialProposal.count({
+      where: {
+        projectId: project.id,
+        status: "accepted",
+        orderStatus: { in: ["ordered", "received"] },
+        closedAt: null,
+      },
+    }),
+  ]);
 
   return (
     <SubLayout
@@ -39,9 +49,8 @@ export default async function MaterialHubPage({ params }: { params: { projectId:
       <BigCard
         icon={<Inbox className="h-8 w-8" />}
         title="NHẬN VẬT TƯ"
-        subtitle="Sắp ra mắt"
-        tone="muted"
-        disabled
+        subtitle={openReceiveCount > 0 ? `${openReceiveCount} PO chờ nhận` : "Chưa có PO nào chờ nhận"}
+        href={`/ks-ql/sub/${project.id}/material/receive`}
       />
       <BigCard
         icon={<ClipboardCheck className="h-8 w-8" />}

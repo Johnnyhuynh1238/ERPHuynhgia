@@ -2761,7 +2761,7 @@ model MaterialProposalItemReceipt {
   proposal MaterialProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   receiver User             @relation("MatProposalItemReceiptReceiver", fields: [receivedBy], references: [id])
 
-  @@index([proposalId, itemSeq])
+  @@unique([proposalId, itemSeq])
   @@index([receivedAt])
   @@map("material_proposal_item_receipts")
 }
