@@ -428,18 +428,23 @@ export function DiaryClient({
           Lịch sử các ngày
         </div>
         {history.length === 0 ? (
-          <p className="text-sm text-[#8892b0]">Chưa có bản ghi nào trước hôm nay.</p>
+          <p className="text-sm text-[#8892b0]">Chưa có bản ghi nào.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {history
-              .filter((h) => h.entryDate !== todayYmd)
-              .map((h) => (
+            {history.map((h) => (
                 <li
                   key={h.id}
                   className="rounded-xl border border-[#252840] bg-[#0f1320] px-3 py-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-bold text-[#f5ede4]">{fmtDateVn(h.entryDate)}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-bold text-[#f5ede4]">{fmtDateVn(h.entryDate)}</div>
+                      {h.entryDate === todayYmd && (
+                        <span className="rounded-full bg-[#ff8a3d]/20 px-2 py-0.5 text-[10px] font-semibold text-orange-300">
+                          Hôm nay
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-xs">
                       {h.savedAt ? (
                         <span className="rounded-full bg-[#6FA677]/20 px-2 py-0.5 text-[#a3d3a8]">
