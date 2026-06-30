@@ -1615,6 +1615,17 @@ function TransferDetails({
             <span className="text-[#8b95b7]">Nội dung</span>
             <span className="font-mono text-[#f0f2ff]">{memo} ⧉</span>
           </button>
+          {expense.note && (
+            <button
+              type="button"
+              onClick={() => copy(expense.note!, "ghi chú admin")}
+              className="flex w-full items-start justify-between gap-2 rounded text-left hover:bg-[#13151f]/60 px-1 py-0.5"
+              title="Bấm để copy ghi chú admin"
+            >
+              <span className="text-[#8b95b7] shrink-0">Ghi chú</span>
+              <span className="text-right text-[#f0f2ff] break-words">{expense.note} ⧉</span>
+            </button>
+          )}
         </div>
           </div>
 

@@ -584,11 +584,49 @@ export function ReceiptsClient({
                                 {r.paymentMethod === "cash" ? "Tiền mặt" : r.paymentMethod === "transfer" ? "Chuyển khoản" : "—"}
                               </div>
                               {r.note && (
-                                <div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard?.writeText(r.note!);
+                                    toast.success("Đã copy ghi chú");
+                                  }}
+                                  className="w-full text-left rounded px-1 py-0.5 hover:bg-[#0b0d16]/60"
+                                  title="Bấm để copy"
+                                >
                                   <span className="text-[#8892b0]">Ghi chú: </span>
-                                  {r.note}
-                                </div>
+                                  {r.note} <span className="text-emerald-300">⧉</span>
+                                </button>
                               )}
+                              {r.payer && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard?.writeText(r.payer!);
+                                    toast.success("Đã copy tên người nộp");
+                                  }}
+                                  className="w-full text-left rounded px-1 py-0.5 hover:bg-[#0b0d16]/60"
+                                  title="Bấm để copy"
+                                >
+                                  <span className="text-[#8892b0]">Người nộp: </span>
+                                  {r.payer} <span className="text-emerald-300">⧉</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard?.writeText(String(Math.round(r.amount)));
+                                  toast.success("Đã copy số tiền");
+                                }}
+                                className="w-full text-left rounded px-1 py-0.5 hover:bg-[#0b0d16]/60"
+                                title="Bấm để copy"
+                              >
+                                <span className="text-[#8892b0]">Số tiền: </span>
+                                <span className="font-semibold text-emerald-300">{money(r.amount)}</span>{" "}
+                                <span className="text-emerald-300">⧉</span>
+                              </button>
                               {r.attachmentUrl && (
                                 <div>
                                   <a
