@@ -42,9 +42,8 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
       <BigCard
         icon={<BookOpen className="h-8 w-8" />}
         title="NHẬT KÝ THI CÔNG"
-        subtitle="Sắp ra mắt"
-        tone="muted"
-        disabled
+        subtitle="Trả lời 5 câu hỏi mỗi ngày"
+        href={`/ks-ql/sub/${project.id}/diary`}
       />
     </SubLayout>
   );

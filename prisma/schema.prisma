@@ -547,6 +547,7 @@ model User {
   materialProposalCommentsAuthored MaterialProposalComment[]     @relation("MatProposalCommentAuthor")
   materialReceiptsLogged           MaterialProposalItemReceipt[] @relation("MatProposalItemReceiptReceiver")
   materialDebtsRecorded            MaterialProposalItemDebt[]    @relation("MatProposalItemDebtRecorder")
+  constructionDiariesAsKs          ConstructionDiary[]           @relation("ConstructionDiaryKs")
   supplierPayOrdersCreated         SupplierPaymentOrder[]        @relation("SupplierPayOrderCreator")
   supplierPayOrdersApproved        SupplierPaymentOrder[]        @relation("SupplierPayOrderApprover")
   supplierPayOrdersRejected        SupplierPaymentOrder[]        @relation("SupplierPayOrderRejecter")
@@ -732,6 +733,7 @@ model Project {
   workerAttendances         WorkerAttendance[]
   taskDailyAssignments      TaskDailyAssignment[]
   materialProposals         MaterialProposal[]
+  constructionDiaries       ConstructionDiary[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
   projectComponents         ProjectComponent[]
@@ -3806,4 +3808,28 @@ model CashTransaction {
   @@index([createdAt(sort: Desc)])
   @@index([accountId, occurredAt(sort: Desc)])
   @@map("cash_transactions")
+}
+
+// Nhật ký thi công của KS PM cho dự án sub-contract.
+// Mỗi (project, ks, entryDate) chỉ có 1 entry — KS sửa lại tự nó được.
+model ConstructionDiary {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  ksId        String   @map("ks_id") @db.Uuid
+  entryDate   DateTime @map("entry_date") @db.Date
+  workerCount Int      @default(0) @map("worker_count")
+  tasksDone   String   @default("") @map("tasks_done") @db.Text
+  issues      String?  @db.Text
+  taskPhotos  Json     @default("[]") @map("task_photos") // mảng {key, contentType, width, height}
+  sitePhotos  Json     @default("[]") @map("site_photos")
+  savedAt     DateTime? @map("saved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ks      User    @relation("ConstructionDiaryKs", fields: [ksId], references: [id])
+
+  @@unique([projectId, ksId, entryDate])
+  @@index([projectId, entryDate(sort: Desc)])
+  @@map("construction_diaries")
 }
