@@ -130,11 +130,74 @@ export async function GET(request: Request) {
     prisma.cashTransaction.count({ where }),
   ]);
 
+  const idsByType = {
+    expense: [] as string[],
+    receipt: [] as string[],
+    sub_payment: [] as string[],
+    payment_schedule: [] as string[],
+  };
+  for (const r of rows) {
+    if (!r.refId) continue;
+    if (r.refType === "expense") idsByType.expense.push(r.refId);
+    else if (r.refType === "receipt") idsByType.receipt.push(r.refId);
+    else if (r.refType === "sub_payment") idsByType.sub_payment.push(r.refId);
+    else if (r.refType === "payment_schedule") idsByType.payment_schedule.push(r.refId);
+  }
+
+  const [expenseRows, receiptRows, subPayRows, payScheduleRows] = await Promise.all([
+    idsByType.expense.length
+      ? prisma.expense.findMany({
+          where: { id: { in: idsByType.expense } },
+          select: { id: true, attachmentUrl: true, paidReceiptUrl: true },
+        })
+      : Promise.resolve([] as { id: string; attachmentUrl: string | null; paidReceiptUrl: string | null }[]),
+    idsByType.receipt.length
+      ? prisma.receipt.findMany({
+          where: { id: { in: idsByType.receipt } },
+          select: { id: true, attachmentUrl: true, receivedReceiptUrl: true },
+        })
+      : Promise.resolve([] as { id: string; attachmentUrl: string | null; receivedReceiptUrl: string | null }[]),
+    idsByType.sub_payment.length
+      ? prisma.subPayment.findMany({
+          where: { id: { in: idsByType.sub_payment } },
+          select: { id: true, receiptUrl: true },
+        })
+      : Promise.resolve([] as { id: string; receiptUrl: string | null }[]),
+    idsByType.payment_schedule.length
+      ? prisma.paymentSchedule.findMany({
+          where: { id: { in: idsByType.payment_schedule } },
+          select: { id: true, receiptUrl: true },
+        })
+      : Promise.resolve([] as { id: string; receiptUrl: string | null }[]),
+  ]);
+
+  const attMap = new Map<string, string[]>();
+  const keyOf = (t: string, id: string) => `${t}:${id}`;
+  for (const e of expenseRows) {
+    attMap.set(
+      keyOf("expense", e.id),
+      [e.attachmentUrl, e.paidReceiptUrl].filter((u): u is string => !!u),
+    );
+  }
+  for (const r of receiptRows) {
+    attMap.set(
+      keyOf("receipt", r.id),
+      [r.attachmentUrl, r.receivedReceiptUrl].filter((u): u is string => !!u),
+    );
+  }
+  for (const s of subPayRows) {
+    attMap.set(keyOf("sub_payment", s.id), [s.receiptUrl].filter((u): u is string => !!u));
+  }
+  for (const p of payScheduleRows) {
+    attMap.set(keyOf("payment_schedule", p.id), [p.receiptUrl].filter((u): u is string => !!u));
+  }
+
   return NextResponse.json({
     rows: rows.map((r) => ({
       ...r,
       amount: Number(r.amount),
       balanceAfter: Number(r.balanceAfter),
+      attachments: r.refId ? attMap.get(keyOf(r.refType, r.refId)) ?? [] : [],
     })),
     total,
     page,

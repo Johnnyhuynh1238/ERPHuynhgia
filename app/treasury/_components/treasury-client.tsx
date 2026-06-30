@@ -45,7 +45,13 @@ type Txn = {
   creator: { id: string; fullName: string };
   account: TxnAccount | null;
   counterAccount: TxnAccount | null;
+  attachments: string[];
 };
+
+const IMG_EXT_RE = /\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|svg)(\?|#|$)/i;
+function isImageUrl(u: string) {
+  return IMG_EXT_RE.test(u);
+}
 
 function money(v: number | null | undefined) {
   return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
@@ -112,6 +118,16 @@ export function TreasuryClient({
   const [showFilters, setShowFilters] = useState(false);
 
   const [selectedTxn, setSelectedTxn] = useState<Txn | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxUrl(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxUrl]);
 
   const [showTransfer, setShowTransfer] = useState(false);
   const [trFrom, setTrFrom] = useState("");
@@ -482,6 +498,44 @@ export function TreasuryClient({
                   </div>
                 )}
 
+                {r.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {r.attachments.map((url, i) =>
+                      isImageUrl(url) ? (
+                        <button
+                          key={`${url}-${i}`}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxUrl(url);
+                          }}
+                          className="h-16 w-16 overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
+                          aria-label="Xem ảnh"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt="Chứng từ"
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                      ) : (
+                        <a
+                          key={`${url}-${i}`}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex h-16 items-center gap-2 rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 text-xs text-indigo-300 hover:border-orange-400/60"
+                        >
+                          📎 Mở tệp
+                        </a>
+                      ),
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#2d3249]/60 pt-2 text-xs text-[#8b95b7]">
                   <span>{r.creator.fullName}</span>
                   <span>
@@ -588,6 +642,43 @@ export function TreasuryClient({
                 <div className="mb-1 text-xs uppercase tracking-wide text-[#8b95b7]">Ghi chú</div>
                 <div className="whitespace-pre-wrap break-words text-sm text-[#cfd4e8]">
                   {selectedTxn.note}
+                </div>
+              </div>
+            )}
+
+            {selectedTxn.attachments.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-2 text-xs uppercase tracking-wide text-[#8b95b7]">Chứng từ</div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTxn.attachments.map((url, i) =>
+                    isImageUrl(url) ? (
+                      <button
+                        key={`${url}-${i}`}
+                        type="button"
+                        onClick={() => setLightboxUrl(url)}
+                        className="h-24 w-24 overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
+                        aria-label="Xem ảnh"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt="Chứng từ"
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <a
+                        key={`${url}-${i}`}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex h-24 items-center gap-2 rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 text-xs text-indigo-300 hover:border-orange-400/60"
+                      >
+                        📎 Mở tệp
+                      </a>
+                    ),
+                  )}
                 </div>
               </div>
             )}
@@ -702,6 +793,33 @@ export function TreasuryClient({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox ảnh */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxUrl(null);
+            }}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-2xl text-white hover:bg-black/80"
+            aria-label="Đóng"
+          >
+            ✕
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Chứng từ"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
+          />
         </div>
       )}
 
