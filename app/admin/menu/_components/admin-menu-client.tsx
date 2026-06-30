@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   Briefcase,
+  Building2,
   CalendarDays,
   CheckSquare,
   ClipboardList,
@@ -77,6 +78,7 @@ const SECTIONS: MenuSection[] = [
     icon: Package,
     items: [
       { label: "Đề xuất vật tư", href: "/proposals", icon: ShoppingCart, desc: "Yêu cầu mua vật tư" },
+      { label: "NCC vật tư", href: "/admin/suppliers", icon: Building2, desc: "Nhà cung cấp + bảng giá" },
       { label: "Thầu phụ", href: "/subcontractors", icon: HardHat, desc: "Danh sách nhà thầu phụ" },
       { label: "HĐ thầu phụ", href: "/sub-contracts", icon: FileSignature, desc: "Hợp đồng giao khoán" },
       { label: "Chi thầu phụ", href: "/sub-payments", icon: Wallet, desc: "Thanh toán thầu phụ" },
