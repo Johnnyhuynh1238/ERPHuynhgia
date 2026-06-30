@@ -3,13 +3,13 @@ import { ExpensePriority, ExpenseStatus, Prisma, UserRole } from "@prisma/client
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { fireAndForget, notifyExpenseCreated } from "@/lib/notifications";
+import { fireAndForget, notifyExpenseCreated, notifyExpenseKtRequest } from "@/lib/notifications";
 import { nextReminderForPriority } from "@/lib/expense-reminder";
 
 const ROLES_VIEW = new Set<string>([UserRole.admin, UserRole.accountant]);
 
 function canCreate(role: string) {
-  return role === UserRole.admin;
+  return role === UserRole.admin || role === UserRole.accountant;
 }
 
 function canView(role: string) {
@@ -58,9 +58,16 @@ export async function GET(request: Request) {
   const where: Prisma.ExpenseWhereInput = {};
   if (status && status !== "all" && (status === "pending" || status === "paid" || status === "cancelled")) {
     where.status = status as ExpenseStatus;
+  } else if (status === "tptc_pending") {
+    // Chỉ trả về lệnh chi do KT tạo đang chờ admin duyệt (loại bỏ KS đề xuất)
+    where.status = ExpenseStatus.tptc_pending;
+    where.creator = { role: UserRole.accountant };
   } else {
-    // KT/admin không thấy yêu cầu KS đang chờ TPTC duyệt
-    where.status = { in: [ExpenseStatus.pending, ExpenseStatus.paid, ExpenseStatus.cancelled] };
+    // Mặc định: pending/paid/cancelled + lệnh KT tạo đang chờ admin duyệt (loại bỏ KS đề xuất)
+    where.OR = [
+      { status: { in: [ExpenseStatus.pending, ExpenseStatus.paid, ExpenseStatus.cancelled] } },
+      { status: ExpenseStatus.tptc_pending, creator: { role: UserRole.accountant } },
+    ];
   }
   if (projectId === "none") where.projectId = null;
   else if (projectId) where.projectId = projectId;
@@ -121,6 +128,10 @@ export async function POST(request: Request) {
   const urls = (data.attachmentUrls ?? []).map((u) => u.trim()).filter(Boolean);
   const legacyUrl = data.attachmentUrl?.trim() || null;
   if (legacyUrl && !urls.includes(legacyUrl)) urls.unshift(legacyUrl);
+
+  const isKtCreated = user.role === UserRole.accountant;
+  const initialStatus = isKtCreated ? ExpenseStatus.tptc_pending : ExpenseStatus.pending;
+
   const expense = await prisma.expense.create({
     data: {
       code,
@@ -132,9 +143,9 @@ export async function POST(request: Request) {
       note: data.note?.trim() || null,
       attachmentUrl: urls[0] ?? null,
       attachmentUrls: urls,
-      status: ExpenseStatus.pending,
+      status: initialStatus,
       priority,
-      nextReminderAt: nextReminderForPriority(priority),
+      nextReminderAt: isKtCreated ? null : nextReminderForPriority(priority),
       payeeBankBin: data.payeeBankBin?.trim() || null,
       payeeAccountNumber: data.payeeAccountNumber?.trim() || null,
       payeeAccountName: data.payeeAccountName?.trim() || null,
@@ -146,21 +157,41 @@ export async function POST(request: Request) {
     },
   });
 
-  fireAndForget(
-    notifyExpenseCreated({
-      expenseId: expense.id,
-      code: expense.code,
-      amount: Number(expense.amount),
-      categoryName: expense.category.name,
-      payee: expense.payee,
-      projectLabel: expense.project ? `${expense.project.code} — ${expense.project.name}` : null,
-      actorUserId: user.id,
-      actorName: user.name || user.email || "Admin",
-    }),
-  );
+  const projectLabel = expense.project ? `${expense.project.code} — ${expense.project.name}` : null;
+  const actorName = user.name || user.email || (isKtCreated ? "KT" : "Admin");
+
+  if (isKtCreated) {
+    fireAndForget(
+      notifyExpenseKtRequest({
+        expenseId: expense.id,
+        code: expense.code,
+        amount: Number(expense.amount),
+        categoryName: expense.category.name,
+        payee: expense.payee,
+        projectLabel,
+        actorUserId: user.id,
+        actorName,
+      }),
+    );
+  } else {
+    fireAndForget(
+      notifyExpenseCreated({
+        expenseId: expense.id,
+        code: expense.code,
+        amount: Number(expense.amount),
+        categoryName: expense.category.name,
+        payee: expense.payee,
+        projectLabel,
+        actorUserId: user.id,
+        actorName,
+      }),
+    );
+  }
 
   return NextResponse.json({
     expense: { ...expense, amount: Number(expense.amount), paidAmount: null },
-    message: "Đã tạo lệnh chi. Đang chờ KT thanh toán.",
+    message: isKtCreated
+      ? "Đã gửi yêu cầu chi. Đang chờ admin duyệt."
+      : "Đã tạo lệnh chi. Đang chờ KT thanh toán.",
   });
 }

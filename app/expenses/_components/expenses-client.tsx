@@ -21,7 +21,7 @@ type Expense = {
   note: string | null;
   attachmentUrl: string | null;
   attachmentUrls: string[];
-  status: "pending" | "paid" | "cancelled";
+  status: "tptc_pending" | "pending" | "paid" | "cancelled";
   priority: "normal" | "urgent";
   createdAt: string;
   paidAt: string | null;
@@ -92,6 +92,8 @@ export function ExpensesClient({
   categories: CategoryOption[];
 }) {
   const isAdmin = role === "admin";
+  const isKt = role === "accountant";
+  const canCreate = role === "admin" || role === "accountant";
   const canMarkPaid = role === "admin" || role === "accountant";
 
   const [rows, setRows] = useState<Expense[]>([]);
@@ -486,7 +488,7 @@ export function ExpensesClient({
           >
             ?
           </button>
-          {isAdmin && (
+          {canCreate && (
             <button
               onClick={() => setShowCreate((v) => !v)}
               className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#0b0d16]"
@@ -506,6 +508,7 @@ export function ExpensesClient({
             className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-1.5 text-sm text-[#f0f2ff]"
           >
             <option value="pending">Cần chi</option>
+            <option value="tptc_pending">Chờ admin duyệt</option>
             <option value="paid">Đã chi</option>
             <option value="cancelled">Đã huỷ</option>
             <option value="all">Tất cả</option>
@@ -545,7 +548,7 @@ export function ExpensesClient({
       )}
 
       {/* Create form */}
-      {showCreate && isAdmin && (
+      {showCreate && canCreate && (
         <form onSubmit={submitCreate} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 space-y-3">
           <div className="flex flex-wrap items-baseline gap-3 rounded-lg bg-[#0b0d16] px-3 py-2 text-xs">
             <span className="text-[#8892b0]">Số dư quỹ hiện tại:</span>
@@ -844,9 +847,11 @@ export function ExpensesClient({
             const statusBadge =
               r.status === "pending"
                 ? { label: "Chờ chi", chip: "bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30" }
-                : r.status === "paid"
-                  ? { label: "Đã chi", chip: "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30" }
-                  : { label: "Đã huỷ", chip: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30" };
+                : r.status === "tptc_pending"
+                  ? { label: "Chờ admin duyệt", chip: "bg-violet-400/15 text-violet-300 ring-1 ring-violet-400/30" }
+                  : r.status === "paid"
+                    ? { label: "Đã chi", chip: "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30" }
+                    : { label: "Đã huỷ", chip: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30" };
 
             const cardBorder = isUrgent
               ? "border-red-500/60 shadow-[0_0_0_1px_rgba(248,113,113,0.20),0_4px_16px_-6px_rgba(248,113,113,0.3)]"
@@ -854,7 +859,9 @@ export function ExpensesClient({
                 ? "border-emerald-500/20"
                 : r.status === "cancelled"
                   ? "border-zinc-700/40 opacity-80"
-                  : "border-[#2d3249]";
+                  : r.status === "tptc_pending"
+                    ? "border-violet-500/30"
+                    : "border-[#2d3249]";
 
             return (
               <div
@@ -951,6 +958,14 @@ export function ExpensesClient({
                 )}
 
                 {/* Status meta */}
+                {r.status === "tptc_pending" && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-violet-300/80">
+                    <span aria-hidden>⏳</span>
+                    <span>
+                      KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt
+                    </span>
+                  </div>
+                )}
                 {r.status === "paid" && (
                   <div className="flex items-start gap-1.5 text-[11px] text-emerald-300/80">
                     <span aria-hidden>✓</span>
@@ -975,6 +990,7 @@ export function ExpensesClient({
                 {(canQuickTransfer ||
                   (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
                   (r.status === "pending" && isAdmin) ||
+                  (r.status === "tptc_pending" && isAdmin) ||
                   attachmentList(r).length > 0 ||
                   r.paidReceiptUrl) && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#2d3249]/40" onClick={(e) => e.stopPropagation()}>
@@ -997,6 +1013,50 @@ export function ExpensesClient({
                       >
                         Ghi nhận đã chi
                       </button>
+                    )}
+                    {r.status === "tptc_pending" && isAdmin && (
+                      <>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Duyệt lệnh chi ${r.code}?`)) return;
+                            const res = await fetch(`/api/expenses/${r.id}/approve`, { method: "POST" });
+                            const j = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              toast.error(j.message || "Không duyệt được");
+                              return;
+                            }
+                            toast.success(j.message || "Đã duyệt");
+                            load();
+                          }}
+                          className="rounded-lg bg-emerald-500/20 text-emerald-300 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30"
+                        >
+                          ✓ Duyệt
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const reason = window.prompt(`Lý do từ chối lệnh chi ${r.code}:`);
+                            if (!reason || reason.trim().length < 3) {
+                              if (reason !== null) toast.error("Lý do tối thiểu 3 ký tự");
+                              return;
+                            }
+                            const res = await fetch(`/api/expenses/${r.id}/reject`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ reason: reason.trim() }),
+                            });
+                            const j = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              toast.error(j.message || "Không từ chối được");
+                              return;
+                            }
+                            toast.success(j.message || "Đã từ chối");
+                            load();
+                          }}
+                          className="rounded-lg bg-red-500/15 text-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-500/25"
+                        >
+                          ✕ Từ chối
+                        </button>
+                      </>
                     )}
                     {r.status === "pending" && isAdmin && (
                       <button

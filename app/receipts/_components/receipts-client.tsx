@@ -18,7 +18,7 @@ type Receipt = {
   paymentMethod: string | null;
   note: string | null;
   attachmentUrl: string | null;
-  status: "pending" | "received" | "cancelled";
+  status: "awaiting_approval" | "pending" | "received" | "cancelled";
   createdAt: string;
   receivedAt: string | null;
   receivedAmount: number | null;
@@ -54,6 +54,7 @@ function fmtDate(s: string | null) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 function statusMeta(s: Receipt["status"]) {
+  if (s === "awaiting_approval") return { label: "Chờ admin duyệt", cls: "bg-violet-500/15 text-violet-300" };
   if (s === "pending") return { label: "Chờ thu", cls: "bg-amber-500/15 text-amber-300" };
   if (s === "received") return { label: "Đã thu", cls: "bg-emerald-500/15 text-emerald-300" };
   return { label: "Đã huỷ", cls: "bg-zinc-500/15 text-zinc-300" };
@@ -87,6 +88,7 @@ export function ReceiptsClient({
   projects: ProjectOption[];
 }) {
   const isAdmin = role === "admin";
+  const canCreate = role === "admin" || role === "accountant";
   const canMarkReceived = role === "admin" || role === "accountant";
 
   const [rows, setRows] = useState<Receipt[]>([]);
@@ -307,7 +309,7 @@ export function ReceiptsClient({
           >
             ⏷ Lọc
           </button>
-          {isAdmin && (
+          {canCreate && (
             <button
               onClick={() => setShowCreate((v) => !v)}
               className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-[#0b0d16]"
@@ -327,6 +329,7 @@ export function ReceiptsClient({
             className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-1.5 text-sm text-[#f0f2ff]"
           >
             <option value="pending">Chờ thu</option>
+            <option value="awaiting_approval">Chờ admin duyệt</option>
             <option value="received">Đã thu</option>
             <option value="cancelled">Đã huỷ</option>
             <option value="">Tất cả</option>
@@ -366,7 +369,7 @@ export function ReceiptsClient({
       )}
 
       {/* Create form */}
-      {showCreate && isAdmin && (
+      {showCreate && canCreate && (
         <form onSubmit={submitCreate} className="space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
@@ -683,6 +686,61 @@ export function ReceiptsClient({
                             </div>
                           </div>
 
+                          {r.status === "awaiting_approval" && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <div className="text-[11px] text-violet-300/80">
+                                KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt
+                              </div>
+                              {isAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!window.confirm(`Duyệt lệnh thu ${r.code}?`)) return;
+                                      const res = await fetch(`/api/receipts/${r.id}/approve`, { method: "POST" });
+                                      const j = await res.json().catch(() => ({}));
+                                      if (!res.ok) {
+                                        toast.error(j.message || "Không duyệt được");
+                                        return;
+                                      }
+                                      toast.success(j.message || "Đã duyệt");
+                                      load();
+                                    }}
+                                    className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30"
+                                  >
+                                    ✓ Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const reason = window.prompt(`Lý do từ chối lệnh thu ${r.code}:`);
+                                      if (!reason || reason.trim().length < 3) {
+                                        if (reason !== null) toast.error("Lý do tối thiểu 3 ký tự");
+                                        return;
+                                      }
+                                      const res = await fetch(`/api/receipts/${r.id}/reject`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ reason: reason.trim() }),
+                                      });
+                                      const j = await res.json().catch(() => ({}));
+                                      if (!res.ok) {
+                                        toast.error(j.message || "Không từ chối được");
+                                        return;
+                                      }
+                                      toast.success(j.message || "Đã từ chối");
+                                      load();
+                                    }}
+                                    className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300"
+                                  >
+                                    ✕ Từ chối
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                           {r.status === "pending" && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {canMarkReceived && (

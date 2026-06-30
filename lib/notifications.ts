@@ -1165,6 +1165,84 @@ export async function notifyExpenseTptcRejected(input: {
   });
 }
 
+/**
+ * Event — KT tạo lệnh chi cần admin duyệt. Recipients: admin.
+ */
+export async function notifyExpenseKtRequest(input: {
+  expenseId: string;
+  code: string;
+  amount: number;
+  categoryName: string;
+  payee: string | null;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["admin"]);
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_kt_request",
+    title: `KT ${input.actorName} xin chi ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${input.categoryName}${input.payee ? ` · ${input.payee}` : ""}${where}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-kt-request-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — Admin duyệt lệnh chi do KT tạo. Recipients: KT tạo + các KT khác.
+ */
+export async function notifyExpenseKtApproved(input: {
+  expenseId: string;
+  code: string;
+  amount: number;
+  ktUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const accountants = await getRoleUserIds(["accountant"]);
+  const recipients = Array.from(new Set([...accountants, input.ktUserId]));
+  await writeExpenseStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_kt_approved",
+    title: `Admin duyệt lệnh chi ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `Đã chuyển sang chờ KT thanh toán.`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-kt-approved-${input.expenseId}`,
+  });
+}
+
+/**
+ * Event — Admin từ chối lệnh chi do KT tạo. Recipients: KT tạo.
+ */
+export async function notifyExpenseKtRejected(input: {
+  expenseId: string;
+  code: string;
+  reason: string;
+  ktUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  await writeExpenseStaffNotif({
+    recipients: [input.ktUserId],
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "expense_kt_rejected",
+    title: `Admin từ chối lệnh chi ${input.code}`,
+    body: `Lý do: ${input.reason}`,
+    link: `/expenses?id=${input.expenseId}`,
+    expenseId: input.expenseId,
+    tag: `expense-kt-rejected-${input.expenseId}`,
+  });
+}
+
 async function writeReceiptStaffNotif(input: {
   recipients: string[];
   actorUserId: string;
@@ -1266,6 +1344,85 @@ export async function notifyReceiptReceived(input: {
     link: `/receipts?id=${input.receiptId}`,
     receiptId: input.receiptId,
     tag: `receipt-received-${input.receiptId}`,
+  });
+}
+
+/**
+ * Event — KT tạo lệnh thu cần admin duyệt. Recipients: admin.
+ */
+export async function notifyReceiptKtRequest(input: {
+  receiptId: string;
+  code: string;
+  amount: number;
+  source: string;
+  payer: string | null;
+  projectLabel: string | null;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const recipients = await getRoleUserIds(["admin"]);
+  const sourceLabel = RECEIPT_SOURCE_LABEL[input.source] || input.source;
+  const where = input.projectLabel ? ` (${input.projectLabel})` : "";
+  await writeReceiptStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_kt_request",
+    title: `KT ${input.actorName} xin thu ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `${sourceLabel}${input.payer ? ` · ${input.payer}` : ""}${where}`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-kt-request-${input.receiptId}`,
+  });
+}
+
+/**
+ * Event — Admin duyệt lệnh thu do KT tạo. Recipients: KT tạo + các KT khác.
+ */
+export async function notifyReceiptKtApproved(input: {
+  receiptId: string;
+  code: string;
+  amount: number;
+  ktUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  const accountants = await getRoleUserIds(["accountant"]);
+  const recipients = Array.from(new Set([...accountants, input.ktUserId]));
+  await writeReceiptStaffNotif({
+    recipients,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_kt_approved",
+    title: `Admin duyệt lệnh thu ${input.code} — ${fmtVndShort(input.amount)}`,
+    body: `Đã chuyển sang chờ KT xác nhận đã thu.`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-kt-approved-${input.receiptId}`,
+  });
+}
+
+/**
+ * Event — Admin từ chối lệnh thu do KT tạo. Recipients: KT tạo.
+ */
+export async function notifyReceiptKtRejected(input: {
+  receiptId: string;
+  code: string;
+  reason: string;
+  ktUserId: string;
+  actorUserId: string;
+  actorName: string;
+}) {
+  await writeReceiptStaffNotif({
+    recipients: [input.ktUserId],
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    kind: "receipt_kt_rejected",
+    title: `Admin từ chối lệnh thu ${input.code}`,
+    body: `Lý do: ${input.reason}`,
+    link: `/receipts?id=${input.receiptId}`,
+    receiptId: input.receiptId,
+    tag: `receipt-kt-rejected-${input.receiptId}`,
   });
 }
 

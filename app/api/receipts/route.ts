@@ -3,12 +3,12 @@ import { Prisma, ReceiptSource, ReceiptStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { fireAndForget, notifyReceiptCreated } from "@/lib/notifications";
+import { fireAndForget, notifyReceiptCreated, notifyReceiptKtRequest } from "@/lib/notifications";
 
 const VIEW_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
 function canCreate(role: string) {
-  return role === UserRole.admin;
+  return role === UserRole.admin || role === UserRole.accountant;
 }
 
 function canView(role: string) {
@@ -50,7 +50,10 @@ export async function GET(request: Request) {
   const search = url.searchParams.get("search")?.trim();
 
   const where: Prisma.ReceiptWhereInput = {};
-  if (status && (status === "pending" || status === "received" || status === "cancelled")) {
+  if (
+    status &&
+    (status === "pending" || status === "received" || status === "cancelled" || status === "awaiting_approval")
+  ) {
     where.status = status as ReceiptStatus;
   }
   if (source && (source === "customer" || source === "loan" || source === "advance_return" || source === "other")) {
@@ -105,6 +108,9 @@ export async function POST(request: Request) {
   }
 
   const code = await nextReceiptCode();
+  const isKtCreated = user.role === UserRole.accountant;
+  const initialStatus = isKtCreated ? ReceiptStatus.awaiting_approval : ReceiptStatus.pending;
+
   const receipt = await prisma.receipt.create({
     data: {
       code,
@@ -115,7 +121,7 @@ export async function POST(request: Request) {
       paymentMethod: data.paymentMethod || null,
       note: data.note?.trim() || null,
       attachmentUrl: data.attachmentUrl?.trim() || null,
-      status: ReceiptStatus.pending,
+      status: initialStatus,
       createdBy: user.id,
     },
     include: {
@@ -123,21 +129,41 @@ export async function POST(request: Request) {
     },
   });
 
-  fireAndForget(
-    notifyReceiptCreated({
-      receiptId: receipt.id,
-      code: receipt.code,
-      amount: Number(receipt.amount),
-      source: receipt.source,
-      payer: receipt.payer,
-      projectLabel: receipt.project ? `${receipt.project.code} — ${receipt.project.name}` : null,
-      actorUserId: user.id,
-      actorName: user.name || user.email || "Admin",
-    }),
-  );
+  const projectLabel = receipt.project ? `${receipt.project.code} — ${receipt.project.name}` : null;
+  const actorName = user.name || user.email || (isKtCreated ? "KT" : "Admin");
+
+  if (isKtCreated) {
+    fireAndForget(
+      notifyReceiptKtRequest({
+        receiptId: receipt.id,
+        code: receipt.code,
+        amount: Number(receipt.amount),
+        source: receipt.source,
+        payer: receipt.payer,
+        projectLabel,
+        actorUserId: user.id,
+        actorName,
+      }),
+    );
+  } else {
+    fireAndForget(
+      notifyReceiptCreated({
+        receiptId: receipt.id,
+        code: receipt.code,
+        amount: Number(receipt.amount),
+        source: receipt.source,
+        payer: receipt.payer,
+        projectLabel,
+        actorUserId: user.id,
+        actorName,
+      }),
+    );
+  }
 
   return NextResponse.json({
     receipt: { ...receipt, amount: Number(receipt.amount), receivedAmount: null },
-    message: "Đã tạo lệnh thu. Đang chờ KT xác nhận đã thu.",
+    message: isKtCreated
+      ? "Đã gửi yêu cầu thu. Đang chờ admin duyệt."
+      : "Đã tạo lệnh thu. Đang chờ KT xác nhận đã thu.",
   });
 }
