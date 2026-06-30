@@ -198,6 +198,7 @@ export function ReportsHubClient() {
   const [checkinPickerStep, setCheckinPickerStep] = useState<"projects" | "tasks">("projects");
   const [checkinPickerProjectId, setCheckinPickerProjectId] = useState<string | null>(null);
   const [checkinPickerTaskIds, setCheckinPickerTaskIds] = useState<Record<string, boolean>>({});
+  const [supplementMode, setSupplementMode] = useState(false);
   const [doneModalItem, setDoneModalItem] = useState<FlatAssignment | null>(null);
   const [donePhotoUrl, setDonePhotoUrl] = useState("");
   const [doneNote, setDoneNote] = useState("");
@@ -227,8 +228,47 @@ export function ReportsHubClient() {
 
   const needCheckin = useMemo(() => {
     if (!today) return false;
-    return !today.submitted && !today.hasCheckedIn;
+    if (today.submitted) return false;
+    return !today.hasCheckedIn || supplementMode;
+  }, [today, supplementMode]);
+
+  const alreadyCheckedTaskIds = useMemo(() => {
+    if (!today) return new Set<string>();
+    const ids = new Set<string>();
+    for (const item of today.assignments) {
+      if (item.taskId) ids.add(item.taskId);
+    }
+    return ids;
   }, [today]);
+
+  const alreadyCheckedTptcIds = useMemo(() => {
+    if (!today) return new Set<string>();
+    const ids = new Set<string>();
+    for (const item of today.assignments) {
+      if (item.type === "tptc_assignment" && item.tptcAssignmentId) ids.add(item.tptcAssignmentId);
+    }
+    return ids;
+  }, [today]);
+
+  const displayCheckin = useMemo(() => {
+    if (!checkin) return null;
+    if (!supplementMode) return checkin;
+    return {
+      ...checkin,
+      taskProjects: checkin.taskProjects
+        .map((project) => ({
+          ...project,
+          tasks: project.tasks.filter((task) => !alreadyCheckedTaskIds.has(task.id)),
+        }))
+        .filter((project) => project.tasks.length > 0),
+      tptcProjects: checkin.tptcProjects
+        .map((project) => ({
+          ...project,
+          assignments: project.assignments.filter((item) => !alreadyCheckedTptcIds.has(item.id)),
+        }))
+        .filter((project) => project.assignments.length > 0),
+    };
+  }, [checkin, supplementMode, alreadyCheckedTaskIds, alreadyCheckedTptcIds]);
 
   const taskModeGroups = useMemo(() => {
     if (!today) return [];
@@ -245,30 +285,30 @@ export function ReportsHubClient() {
 
   const checkinInProgressProjects = useMemo(
     () =>
-      (checkin?.taskProjects || [])
+      (displayCheckin?.taskProjects || [])
         .map((project) => ({
           ...project,
           tasks: project.tasks.filter((task) => task.group === "in_progress"),
         }))
         .filter((project) => project.tasks.length > 0),
-    [checkin],
+    [displayCheckin],
   );
 
   const checkinSelectedExtraProjects = useMemo(
     () =>
-      (checkin?.taskProjects || [])
+      (displayCheckin?.taskProjects || [])
         .map((project) => ({
           ...project,
           tasks: project.tasks.filter((task) => task.group !== "in_progress" && pickedTaskIds[task.id]),
         }))
         .filter((project) => project.tasks.length > 0),
-    [checkin, pickedTaskIds],
+    [displayCheckin, pickedTaskIds],
   );
 
   const checkinPickerProject = useMemo(() => {
-    const projects = checkin?.taskProjects || [];
+    const projects = displayCheckin?.taskProjects || [];
     return projects.find((project) => project.projectId === checkinPickerProjectId) || null;
-  }, [checkin, checkinPickerProjectId]);
+  }, [displayCheckin, checkinPickerProjectId]);
 
   const checkinPickerSelectedCount = useMemo(() => Object.values(checkinPickerTaskIds).filter(Boolean).length, [checkinPickerTaskIds]);
 
@@ -435,7 +475,11 @@ export function ReportsHubClient() {
     setBusyId("checkin");
     try {
       await postAction("/api/reports/today/checkin", { taskIds, tptcAssignmentIds });
-      await loadToday("flat");
+      const wasSupplement = supplementMode;
+      setPickedTaskIds({});
+      setPickedTptcIds({});
+      setSupplementMode(false);
+      await loadToday(wasSupplement ? mode : "flat");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check-in thất bại");
     } finally {
@@ -859,9 +903,33 @@ export function ReportsHubClient() {
           </div>
         ) : null}
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-          <div className="text-lg font-bold text-[#f0f2ff]">☀️ Check-in sáng</div>
-          <div className="mt-1 text-xs text-[#8892b0]">Ngày {checkin?.reportDate ? new Date(checkin.reportDate).toLocaleDateString("vi-VN") : "--/--/----"}</div>
-          <div className="mt-2 text-sm text-[#f0f2ff]">Đã chọn: {totalPicked} việc hôm nay</div>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-[#f0f2ff]">
+                {supplementMode ? "➕ Bổ sung công tác" : "☀️ Check-in sáng"}
+              </div>
+              <div className="mt-1 text-xs text-[#8892b0]">Ngày {displayCheckin?.reportDate ? new Date(displayCheckin.reportDate).toLocaleDateString("vi-VN") : "--/--/----"}</div>
+            </div>
+            {supplementMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSupplementMode(false);
+                  setPickedTaskIds({});
+                  setPickedTptcIds({});
+                }}
+                className="shrink-0 rounded-[10px] border border-[#252840] px-3 py-2 text-xs font-semibold text-[#8892b0]"
+              >
+                ← Thoát
+              </button>
+            ) : null}
+          </div>
+          {supplementMode ? (
+            <div className="mt-2 rounded-[10px] border border-dashed border-[#f97316]/30 bg-[#f97316]/5 px-3 py-2 text-xs text-[#ff8a3d]">
+              Chỉ hiện task/việc TPTC <b>chưa</b> chọn sáng. Tick các công tác còn thiếu rồi bấm Gửi.
+            </div>
+          ) : null}
+          <div className="mt-2 text-sm text-[#f0f2ff]">Đã chọn: {totalPicked} việc {supplementMode ? "bổ sung" : "hôm nay"}</div>
         </div>
 
         <section className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
@@ -962,8 +1030,8 @@ export function ReportsHubClient() {
                   <div key={`${checkinPickerStep}-${checkinPickerProjectId || "projects"}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                     {checkinPickerStep === "projects" ? (
                       <div className="space-y-2">
-                        {(checkin?.taskProjects || []).length > 0 ? (
-                          (checkin?.taskProjects || []).map((project) => {
+                        {(displayCheckin?.taskProjects || []).length > 0 ? (
+                          (displayCheckin?.taskProjects || []).map((project) => {
                             const selectedCount = project.tasks.filter((task) => checkinPickerTaskIds[task.id]).length;
                             const inProgressCount = project.tasks.filter((task) => task.group === "in_progress").length;
 
@@ -1041,11 +1109,11 @@ export function ReportsHubClient() {
             )
           : null}
 
-        {(checkin?.tptcProjects || []).length > 0 ? (
+        {(displayCheckin?.tptcProjects || []).length > 0 ? (
           <section className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
             <div className="text-sm font-semibold text-[#f0f2ff]">⚡ Việc TPTC giao hôm nay</div>
             <div className="mt-2 space-y-2">
-              {checkin?.tptcProjects.map((project) => (
+              {displayCheckin?.tptcProjects.map((project) => (
                 <div key={project.projectId} className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
                   <div className="text-sm font-bold text-[#f0f2ff]">{project.projectName}</div>
                   <div className="mt-2 space-y-1.5">
@@ -1077,7 +1145,13 @@ export function ReportsHubClient() {
           onClick={submitCheckin}
           className="flex w-full items-center justify-between rounded-[10px] border border-[#f97316]/30 bg-[#f97316]/10 px-[14px] py-[10px] text-[13px] font-bold text-[#f97316] transition active:scale-[0.97] disabled:opacity-60"
         >
-          {busyId === "checkin" ? "Đang gửi check-in..." : "📤 Gửi check-in"}
+          {busyId === "checkin"
+            ? supplementMode
+              ? "Đang bổ sung..."
+              : "Đang gửi check-in..."
+            : supplementMode
+              ? "📤 Gửi bổ sung"
+              : "📤 Gửi check-in"}
         </button>
       </div>
     );
@@ -1124,6 +1198,22 @@ export function ReportsHubClient() {
           <div className="text-[11px] text-[#8892b0]">☐ Còn</div>
         </div>
       </div>
+
+      {!today.submitted && today.hasCheckedIn ? (
+        <button
+          type="button"
+          onClick={() => {
+            setPickedTaskIds({});
+            setPickedTptcIds({});
+            setError(null);
+            setSupplementMode(true);
+          }}
+          className="flex w-full items-center justify-between rounded-[10px] border border-dashed border-[#f97316]/40 bg-[#f97316]/5 px-[14px] py-[10px] text-[13px] font-semibold text-[#f97316] transition active:scale-[0.97]"
+        >
+          <span>➕ Bổ sung công tác đã check-in</span>
+          <span className="text-[11px] font-normal text-[#8892b0]">Quên tick task?</span>
+        </button>
+      ) : null}
 
       <div className="sticky top-14 z-20 grid grid-cols-3 gap-1.5 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-1 md:top-[64px]">
         <button

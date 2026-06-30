@@ -68,19 +68,26 @@ export async function POST(req: Request) {
       });
 
       if (existing) {
-        await tx.morningCheckinTask.deleteMany({ where: { checkinId: existing.id } });
-        await tx.morningCheckin.update({
-          where: { id: existing.id },
-          data: {
-            submittedAt: new Date(),
-            tasks: {
-              create: validTaskIds.map((taskId) => ({
-                taskId,
-                taskGroup: "manual_checkin",
-              })),
-            },
-          },
+        const existingTasks = await tx.morningCheckinTask.findMany({
+          where: { checkinId: existing.id },
+          select: { taskId: true },
         });
+        const existingTaskIdSet = new Set(existingTasks.map((row) => row.taskId).filter(Boolean));
+        const newTaskIds = validTaskIds.filter((id) => !existingTaskIdSet.has(id));
+
+        if (newTaskIds.length) {
+          await tx.morningCheckin.update({
+            where: { id: existing.id },
+            data: {
+              tasks: {
+                create: newTaskIds.map((taskId) => ({
+                  taskId,
+                  taskGroup: "manual_checkin",
+                })),
+              },
+            },
+          });
+        }
       } else {
         const firstTask = validTasks[0];
 
