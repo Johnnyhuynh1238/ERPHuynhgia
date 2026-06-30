@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
+  ChevronRight,
+  CircleDashed,
+  ClipboardList,
   ImageIcon,
   Loader2,
   Lock,
+  PackageCheck,
+  Pencil,
   Plus,
   Receipt,
   RotateCcw,
@@ -135,7 +140,8 @@ export function ProposalKtItems({
 
   if (loading || !items) {
     return (
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 text-center text-sm text-[#8892b0]">
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
         Đang tải danh sách vật tư…
       </div>
     );
@@ -143,143 +149,95 @@ export function ProposalKtItems({
 
   const canClose = !closedAt && orderStatus !== "not_ordered";
   const canReopen = !!closedAt && currentUserRole === "admin";
+  const allDebted = summary.debt === summary.total && summary.total > 0;
+  const allReceived = summary.recv === summary.total && summary.total > 0;
+  const readyToClose = canClose && allReceived && allDebted;
 
   return (
-    <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-[#f0f2ff]">
-            <Receipt className="h-4 w-4 text-[#fb923c]" />
-            Nhận hàng & Công nợ theo món
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-[#252840] bg-gradient-to-br from-[#1a1d2e] to-[#13151f] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ff8a3d]/15 text-[#fb923c]">
+            <Receipt className="h-5 w-5" />
           </div>
-          <div className="mt-0.5 text-[11px] text-[#8892b0]">
-            Nhận: <b className="text-[#f0f2ff]">{summary.recv}</b>/{summary.total} · CN:{" "}
-            <b className="text-[#f0f2ff]">{summary.debt}</b>/{summary.total} ·{" "}
-            <span className="text-emerald-300">{fmtVnd(summary.money)} ₫</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-[#f0f2ff]">Nhận hàng & Công nợ theo món</div>
+            <div className="mt-0.5 text-[11px] text-[#8892b0]">
+              KT ghi NCC + giá cho từng món, xong hoàn tất PO
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          {canClose && (
-            <button
-              type="button"
-              onClick={closePo}
-              disabled={closing}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
-            >
-              {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
-              Hoàn tất PO
-            </button>
-          )}
-          {canReopen && (
-            <button
-              type="button"
-              onClick={reopenPo}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2d3249] bg-[#0f1220] px-3 py-1.5 text-xs text-[#8892b0] hover:text-[#f0f2ff]"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Mở lại
-            </button>
-          )}
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <StatTile
+            label="Đã nhận"
+            value={`${summary.recv}/${summary.total}`}
+            tone={allReceived ? "good" : summary.recv > 0 ? "warn" : "muted"}
+            icon={<PackageCheck className="h-3.5 w-3.5" />}
+          />
+          <StatTile
+            label="Đã ghi CN"
+            value={`${summary.debt}/${summary.total}`}
+            tone={allDebted ? "good" : summary.debt > 0 ? "warn" : "muted"}
+            icon={<ClipboardList className="h-3.5 w-3.5" />}
+          />
+          <StatTile
+            label="Tổng tiền"
+            value={`${fmtVnd(summary.money)}₫`}
+            tone={summary.money > 0 ? "good" : "muted"}
+            icon={<Wallet className="h-3.5 w-3.5" />}
+            small
+          />
         </div>
+
+        {(canClose || canReopen) && (
+          <div className="mt-3 flex gap-2">
+            {canClose && (
+              <button
+                type="button"
+                onClick={closePo}
+                disabled={closing}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold transition disabled:opacity-50 ${
+                  readyToClose
+                    ? "bg-emerald-500 text-[#0b0d16] hover:bg-emerald-400 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.6)]"
+                    : "border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+                }`}
+              >
+                {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                {readyToClose ? "Hoàn tất PO" : `Hoàn tất PO${allDebted ? "" : ` (còn ${summary.total - summary.debt} món chưa CN)`}`}
+              </button>
+            )}
+            {canReopen && (
+              <button
+                type="button"
+                onClick={reopenPo}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#2d3249] bg-[#0f1220] px-3 py-2.5 text-sm text-[#8892b0] hover:text-[#f0f2ff]"
+              >
+                <RotateCcw className="h-4 w-4" /> Mở lại PO
+              </button>
+            )}
+          </div>
+        )}
+
+        {closedAt && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              PO đã đóng lúc {new Date(closedAt).toLocaleString("vi-VN")}. KS không nhận thêm được.
+            </span>
+          </div>
+        )}
       </div>
 
-      {closedAt && (
-        <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          PO đã đóng lúc {new Date(closedAt).toLocaleString("vi-VN")}. KS không nhận thêm được.
-        </div>
-      )}
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-[10px] uppercase tracking-wide text-[#8892b0]">
-            <tr>
-              <th className="px-2 py-1 text-left">Vật tư</th>
-              <th className="px-2 py-1 text-right">Đặt</th>
-              <th className="px-2 py-1 text-right">Nhận</th>
-              <th className="px-2 py-1 text-left">NCC</th>
-              <th className="px-2 py-1 text-right">Đơn giá</th>
-              <th className="px-2 py-1 text-right">Thành tiền</th>
-              <th className="px-2 py-1" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.seq} className="border-t border-[#252840] text-[#f0f2ff]">
-                <td className="px-2 py-2">
-                  <div className="font-semibold">{it.name}</div>
-                  {it.task && <div className="text-[10px] text-[#5a627a]">{it.task}</div>}
-                  {it.receipt && (
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[#8892b0]">
-                      {it.receipt.qcChecked && (
-                        <span className="inline-flex items-center gap-0.5 text-emerald-300">
-                          <CheckCircle2 className="h-3 w-3" /> QC OK
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-0.5">
-                        <ImageIcon className="h-3 w-3" /> {it.receipt.photoCount}
-                      </span>
-                      {it.receipt.note && (
-                        <span className="truncate italic">&ldquo;{it.receipt.note}&rdquo;</span>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right text-[11px]">
-                  {fmtQty(it.qty)} {it.unit}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right text-[11px]">
-                  {it.receipt ? (
-                    <span
-                      className={
-                        it.receipt.receivedQty + 1e-6 >= it.qty ? "text-emerald-300" : "text-amber-300"
-                      }
-                    >
-                      {fmtQty(it.receipt.receivedQty)} {it.unit}
-                    </span>
-                  ) : (
-                    <span className="text-[#5a627a]">—</span>
-                  )}
-                </td>
-                <td className="px-2 py-2">
-                  {it.debt ? (
-                    <div>
-                      <div className="text-[11px] font-semibold text-[#f0f2ff]">{it.debt.supplierName}</div>
-                      <div className="text-[10px] text-[#8892b0]">
-                        {it.debt.supplierCode}
-                        {it.debt.supplierItemCode && ` · ${it.debt.supplierItemCode}`}
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-[#5a627a]">—</span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right text-[11px]">
-                  {it.debt ? fmtVnd(it.debt.unitPrice) : <span className="text-[#5a627a]">—</span>}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold">
-                  {it.debt ? (
-                    <span className="text-emerald-300">{fmtVnd(it.debt.totalAmount)}</span>
-                  ) : (
-                    <span className="text-[#5a627a]">—</span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right">
-                  {!closedAt &&
-                    (it.receipt ? (
-                      <button
-                        type="button"
-                        onClick={() => setOpenSeq(it.seq)}
-                        className="rounded-lg bg-[#ff8a3d] px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-[#ffa05f]"
-                      >
-                        {it.debt ? "Sửa" : "Ghi CN"}
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-[#5a627a]">Chờ KS nhận</span>
-                    ))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {items.map((it) => (
+          <ItemCard
+            key={it.seq}
+            item={it}
+            locked={!!closedAt}
+            onOpen={() => setOpenSeq(it.seq)}
+          />
+        ))}
       </div>
 
       {openSeq !== null && (
@@ -293,6 +251,214 @@ export function ProposalKtItems({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone,
+  icon,
+  small,
+}: {
+  label: string;
+  value: string;
+  tone: "good" | "warn" | "muted";
+  icon: React.ReactNode;
+  small?: boolean;
+}) {
+  const toneCls =
+    tone === "good"
+      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+      : tone === "warn"
+        ? "border-amber-400/30 bg-amber-500/10 text-amber-200"
+        : "border-[#2d3249] bg-[#0f1220] text-[#8892b0]";
+  return (
+    <div className={`rounded-xl border px-2.5 py-2 ${toneCls}`}>
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-80">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className={`mt-0.5 font-bold tabular-nums ${small ? "text-sm" : "text-base"}`}>{value}</div>
+    </div>
+  );
+}
+
+function ItemCard({
+  item: it,
+  locked,
+  onOpen,
+}: {
+  item: Item;
+  locked: boolean;
+  onOpen: () => void;
+}) {
+  const fullyReceived = it.receipt && it.receipt.receivedQty + 1e-6 >= it.qty && it.qty > 0;
+  const state: "waiting" | "received_no_debt" | "complete" = !it.receipt
+    ? "waiting"
+    : it.debt
+      ? "complete"
+      : "received_no_debt";
+  const stateMeta = {
+    waiting: {
+      border: "border-[#2d3249]",
+      stripe: "bg-[#3a3f5c]",
+      chip: "bg-[#252840] text-[#8892b0]",
+      chipLabel: "Chờ KS nhận",
+      icon: <CircleDashed className="h-3 w-3" />,
+    },
+    received_no_debt: {
+      border: "border-amber-400/40",
+      stripe: "bg-amber-400",
+      chip: "bg-amber-500/20 text-amber-200",
+      chipLabel: "Chờ KT ghi CN",
+      icon: <ClipboardList className="h-3 w-3" />,
+    },
+    complete: {
+      border: "border-emerald-400/30",
+      stripe: "bg-emerald-400",
+      chip: "bg-emerald-500/15 text-emerald-200",
+      chipLabel: "Đã ghi CN",
+      icon: <CheckCircle2 className="h-3 w-3" />,
+    },
+  }[state];
+
+  const clickable = !locked && state !== "waiting";
+  const handleClick = clickable ? onOpen : undefined;
+
+  return (
+    <div
+      onClick={handleClick}
+      className={`relative overflow-hidden rounded-2xl border ${stateMeta.border} bg-[#1a1d2e] p-3 transition ${
+        clickable ? "cursor-pointer hover:border-[#ff8a3d]/60 active:bg-[#13151f]" : ""
+      }`}
+    >
+      <span className={`absolute inset-y-0 left-0 w-1 ${stateMeta.stripe}`} />
+
+      <div className="pl-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#252840] px-1.5 text-[10px] font-bold text-[#8892b0]">
+                #{it.seq}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${stateMeta.chip}`}
+              >
+                {stateMeta.icon}
+                {stateMeta.chipLabel}
+              </span>
+            </div>
+            <div className="mt-1 text-sm font-bold text-[#f0f2ff]">{it.name}</div>
+            {it.task && <div className="mt-0.5 text-[11px] text-[#5a627a]">{it.task}</div>}
+          </div>
+          {clickable && <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5a627a]" />}
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-[#0f1220] p-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-[#5a627a]">Đặt</div>
+            <div className="mt-0.5 text-sm font-semibold text-[#f0f2ff] tabular-nums">
+              {fmtQty(it.qty)} <span className="text-[11px] font-normal text-[#8892b0]">{it.unit}</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-[#5a627a]">Đã nhận</div>
+            <div
+              className={`mt-0.5 text-sm font-semibold tabular-nums ${
+                it.receipt
+                  ? fullyReceived
+                    ? "text-emerald-300"
+                    : "text-amber-300"
+                  : "text-[#5a627a]"
+              }`}
+            >
+              {it.receipt ? (
+                <>
+                  {fmtQty(it.receipt.receivedQty)}{" "}
+                  <span className="text-[11px] font-normal opacity-80">{it.unit}</span>
+                </>
+              ) : (
+                "—"
+              )}
+            </div>
+          </div>
+        </div>
+
+        {it.receipt && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[#8892b0]">
+            {it.receipt.qcChecked && (
+              <span className="inline-flex items-center gap-0.5 text-emerald-300">
+                <CheckCircle2 className="h-3 w-3" /> QC OK
+              </span>
+            )}
+            <span className="inline-flex items-center gap-0.5">
+              <ImageIcon className="h-3 w-3" /> {it.receipt.photoCount} ảnh
+            </span>
+            {it.receipt.note && (
+              <span className="truncate italic">&ldquo;{it.receipt.note}&rdquo;</span>
+            )}
+          </div>
+        )}
+
+        {it.debt ? (
+          <div className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] uppercase tracking-wide text-emerald-300/70">NCC</div>
+                <div className="mt-0.5 truncate text-sm font-semibold text-[#f0f2ff]">
+                  {it.debt.supplierName}
+                </div>
+                <div className="truncate text-[11px] text-[#8892b0]">
+                  {it.debt.supplierCode}
+                  {it.debt.supplierItemCode && ` · ${it.debt.supplierItemCode}`}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-[10px] uppercase tracking-wide text-emerald-300/70">Thành tiền</div>
+                <div className="mt-0.5 text-base font-bold text-emerald-300 tabular-nums">
+                  {fmtVnd(it.debt.totalAmount)}₫
+                </div>
+                <div className="text-[10px] text-[#8892b0] tabular-nums">
+                  {fmtVnd(it.debt.unitPrice)}₫ × {fmtQty(it.debt.qty)}
+                </div>
+              </div>
+            </div>
+            {!locked && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpen();
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] bg-[#0f1220] px-2.5 py-1 text-[11px] text-[#8892b0] hover:border-[#ff8a3d]/60 hover:text-[#f0f2ff]"
+                >
+                  <Pencil className="h-3 w-3" /> Sửa CN
+                </button>
+              </div>
+            )}
+          </div>
+        ) : it.receipt ? (
+          !locked && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#ff8a3d] px-3 py-2 text-sm font-bold text-black hover:bg-[#ffa05f]"
+            >
+              <Plus className="h-4 w-4" /> Ghi công nợ
+            </button>
+          )
+        ) : (
+          <div className="mt-2 rounded-xl border border-dashed border-[#2d3249] px-3 py-2 text-center text-[11px] text-[#5a627a]">
+            Chờ KS nhận hàng tại công trình
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -462,17 +628,33 @@ function DebtModal({
   const total = (Number(unitPrice.replace(/[^0-9.]/g, "")) || 0) * (Number(qty.replace(",", ".")) || 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3">
-      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8892b0]">
-            Ghi công nợ
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#1a1d2e] p-4 sm:rounded-2xl"
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8892b0]">
+              Ghi công nợ
+            </div>
+            <div className="text-base font-bold text-[#f0f2ff]">{item.name}</div>
+            <div className="text-[11px] text-[#8892b0]">
+              Đặt: {fmtQty(item.qty)} {item.unit}
+              {item.receipt && ` · Đã nhận: ${fmtQty(item.receipt.receivedQty)} ${item.unit}`}
+            </div>
           </div>
-          <div className="text-base font-bold text-[#f0f2ff]">{item.name}</div>
-          <div className="text-[11px] text-[#8892b0]">
-            Đặt: {fmtQty(item.qty)} {item.unit}
-            {item.receipt && ` · Đã nhận: ${fmtQty(item.receipt.receivedQty)} ${item.unit}`}
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
+            aria-label="Đóng"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="space-y-2">
