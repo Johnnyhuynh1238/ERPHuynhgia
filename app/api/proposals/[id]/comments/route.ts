@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import {
   canCommentOnProposal,
   canViewProposal,
 } from "@/lib/proposal-access";
+import { notifyMaterialProposalComment } from "@/lib/notify-material-proposal";
 
 export const runtime = "nodejs";
+
+const ROLE_LABEL: Partial<Record<UserRole, string>> = {
+  [UserRole.engineer]: "KS",
+  [UserRole.accountant]: "KT",
+  [UserRole.construction_manager]: "TPTC",
+  [UserRole.admin]: "Admin",
+};
 
 const postSchema = z.object({
   body: z.string().trim().min(1).max(2000),
@@ -16,7 +25,12 @@ const postSchema = z.object({
 async function loadProposal(id: string) {
   return prisma.materialProposal.findUnique({
     where: { id },
-    select: { id: true, ksId: true },
+    select: {
+      id: true,
+      ksId: true,
+      projectId: true,
+      project: { select: { id: true, name: true } },
+    },
   });
 }
 
@@ -79,6 +93,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
       createdAt: true,
       author: { select: { id: true, fullName: true } },
     },
+  });
+
+  notifyMaterialProposalComment({
+    proposalId: proposal.id,
+    projectId: proposal.project.id,
+    projectName: proposal.project.name,
+    ksId: proposal.ksId,
+    authorId: user.id,
+    authorName: comment.author.fullName,
+    authorRoleLabel: ROLE_LABEL[user.role as UserRole] || user.role,
+    body: comment.body,
+  }).catch((err) => {
+    console.error("[proposals.comments] notify failed", err);
   });
 
   return NextResponse.json({ comment });

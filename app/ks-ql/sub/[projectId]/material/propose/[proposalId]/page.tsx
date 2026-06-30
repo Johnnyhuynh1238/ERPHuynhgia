@@ -50,6 +50,7 @@ export default async function SubProposalDetailPage({
     >
       <SubProposalDetail
         projectId={project.id}
+        currentUserId={user.id}
         proposal={{
           id: proposal.id,
           description: proposal.description,

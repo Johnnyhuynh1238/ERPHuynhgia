@@ -104,6 +104,67 @@ export async function notifyMaterialProposalUpdate(input: {
   });
 }
 
+// Push các bên liên quan (KS chủ + KT + TPTC + admin) khi có comment mới trên đề xuất.
+// Trừ tác giả ra để khỏi tự bắn về mình.
+export async function notifyMaterialProposalComment(input: {
+  proposalId: string;
+  projectId: string;
+  projectName: string;
+  ksId: string;
+  authorId: string;
+  authorName: string;
+  authorRoleLabel: string;
+  body: string;
+}) {
+  const staff = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { role: "accountant" },
+        { role: "construction_manager" },
+        { role: "admin" },
+      ],
+    },
+    select: { id: true },
+  });
+  const recipientIds = new Set<string>();
+  recipientIds.add(input.ksId);
+  for (const s of staff) recipientIds.add(s.id);
+  recipientIds.delete(input.authorId);
+  const targets = Array.from(recipientIds);
+  if (!targets.length) return;
+
+  const title = `Trao đổi đề xuất: ${input.projectName}`;
+  const shortBody = input.body.length > 140 ? `${input.body.slice(0, 137)}…` : input.body;
+  const body = `${input.authorRoleLabel} ${input.authorName}: ${shortBody}`;
+  const link = `/proposals/${input.proposalId}`;
+
+  await prisma.staffNotification.createMany({
+    data: targets.map((rid) => ({
+      recipientId: rid,
+      actorUserId: input.authorId,
+      actorName: input.authorName,
+      projectId: input.projectId,
+      kind: "material_proposal_update" as const,
+      title,
+      body,
+      link,
+      refType: "material_proposal",
+      refId: input.proposalId,
+    })),
+  });
+  await Promise.all(
+    targets.map((rid) =>
+      pushOne(rid, {
+        title,
+        body,
+        link,
+        tag: `material-proposal-comment-${input.proposalId}`,
+      }),
+    ),
+  );
+}
+
 // Push nhắc kế toán nếu đã duyệt mà 5p chưa đặt NCC. Cron gọi lặp tới khi đặt NCC.
 export async function notifyMaterialProposalReminder(input: {
   proposalId: string;

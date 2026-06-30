@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Pencil } from "lucide-react";
+import { ProposalComments } from "@/app/proposals/[id]/_components/proposal-comments";
 
 type RawItem = Record<string, unknown>;
 
@@ -44,7 +45,15 @@ function statusInfo(p: Proposal): { label: string; cls: string } {
   return { label: "Đã thanh toán", cls: "bg-[#6FA677]/20 text-[#6FA677]" };
 }
 
-export function SubProposalDetail({ proposal, projectId }: { proposal: Proposal; projectId: string }) {
+export function SubProposalDetail({
+  proposal,
+  projectId,
+  currentUserId,
+}: {
+  proposal: Proposal;
+  projectId: string;
+  currentUserId: string;
+}) {
   const items: Item[] = (proposal.parsedItems || []).map(normalize);
   const hasItems = items.length > 0;
   const st = statusInfo(proposal);
@@ -119,6 +128,10 @@ export function SubProposalDetail({ proposal, projectId }: { proposal: Proposal;
           <Row label="Đã nhận hàng tại công trình" time={proposal.receivedAt} active={!!proposal.receivedAt} />
           <Row label="Đã thanh toán" time={proposal.paidAt} active={!!proposal.paidAt} />
         </div>
+      </div>
+
+      <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-3">
+        <ProposalComments proposalId={proposal.id} currentUserId={currentUserId} />
       </div>
     </>
   );
