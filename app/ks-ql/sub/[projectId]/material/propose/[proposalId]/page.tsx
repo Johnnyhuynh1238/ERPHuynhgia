@@ -49,6 +49,7 @@ export default async function SubProposalDetailPage({
       backHref={`/ks-ql/sub/${project.id}/material/propose`}
     >
       <SubProposalDetail
+        projectId={project.id}
         proposal={{
           id: proposal.id,
           description: proposal.description,

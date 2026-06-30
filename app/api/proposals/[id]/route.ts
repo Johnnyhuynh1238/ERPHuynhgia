@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canViewProposal, isProposalStaffViewer } from "@/lib/proposal-access";
+import { notifyMaterialProposalNew } from "@/lib/notify-material-proposal";
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -44,4 +47,95 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     proposal,
     viewMode: isStaffView ? "accountant" : "ks",
   });
+}
+
+const structuredItemSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  qty: z.number().positive(),
+  unit: z.string().trim().min(1).max(50),
+  task: z.string().trim().min(1).max(500),
+});
+
+const patchSchema = z.object({
+  items: z.array(structuredItemSchema).min(1).max(50),
+});
+
+// KS chủ sở hữu sửa nội dung + gửi lại đề xuất đã bị từ chối.
+// Reset status về pending, xoá metadata duyệt cũ, push lại kế toán.
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+  const parsed = patchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "validation", details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const proposal = await prisma.materialProposal.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      ksId: true,
+      projectId: true,
+      status: true,
+      project: { select: { id: true, name: true, code: true } },
+    },
+  });
+  if (!proposal) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  const isOwnKs = proposal.ksId === user.id;
+  const isAdmin = user.role === UserRole.admin;
+  if (!isOwnKs && !isAdmin) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (proposal.status !== "declined") {
+    return NextResponse.json(
+      { error: "invalid_state", message: "Chỉ sửa được đề xuất đã bị từ chối" },
+      { status: 409 },
+    );
+  }
+
+  const items = parsed.data.items;
+  const description = items.map((it) => `${it.name} ${it.qty} ${it.unit} — ${it.task}`).join("; ");
+
+  await prisma.materialProposal.update({
+    where: { id: proposal.id },
+    data: {
+      description,
+      parsedItems: items,
+      status: "pending",
+      processedBy: null,
+      processedAt: null,
+      processedNote: null,
+      reminderDueAt: null,
+    },
+  });
+
+  const ksRow = await prisma.user.findUnique({
+    where: { id: proposal.ksId },
+    select: { fullName: true },
+  });
+  notifyMaterialProposalNew({
+    proposalId: proposal.id,
+    projectId: proposal.project.id,
+    projectName: proposal.project.name,
+    projectCode: proposal.project.code,
+    ksName: ksRow?.fullName || user.name || user.email || "KS",
+    description: `(Gửi lại sau khi sửa) ${description}`,
+    actorUserId: user.id,
+  }).catch((err) => {
+    console.error("[proposals.PATCH] notify failed", err);
+  });
+
+  return NextResponse.json({ ok: true });
 }

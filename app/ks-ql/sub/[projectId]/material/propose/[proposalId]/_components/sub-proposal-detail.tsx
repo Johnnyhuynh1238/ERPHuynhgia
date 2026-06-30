@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { Pencil } from "lucide-react";
+
 type RawItem = Record<string, unknown>;
 
 type Proposal = {
@@ -41,10 +44,11 @@ function statusInfo(p: Proposal): { label: string; cls: string } {
   return { label: "Đã thanh toán", cls: "bg-[#6FA677]/20 text-[#6FA677]" };
 }
 
-export function SubProposalDetail({ proposal }: { proposal: Proposal }) {
+export function SubProposalDetail({ proposal, projectId }: { proposal: Proposal; projectId: string }) {
   const items: Item[] = (proposal.parsedItems || []).map(normalize);
   const hasItems = items.length > 0;
   const st = statusInfo(proposal);
+  const isDeclined = proposal.status === "declined";
 
   return (
     <>
@@ -57,6 +61,15 @@ export function SubProposalDetail({ proposal }: { proposal: Proposal }) {
           <div className="mt-3 rounded-xl border border-[#D26B6B]/30 bg-[#D26B6B]/10 px-3 py-2 text-sm text-[#f5ede4]">
             <span className="text-[#D26B6B] font-semibold">Ghi chú từ TPTC:</span> {proposal.processedNote}
           </div>
+        ) : null}
+        {isDeclined ? (
+          <Link
+            href={`/ks-ql/sub/${projectId}/material/propose/${proposal.id}/edit`}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-3 text-base font-bold text-black transition active:scale-[0.99] hover:bg-[#ffa05f]"
+          >
+            <Pencil className="h-5 w-5" />
+            Sửa & gửi lại đề xuất
+          </Link>
         ) : null}
       </div>
 
