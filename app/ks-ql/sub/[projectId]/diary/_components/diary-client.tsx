@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -17,6 +18,8 @@ import {
   History,
   FileText,
   PackageCheck,
+  Pencil,
+  Plus,
 } from "lucide-react";
 
 type Photo = { key: string; contentType: string };
@@ -93,6 +96,7 @@ export function DiaryClient({
   const siteFileRef = useRef<HTMLInputElement>(null);
   const [uploadingTask, setUploadingTask] = useState(false);
   const [uploadingSite, setUploadingSite] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -149,6 +153,7 @@ export function DiaryClient({
       }
       flash("ok", finalize ? "Đã chốt nhật ký hôm nay" : "Đã lưu nháp");
       await loadAll();
+      if (finalize) setShowModal(false);
       return true;
     } finally {
       setSaving(false);
@@ -222,20 +227,47 @@ export function DiaryClient({
         </div>
       ) : null}
 
-      {finalized ? (
-        <div className="flex items-center gap-2 rounded-xl border-2 border-[#6FA677]/40 bg-[#152418] px-4 py-3 text-sm text-[#a3d3a8]">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>
-            Nhật ký <b>{fmtDateVn(todayYmd)}</b> đã chốt lúc{" "}
-            {data?.diary?.savedAt ? fmtTimeVn(data.diary.savedAt) : "—"}. Vẫn có thể sửa lại
-            nếu cần.
-          </span>
+      <TodayCard
+        todayYmd={todayYmd}
+        diary={data?.diary ?? null}
+        onOpen={() => setShowModal(true)}
+      />
+
+      {data && data.activities.length > 0 ? (
+        <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-4">
+          <div className="mb-3 text-sm font-semibold text-orange-300">
+            Hoạt động trong ngày (tự động ghép)
+          </div>
+          <ul className="flex flex-col gap-2">
+            {data.activities.map((a, i) => (
+              <li key={i}>
+                <Link
+                  href={a.href}
+                  className="flex items-start gap-3 rounded-xl border border-[#252840] bg-[#0f1320] px-3 py-2 active:scale-[0.99] hover:border-[#ff8a3d]/40"
+                >
+                  <div className="mt-0.5 shrink-0 text-orange-300">
+                    {a.kind === "proposal" ? (
+                      <FileText className="h-4 w-4" />
+                    ) : (
+                      <PackageCheck className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-[#f5ede4]">{a.label}</div>
+                    {a.sub ? (
+                      <div className="truncate text-xs text-[#8892b0]">{a.sub}</div>
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 text-xs text-[#8892b0]">{fmtTimeVn(a.at)}</div>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : (
-        <div className="rounded-xl border-2 border-[#ff8a3d]/30 bg-[#1a1d2e] px-4 py-3 text-sm text-[#f5ede4]">
-          Hôm nay <b>{fmtDateVn(todayYmd)}</b> — trả lời 5 câu rồi bấm <b>Lưu nhật ký</b>.
-        </div>
-      )}
+      ) : null}
+
+      {showModal ? (
+        <DiaryModal onClose={() => setShowModal(false)} title={`Nhật ký ${fmtDateVn(todayYmd)}`}>
 
       <Section icon={<Users className="h-5 w-5" />} idx={1} title="Hôm nay thợ có mấy người?">
         <div className="flex items-center gap-3">
@@ -363,40 +395,7 @@ export function DiaryClient({
         <p className="mt-1 text-right text-xs text-[#8892b0]">{issues.length}/4000</p>
       </Section>
 
-      {data && data.activities.length > 0 ? (
-        <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-4">
-          <div className="mb-3 text-sm font-semibold text-orange-300">
-            Hoạt động trong ngày (tự động ghép)
-          </div>
-          <ul className="flex flex-col gap-2">
-            {data.activities.map((a, i) => (
-              <li key={i}>
-                <Link
-                  href={a.href}
-                  className="flex items-start gap-3 rounded-xl border border-[#252840] bg-[#0f1320] px-3 py-2 active:scale-[0.99] hover:border-[#ff8a3d]/40"
-                >
-                  <div className="mt-0.5 shrink-0 text-orange-300">
-                    {a.kind === "proposal" ? (
-                      <FileText className="h-4 w-4" />
-                    ) : (
-                      <PackageCheck className="h-4 w-4" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-[#f5ede4]">{a.label}</div>
-                    {a.sub ? (
-                      <div className="truncate text-xs text-[#8892b0]">{a.sub}</div>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 text-xs text-[#8892b0]">{fmtTimeVn(a.at)}</div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <div className="sticky bottom-2 z-10 flex flex-col gap-2 rounded-2xl border-2 border-[#ff8a3d]/40 bg-[#1a1d2e] p-3 shadow-xl">
+      <div className="flex flex-col gap-2 rounded-2xl border-2 border-[#ff8a3d]/40 bg-[#1a1d2e] p-3 shadow-xl">
         <button
           type="button"
           onClick={() => upsertDiary(true)}
@@ -421,6 +420,8 @@ export function DiaryClient({
           </button>
         )}
       </div>
+        </DiaryModal>
+      ) : null}
 
       <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-orange-300">
@@ -483,6 +484,121 @@ export function DiaryClient({
         )}
       </div>
     </>
+  );
+}
+
+function TodayCard({
+  todayYmd,
+  diary,
+  onOpen,
+}: {
+  todayYmd: string;
+  diary: DiaryDay | null;
+  onOpen: () => void;
+}) {
+  const has = !!diary;
+  const finalized = !!diary?.savedAt;
+  return (
+    <div
+      className={`rounded-2xl border-2 p-4 ${
+        finalized
+          ? "border-[#6FA677]/40 bg-[#152418]"
+          : has
+            ? "border-[#E0B855]/40 bg-[#1f1a14]"
+            : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
+      }`}
+    >
+      <div className="flex items-center gap-2 text-sm">
+        {finalized ? (
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-[#a3d3a8]" />
+        ) : has ? (
+          <Pencil className="h-5 w-5 shrink-0 text-[#E0B855]" />
+        ) : (
+          <Plus className="h-5 w-5 shrink-0 text-orange-300" />
+        )}
+        <div className="flex-1">
+          <div className="font-semibold text-[#f5ede4]">
+            Nhật ký {fmtDateVn(todayYmd)}
+          </div>
+          <div
+            className={`text-xs ${
+              finalized ? "text-[#a3d3a8]" : has ? "text-[#E0B855]" : "text-[#8892b0]"
+            }`}
+          >
+            {finalized
+              ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}`
+              : has
+                ? "Đang là nháp — chưa chốt"
+                : "Hôm nay chưa có nhật ký"}
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-bold active:scale-[0.99] ${
+          has
+            ? "border-2 border-[#ff8a3d]/60 bg-transparent text-orange-300"
+            : "bg-[#ff8a3d] text-black"
+        }`}
+      >
+        {has ? <Pencil className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
+        {has ? "Cập nhật nhật ký hôm nay" : "Tạo nhật ký hôm nay"}
+      </button>
+    </div>
+  );
+}
+
+function DiaryModal({
+  onClose,
+  title,
+  children,
+}: {
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!mounted) return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl border border-[#252840] bg-[#0f1320] sm:rounded-2xl"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-[#252840] px-4 py-3">
+          <div className="text-base font-bold text-[#f5ede4]">{title}</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f5ede4]"
+            aria-label="Đóng"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-3 overflow-y-auto p-3">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
