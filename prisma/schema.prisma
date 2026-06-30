@@ -547,6 +547,10 @@ model User {
   materialProposalCommentsAuthored MaterialProposalComment[]     @relation("MatProposalCommentAuthor")
   materialReceiptsLogged           MaterialProposalItemReceipt[] @relation("MatProposalItemReceiptReceiver")
   materialDebtsRecorded            MaterialProposalItemDebt[]    @relation("MatProposalItemDebtRecorder")
+  supplierPayOrdersCreated         SupplierPaymentOrder[]        @relation("SupplierPayOrderCreator")
+  supplierPayOrdersApproved        SupplierPaymentOrder[]        @relation("SupplierPayOrderApprover")
+  supplierPayOrdersRejected        SupplierPaymentOrder[]        @relation("SupplierPayOrderRejecter")
+  supplierPayOrdersPaid            SupplierPaymentOrder[]        @relation("SupplierPayOrderPayer")
   suppliersCreated                 Supplier[]                    @relation("SupplierCreator")
   supplierPricesUpdated            SupplierMaterialPrice[]       @relation("SupplierMaterialPriceUpdater")
   projectBudgetsCreated            ProjectBudget[]               @relation("ProjectBudgetCreator")
@@ -578,8 +582,9 @@ model CashAccount {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  cashTransactions        CashTransaction[] @relation("CashTransactionAccount")
-  cashTransactionsCounter CashTransaction[] @relation("CashTransactionCounterAccount")
+  cashTransactions        CashTransaction[]      @relation("CashTransactionAccount")
+  cashTransactionsCounter CashTransaction[]      @relation("CashTransactionCounterAccount")
+  supplierPayOrders       SupplierPaymentOrder[] @relation("SupplierPayOrderAccount")
 
   @@index([active, sortOrder])
   @@map("cash_accounts")
@@ -2547,6 +2552,8 @@ enum StaffNotificationKind {
   receipt_new
   receipt_received
   receipt_cancelled
+  supplier_payment_order_new
+  supplier_payment_order_decision
 }
 
 enum MaterialProposalStatus {
@@ -2781,13 +2788,76 @@ model MaterialProposalItemDebt {
   recordedBy       String    @map("recorded_by") @db.Uuid
   paidAt           DateTime? @map("paid_at")
 
-  proposal MaterialProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  supplier Supplier         @relation(fields: [supplierId], references: [id])
-  recorder User             @relation("MatProposalItemDebtRecorder", fields: [recordedBy], references: [id])
+  proposal          MaterialProposal           @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  supplier          Supplier                   @relation(fields: [supplierId], references: [id])
+  recorder          User                       @relation("MatProposalItemDebtRecorder", fields: [recordedBy], references: [id])
+  paymentOrderItems SupplierPaymentOrderItem[]
 
   @@unique([proposalId, itemSeq])
   @@index([supplierId, paidAt])
   @@map("material_proposal_item_debts")
+}
+
+// Lệnh thanh toán NCC: KT tạo, Admin duyệt, KT chi.
+enum SupplierPaymentOrderStatus {
+  pending
+  approved
+  paid
+  rejected
+  cancelled
+}
+
+model SupplierPaymentOrder {
+  id            String                    @id @default(uuid()) @db.Uuid
+  code          String                    @unique
+  supplierId    String                    @map("supplier_id") @db.Uuid
+  totalAmount   Decimal                   @map("total_amount") @db.Decimal(18, 2)
+  status        SupplierPaymentOrderStatus @default(pending)
+  paymentMethod String?                   @map("payment_method")
+  note          String?                   @db.Text
+
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  approvedBy   String?   @map("approved_by") @db.Uuid
+  approvedAt   DateTime? @map("approved_at")
+  approvalNote String?   @map("approval_note") @db.Text
+
+  rejectedBy    String?   @map("rejected_by") @db.Uuid
+  rejectedAt    DateTime? @map("rejected_at")
+  rejectionNote String?   @map("rejection_note") @db.Text
+
+  paidBy    String?   @map("paid_by") @db.Uuid
+  paidAt    DateTime? @map("paid_at")
+  accountId String?   @map("account_id") @db.Uuid
+
+  cancelledAt DateTime? @map("cancelled_at")
+
+  supplier Supplier                    @relation(fields: [supplierId], references: [id])
+  account  CashAccount?                @relation("SupplierPayOrderAccount", fields: [accountId], references: [id])
+  creator  User                        @relation("SupplierPayOrderCreator", fields: [createdBy], references: [id])
+  approver User?                       @relation("SupplierPayOrderApprover", fields: [approvedBy], references: [id])
+  rejecter User?                       @relation("SupplierPayOrderRejecter", fields: [rejectedBy], references: [id])
+  payer    User?                       @relation("SupplierPayOrderPayer", fields: [paidBy], references: [id])
+  items    SupplierPaymentOrderItem[]
+
+  @@index([supplierId, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("supplier_payment_orders")
+}
+
+model SupplierPaymentOrderItem {
+  id      String  @id @default(uuid()) @db.Uuid
+  orderId String  @map("order_id") @db.Uuid
+  debtId  String  @map("debt_id") @db.Uuid
+  amount  Decimal @db.Decimal(18, 2)
+
+  order SupplierPaymentOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  debt  MaterialProposalItemDebt @relation(fields: [debtId], references: [id])
+
+  @@index([orderId])
+  @@index([debtId])
+  @@map("supplier_payment_order_items")
 }
 
 // NCC cung cấp vật tư cho công trình.
@@ -2809,10 +2879,11 @@ model Supplier {
   createdBy       String   @map("created_by") @db.Uuid
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  creator User                       @relation("SupplierCreator", fields: [createdBy], references: [id])
-  groups  SupplierMaterialGroup[]
-  prices  SupplierMaterialPrice[]
-  debts   MaterialProposalItemDebt[]
+  creator       User                       @relation("SupplierCreator", fields: [createdBy], references: [id])
+  groups        SupplierMaterialGroup[]
+  prices        SupplierMaterialPrice[]
+  debts         MaterialProposalItemDebt[]
+  paymentOrders SupplierPaymentOrder[]
 
   @@index([isActive, name])
   @@map("suppliers")
@@ -3632,6 +3703,7 @@ model Expense {
   paymentMethod      String?         @map("payment_method")
   note               String?         @db.Text
   attachmentUrl      String?         @map("attachment_url")
+  attachmentUrls     String[]        @default([]) @map("attachment_urls")
   status             ExpenseStatus   @default(pending)
   createdBy          String          @map("created_by") @db.Uuid
   createdAt          DateTime        @default(now()) @map("created_at")

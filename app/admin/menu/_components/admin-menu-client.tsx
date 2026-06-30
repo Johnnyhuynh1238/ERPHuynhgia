@@ -90,6 +90,8 @@ const SECTIONS: MenuSection[] = [
     items: [
       { label: "Lệnh thu", href: "/receipts", icon: Receipt, desc: "Tạo lệnh thu (KH, vay, hoàn ứng…)" },
       { label: "Lệnh chi", href: "/expenses", icon: Receipt, desc: "Tạo lệnh chi gửi kế toán" },
+      { label: "Công nợ NCC", href: "/payables", icon: Wallet, desc: "Công nợ phải trả NCC vật tư" },
+      { label: "Lệnh thanh toán NCC", href: "/payment-orders", icon: Receipt, desc: "Duyệt & ghi chi NCC" },
       { label: "Sổ quỹ", href: "/treasury", icon: Wallet, desc: "Nhật ký thu/chi + số dư" },
     ],
   },
