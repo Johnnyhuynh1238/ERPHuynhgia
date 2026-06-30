@@ -111,6 +111,8 @@ export function TreasuryClient({
   const pageSize = 50;
   const [showFilters, setShowFilters] = useState(false);
 
+  const [selectedTxn, setSelectedTxn] = useState<Txn | null>(null);
+
   const [showTransfer, setShowTransfer] = useState(false);
   const [trFrom, setTrFrom] = useState("");
   const [trTo, setTrTo] = useState("");
@@ -438,7 +440,8 @@ export function TreasuryClient({
             return (
               <div
                 key={r.id}
-                className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 shadow-sm"
+                onClick={() => setSelectedTxn(r)}
+                className="cursor-pointer rounded-xl border border-[#2d3249] bg-[#13151f] p-3 shadow-sm transition hover:border-orange-400/40 hover:bg-[#181b28]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -489,6 +492,118 @@ export function TreasuryClient({
             );
           })}
       </div>
+
+      {/* Detail modal */}
+      {selectedTxn && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setSelectedTxn(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[#2d3249] bg-[#13151f] p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${REFTYPE_CHIP[selectedTxn.refType]}`}
+                >
+                  {REFTYPE_LABEL[selectedTxn.refType]}
+                </span>
+                <span className="text-sm text-[#8b95b7]">
+                  {selectedTxn.direction === "in" ? "Thu" : "Chi"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTxn(null)}
+                className="text-[#8b95b7] hover:text-[#f0f2ff]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div
+              className={`text-2xl font-bold ${
+                selectedTxn.direction === "in" ? "text-emerald-300" : "text-red-300"
+              }`}
+            >
+              {selectedTxn.direction === "in" ? "+" : "−"} {money(selectedTxn.amount)}
+            </div>
+            <div className="mt-1 text-xs text-[#8b95b7]">
+              Số dư sau giao dịch:{" "}
+              <span className="font-semibold text-[#cfd4e8]">{money(selectedTxn.balanceAfter)}</span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-[#8b95b7]">Ngày phát sinh</span>
+                <span className="text-[#f0f2ff]">{fmtDate(selectedTxn.occurredAt)}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#8b95b7]">Tạo lúc</span>
+                <span className="text-[#f0f2ff]">{fmtDateTime(selectedTxn.createdAt)}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#8b95b7]">Người tạo</span>
+                <span className="text-[#f0f2ff]">{selectedTxn.creator.fullName}</span>
+              </div>
+              {selectedTxn.account && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[#8b95b7]">Tài khoản</span>
+                  <span className="text-indigo-300">
+                    {selectedTxn.refType === "transfer" && selectedTxn.counterAccount
+                      ? selectedTxn.direction === "out"
+                        ? `${selectedTxn.account.name} → ${selectedTxn.counterAccount.name}`
+                        : `${selectedTxn.counterAccount.name} → ${selectedTxn.account.name}`
+                      : `${selectedTxn.account.name} (${ACCOUNT_KIND_LABEL[selectedTxn.account.kind]})`}
+                  </span>
+                </div>
+              )}
+              {selectedTxn.project && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[#8b95b7]">Dự án</span>
+                  <span className="text-[#f0f2ff]">
+                    <span className="font-mono">{selectedTxn.project.code}</span> · {selectedTxn.project.name}
+                  </span>
+                </div>
+              )}
+              {selectedTxn.category && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[#8b95b7]">Danh mục</span>
+                  <span className="text-[#f0f2ff]">{selectedTxn.category.name}</span>
+                </div>
+              )}
+              {selectedTxn.refId && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[#8b95b7]">Mã tham chiếu</span>
+                  <span className="font-mono text-[11px] text-[#8b95b7]">{selectedTxn.refId}</span>
+                </div>
+              )}
+            </div>
+
+            {selectedTxn.note && (
+              <div className="mt-4 rounded-lg border border-[#2d3249] bg-[#0b0d16] p-3">
+                <div className="mb-1 text-xs uppercase tracking-wide text-[#8b95b7]">Ghi chú</div>
+                <div className="whitespace-pre-wrap break-words text-sm text-[#cfd4e8]">
+                  {selectedTxn.note}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedTxn(null)}
+                className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#8b95b7]"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transfer modal */}
       {showTransfer && summary?.accounts && (
