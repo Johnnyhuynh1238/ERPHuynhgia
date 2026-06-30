@@ -45,13 +45,8 @@ type Txn = {
   creator: { id: string; fullName: string };
   account: TxnAccount | null;
   counterAccount: TxnAccount | null;
-  attachments: string[];
+  attachments: { url: string; isImage: boolean }[];
 };
-
-const IMG_EXT_RE = /\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|svg)(\?|#|$)/i;
-function isImageUrl(u: string) {
-  return IMG_EXT_RE.test(u);
-}
 
 function money(v: number | null | undefined) {
   return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
@@ -498,46 +493,15 @@ export function TreasuryClient({
                   </div>
                 )}
 
-                {r.attachments.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {r.attachments.map((url, i) =>
-                      isImageUrl(url) ? (
-                        <button
-                          key={`${url}-${i}`}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLightboxUrl(url);
-                          }}
-                          className="h-16 w-16 overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
-                          aria-label="Xem ảnh"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={url}
-                            alt="Chứng từ"
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        </button>
-                      ) : (
-                        <a
-                          key={`${url}-${i}`}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex h-16 items-center gap-2 rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 text-xs text-indigo-300 hover:border-orange-400/60"
-                        >
-                          📎 Mở tệp
-                        </a>
-                      ),
-                    )}
-                  </div>
-                )}
-
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#2d3249]/60 pt-2 text-xs text-[#8b95b7]">
-                  <span>{r.creator.fullName}</span>
+                  <span className="flex items-center gap-2">
+                    {r.creator.fullName}
+                    {r.attachments.length > 0 && (
+                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] text-indigo-300">
+                        📎 {r.attachments.length}
+                      </span>
+                    )}
+                  </span>
                   <span>
                     Số dư sau: <span className="font-semibold text-[#cfd4e8]">{money(r.balanceAfter)}</span>
                   </span>
@@ -648,20 +612,22 @@ export function TreasuryClient({
 
             {selectedTxn.attachments.length > 0 && (
               <div className="mt-4">
-                <div className="mb-2 text-xs uppercase tracking-wide text-[#8b95b7]">Chứng từ</div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedTxn.attachments.map((url, i) =>
-                    isImageUrl(url) ? (
+                <div className="mb-2 text-xs uppercase tracking-wide text-[#8b95b7]">
+                  Chứng từ ({selectedTxn.attachments.length})
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {selectedTxn.attachments.map((att, i) =>
+                    att.isImage ? (
                       <button
-                        key={`${url}-${i}`}
+                        key={`${att.url}-${i}`}
                         type="button"
-                        onClick={() => setLightboxUrl(url)}
-                        className="h-24 w-24 overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
+                        onClick={() => setLightboxUrl(att.url)}
+                        className="aspect-square overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
                         aria-label="Xem ảnh"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={url}
+                          src={att.url}
                           alt="Chứng từ"
                           loading="lazy"
                           className="h-full w-full object-cover"
@@ -669,13 +635,14 @@ export function TreasuryClient({
                       </button>
                     ) : (
                       <a
-                        key={`${url}-${i}`}
-                        href={url}
+                        key={`${att.url}-${i}`}
+                        href={att.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex h-24 items-center gap-2 rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 text-xs text-indigo-300 hover:border-orange-400/60"
+                        className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[#2d3249] bg-[#0b0d16] text-xs text-indigo-300 hover:border-orange-400/60"
                       >
-                        📎 Mở tệp
+                        <span className="text-2xl">📎</span>
+                        Mở tệp
                       </a>
                     ),
                   )}

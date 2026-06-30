@@ -173,26 +173,45 @@ export async function GET(request: Request) {
       : Promise.resolve([] as { id: string; receiptUrl: string | null }[]),
   ]);
 
-  const attMap = new Map<string, string[]>();
+  const IMG_RE = /\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|svg)(\?|#|$)/i;
+  const isImg = (u: string) => IMG_RE.test(u);
+  type Att = { url: string; isImage: boolean };
+  const attMap = new Map<string, Att[]>();
   const keyOf = (t: string, id: string) => `${t}:${id}`;
   for (const e of expenseRows) {
-    const list = e.attachmentUrls?.length ? e.attachmentUrls : (e.attachmentUrl ? [e.attachmentUrl] : []);
-    attMap.set(
-      keyOf("expense", e.id),
-      [...list, e.paidReceiptUrl].filter((u): u is string => !!u),
+    const atts: Att[] = [];
+    const list = e.attachmentUrls?.length ? e.attachmentUrls : e.attachmentUrl ? [e.attachmentUrl] : [];
+    list.forEach((src, i) =>
+      atts.push({ url: `/api/expenses/${e.id}/file?type=attachment&index=${i}`, isImage: isImg(src) }),
     );
+    if (e.paidReceiptUrl) {
+      atts.push({ url: `/api/expenses/${e.id}/file?type=receipt`, isImage: isImg(e.paidReceiptUrl) });
+    }
+    if (atts.length) attMap.set(keyOf("expense", e.id), atts);
   }
   for (const r of receiptRows) {
-    attMap.set(
-      keyOf("receipt", r.id),
-      [r.attachmentUrl, r.receivedReceiptUrl].filter((u): u is string => !!u),
-    );
+    const atts: Att[] = [];
+    if (r.attachmentUrl) {
+      atts.push({ url: `/api/receipts/${r.id}/file?type=attachment`, isImage: isImg(r.attachmentUrl) });
+    }
+    if (r.receivedReceiptUrl) {
+      atts.push({ url: `/api/receipts/${r.id}/file?type=received`, isImage: isImg(r.receivedReceiptUrl) });
+    }
+    if (atts.length) attMap.set(keyOf("receipt", r.id), atts);
   }
   for (const s of subPayRows) {
-    attMap.set(keyOf("sub_payment", s.id), [s.receiptUrl].filter((u): u is string => !!u));
+    if (s.receiptUrl) {
+      attMap.set(keyOf("sub_payment", s.id), [
+        { url: `/api/sub-payments/${s.id}/receipt/view`, isImage: isImg(s.receiptUrl) },
+      ]);
+    }
   }
   for (const p of payScheduleRows) {
-    attMap.set(keyOf("payment_schedule", p.id), [p.receiptUrl].filter((u): u is string => !!u));
+    if (p.receiptUrl) {
+      attMap.set(keyOf("payment_schedule", p.id), [
+        { url: `/api/payment-schedules/${p.id}/receipt`, isImage: isImg(p.receiptUrl) },
+      ]);
+    }
   }
 
   return NextResponse.json({
