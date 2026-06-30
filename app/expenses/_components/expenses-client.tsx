@@ -20,6 +20,7 @@ type Expense = {
   paymentMethod: string | null;
   note: string | null;
   attachmentUrl: string | null;
+  attachmentUrls: string[];
   status: "pending" | "paid" | "cancelled";
   priority: "normal" | "urgent";
   createdAt: string;
@@ -61,7 +62,7 @@ type CreateForm = {
   paymentMethod: "cash" | "transfer";
   priority: "normal" | "urgent";
   note: string;
-  attachmentUrl: string;
+  attachmentUrls: string[];
   payeeBankBin: string;
   payeeAccountNumber: string;
   payeeAccountName: string;
@@ -75,7 +76,7 @@ const emptyCreate: CreateForm = {
   paymentMethod: "transfer",
   priority: "normal",
   note: "",
-  attachmentUrl: "",
+  attachmentUrls: [],
   payeeBankBin: "",
   payeeAccountNumber: "",
   payeeAccountName: "",
@@ -130,6 +131,23 @@ export function ExpensesClient({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  const [viewer, setViewer] = useState<{ urls: string[]; index: number; expenseId: string; type: "attachment" | "receipt" } | null>(null);
+  useEffect(() => {
+    if (!viewer) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewer(null);
+      if (e.key === "ArrowRight") setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v));
+      if (e.key === "ArrowLeft") setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v));
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [viewer]);
+
+  function attachmentList(r: Expense): string[] {
+    if (r.attachmentUrls?.length) return r.attachmentUrls;
+    return r.attachmentUrl ? [r.attachmentUrl] : [];
+  }
+
   const loadBalance = useCallback(async () => {
     try {
       const res = await fetch("/api/treasury/summary", { cache: "no-store" });
@@ -173,32 +191,55 @@ export function ExpensesClient({
     return balance - amt;
   }, [form.amount, balance]);
 
-  async function uploadAttachment(file: File) {
+  async function uploadOne(file: File): Promise<string | null> {
     if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
-      toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
-      return;
+      toast.error(`${file.name}: Chỉ hỗ trợ ảnh hoặc PDF`);
+      return null;
     }
     if (file.size > 8 * 1024 * 1024) {
-      toast.error("File quá lớn (tối đa 8MB)");
+      toast.error(`${file.name}: File quá lớn (tối đa 8MB)`);
+      return null;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", "attachment");
+    const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(j.message || `${file.name}: Upload thất bại`);
+      return null;
+    }
+    return j.url as string;
+  }
+
+  async function uploadAttachments(files: FileList | File[]) {
+    const arr = Array.from(files);
+    if (!arr.length) return;
+    const remaining = 20 - form.attachmentUrls.length;
+    if (remaining <= 0) {
+      toast.error("Đã đính kèm tối đa 20 ảnh");
       return;
+    }
+    const slice = arr.slice(0, remaining);
+    if (slice.length < arr.length) {
+      toast.warning(`Chỉ thêm ${slice.length}/${arr.length} ảnh (giới hạn 20)`);
     }
     setUploadingAttachment(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("kind", "attachment");
-      const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(j.message || "Upload thất bại");
-        return;
+      const results = await Promise.all(slice.map(uploadOne));
+      const urls = results.filter((u): u is string => !!u);
+      if (urls.length) {
+        setForm((f) => ({ ...f, attachmentUrls: [...f.attachmentUrls, ...urls] }));
+        toast.success(`Đã tải ${urls.length} ảnh hoá đơn`);
       }
-      setForm((f) => ({ ...f, attachmentUrl: j.url }));
-      toast.success("Đã tải ảnh hoá đơn");
     } finally {
       setUploadingAttachment(false);
       if (attachmentInputRef.current) attachmentInputRef.current.value = "";
     }
+  }
+
+  function removeAttachment(index: number) {
+    setForm((f) => ({ ...f, attachmentUrls: f.attachmentUrls.filter((_, i) => i !== index) }));
   }
 
   async function decodeQrFile(file: File) {
@@ -299,7 +340,7 @@ export function ExpensesClient({
         paymentMethod: form.paymentMethod,
         priority: form.priority,
         note: form.note.trim() || null,
-        attachmentUrl: form.attachmentUrl.trim() || null,
+        attachmentUrls: form.attachmentUrls,
         payeeBankBin: form.payeeBankBin || null,
         payeeAccountNumber: form.payeeAccountNumber.trim() || null,
         payeeAccountName: form.payeeAccountName.trim() || null,
@@ -587,39 +628,65 @@ export function ExpensesClient({
               </select>
             </label>
             <div className="block">
-              <span className="text-xs text-[#8b95b7]">Ảnh hoá đơn / báo giá</span>
+              <span className="text-xs text-[#8b95b7]">
+                Ảnh hoá đơn / báo giá {form.attachmentUrls.length > 0 && `(${form.attachmentUrls.length}/20)`}
+              </span>
               <input
                 ref={attachmentInputRef}
                 type="file"
                 accept="image/*,application/pdf"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadAttachment(f);
+                  if (e.target.files?.length) uploadAttachments(e.target.files);
                 }}
               />
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => attachmentInputRef.current?.click()}
-                  disabled={uploadingAttachment}
+                  disabled={uploadingAttachment || form.attachmentUrls.length >= 20}
                   className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-xs font-medium text-[#cfd4e8] disabled:opacity-50"
                 >
-                  {uploadingAttachment ? "Đang tải…" : form.attachmentUrl ? "📎 Đổi ảnh" : "📷 Chọn ảnh"}
+                  {uploadingAttachment ? "Đang tải…" : form.attachmentUrls.length ? "📎 Thêm ảnh" : "📷 Chọn ảnh"}
                 </button>
-                {form.attachmentUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, attachmentUrl: "" })}
-                    className="text-[11px] text-red-300 hover:text-red-200"
-                  >
-                    Xoá
-                  </button>
-                )}
-                {form.attachmentUrl && (
-                  <span className="text-[11px] text-emerald-300">✓ đã đính kèm</span>
-                )}
               </div>
+              {form.attachmentUrls.length > 0 && (
+                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  {form.attachmentUrls.map((url, i) => {
+                    const isPdf = url.toLowerCase().endsWith(".pdf");
+                    const previewSrc = url.startsWith("minio://")
+                      ? `/api/expenses/upload-preview?url=${encodeURIComponent(url)}`
+                      : url;
+                    return (
+                      <div
+                        key={`${url}-${i}`}
+                        className="group relative aspect-square overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16]"
+                      >
+                        {isPdf ? (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-[#8b95b7]">
+                            📄 PDF
+                          </div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={previewSrc} alt={`bill-${i + 1}`} className="h-full w-full object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(i)}
+                          className="absolute right-1 top-1 rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-red-500"
+                          title="Xoá ảnh"
+                        >
+                          ✕
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-1 py-0.5 text-[10px] text-white">
+                          #{i + 1}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -908,7 +975,7 @@ export function ExpensesClient({
                 {(canQuickTransfer ||
                   (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
                   (r.status === "pending" && isAdmin) ||
-                  r.attachmentUrl ||
+                  attachmentList(r).length > 0 ||
                   r.paidReceiptUrl) && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#2d3249]/40" onClick={(e) => e.stopPropagation()}>
                     {canQuickTransfer && (
@@ -942,30 +1009,36 @@ export function ExpensesClient({
                         Huỷ
                       </button>
                     )}
-                    {(r.attachmentUrl || r.paidReceiptUrl) && (
-                      <div className="ml-auto flex gap-1.5">
-                        {r.attachmentUrl && (
-                          <a
-                            href={r.attachmentUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=attachment` : r.attachmentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-lg bg-blue-500/15 text-blue-300 px-3 py-1.5 text-xs font-medium hover:bg-blue-500/25"
-                          >
-                            📎 Hoá đơn
-                          </a>
-                        )}
-                        {r.paidReceiptUrl && (
-                          <a
-                            href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25"
-                          >
-                            📄 Chứng từ
-                          </a>
-                        )}
-                      </div>
-                    )}
+                    {(() => {
+                      const atts = attachmentList(r);
+                      if (atts.length === 0 && !r.paidReceiptUrl) return null;
+                      return (
+                        <div className="ml-auto flex gap-1.5">
+                          {atts.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewer({ urls: atts, index: 0, expenseId: r.id, type: "attachment" });
+                              }}
+                              className="rounded-lg bg-blue-500/15 text-blue-300 px-3 py-1.5 text-xs font-medium hover:bg-blue-500/25"
+                            >
+                              📎 {atts.length > 1 ? `${atts.length} hoá đơn` : "Hoá đơn"}
+                            </button>
+                          )}
+                          {r.paidReceiptUrl && (
+                            <a
+                              href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25"
+                            >
+                              📄 Chứng từ
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1192,6 +1265,81 @@ export function ExpensesClient({
           </div>
         </div>
       )}
+
+      {/* Lightbox xem ảnh hoá đơn (multi) */}
+      {viewer && (() => {
+        const url = viewer.urls[viewer.index];
+        const src = url.startsWith("minio://")
+          ? `/api/expenses/${viewer.expenseId}/file?type=${viewer.type}${viewer.type === "attachment" ? `&index=${viewer.index}` : ""}`
+          : url;
+        const isPdf = url.toLowerCase().endsWith(".pdf");
+        return (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4"
+            onClick={() => setViewer(null)}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewer(null);
+              }}
+              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-2xl text-white hover:bg-black/80"
+              aria-label="Đóng"
+            >
+              ✕
+            </button>
+            {viewer.urls.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v));
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-3xl text-white hover:bg-black/80"
+                  aria-label="Trước"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v));
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-3xl text-white hover:bg-black/80"
+                  aria-label="Sau"
+                >
+                  ›
+                </button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+                  {viewer.index + 1} / {viewer.urls.length}
+                </div>
+              </>
+            )}
+            {isPdf ? (
+              <a
+                href={src}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-lg bg-white px-6 py-4 text-center text-lg font-semibold text-blue-600 shadow-2xl"
+              >
+                📄 Mở PDF #{viewer.index + 1}
+              </a>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={`Hoá đơn ${viewer.index + 1}`}
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
+              />
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

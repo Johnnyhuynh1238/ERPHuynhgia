@@ -32,17 +32,25 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   const url = new URL(request.url);
   const type = url.searchParams.get("type") === "receipt" ? "receipt" : "attachment";
+  const indexRaw = url.searchParams.get("index");
+  const index = indexRaw ? Math.max(0, Number(indexRaw) | 0) : 0;
 
   const expense = await prisma.expense.findUnique({
     where: { id: params.id },
-    select: { attachmentUrl: true, paidReceiptUrl: true, createdBy: true },
+    select: { attachmentUrl: true, attachmentUrls: true, paidReceiptUrl: true, createdBy: true },
   });
   if (!expense) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
   if (user.role === UserRole.engineer && expense.createdBy !== user.id) {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 
-  const stored = type === "receipt" ? expense.paidReceiptUrl : expense.attachmentUrl;
+  let stored: string | null;
+  if (type === "receipt") {
+    stored = expense.paidReceiptUrl;
+  } else {
+    const list = expense.attachmentUrls?.length ? expense.attachmentUrls : (expense.attachmentUrl ? [expense.attachmentUrl] : []);
+    stored = list[index] ?? null;
+  }
   if (!stored) return NextResponse.json({ message: "Không có file" }, { status: 404 });
 
   if (stored.startsWith("minio://")) {

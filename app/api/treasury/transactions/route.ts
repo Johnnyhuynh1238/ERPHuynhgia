@@ -148,9 +148,11 @@ export async function GET(request: Request) {
     idsByType.expense.length
       ? prisma.expense.findMany({
           where: { id: { in: idsByType.expense } },
-          select: { id: true, attachmentUrl: true, paidReceiptUrl: true },
+          select: { id: true, attachmentUrl: true, attachmentUrls: true, paidReceiptUrl: true },
         })
-      : Promise.resolve([] as { id: string; attachmentUrl: string | null; paidReceiptUrl: string | null }[]),
+      : Promise.resolve(
+          [] as { id: string; attachmentUrl: string | null; attachmentUrls: string[]; paidReceiptUrl: string | null }[],
+        ),
     idsByType.receipt.length
       ? prisma.receipt.findMany({
           where: { id: { in: idsByType.receipt } },
@@ -174,9 +176,10 @@ export async function GET(request: Request) {
   const attMap = new Map<string, string[]>();
   const keyOf = (t: string, id: string) => `${t}:${id}`;
   for (const e of expenseRows) {
+    const list = e.attachmentUrls?.length ? e.attachmentUrls : (e.attachmentUrl ? [e.attachmentUrl] : []);
     attMap.set(
       keyOf("expense", e.id),
-      [e.attachmentUrl, e.paidReceiptUrl].filter((u): u is string => !!u),
+      [...list, e.paidReceiptUrl].filter((u): u is string => !!u),
     );
   }
   for (const r of receiptRows) {

@@ -37,6 +37,7 @@ const createSchema = z.object({
   paymentMethod: z.enum(["cash", "transfer"]).optional(),
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
+  attachmentUrls: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
   priority: z.enum(["normal", "urgent"]).optional(),
   payeeBankBin: z.string().trim().max(20).optional().nullable(),
   payeeAccountNumber: z.string().trim().max(40).optional().nullable(),
@@ -117,6 +118,9 @@ export async function POST(request: Request) {
 
   const code = await nextExpenseCode();
   const priority: ExpensePriority = data.priority === "urgent" ? ExpensePriority.urgent : ExpensePriority.normal;
+  const urls = (data.attachmentUrls ?? []).map((u) => u.trim()).filter(Boolean);
+  const legacyUrl = data.attachmentUrl?.trim() || null;
+  if (legacyUrl && !urls.includes(legacyUrl)) urls.unshift(legacyUrl);
   const expense = await prisma.expense.create({
     data: {
       code,
@@ -126,7 +130,8 @@ export async function POST(request: Request) {
       payee: data.payee?.trim() || null,
       paymentMethod: data.paymentMethod || null,
       note: data.note?.trim() || null,
-      attachmentUrl: data.attachmentUrl?.trim() || null,
+      attachmentUrl: urls[0] ?? null,
+      attachmentUrls: urls,
       status: ExpenseStatus.pending,
       priority,
       nextReminderAt: nextReminderForPriority(priority),
