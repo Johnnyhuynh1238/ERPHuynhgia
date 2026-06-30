@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { RouteToast } from "./_components/route-toast";
@@ -13,6 +14,10 @@ export const revalidate = 60;
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const user = await getCurrentUser();
+
+  if (user?.role === "accountant" && !searchParams?.denied) {
+    redirect("/ketoan");
+  }
 
   return (
     <ProtectedLayout>
