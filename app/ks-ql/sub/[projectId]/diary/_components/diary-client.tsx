@@ -726,12 +726,12 @@ function DiaryModal({
   if (!mounted) return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
+      className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl border border-[#252840] bg-[#0f1320] sm:rounded-2xl"
+        className="modal-sheet-in flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl border border-[#252840] bg-[#0f1320] sm:rounded-2xl"
       >
         <div className="flex items-center justify-between gap-2 border-b border-[#252840] px-4 py-3">
           <div className="text-base font-bold text-[#f5ede4]">{title}</div>

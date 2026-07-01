@@ -92,6 +92,64 @@ body {
   opacity: 0;
 }
 
+@keyframes ksqlRouteIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ksql-route-in {
+  animation: ksqlRouteIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ksqlCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ksql-card-in {
+  animation: ksqlCardIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ksql-tap {
+  transition:
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ksql-tap:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-up,
+  .ksql-route-in,
+  .ksql-card-in,
+  .modal-backdrop-in,
+  .modal-panel-in,
+  .modal-sheet-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .ksql-tap {
+    transition: none !important;
+  }
+}
+
 @keyframes modalBackdropIn {
   from {
     opacity: 0;

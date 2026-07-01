@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Bell, CalendarCheck2, ChevronDown, FolderOpen, LogOut, User as UserIcon } from "lucide-react";
+import { KsQlPageMotion } from "./ksql-page-motion";
 
 type FrameUser = { id: string; name: string; email: string; role: string };
 
@@ -48,7 +49,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
 
   // Flow giao khoán (KS Phúc) dùng SubLayout riêng — bỏ frame cũ để không đè lên.
   if (pathname.startsWith("/ks-ql/sub")) {
-    return <>{children}</>;
+    return <KsQlPageMotion>{children}</KsQlPageMotion>;
   }
 
   return (
@@ -147,7 +148,9 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-3xl px-4 pb-28 pt-4 sm:px-5">{children}</main>
+      <main className="relative z-10 mx-auto max-w-3xl px-4 pb-28 pt-4 sm:px-5">
+        <KsQlPageMotion>{children}</KsQlPageMotion>
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#2a221c] bg-[#0d0b09]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0d0b09]/80">
         <div className="relative mx-auto grid max-w-3xl grid-cols-3">
