@@ -141,11 +141,11 @@ body {
   .modal-backdrop-in,
   .modal-panel-in,
   .modal-sheet-in,
-  .popover-in,
-  .popover-item-in {
+  .popover-in {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
   }
   .ksql-tap {
     transition: none !important;
@@ -153,35 +153,24 @@ body {
 }
 
 @keyframes popoverIn {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(4px) scale(0.97);
-    filter: blur(2px);
+    transform: scale(0.9);
+    filter: blur(6px);
   }
-  to {
+  55% {
+    filter: blur(0);
+  }
+  100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
     filter: blur(0);
   }
 }
 
 .popover-in {
-  animation: popoverIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
-}
-
-@keyframes popoverItemIn {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.popover-item-in {
-  animation: popoverItemIn 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: popoverIn 0.46s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity, filter;
 }
 
 @keyframes modalBackdropIn {

@@ -48,17 +48,21 @@ type AppDef = {
   key: AppKey | null;
   label: string;
   Icon: LucideIcon;
-  tint: string;
   disabled?: boolean;
   buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
+
+// Brand palette rút từ avatar HuynhGia6 (rust + cream + terracotta accent)
+const BRAND_TINT = "#6b2d1c";
+const BRAND_GLYPH = "#f0dcc3";
+const BRAND_ACCENT = "#e78b4a";
+const BRAND_BG = "#0f0906";
 
 const APPS: AppDef[] = [
   {
     key: "thu-chi",
     label: "Thu - Chi",
     Icon: ArrowRightLeft,
-    tint: "#f97316",
     buildItems: (data) => {
       const pb = data?.processBreakdown;
       return [
@@ -73,13 +77,13 @@ const APPS: AppDef[] = [
       ];
     },
   },
-  { key: null, label: "Lương",      Icon: Banknote,      tint: "#10b981", disabled: true },
-  { key: null, label: "Vật tư",     Icon: Package,       tint: "#f59e0b", disabled: true },
-  { key: null, label: "HĐ - Nợ KH", Icon: Receipt,       tint: "#3b82f6", disabled: true },
-  { key: null, label: "Báo cáo",    Icon: BarChart3,     tint: "#a855f7", disabled: true },
-  { key: null, label: "Chứng từ",   Icon: ScrollText,    tint: "#ec4899", disabled: true },
-  { key: null, label: "Thuế",       Icon: Landmark,      tint: "#64748b", disabled: true },
-  { key: null, label: "Cài đặt",    Icon: Settings,      tint: "#737373", disabled: true },
+  { key: null, label: "Lương",      Icon: Banknote,      disabled: true },
+  { key: null, label: "Vật tư",     Icon: Package,       disabled: true },
+  { key: null, label: "HĐ - Nợ KH", Icon: Receipt,       disabled: true },
+  { key: null, label: "Báo cáo",    Icon: BarChart3,     disabled: true },
+  { key: null, label: "Chứng từ",   Icon: ScrollText,    disabled: true },
+  { key: null, label: "Thuế",       Icon: Landmark,      disabled: true },
+  { key: null, label: "Cài đặt",    Icon: Settings,      disabled: true },
 ];
 
 export function KetoanLauncher() {
@@ -114,7 +118,7 @@ export function KetoanLauncher() {
   return (
     <div
       className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
-      style={{ background: "#0a0b12" }}
+      style={{ background: BRAND_BG }}
     >
       <div className="relative space-y-7">
         <BalanceHeadline
@@ -203,7 +207,7 @@ function BalanceHeadline({
   return (
     <div className="slide-up delay-1 relative px-1 pt-2">
       <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
-        <Wallet className="h-3 w-3 text-[#fb923c]" />
+        <Wallet className="h-3 w-3" style={{ color: BRAND_ACCENT }} />
         <span>Số dư hiện tại</span>
         <span className="text-white/25">·</span>
         <button
@@ -222,8 +226,11 @@ function BalanceHeadline({
 
       <div className="mt-1.5 flex items-baseline gap-1.5">
         <span
-          className="text-[44px] font-bold leading-none tabular-nums tracking-tight text-white"
-          style={{ textShadow: "0 2px 28px rgba(249,115,22,0.45)" }}
+          className="text-[44px] font-bold leading-none tabular-nums tracking-tight"
+          style={{
+            color: BRAND_GLYPH,
+            textShadow: "0 2px 28px rgba(231,139,74,0.35)",
+          }}
         >
           {formatVnd(animated)}
         </span>
@@ -290,30 +297,35 @@ function AppIcon({
         onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
         disabled={disabled}
         className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[22px] sm:h-[68px] sm:w-[68px] ${
-          disabled ? "cursor-not-allowed opacity-45" : ""
+          disabled ? "cursor-not-allowed opacity-55" : ""
         }`}
         style={{
-          backgroundColor: `${app.tint}${disabled ? "22" : "40"}`,
+          backgroundColor: BRAND_TINT,
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          boxShadow: `inset 0 0 0 1px ${app.tint}55, inset 0 1px 0 rgba(255,255,255,0.18)`,
+          boxShadow:
+            "inset 0 0 0 1px rgba(240,220,195,0.14), inset 0 1px 0 rgba(255,230,200,0.18), 0 6px 14px -6px rgba(0,0,0,0.55)",
         }}
       >
         <Icon
           className="relative h-[28px] w-[28px] sm:h-[30px] sm:w-[30px]"
           strokeWidth={1.75}
-          style={{ color: "#ffffff" }}
+          style={{ color: BRAND_GLYPH }}
         />
         {badge > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b30] px-1 text-[10px] font-bold text-white ring-2 ring-[#0a0b12]">
+          <span
+            className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+            style={{ backgroundColor: BRAND_ACCENT, boxShadow: `0 0 0 2px ${BRAND_BG}` }}
+          >
             {badge > 99 ? "99+" : badge}
           </span>
         )}
       </button>
       <span
         className={`text-center text-[11px] font-medium leading-tight sm:text-[12px] ${
-          disabled ? "text-white/35" : "text-white/80"
+          disabled ? "text-white/35" : ""
         }`}
+        style={disabled ? undefined : { color: "rgba(240,220,195,0.85)" }}
       >
         {app.label}
       </span>
@@ -321,12 +333,11 @@ function AppIcon({
   );
 }
 
-const POPOVER_WIDTH = 260;
+const POPOVER_WIDTH = 224;
 const POPOVER_MARGIN = 10;
 const POPOVER_GAP = 12;
 
 function AppPopover({
-  app,
   anchor,
   items,
   onClose,
@@ -350,36 +361,48 @@ function AppPopover({
       const rect = el.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const anchorCenterX = anchor.left + anchor.width / 2;
+      const anchorCenterY = anchor.top + anchor.height / 2;
+      const width = POPOVER_WIDTH;
+      const height = rect.height;
 
-      // Vertical: prefer below, fallback above
-      let top = anchor.bottom + POPOVER_GAP;
-      let vertOrigin = "top";
-      if (top + rect.height > vh - POPOVER_MARGIN) {
-        const above = anchor.top - rect.height - POPOVER_GAP;
-        if (above >= POPOVER_MARGIN) {
-          top = above;
-          vertOrigin = "bottom";
+      // Prefer right of icon
+      let left = anchor.right + POPOVER_GAP;
+      let side: "right" | "left" | "bottom" = "right";
+      if (left + width > vw - POPOVER_MARGIN) {
+        const leftPos = anchor.left - width - POPOVER_GAP;
+        if (leftPos >= POPOVER_MARGIN) {
+          left = leftPos;
+          side = "left";
         } else {
-          // Neither fits: clamp
-          top = Math.max(POPOVER_MARGIN, vh - rect.height - POPOVER_MARGIN);
-          vertOrigin = "top";
+          // Not enough side space (narrow phone): fall back to below icon
+          left = Math.max(
+            POPOVER_MARGIN,
+            Math.min(vw - width - POPOVER_MARGIN, anchor.left + anchor.width / 2 - width / 2),
+          );
+          side = "bottom";
         }
       }
 
-      // Horizontal: center on icon, clamp to viewport
-      let left = anchorCenterX - rect.width / 2;
-      left = Math.max(POPOVER_MARGIN, Math.min(vw - rect.width - POPOVER_MARGIN, left));
+      let top: number;
+      let origin: string;
+      if (side === "bottom") {
+        top = anchor.bottom + POPOVER_GAP;
+        if (top + height > vh - POPOVER_MARGIN) {
+          const above = anchor.top - height - POPOVER_GAP;
+          top = above >= POPOVER_MARGIN ? above : Math.max(POPOVER_MARGIN, vh - height - POPOVER_MARGIN);
+        }
+        const anchorCenterX = anchor.left + anchor.width / 2;
+        const originXpx = Math.max(0, Math.min(width, anchorCenterX - left));
+        origin = `${((originXpx / width) * 100).toFixed(1)}% 0%`;
+      } else {
+        top = anchorCenterY - height / 2;
+        top = Math.max(POPOVER_MARGIN, Math.min(vh - height - POPOVER_MARGIN, top));
+        const originYpx = Math.max(0, Math.min(height, anchorCenterY - top));
+        const originYpc = (originYpx / height) * 100;
+        origin = side === "right" ? `0% ${originYpc.toFixed(1)}%` : `100% ${originYpc.toFixed(1)}%`;
+      }
 
-      // Compute origin X as % relative to popup (for scale anchor near icon)
-      const originXpx = Math.max(0, Math.min(rect.width, anchorCenterX - left));
-      const originXpc = (originXpx / rect.width) * 100;
-
-      setPos({
-        top,
-        left,
-        origin: `${originXpc.toFixed(1)}% ${vertOrigin === "top" ? "0%" : "100%"}`,
-      });
+      setPos({ top, left, origin });
     };
     measure();
     window.addEventListener("resize", measure);
@@ -407,75 +430,57 @@ function AppPopover({
       <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
-        className="popover-in fixed rounded-[18px]"
+        className="popover-in fixed flex flex-col gap-[6px]"
         style={{
           width: POPOVER_WIDTH,
           top: pos?.top ?? -9999,
           left: pos?.left ?? -9999,
-          transformOrigin: pos?.origin ?? "50% 0%",
+          transformOrigin: pos?.origin ?? "0% 50%",
           visibility: pos ? "visible" : "hidden",
-          background: "rgba(22,24,34,0.68)",
-          backdropFilter: "blur(40px) saturate(200%)",
-          WebkitBackdropFilter: "blur(40px) saturate(200%)",
-          boxShadow:
-            "0 20px 50px -12px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.14), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
-        <div className="flex items-center gap-2 px-3.5 pt-3 pb-1.5">
-          <app.Icon
-            className="h-3.5 w-3.5"
-            strokeWidth={2}
-            style={{ color: app.tint }}
-          />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-            {app.label}
-          </span>
-        </div>
-        <div className="px-1.5 pb-1.5 pt-0.5">
-          {items.map((it, idx) =>
-            it === "divider" ? (
-              <div
-                key={`d-${idx}`}
-                className="popover-item-in mx-2 my-1 h-px bg-white/8"
-                style={{ animationDelay: `${0.05 + idx * 0.035}s` }}
-              />
-            ) : (
-              <PopItemRow key={it.href + idx} item={it} tint={app.tint} index={idx} />
-            )
-          )}
-        </div>
+        {items.map((it, idx) =>
+          it === "divider" ? (
+            <div key={`d-${idx}`} className="h-[4px]" />
+          ) : (
+            <PopItemCard key={it.href + idx} item={it} index={idx} />
+          )
+        )}
       </div>
     </div>
   );
 }
 
-function PopItemRow({
+function PopItemCard({
   item,
-  tint,
-  index,
 }: {
   item: PopItem;
-  tint: string;
   index: number;
 }) {
   return (
     <Link
       href={item.href}
-      className="popover-item-in group flex items-center justify-between rounded-[10px] px-2.5 py-2 text-[13.5px] transition-colors duration-150 hover:bg-white/[0.07]"
+      className="smooth-press group flex items-center justify-between rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-colors duration-150 hover:bg-[rgba(240,220,195,0.06)]"
       style={{
-        animationDelay: `${0.05 + index * 0.035}s`,
+        background: "rgba(28,16,10,0.78)",
+        backdropFilter: "blur(30px) saturate(180%)",
+        WebkitBackdropFilter: "blur(30px) saturate(180%)",
+        boxShadow:
+          "0 10px 24px -10px rgba(0,0,0,0.6), inset 0 0 0 0.5px rgba(240,220,195,0.14), inset 0 1px 0 rgba(255,230,200,0.08)",
       }}
     >
       <span
         className="truncate font-medium leading-none"
-        style={{ color: item.isNew ? tint : "rgba(255,255,255,0.88)" }}
+        style={{
+          color: item.isNew ? BRAND_ACCENT : "rgba(240,220,195,0.92)",
+        }}
       >
         {item.label}
       </span>
       {item.badge !== undefined && item.badge > 0 && (
         <span
           className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
-          style={{ backgroundColor: "#ff3b30" }}
+          style={{ backgroundColor: BRAND_ACCENT }}
         >
           {item.badge > 99 ? "99+" : item.badge}
         </span>
