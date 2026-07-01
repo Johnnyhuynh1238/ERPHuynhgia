@@ -35,75 +35,19 @@ type AppDef = {
   key: "thu-chi" | null;
   label: string;
   emoji: string;
-  gradient: string;
-  glow: string;
+  tint: string;
   disabled?: boolean;
 };
 
 const APPS: AppDef[] = [
-  {
-    key: "thu-chi",
-    label: "Thu - Chi",
-    emoji: "💵",
-    gradient: "from-[#fb923c] via-[#f97316] to-[#ea580c]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(249,115,22,0.65)]",
-  },
-  {
-    key: null,
-    label: "Lương",
-    emoji: "💰",
-    gradient: "from-[#34d399] via-[#10b981] to-[#059669]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(16,185,129,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "Vật tư",
-    emoji: "🏗️",
-    gradient: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(245,158,11,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "HĐ - Nợ KH",
-    emoji: "📋",
-    gradient: "from-[#60a5fa] via-[#3b82f6] to-[#1d4ed8]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(59,130,246,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "Báo cáo",
-    emoji: "📊",
-    gradient: "from-[#c084fc] via-[#a855f7] to-[#7e22ce]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(168,85,247,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "Chứng từ",
-    emoji: "🧾",
-    gradient: "from-[#f472b6] via-[#ec4899] to-[#be185d]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(236,72,153,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "Thuế",
-    emoji: "🏛️",
-    gradient: "from-[#94a3b8] via-[#64748b] to-[#334155]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(100,116,139,0.55)]",
-    disabled: true,
-  },
-  {
-    key: null,
-    label: "Cài đặt",
-    emoji: "⚙️",
-    gradient: "from-[#a3a3a3] via-[#737373] to-[#404040]",
-    glow: "shadow-[0_10px_30px_-8px_rgba(115,115,115,0.55)]",
-    disabled: true,
-  },
+  { key: "thu-chi", label: "Thu - Chi",  emoji: "💵", tint: "#f97316" },
+  { key: null,     label: "Lương",       emoji: "💰", tint: "#10b981", disabled: true },
+  { key: null,     label: "Vật tư",      emoji: "🏗️", tint: "#f59e0b", disabled: true },
+  { key: null,     label: "HĐ - Nợ KH",  emoji: "📋", tint: "#3b82f6", disabled: true },
+  { key: null,     label: "Báo cáo",     emoji: "📊", tint: "#a855f7", disabled: true },
+  { key: null,     label: "Chứng từ",    emoji: "🧾", tint: "#ec4899", disabled: true },
+  { key: null,     label: "Thuế",        emoji: "🏛️", tint: "#64748b", disabled: true },
+  { key: null,     label: "Cài đặt",     emoji: "⚙️", tint: "#737373", disabled: true },
 ];
 
 export function KetoanLauncher() {
@@ -136,10 +80,11 @@ export function KetoanLauncher() {
   }, []);
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden px-4 pt-4 pb-10 sm:px-6">
-      <VibrantBackdrop />
-
-      <div className="relative space-y-6">
+    <div
+      className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
+      style={{ background: "#0a0b12" }}
+    >
+      <div className="relative space-y-7">
         <BalanceHeadline
           data={data}
           loading={loading}
@@ -174,38 +119,6 @@ export function KetoanLauncher() {
         </AppDrawer>
       )}
     </div>
-  );
-}
-
-function VibrantBackdrop() {
-  return (
-    <>
-      <div
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{ background: "linear-gradient(180deg, #0d0f18 0%, #0a0b12 100%)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -top-24 -right-20 -z-10 h-[380px] w-[380px] rounded-full opacity-70 blur-3xl"
-        style={{ background: "radial-gradient(circle, #f97316 0%, transparent 65%)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute top-32 -left-24 -z-10 h-[300px] w-[300px] rounded-full opacity-50 blur-3xl"
-        style={{ background: "radial-gradient(circle, #ec4899 0%, transparent 65%)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-0 right-10 -z-10 h-[260px] w-[260px] rounded-full opacity-40 blur-3xl"
-        style={{ background: "radial-gradient(circle, #a855f7 0%, transparent 65%)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-24 left-8 -z-10 h-[220px] w-[220px] rounded-full opacity-40 blur-3xl"
-        style={{ background: "radial-gradient(circle, #3b82f6 0%, transparent 65%)" }}
-        aria-hidden
-      />
-    </>
   );
 }
 
@@ -338,35 +251,28 @@ function AppIcon({
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[20px] bg-gradient-to-br ${app.gradient} ${app.glow} sm:h-[68px] sm:w-[68px] ${
-          disabled ? "opacity-40 grayscale saturate-50 cursor-not-allowed" : ""
+        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[22px] sm:h-[68px] sm:w-[68px] ${
+          disabled ? "cursor-not-allowed opacity-45" : ""
         }`}
         style={{
-          boxShadow: disabled
-            ? "0 4px 12px -4px rgba(0,0,0,0.4)"
-            : undefined,
+          backgroundColor: `${app.tint}${disabled ? "22" : "40"}`,
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          boxShadow: `inset 0 0 0 1px ${app.tint}55, inset 0 1px 0 rgba(255,255,255,0.18)`,
         }}
       >
-        <span
-          className="pointer-events-none absolute inset-x-1.5 top-1 h-[38%] rounded-[16px] bg-gradient-to-b from-white/45 to-transparent"
-          aria-hidden
-        />
-        <span
-          className="pointer-events-none absolute inset-0 rounded-[20px] ring-1 ring-inset ring-white/15"
-          aria-hidden
-        />
-        <span className="relative text-[32px] drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] sm:text-[34px]">
+        <span className="relative text-[30px] leading-none sm:text-[32px]">
           {app.emoji}
         </span>
         {badge > 0 && (
-          <span className="pulse-glow absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#ff3b30] px-1.5 text-[11px] font-bold text-white ring-2 ring-[#0d0f18]">
+          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b30] px-1 text-[10px] font-bold text-white ring-2 ring-[#0a0b12]">
             {badge > 99 ? "99+" : badge}
           </span>
         )}
       </button>
       <span
         className={`text-center text-[11px] font-medium leading-tight sm:text-[12px] ${
-          disabled ? "text-white/35" : "text-white/85"
+          disabled ? "text-white/35" : "text-white/80"
         }`}
       >
         {app.label}
@@ -406,21 +312,15 @@ function AppDrawer({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="modal-sheet-in w-full max-w-md rounded-t-[28px] border border-white/10 shadow-2xl shadow-black/60 sm:rounded-[28px]"
+        className="modal-sheet-in w-full max-w-md rounded-t-[28px] border border-white/10 sm:rounded-[28px]"
         style={{
           maxHeight: "90vh",
           overflowY: "auto",
-          background:
-            "linear-gradient(160deg, rgba(30,32,45,0.85) 0%, rgba(18,20,30,0.85) 100%)",
-          backdropFilter: "blur(28px) saturate(180%)",
-          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+          background: "rgba(20,22,32,0.72)",
+          backdropFilter: "blur(30px) saturate(180%)",
+          WebkitBackdropFilter: "blur(30px) saturate(180%)",
         }}
       >
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[28px]"
-          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)" }}
-          aria-hidden
-        />
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <span className="text-[22px]">{emoji}</span>
@@ -447,7 +347,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
     <div className="space-y-3">
       <MenuRow
         icon={<PlusCircle className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-[#fb923c] to-[#ea580c]"
+        iconTint="#f97316"
         title="Tạo lệnh thu / chi"
         subtitle="Gửi admin duyệt"
       >
@@ -459,7 +359,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
 
       <MenuRow
         icon={<Inbox className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-[#f472b6] to-[#be185d]"
+        iconTint="#ec4899"
         title="Xử lý lệnh từ admin"
         subtitle={hasPending ? "Admin duyệt → KT chuyển khoản" : "Không có lệnh đang chờ"}
         badge={data?.counts.process ?? 0}
@@ -480,7 +380,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
       <MenuRow
         href="/treasury"
         icon={<BookOpen className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-[#64748b] to-[#334155]"
+        iconTint="#64748b"
         title="Sổ cái thu - chi"
         subtitle="Nhật ký đã thực hiện"
       />
@@ -491,7 +391,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
 function MenuRow({
   href,
   icon,
-  iconBg,
+  iconTint,
   title,
   subtitle,
   badge,
@@ -499,7 +399,7 @@ function MenuRow({
 }: {
   href?: string;
   icon: React.ReactNode;
-  iconBg: string;
+  iconTint: string;
   title: string;
   subtitle?: string;
   badge?: number;
@@ -508,7 +408,12 @@ function MenuRow({
   const inner = (
     <div className="flex items-center gap-3 px-3.5 py-3">
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-md ${iconBg}`}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          backgroundColor: `${iconTint}33`,
+          color: iconTint,
+          boxShadow: `inset 0 0 0 1px ${iconTint}55`,
+        }}
       >
         {icon}
       </div>
@@ -517,7 +422,7 @@ function MenuRow({
         {subtitle && <div className="text-[12px] text-white/55">{subtitle}</div>}
       </div>
       {badge !== undefined && badge > 0 && (
-        <span className="rounded-full bg-[#ff3b30] px-2 py-0.5 text-xs font-bold text-white shadow-md">
+        <span className="rounded-full bg-[#ff3b30] px-2 py-0.5 text-xs font-bold text-white">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
@@ -528,10 +433,9 @@ function MenuRow({
     <div
       className="smooth-press overflow-hidden rounded-2xl border border-white/10"
       style={{
-        background:
-          "linear-gradient(140deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        backgroundColor: "rgba(255,255,255,0.04)",
+        backdropFilter: "blur(16px) saturate(160%)",
+        WebkitBackdropFilter: "blur(16px) saturate(160%)",
       }}
     >
       {href ? (
