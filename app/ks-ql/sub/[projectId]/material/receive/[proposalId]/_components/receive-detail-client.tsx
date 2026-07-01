@@ -60,10 +60,35 @@ export function ReceiveDetailClient({
         scale: 2,
         useCORS: true,
       });
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/png"),
+      );
+      if (!blob) throw new Error("no blob");
+      const file = new File([blob], `${code}.png`, { type: "image/png" });
+
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+      if (nav.canShare?.({ files: [file] }) && nav.share) {
+        try {
+          await nav.share({
+            files: [file],
+            title: code,
+            text: `${code} - Đơn đặt hàng vật tư Huỳnh Gia`,
+          });
+          return;
+        } catch (e) {
+          if ((e as Error).name === "AbortError") return;
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `${code}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = url;
       link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } finally {
       setDownloadingPo(false);
     }
@@ -109,7 +134,7 @@ export function ReceiveDetailClient({
               className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
             >
               <Download className="h-3 w-3" />
-              {downloadingPo ? "Đang tạo..." : "Tải PO"}
+              {downloadingPo ? "Đang tạo..." : "Tải / Chia sẻ PO"}
             </button>
           )}
         </div>
