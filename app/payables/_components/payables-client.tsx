@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Building2, ChevronRight, FileText, Loader2, Phone, Wallet } from "lucide-react";
+import { KetoanBackButton } from "@/app/ketoan/_components/back-button";
 
 type Group = {
   supplierId: string;
@@ -68,6 +69,7 @@ export function PayablesClient() {
 
   return (
     <div className="space-y-3">
+      <KetoanBackButton />
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="flex items-start justify-between gap-3">
           <div>

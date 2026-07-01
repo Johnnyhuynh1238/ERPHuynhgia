@@ -6,6 +6,7 @@ import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
+import { KetoanBackButton } from "@/app/ketoan/_components/back-button";
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
@@ -446,6 +447,15 @@ export function ExpensesClient({
 
   return (
     <div className="space-y-3">
+      <KetoanBackButton />
+      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
+        <div>
+          <h1 className="text-xl font-semibold text-orange-300">Lệnh chi</h1>
+          <p className="mt-1 text-xs text-[#8892b0]">
+            Tạo lệnh chi, duyệt và thanh toán các khoản chi ngoài công nợ NCC.
+          </p>
+        </div>
+      </div>
       {/* Top bar: balance + actions */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2">
         <button

@@ -4,6 +4,7 @@ import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TreasuryClient } from "./_components/treasury-client";
+import { KetoanBackButton } from "@/app/ketoan/_components/back-button";
 
 export default async function TreasuryPage() {
   const user = await getCurrentUser();
@@ -26,10 +27,11 @@ export default async function TreasuryPage() {
 
   return (
     <ProtectedLayout>
-      <div className="space-y-4">
-        <div>
+      <div className="space-y-3">
+        <KetoanBackButton />
+        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
           <h1 className="text-xl font-semibold text-orange-300">Sổ quỹ công ty</h1>
-          <p className="text-sm text-[#8b95b7]">
+          <p className="mt-1 text-xs text-[#8892b0]">
             Mọi giao dịch thu (chủ nhà chuyển khoản) và chi (lệnh chi, thầu phụ, vật tư, …) đều
             được ghi tự động ở đây. Số dư cập nhật luỹ kế theo thời gian thực.
           </p>
