@@ -1,16 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Wallet,
-  PlusCircle,
-  Inbox,
-  BookOpen,
-  RefreshCw,
-  X,
-  ChevronRight,
-} from "lucide-react";
+import { Wallet, RefreshCw } from "lucide-react";
 
 type AccountDto = {
   id: string;
@@ -31,23 +23,51 @@ const formatVnd = (n: number) =>
 
 const kindIcon = (kind: string) => (kind === "cash" ? "💵" : "🏦");
 
+type AppKey = "thu-chi";
+
+type PopItem = {
+  label: string;
+  href: string;
+  badge?: number;
+  isNew?: boolean;
+};
+
 type AppDef = {
-  key: "thu-chi" | null;
+  key: AppKey | null;
   label: string;
   emoji: string;
   tint: string;
   disabled?: boolean;
+  buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
 
 const APPS: AppDef[] = [
-  { key: "thu-chi", label: "Thu - Chi",  emoji: "💵", tint: "#f97316" },
-  { key: null,     label: "Lương",       emoji: "💰", tint: "#10b981", disabled: true },
-  { key: null,     label: "Vật tư",      emoji: "🏗️", tint: "#f59e0b", disabled: true },
-  { key: null,     label: "HĐ - Nợ KH",  emoji: "📋", tint: "#3b82f6", disabled: true },
-  { key: null,     label: "Báo cáo",     emoji: "📊", tint: "#a855f7", disabled: true },
-  { key: null,     label: "Chứng từ",    emoji: "🧾", tint: "#ec4899", disabled: true },
-  { key: null,     label: "Thuế",        emoji: "🏛️", tint: "#64748b", disabled: true },
-  { key: null,     label: "Cài đặt",     emoji: "⚙️", tint: "#737373", disabled: true },
+  {
+    key: "thu-chi",
+    label: "Thu - Chi",
+    emoji: "💵",
+    tint: "#f97316",
+    buildItems: (data) => {
+      const pb = data?.processBreakdown;
+      return [
+        { label: "+ Lệnh chi mới", href: "/expenses", isNew: true },
+        { label: "+ Lệnh thu mới", href: "/receipts", isNew: true },
+        "divider",
+        { label: "Lệnh chi chờ chuyển", href: "/expenses?status=pending", badge: pb?.expense ?? 0 },
+        { label: "Lệnh thu chờ nhận", href: "/receipts?status=pending", badge: pb?.receipt ?? 0 },
+        { label: "Lệnh thanh toán NCC", href: "/payment-orders?status=approved", badge: pb?.paymentOrder ?? 0 },
+        "divider",
+        { label: "Sổ cái thu - chi", href: "/treasury" },
+      ];
+    },
+  },
+  { key: null, label: "Lương",      emoji: "💰", tint: "#10b981", disabled: true },
+  { key: null, label: "Vật tư",     emoji: "🏗️", tint: "#f59e0b", disabled: true },
+  { key: null, label: "HĐ - Nợ KH", emoji: "📋", tint: "#3b82f6", disabled: true },
+  { key: null, label: "Báo cáo",    emoji: "📊", tint: "#a855f7", disabled: true },
+  { key: null, label: "Chứng từ",   emoji: "🧾", tint: "#ec4899", disabled: true },
+  { key: null, label: "Thuế",       emoji: "🏛️", tint: "#64748b", disabled: true },
+  { key: null, label: "Cài đặt",    emoji: "⚙️", tint: "#737373", disabled: true },
 ];
 
 export function KetoanLauncher() {
@@ -55,7 +75,7 @@ export function KetoanLauncher() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
-  const [openApp, setOpenApp] = useState<null | "thu-chi">(null);
+  const [open, setOpen] = useState<null | { app: AppDef; anchor: DOMRect }>(null);
 
   const load = async () => {
     try {
@@ -105,7 +125,9 @@ export function KetoanLauncher() {
                 delayClass={`delay-${Math.min(idx + 1, 6)}`}
                 badge={app.key === "thu-chi" ? data?.counts.process ?? 0 : 0}
                 onClick={
-                  app.key === "thu-chi" ? () => setOpenApp("thu-chi") : undefined
+                  app.buildItems
+                    ? (rect) => setOpen({ app, anchor: rect })
+                    : undefined
                 }
               />
             ))}
@@ -113,10 +135,13 @@ export function KetoanLauncher() {
         </div>
       </div>
 
-      {openApp === "thu-chi" && (
-        <AppDrawer title="Thu - Chi" emoji="💵" onClose={() => setOpenApp(null)}>
-          <ThuChiContent data={data} />
-        </AppDrawer>
+      {open && open.app.buildItems && (
+        <AppPopover
+          app={open.app}
+          anchor={open.anchor}
+          items={open.app.buildItems(data)}
+          onClose={() => setOpen(null)}
+        />
       )}
     </div>
   );
@@ -241,7 +266,7 @@ function AppIcon({
 }: {
   app: AppDef;
   badge?: number;
-  onClick?: () => void;
+  onClick?: (rect: DOMRect) => void;
   delayClass: string;
 }) {
   const disabled = !!app.disabled;
@@ -249,7 +274,7 @@ function AppIcon({
     <div className={`slide-up ${delayClass} flex flex-col items-center gap-2`}>
       <button
         type="button"
-        onClick={onClick}
+        onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
         disabled={disabled}
         className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[22px] sm:h-[68px] sm:w-[68px] ${
           disabled ? "cursor-not-allowed opacity-45" : ""
@@ -281,192 +306,153 @@ function AppIcon({
   );
 }
 
-function AppDrawer({
-  title,
-  emoji,
+const POPOVER_WIDTH = 248;
+const POPOVER_MARGIN = 8;
+const POPOVER_GAP = 10;
+
+function AppPopover({
+  app,
+  anchor,
+  items,
   onClose,
-  children,
 }: {
-  title: string;
-  emoji: string;
+  app: AppDef;
+  anchor: DOMRect;
+  items: Array<PopItem | "divider">;
   onClose: () => void;
-  children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    origin: string;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const anchorCenterX = anchor.left + anchor.width / 2;
+
+      // Vertical: prefer below, fallback above
+      let top = anchor.bottom + POPOVER_GAP;
+      let vertOrigin = "top";
+      if (top + rect.height > vh - POPOVER_MARGIN) {
+        const above = anchor.top - rect.height - POPOVER_GAP;
+        if (above >= POPOVER_MARGIN) {
+          top = above;
+          vertOrigin = "bottom";
+        } else {
+          // Neither fits: clamp
+          top = Math.max(POPOVER_MARGIN, vh - rect.height - POPOVER_MARGIN);
+          vertOrigin = "top";
+        }
+      }
+
+      // Horizontal: center on icon, clamp to viewport
+      let left = anchorCenterX - rect.width / 2;
+      left = Math.max(POPOVER_MARGIN, Math.min(vw - rect.width - POPOVER_MARGIN, left));
+
+      // Compute origin X as % relative to popup (for scale anchor near icon)
+      const originXpx = Math.max(0, Math.min(rect.width, anchorCenterX - left));
+      const originXpc = (originXpx / rect.width) * 100;
+
+      setPos({
+        top,
+        left,
+        origin: `${originXpc.toFixed(1)}% ${vertOrigin === "top" ? "0%" : "100%"}`,
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [anchor]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   return (
     <div
-      className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
-      style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+      className="fixed inset-0 z-50"
       onClick={onClose}
+      style={{ background: "rgba(0,0,0,0.15)" }}
     >
       <div
+        ref={ref}
         onClick={(e) => e.stopPropagation()}
-        className="modal-sheet-in w-full max-w-md rounded-t-[28px] border border-white/10 sm:rounded-[28px]"
+        className="popover-in fixed rounded-2xl border border-white/12"
         style={{
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: "rgba(20,22,32,0.72)",
-          backdropFilter: "blur(30px) saturate(180%)",
-          WebkitBackdropFilter: "blur(30px) saturate(180%)",
+          width: POPOVER_WIDTH,
+          top: pos?.top ?? -9999,
+          left: pos?.left ?? -9999,
+          transformOrigin: pos?.origin ?? "50% 0%",
+          visibility: pos ? "visible" : "hidden",
+          background: "rgba(20,22,32,0.82)",
+          backdropFilter: "blur(28px) saturate(180%)",
+          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+          boxShadow: "0 12px 40px -8px rgba(0,0,0,0.6)",
         }}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[22px]">{emoji}</span>
-            <h2 className="text-[15px] font-semibold text-white">{title}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="smooth-press rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
+        <div className="flex items-center gap-2 border-b border-white/8 px-3 py-2">
+          <span className="text-[16px] leading-none">{app.emoji}</span>
+          <span className="text-[12px] font-semibold text-white/85">{app.label}</span>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="space-y-1 p-2">
+          {items.map((it, idx) =>
+            it === "divider" ? (
+              <div key={`d-${idx}`} className="my-1 h-px bg-white/8" />
+            ) : (
+              <PopItemRow key={it.href + idx} item={it} tint={app.tint} index={idx} />
+            )
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function ThuChiContent({ data }: { data: SummaryDto | null }) {
-  const pb = data?.processBreakdown;
-  const hasPending = pb && pb.expense + pb.receipt + pb.paymentOrder > 0;
-  return (
-    <div className="space-y-3">
-      <MenuRow
-        icon={<PlusCircle className="h-5 w-5" />}
-        iconTint="#f97316"
-        title="Tạo lệnh thu / chi"
-        subtitle="Gửi admin duyệt"
-      >
-        <div className="mt-2 grid grid-cols-2 gap-2 pl-11">
-          <SubLink href="/expenses" label="+ Lệnh chi" />
-          <SubLink href="/receipts" label="+ Lệnh thu" />
-        </div>
-      </MenuRow>
-
-      <MenuRow
-        icon={<Inbox className="h-5 w-5" />}
-        iconTint="#ec4899"
-        title="Xử lý lệnh từ admin"
-        subtitle={hasPending ? "Admin duyệt → KT chuyển khoản" : "Không có lệnh đang chờ"}
-        badge={data?.counts.process ?? 0}
-      >
-        {pb && (
-          <div className="mt-2 grid grid-cols-1 gap-1.5 pl-11">
-            <SubLink href="/expenses?status=pending" label="Lệnh chi chờ chuyển" count={pb.expense} />
-            <SubLink href="/receipts?status=pending" label="Lệnh thu chờ nhận" count={pb.receipt} />
-            <SubLink
-              href="/payment-orders?status=approved"
-              label="Lệnh thanh toán NCC"
-              count={pb.paymentOrder}
-            />
-          </div>
-        )}
-      </MenuRow>
-
-      <MenuRow
-        href="/treasury"
-        icon={<BookOpen className="h-5 w-5" />}
-        iconTint="#64748b"
-        title="Sổ cái thu - chi"
-        subtitle="Nhật ký đã thực hiện"
-      />
-    </div>
-  );
-}
-
-function MenuRow({
-  href,
-  icon,
-  iconTint,
-  title,
-  subtitle,
-  badge,
-  children,
+function PopItemRow({
+  item,
+  tint,
+  index,
 }: {
-  href?: string;
-  icon: React.ReactNode;
-  iconTint: string;
-  title: string;
-  subtitle?: string;
-  badge?: number;
-  children?: React.ReactNode;
+  item: PopItem;
+  tint: string;
+  index: number;
 }) {
-  const inner = (
-    <div className="flex items-center gap-3 px-3.5 py-3">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-        style={{
-          backgroundColor: `${iconTint}33`,
-          color: iconTint,
-          boxShadow: `inset 0 0 0 1px ${iconTint}55`,
-        }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold text-white">{title}</div>
-        {subtitle && <div className="text-[12px] text-white/55">{subtitle}</div>}
-      </div>
-      {badge !== undefined && badge > 0 && (
-        <span className="rounded-full bg-[#ff3b30] px-2 py-0.5 text-xs font-bold text-white">
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
-      {href && <ChevronRight className="h-5 w-5 text-white/40" />}
-    </div>
-  );
-  return (
-    <div
-      className="smooth-press overflow-hidden rounded-2xl border border-white/10"
-      style={{
-        backgroundColor: "rgba(255,255,255,0.04)",
-        backdropFilter: "blur(16px) saturate(160%)",
-        WebkitBackdropFilter: "blur(16px) saturate(160%)",
-      }}
-    >
-      {href ? (
-        <Link href={href} className="block hover:bg-white/5">
-          {inner}
-        </Link>
-      ) : (
-        inner
-      )}
-      {children && <div className="px-3.5 pb-3.5">{children}</div>}
-    </div>
-  );
-}
-
-function SubLink({ href, label, count }: { href: string; label: string; count?: number }) {
   return (
     <Link
-      href={href}
-      className="smooth-press flex items-center justify-between rounded-xl border border-white/8 bg-white/5 px-3 py-2 text-xs hover:border-[#f97316]/40 hover:bg-[#f97316]/10"
+      href={item.href}
+      className="popover-item-in smooth-press flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2 text-[13px] hover:bg-white/[0.08]"
+      style={{
+        animationDelay: `${0.04 + index * 0.03}s`,
+        borderColor: item.isNew ? `${tint}55` : undefined,
+        backgroundColor: item.isNew ? `${tint}18` : undefined,
+      }}
     >
-      <span className="font-medium text-white/80">{label}</span>
-      <span className="flex items-center gap-1">
-        {count !== undefined && count > 0 ? (
-          <span className="rounded-full bg-[#ff3b30] px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {count}
-          </span>
-        ) : count !== undefined ? (
-          <span className="text-white/35">—</span>
-        ) : null}
-        <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+      <span
+        className="truncate font-medium"
+        style={{ color: item.isNew ? tint : "rgba(255,255,255,0.88)" }}
+      >
+        {item.label}
       </span>
+      {item.badge !== undefined && item.badge > 0 && (
+        <span className="ml-2 shrink-0 rounded-full bg-[#ff3b30] px-1.5 py-0.5 text-[10px] font-bold text-white">
+          {item.badge > 99 ? "99+" : item.badge}
+        </span>
+      )}
     </Link>
   );
 }
