@@ -10,7 +10,6 @@ import {
   RefreshCw,
   X,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 
 type AccountDto = {
@@ -37,7 +36,6 @@ type AppDef = {
   label: string;
   emoji: string;
   gradient: string;
-  ring: string;
   glow: string;
   disabled?: boolean;
 };
@@ -47,71 +45,63 @@ const APPS: AppDef[] = [
     key: "thu-chi",
     label: "Thu - Chi",
     emoji: "💵",
-    gradient: "from-orange-400 via-orange-500 to-rose-500",
-    ring: "ring-orange-300/60",
-    glow: "shadow-orange-500/40",
+    gradient: "from-[#fb923c] via-[#f97316] to-[#ea580c]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(249,115,22,0.65)]",
   },
   {
     key: null,
     label: "Lương",
     emoji: "💰",
-    gradient: "from-emerald-400 via-emerald-500 to-teal-600",
-    ring: "ring-emerald-300/60",
-    glow: "shadow-emerald-500/40",
+    gradient: "from-[#34d399] via-[#10b981] to-[#059669]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(16,185,129,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "Vật tư",
     emoji: "🏗️",
-    gradient: "from-amber-400 via-amber-500 to-orange-500",
-    ring: "ring-amber-300/60",
-    glow: "shadow-amber-500/40",
+    gradient: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(245,158,11,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "HĐ - Nợ KH",
     emoji: "📋",
-    gradient: "from-sky-400 via-blue-500 to-indigo-600",
-    ring: "ring-blue-300/60",
-    glow: "shadow-blue-500/40",
+    gradient: "from-[#60a5fa] via-[#3b82f6] to-[#1d4ed8]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(59,130,246,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "Báo cáo",
     emoji: "📊",
-    gradient: "from-violet-400 via-purple-500 to-fuchsia-600",
-    ring: "ring-violet-300/60",
-    glow: "shadow-violet-500/40",
+    gradient: "from-[#c084fc] via-[#a855f7] to-[#7e22ce]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(168,85,247,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "Chứng từ",
     emoji: "🧾",
-    gradient: "from-pink-400 via-rose-500 to-red-500",
-    ring: "ring-pink-300/60",
-    glow: "shadow-pink-500/40",
+    gradient: "from-[#f472b6] via-[#ec4899] to-[#be185d]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(236,72,153,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "Thuế",
     emoji: "🏛️",
-    gradient: "from-slate-500 via-slate-600 to-zinc-700",
-    ring: "ring-slate-300/60",
-    glow: "shadow-slate-500/40",
+    gradient: "from-[#94a3b8] via-[#64748b] to-[#334155]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(100,116,139,0.55)]",
     disabled: true,
   },
   {
     key: null,
     label: "Cài đặt",
     emoji: "⚙️",
-    gradient: "from-neutral-400 via-neutral-500 to-stone-600",
-    ring: "ring-neutral-300/60",
-    glow: "shadow-neutral-500/40",
+    gradient: "from-[#a3a3a3] via-[#737373] to-[#404040]",
+    glow: "shadow-[0_10px_30px_-8px_rgba(115,115,115,0.55)]",
     disabled: true,
   },
 ];
@@ -146,19 +136,8 @@ export function KetoanLauncher() {
   }, []);
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] -mx-4 -mt-4 px-4 pt-4 pb-8 sm:-mx-6 sm:px-6">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-100/70 via-teal-50/40 to-transparent"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -right-16 top-10 h-56 w-56 rounded-full bg-emerald-300/30 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -left-16 top-40 h-64 w-64 rounded-full bg-teal-300/25 blur-3xl"
-        aria-hidden
-      />
+    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden px-4 pt-4 pb-10 sm:px-6">
+      <VibrantBackdrop />
 
       <div className="relative space-y-6">
         <BalanceCard
@@ -170,13 +149,10 @@ export function KetoanLauncher() {
         />
 
         <div className="slide-up delay-2">
-          <div className="mb-3 flex items-center gap-2 px-1">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Ứng dụng
-            </span>
+          <div className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+            Ứng dụng
           </div>
-          <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:gap-x-4 sm:gap-y-6">
+          <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6">
             {APPS.map((app, idx) => (
               <AppIcon
                 key={app.label}
@@ -198,6 +174,38 @@ export function KetoanLauncher() {
         </AppDrawer>
       )}
     </div>
+  );
+}
+
+function VibrantBackdrop() {
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{ background: "linear-gradient(180deg, #0d0f18 0%, #0a0b12 100%)" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -top-24 -right-20 -z-10 h-[380px] w-[380px] rounded-full opacity-70 blur-3xl"
+        style={{ background: "radial-gradient(circle, #f97316 0%, transparent 65%)" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute top-32 -left-24 -z-10 h-[300px] w-[300px] rounded-full opacity-50 blur-3xl"
+        style={{ background: "radial-gradient(circle, #ec4899 0%, transparent 65%)" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 right-10 -z-10 h-[260px] w-[260px] rounded-full opacity-40 blur-3xl"
+        style={{ background: "radial-gradient(circle, #a855f7 0%, transparent 65%)" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-24 left-8 -z-10 h-[220px] w-[220px] rounded-full opacity-40 blur-3xl"
+        style={{ background: "radial-gradient(circle, #3b82f6 0%, transparent 65%)" }}
+        aria-hidden
+      />
+    </>
   );
 }
 
@@ -243,37 +251,34 @@ function BalanceCard({
   const animated = useAnimatedNumber(total);
 
   return (
-    <div className="slide-up delay-1 relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 p-5 text-white shadow-xl shadow-emerald-900/20">
+    <div
+      className="slide-up delay-1 relative overflow-hidden rounded-[26px] border border-white/10 p-5 shadow-2xl shadow-black/40"
+      style={{
+        background:
+          "linear-gradient(140deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.06) 100%)",
+        backdropFilter: "blur(24px) saturate(160%)",
+        WebkitBackdropFilter: "blur(24px) saturate(160%)",
+      }}
+    >
       <div
-        className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-teal-300/20 blur-2xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute right-6 top-16 h-2 w-2 rounded-full bg-white/40"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute right-14 top-24 h-1.5 w-1.5 rounded-full bg-white/25"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)" }}
         aria-hidden
       />
 
       <div className="relative flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 backdrop-blur">
-            <Wallet className="h-4 w-4" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f97316]/25 ring-1 ring-[#f97316]/40 backdrop-blur">
+            <Wallet className="h-4 w-4 text-[#fb923c]" />
           </div>
-          <span className="text-sm font-medium tracking-wide text-white/90">
+          <span className="text-[13px] font-medium tracking-wide text-white/75">
             Số dư hiện tại
           </span>
         </div>
         <button
           type="button"
           onClick={onRefresh}
-          className="smooth-press flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur hover:bg-white/25"
+          className="smooth-press flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur hover:bg-white/10"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           {refreshedAt
@@ -283,23 +288,26 @@ function BalanceCard({
       </div>
 
       <div className="relative mt-3 flex items-baseline gap-1.5">
-        <span className="text-4xl font-bold tabular-nums tracking-tight drop-shadow-sm">
+        <span
+          className="text-[42px] font-bold leading-none tabular-nums tracking-tight text-white"
+          style={{ textShadow: "0 2px 24px rgba(249,115,22,0.35)" }}
+        >
           {formatVnd(animated)}
         </span>
-        <span className="text-lg font-medium text-white/80">đ</span>
+        <span className="text-lg font-medium text-white/60">đ</span>
       </div>
 
       {error ? (
-        <div className="relative mt-4 rounded-xl bg-red-500/20 px-3 py-2 text-xs text-white ring-1 ring-white/20 backdrop-blur">
+        <div className="relative mt-4 rounded-2xl border border-red-400/25 bg-red-500/15 px-3 py-2 text-xs text-red-200 backdrop-blur">
           {error}
         </div>
       ) : accounts.length === 0 && loading ? (
         <div className="relative mt-4 space-y-2">
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
+          <div className="h-10 rounded-xl bg-white/5" />
+          <div className="h-10 rounded-xl bg-white/5" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="relative mt-4 rounded-xl bg-amber-400/25 px-3 py-2 text-xs text-white ring-1 ring-white/20 backdrop-blur">
+        <div className="relative mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/15 px-3 py-2 text-xs text-amber-100 backdrop-blur">
           Chưa có tài khoản. Vào{" "}
           <Link href="/treasury" className="font-semibold underline">
             Sổ quỹ
@@ -311,12 +319,12 @@ function BalanceCard({
           {accounts.map((a) => (
             <div
               key={a.id}
-              className="flex items-center justify-between rounded-xl bg-white/12 px-3 py-2 text-sm backdrop-blur ring-1 ring-white/15"
+              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm backdrop-blur"
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-base">{kindIcon(a.kind)}</span>
-                <span className="truncate font-medium text-white">{a.name}</span>
-                <span className="hidden text-xs text-white/60 sm:inline">
+                <span className="truncate font-medium text-white/95">{a.name}</span>
+                <span className="hidden text-xs text-white/45 sm:inline">
                   · {a.code}
                 </span>
               </div>
@@ -344,29 +352,40 @@ function AppIcon({
 }) {
   const disabled = !!app.disabled;
   return (
-    <div className={`slide-up ${delayClass} flex flex-col items-center gap-1.5`}>
+    <div className={`slide-up ${delayClass} flex flex-col items-center gap-2`}>
       <button
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`smooth-press relative flex h-16 w-16 items-center justify-center rounded-[22px] bg-gradient-to-br ${app.gradient} text-[34px] shadow-lg ${app.glow} ring-1 ${app.ring} sm:h-[68px] sm:w-[68px] ${
-          disabled ? "opacity-45 grayscale saturate-50 cursor-not-allowed shadow-none" : ""
+        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[20px] bg-gradient-to-br ${app.gradient} ${app.glow} sm:h-[68px] sm:w-[68px] ${
+          disabled ? "opacity-40 grayscale saturate-50 cursor-not-allowed" : ""
         }`}
+        style={{
+          boxShadow: disabled
+            ? "0 4px 12px -4px rgba(0,0,0,0.4)"
+            : undefined,
+        }}
       >
         <span
-          className="pointer-events-none absolute inset-x-2 top-1.5 h-1/3 rounded-full bg-white/25 blur-[1px]"
+          className="pointer-events-none absolute inset-x-1.5 top-1 h-[38%] rounded-[16px] bg-gradient-to-b from-white/45 to-transparent"
           aria-hidden
         />
-        <span className="relative drop-shadow-sm">{app.emoji}</span>
+        <span
+          className="pointer-events-none absolute inset-0 rounded-[20px] ring-1 ring-inset ring-white/15"
+          aria-hidden
+        />
+        <span className="relative text-[32px] drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] sm:text-[34px]">
+          {app.emoji}
+        </span>
         {badge > 0 && (
-          <span className="pulse-glow absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white ring-2 ring-white">
+          <span className="pulse-glow absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#ff3b30] px-1.5 text-[11px] font-bold text-white ring-2 ring-[#0d0f18]">
             {badge > 99 ? "99+" : badge}
           </span>
         )}
       </button>
       <span
-        className={`text-center text-[11px] font-medium leading-tight sm:text-xs ${
-          disabled ? "text-slate-400" : "text-slate-700"
+        className={`text-center text-[11px] font-medium leading-tight sm:text-[12px] ${
+          disabled ? "text-white/35" : "text-white/85"
         }`}
       >
         {app.label}
@@ -400,23 +419,36 @@ function AppDrawer({
 
   return (
     <div
-      className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 backdrop-blur-sm sm:items-center"
+      className="modal-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
+      style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="modal-sheet-in w-full max-w-md rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
-        style={{ maxHeight: "90vh", overflowY: "auto" }}
+        className="modal-sheet-in w-full max-w-md rounded-t-[28px] border border-white/10 shadow-2xl shadow-black/60 sm:rounded-[28px]"
+        style={{
+          maxHeight: "90vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(160deg, rgba(30,32,45,0.85) 0%, rgba(18,20,30,0.85) 100%)",
+          backdropFilter: "blur(28px) saturate(180%)",
+          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+        }}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-3xl border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[28px]"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)" }}
+          aria-hidden
+        />
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{emoji}</span>
-            <h2 className="text-base font-bold text-slate-900">{title}</h2>
+            <span className="text-[22px]">{emoji}</span>
+            <h2 className="text-[15px] font-semibold text-white">{title}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="smooth-press rounded-full p-1.5 text-slate-500 hover:bg-slate-100"
+            className="smooth-press rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -434,7 +466,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
     <div className="space-y-3">
       <MenuRow
         icon={<PlusCircle className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-emerald-400 to-teal-500"
+        iconBg="bg-gradient-to-br from-[#fb923c] to-[#ea580c]"
         title="Tạo lệnh thu / chi"
         subtitle="Gửi admin duyệt"
       >
@@ -446,7 +478,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
 
       <MenuRow
         icon={<Inbox className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-orange-400 to-rose-500"
+        iconBg="bg-gradient-to-br from-[#f472b6] to-[#be185d]"
         title="Xử lý lệnh từ admin"
         subtitle={hasPending ? "Admin duyệt → KT chuyển khoản" : "Không có lệnh đang chờ"}
         badge={data?.counts.process ?? 0}
@@ -467,7 +499,7 @@ function ThuChiContent({ data }: { data: SummaryDto | null }) {
       <MenuRow
         href="/treasury"
         icon={<BookOpen className="h-5 w-5" />}
-        iconBg="bg-gradient-to-br from-slate-500 to-slate-700"
+        iconBg="bg-gradient-to-br from-[#64748b] to-[#334155]"
         title="Sổ cái thu - chi"
         subtitle="Nhật ký đã thực hiện"
       />
@@ -493,34 +525,42 @@ function MenuRow({
   children?: React.ReactNode;
 }) {
   const inner = (
-    <div className="flex items-center gap-3 px-3 py-3">
+    <div className="flex items-center gap-3 px-3.5 py-3">
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${iconBg}`}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-md ${iconBg}`}
       >
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-slate-900">{title}</div>
-        {subtitle && <div className="text-xs text-slate-500">{subtitle}</div>}
+        <div className="text-[14px] font-semibold text-white">{title}</div>
+        {subtitle && <div className="text-[12px] text-white/55">{subtitle}</div>}
       </div>
       {badge !== undefined && badge > 0 && (
-        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+        <span className="rounded-full bg-[#ff3b30] px-2 py-0.5 text-xs font-bold text-white shadow-md">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
-      {href && <ChevronRight className="h-5 w-5 text-slate-400" />}
+      {href && <ChevronRight className="h-5 w-5 text-white/40" />}
     </div>
   );
   return (
-    <div className="smooth-press overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div
+      className="smooth-press overflow-hidden rounded-2xl border border-white/10"
+      style={{
+        background:
+          "linear-gradient(140deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+      }}
+    >
       {href ? (
-        <Link href={href} className="block hover:bg-slate-50">
+        <Link href={href} className="block hover:bg-white/5">
           {inner}
         </Link>
       ) : (
         inner
       )}
-      {children && <div className="px-3 pb-3">{children}</div>}
+      {children && <div className="px-3.5 pb-3.5">{children}</div>}
     </div>
   );
 }
@@ -529,18 +569,18 @@ function SubLink({ href, label, count }: { href: string; label: string; count?: 
   return (
     <Link
       href={href}
-      className="smooth-press flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs hover:border-emerald-200 hover:bg-emerald-50"
+      className="smooth-press flex items-center justify-between rounded-xl border border-white/8 bg-white/5 px-3 py-2 text-xs hover:border-[#f97316]/40 hover:bg-[#f97316]/10"
     >
-      <span className="font-medium text-slate-700">{label}</span>
+      <span className="font-medium text-white/80">{label}</span>
       <span className="flex items-center gap-1">
         {count !== undefined && count > 0 ? (
-          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          <span className="rounded-full bg-[#ff3b30] px-1.5 py-0.5 text-[10px] font-bold text-white">
             {count}
           </span>
         ) : count !== undefined ? (
-          <span className="text-slate-400">—</span>
+          <span className="text-white/35">—</span>
         ) : null}
-        <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+        <ChevronRight className="h-3.5 w-3.5 text-white/40" />
       </span>
     </Link>
   );
