@@ -13,6 +13,13 @@ import {
   ScrollText,
   Landmark,
   Settings,
+  ClipboardList,
+  ShoppingCart,
+  PackageCheck,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Send,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +35,14 @@ type SummaryDto = {
   balance: { total: number; accounts: AccountDto[] };
   counts: { create: number; process: number; journal: number };
   processBreakdown: { expense: number; receipt: number; paymentOrder: number };
+  todos?: {
+    proposalPending: number;
+    proposalToOrder: number;
+    receiptNeedsDebt: number;
+    expensePending: number;
+    receiptPending: number;
+    paymentOrderApproved: number;
+  };
 };
 
 const formatVnd = (n: number) =>
@@ -167,6 +182,8 @@ export function KetoanLauncher() {
             ))}
           </div>
         </div>
+
+        <WorkQueue data={data} loading={loading} />
       </div>
 
       {open && open.app.buildItems && (
@@ -178,6 +195,182 @@ export function KetoanLauncher() {
         />
       )}
     </div>
+  );
+}
+
+type TodoRow = {
+  key: string;
+  label: string;
+  href: string;
+  count: number;
+  Icon: LucideIcon;
+};
+
+function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
+  if (!t) return [];
+  const raw: TodoRow[] = [
+    {
+      key: "proposal-pending",
+      label: "KS gửi đề xuất — cần duyệt",
+      href: "/proposals?status=pending",
+      count: t.proposalPending,
+      Icon: Send,
+    },
+    {
+      key: "proposal-to-order",
+      label: "Đề xuất đã duyệt — cần đặt NCC",
+      href: "/proposals?status=accepted&orderStatus=not_ordered",
+      count: t.proposalToOrder,
+      Icon: ShoppingCart,
+    },
+    {
+      key: "receipt-needs-debt",
+      label: "KS đã nhận hàng — chờ ghi công nợ",
+      href: "/proposals?status=accepted&orderStatus=received",
+      count: t.receiptNeedsDebt,
+      Icon: PackageCheck,
+    },
+    {
+      key: "expense-pending",
+      label: "Lệnh chi — chờ chuyển",
+      href: "/expenses?status=pending",
+      count: t.expensePending,
+      Icon: ArrowUpCircle,
+    },
+    {
+      key: "receipt-pending",
+      label: "Lệnh thu — chờ nhận",
+      href: "/receipts?status=pending",
+      count: t.receiptPending,
+      Icon: ArrowDownCircle,
+    },
+    {
+      key: "payment-order-approved",
+      label: "Lệnh TT NCC đã duyệt — chờ chi",
+      href: "/payment-orders?status=approved",
+      count: t.paymentOrderApproved,
+      Icon: Banknote,
+    },
+  ];
+  return raw.filter((r) => r.count > 0);
+}
+
+function WorkQueue({
+  data,
+  loading,
+}: {
+  data: SummaryDto | null;
+  loading: boolean;
+}) {
+  const rows = buildTodoRows(data?.todos);
+
+  if (!data && loading) {
+    return (
+      <div className="slide-up delay-3 space-y-2">
+        <div className="h-4 w-32 rounded-md bg-white/5" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="slide-up delay-3">
+      <div
+        className="mb-3 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+        style={{ color: BRAND_TEXT_MUTED }}
+      >
+        <ClipboardList className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+        <span>Việc cần làm</span>
+        {rows.length > 0 && (
+          <span
+            className="rounded-full px-1.5 py-[1px] text-[10px] font-bold tracking-normal"
+            style={{ backgroundColor: BRAND_GOLD, color: "#1a1108" }}
+          >
+            {rows.length}
+          </span>
+        )}
+        <span
+          className="h-px flex-1"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, transparent 100%)",
+          }}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <div
+          className="rounded-2xl px-4 py-4 text-center text-[13px]"
+          style={{
+            background:
+              "linear-gradient(155deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+            border: "0.5px solid rgba(232,201,154,0.10)",
+            color: BRAND_TEXT_MUTED,
+          }}
+        >
+          Đã xử lý xong — không có việc đang chờ.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <TodoCard key={r.key} row={r} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodoCard({ row }: { row: TodoRow }) {
+  const Icon = row.Icon;
+  return (
+    <Link
+      href={row.href}
+      className="smooth-press group flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 transition-colors duration-150 hover:brightness-125"
+      style={{
+        background:
+          "linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 60%, rgba(255,255,255,0) 100%), rgba(232,201,154,0.03)",
+        backdropFilter: "blur(24px) saturate(180%)",
+        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        boxShadow: [
+          "inset 0 1px 0 rgba(232,201,154,0.22)",
+          "inset 0 0 0 0.5px rgba(232,201,154,0.12)",
+          "0 10px 24px -14px rgba(0,0,0,0.55)",
+        ].join(", "),
+      }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          background:
+            "linear-gradient(155deg, rgba(217,153,97,0.25) 0%, rgba(184,118,61,0.10) 100%)",
+          border: "0.5px solid rgba(232,201,154,0.20)",
+        }}
+      >
+        <Icon
+          className="h-[18px] w-[18px]"
+          strokeWidth={1.8}
+          style={{ color: BRAND_GLYPH }}
+        />
+      </span>
+      <span
+        className="flex-1 truncate text-[13.5px] font-medium leading-tight"
+        style={{ color: BRAND_TEXT }}
+      >
+        {row.label}
+      </span>
+      <span
+        className="ml-1 shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold leading-none tabular-nums"
+        style={{ backgroundColor: BRAND_GOLD, color: "#1a1108" }}
+      >
+        {row.count > 99 ? "99+" : row.count}
+      </span>
+      <ChevronRight
+        className="ml-0.5 h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5 group-hover:opacity-70"
+        style={{ color: BRAND_GLYPH }}
+      />
+    </Link>
   );
 }
 

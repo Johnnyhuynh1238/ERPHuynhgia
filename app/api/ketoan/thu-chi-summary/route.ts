@@ -14,7 +14,15 @@ export async function GET() {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 
-  const [accounts, expensePending, receiptPending, paymentOrderApproved] = await Promise.all([
+  const [
+    accounts,
+    expensePending,
+    receiptPending,
+    paymentOrderApproved,
+    proposalPending,
+    proposalToOrder,
+    receiptNeedsDebtRows,
+  ] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
@@ -23,7 +31,20 @@ export async function GET() {
     prisma.expense.count({ where: { status: "pending" } }),
     prisma.receipt.count({ where: { status: "pending" } }),
     prisma.supplierPaymentOrder.count({ where: { status: "approved" } }),
+    prisma.materialProposal.count({ where: { status: "pending" } }),
+    prisma.materialProposal.count({
+      where: { status: "accepted", orderStatus: "not_ordered" },
+    }),
+    // Receipt (KS đã nhận) chưa có debt tương ứng (KT chưa ghi công nợ).
+    prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count
+      FROM material_proposal_item_receipts r
+      LEFT JOIN material_proposal_item_debts d
+        ON d.proposal_id = r.proposal_id AND d.item_seq = r.item_seq
+      WHERE d.id IS NULL
+    `,
   ]);
+  const receiptNeedsDebt = Number(receiptNeedsDebtRows[0]?.count ?? 0);
 
   const accountsOut = accounts.map((a) => ({
     id: a.id,
@@ -50,6 +71,14 @@ export async function GET() {
       expense: expensePending,
       receipt: receiptPending,
       paymentOrder: paymentOrderApproved,
+    },
+    todos: {
+      proposalPending,
+      proposalToOrder,
+      receiptNeedsDebt,
+      expensePending,
+      receiptPending,
+      paymentOrderApproved,
     },
   });
 }
