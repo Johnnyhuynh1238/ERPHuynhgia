@@ -413,7 +413,7 @@ export type CustomerDiaryEntry = {
 
 export async function hasProjectConstructionDiary(projectId: string): Promise<boolean> {
   const row = await prisma.constructionDiary.findFirst({
-    where: { projectId, savedAt: { not: null } },
+    where: { projectId },
     select: { id: true },
   });
   return Boolean(row);
@@ -441,7 +441,6 @@ export async function getCustomerConstructionDiaryEntries(
 ): Promise<CustomerDiaryEntry[]> {
   const where: Prisma.ConstructionDiaryWhereInput = {
     projectId,
-    savedAt: { not: null },
   };
   if (filter.entryDate) {
     const parsed = new Date(`${filter.entryDate}T00:00:00.000Z`);

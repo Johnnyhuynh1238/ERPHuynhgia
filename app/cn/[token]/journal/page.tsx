@@ -267,60 +267,46 @@ async function renderConstructionDiaryView({
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="owner-section-title mb-0">NHẬT KÝ THI CÔNG</div>
-            <div className="mt-1 text-sm owner-muted">
-              Kỹ sư giám sát cập nhật mỗi ngày: công tác đã làm và ảnh hiện trường.
-            </div>
-          </div>
-          <details className="owner-filter-toggle shrink-0">
-            <summary
-              className={`owner-chip cursor-pointer ${activeDate ? "orange" : ""}`}
-              aria-label="Lọc theo ngày"
-              title="Lọc theo ngày"
-            >
-              <span aria-hidden>📅</span>
-            </summary>
-            <div className="owner-filter-panel">
-              <form method="get" action={`/cn/${token}/journal`} className="flex flex-col gap-2">
-                <label className="text-xs owner-muted">Chọn ngày</label>
-                <input
-                  type="date"
-                  name="date"
-                  defaultValue={activeDate || ""}
-                  className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
-                />
-                <div className="flex gap-2">
-                  <button type="submit" className="owner-chip orange cursor-pointer">
-                    Lọc
-                  </button>
-                  {activeDate ? (
-                    <a href={`/cn/${token}/journal`} className="owner-chip cursor-pointer">
-                      Xoá lọc
-                    </a>
-                  ) : null}
-                </div>
-              </form>
-            </div>
-          </details>
+        <div className="owner-section-title mb-0">NHẬT KÝ THI CÔNG</div>
+        <div className="mt-1 text-sm owner-muted">
+          Kỹ sư giám sát cập nhật mỗi ngày: công tác đã làm và ảnh hiện trường.
         </div>
-        {activeDate ? (
-          <div className="mt-3 flex items-center gap-2 text-xs owner-muted">
-            <span>
-              Đang lọc: <strong className="text-white">{ymdToVn(activeDate)}</strong>
-            </span>
-            <a href={`/cn/${token}/journal`} className="text-[#ffb37b] underline">
-              Xoá lọc
-            </a>
-          </div>
-        ) : null}
+        <details className="mt-3" open={Boolean(activeDate)}>
+          <summary
+            className={`owner-chip cursor-pointer inline-flex items-center gap-1 ${activeDate ? "orange" : ""}`}
+            style={{ listStyle: "none" }}
+            aria-label="Lọc theo ngày"
+          >
+            <span aria-hidden>📅</span>
+            <span className="text-xs">{activeDate ? ymdToVn(activeDate) : "Lọc theo ngày"}</span>
+          </summary>
+          <form
+            method="get"
+            action={`/cn/${token}/journal`}
+            className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-neutral-800 bg-neutral-950 p-3"
+          >
+            <div className="flex min-w-0 flex-col gap-1">
+              <label htmlFor="diary-date" className="text-xs owner-muted">Chọn ngày</label>
+              <input
+                id="diary-date"
+                type="date"
+                name="date"
+                defaultValue={activeDate || ""}
+                className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <button type="submit" className="owner-chip orange cursor-pointer">Lọc</button>
+            {activeDate ? (
+              <a href={`/cn/${token}/journal`} className="owner-chip cursor-pointer">Xoá lọc</a>
+            ) : null}
+          </form>
+        </details>
       </section>
 
       <section className="owner-section">
         {entries.length === 0 ? (
           <div className="text-sm owner-muted">
-            {activeDate ? "Ngày này chưa có nhật ký." : "Chưa có nhật ký nào được chốt."}
+            {activeDate ? "Ngày này chưa có nhật ký." : "Chưa có nhật ký."}
           </div>
         ) : null}
 
@@ -335,10 +321,18 @@ async function renderConstructionDiaryView({
                 caption: `${ymdToVn(ymdVn(entry.entryDate))} · Ảnh ${index + 1}`,
               };
             });
+            const isDraft = !entry.savedAt;
             return (
               <article key={entry.id} className="owner-card p-4">
                 <header className="mb-2 flex items-baseline justify-between gap-2">
-                  <div className="font-semibold text-white">{ymdToVn(ymdVn(entry.entryDate))}</div>
+                  <div className="flex items-baseline gap-2">
+                    <div className="font-semibold text-white">{ymdToVn(ymdVn(entry.entryDate))}</div>
+                    {isDraft ? (
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                        Đang cập nhật
+                      </span>
+                    ) : null}
+                  </div>
                   {entry.reporter ? (
                     <div className="text-xs owner-muted">KS: {entry.reporter}</div>
                   ) : null}
