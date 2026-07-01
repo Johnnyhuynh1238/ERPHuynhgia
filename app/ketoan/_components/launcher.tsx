@@ -117,8 +117,15 @@ export function KetoanLauncher() {
 
   return (
     <div
-      className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
-      style={{ background: BRAND_BG }}
+      className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] overflow-hidden px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
+      style={{
+        background: `
+          radial-gradient(60% 42% at 14% 18%, rgba(140,55,32,0.45) 0%, transparent 60%),
+          radial-gradient(55% 40% at 88% 78%, rgba(231,139,74,0.34) 0%, transparent 60%),
+          radial-gradient(40% 30% at 50% 55%, rgba(240,220,195,0.06) 0%, transparent 72%),
+          ${BRAND_BG}
+        `,
+      }}
     >
       <div className="relative space-y-7">
         <BalanceHeadline
@@ -296,15 +303,20 @@ function AppIcon({
         type="button"
         onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
         disabled={disabled}
-        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center rounded-[22px] sm:h-[68px] sm:w-[68px] ${
+        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[22px] sm:h-[68px] sm:w-[68px] ${
           disabled ? "cursor-not-allowed opacity-55" : ""
         }`}
         style={{
-          backgroundColor: BRAND_TINT,
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          boxShadow:
-            "inset 0 0 0 1px rgba(240,220,195,0.14), inset 0 1px 0 rgba(255,230,200,0.18), 0 6px 14px -6px rgba(0,0,0,0.55)",
+          background:
+            "linear-gradient(155deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%), rgba(255,235,210,0.06)",
+          backdropFilter: "blur(36px) saturate(190%)",
+          WebkitBackdropFilter: "blur(36px) saturate(190%)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,240,215,0.36)",
+            "inset 0 0 0 0.5px rgba(255,240,215,0.16)",
+            "inset 0 -12px 28px -14px rgba(255,240,215,0.06)",
+            "0 12px 30px -14px rgba(0,0,0,0.55)",
+          ].join(", "),
         }}
       >
         <Icon
@@ -460,13 +472,17 @@ function PopItemCard({
   return (
     <Link
       href={item.href}
-      className="smooth-press group flex items-center justify-between rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-colors duration-150 hover:bg-[rgba(240,220,195,0.06)]"
+      className="smooth-press group flex items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-colors duration-150 hover:brightness-125"
       style={{
-        background: "rgba(28,16,10,0.78)",
-        backdropFilter: "blur(30px) saturate(180%)",
-        WebkitBackdropFilter: "blur(30px) saturate(180%)",
-        boxShadow:
-          "0 10px 24px -10px rgba(0,0,0,0.6), inset 0 0 0 0.5px rgba(240,220,195,0.14), inset 0 1px 0 rgba(255,230,200,0.08)",
+        background:
+          "linear-gradient(155deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0) 100%), rgba(255,235,210,0.05)",
+        backdropFilter: "blur(32px) saturate(190%)",
+        WebkitBackdropFilter: "blur(32px) saturate(190%)",
+        boxShadow: [
+          "inset 0 1px 0 rgba(255,240,215,0.28)",
+          "inset 0 0 0 0.5px rgba(255,240,215,0.14)",
+          "0 10px 26px -12px rgba(0,0,0,0.5)",
+        ].join(", "),
       }}
     >
       <span
