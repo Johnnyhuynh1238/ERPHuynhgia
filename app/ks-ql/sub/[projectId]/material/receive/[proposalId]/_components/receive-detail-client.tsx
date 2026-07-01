@@ -323,7 +323,6 @@ function ReceiveModal({
               type="file"
               accept="image/*"
               multiple
-              capture="environment"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.length) uploadPhotos(e.target.files);
