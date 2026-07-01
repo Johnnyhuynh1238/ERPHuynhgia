@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
-import { buildCustomerJournalEvents } from "@/lib/customer-portal-v2";
+import {
+  buildCustomerJournalEvents,
+  getCustomerConstructionDiaryEntries,
+  hasProjectConstructionDiary,
+} from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
 import { CustomerPhotoAlbum } from "../_components/customer-photo-album";
 
@@ -55,15 +59,32 @@ function buildPhotoUrls(
   return { url: photo.url, thumbnailUrl: photo.thumbnailUrl || null };
 }
 
+function isValidYmd(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function ymdVn(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
 export default async function CustomerJournalPage({
   params,
   searchParams,
 }: {
   params: { token: string };
-  searchParams?: { type?: string; phase?: string; view?: string };
+  searchParams?: { type?: string; phase?: string; view?: string; date?: string };
 }) {
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
+
+  if (await hasProjectConstructionDiary(project.id)) {
+    return renderConstructionDiaryView({ token: params.token, projectId: project.id, searchParams });
+  }
 
   const photoGalleryMode = searchParams?.view === "photos";
   const selectedPhase = searchParams?.phase || "all";
@@ -227,4 +248,127 @@ export default async function CustomerJournalPage({
       </section>
     </div>
   );
+}
+
+async function renderConstructionDiaryView({
+  token,
+  projectId,
+  searchParams,
+}: {
+  token: string;
+  projectId: string;
+  searchParams?: { date?: string };
+}) {
+  const rawDate = searchParams?.date?.trim();
+  const activeDate = rawDate && isValidYmd(rawDate) ? rawDate : null;
+
+  const entries = await getCustomerConstructionDiaryEntries(projectId, { entryDate: activeDate });
+
+  return (
+    <div className="owner-portal-page">
+      <section className="owner-section">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="owner-section-title mb-0">NHẬT KÝ THI CÔNG</div>
+            <div className="mt-1 text-sm owner-muted">
+              Kỹ sư giám sát cập nhật mỗi ngày: công tác đã làm và ảnh hiện trường.
+            </div>
+          </div>
+          <details className="owner-filter-toggle shrink-0">
+            <summary
+              className={`owner-chip cursor-pointer ${activeDate ? "orange" : ""}`}
+              aria-label="Lọc theo ngày"
+              title="Lọc theo ngày"
+            >
+              <span aria-hidden>📅</span>
+            </summary>
+            <div className="owner-filter-panel">
+              <form method="get" action={`/cn/${token}/journal`} className="flex flex-col gap-2">
+                <label className="text-xs owner-muted">Chọn ngày</label>
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={activeDate || ""}
+                  className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+                />
+                <div className="flex gap-2">
+                  <button type="submit" className="owner-chip orange cursor-pointer">
+                    Lọc
+                  </button>
+                  {activeDate ? (
+                    <a href={`/cn/${token}/journal`} className="owner-chip cursor-pointer">
+                      Xoá lọc
+                    </a>
+                  ) : null}
+                </div>
+              </form>
+            </div>
+          </details>
+        </div>
+        {activeDate ? (
+          <div className="mt-3 flex items-center gap-2 text-xs owner-muted">
+            <span>
+              Đang lọc: <strong className="text-white">{ymdToVn(activeDate)}</strong>
+            </span>
+            <a href={`/cn/${token}/journal`} className="text-[#ffb37b] underline">
+              Xoá lọc
+            </a>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="owner-section">
+        {entries.length === 0 ? (
+          <div className="text-sm owner-muted">
+            {activeDate ? "Ngày này chưa có nhật ký." : "Chưa có nhật ký nào được chốt."}
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-4">
+          {entries.map((entry) => {
+            const photos = entry.photos.map((photo, index) => {
+              const url = `/api/customer/${token}/diary/photos/file?key=${encodeURIComponent(photo.key)}`;
+              return {
+                id: `${entry.id}-photo-${index}`,
+                url,
+                thumbnailUrl: url,
+                caption: `${ymdToVn(ymdVn(entry.entryDate))} · Ảnh ${index + 1}`,
+              };
+            });
+            return (
+              <article key={entry.id} className="owner-card p-4">
+                <header className="mb-2 flex items-baseline justify-between gap-2">
+                  <div className="font-semibold text-white">{ymdToVn(ymdVn(entry.entryDate))}</div>
+                  {entry.reporter ? (
+                    <div className="text-xs owner-muted">KS: {entry.reporter}</div>
+                  ) : null}
+                </header>
+                {entry.tasksDone ? (
+                  <p className="whitespace-pre-wrap text-sm text-white/90">{entry.tasksDone}</p>
+                ) : (
+                  <p className="text-sm owner-muted italic">Không có ghi chú công tác.</p>
+                )}
+                {photos.length ? (
+                  <div className="mt-3">
+                    <CustomerPhotoAlbum
+                      photos={photos}
+                      gridClassName="grid grid-cols-3 gap-2"
+                      thumbnailClassName="h-24"
+                    />
+                    <div className="mt-1 text-xs owner-muted">{photos.length} ảnh</div>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ymdToVn(ymd: string) {
+  const [y, m, d] = ymd.split("-");
+  if (!y || !m || !d) return ymd;
+  return `${d}/${m}/${y}`;
 }

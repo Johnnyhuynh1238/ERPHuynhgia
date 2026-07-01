@@ -399,3 +399,80 @@ export async function buildCustomerJournalEvents(
 
   return events.sort((a, b) => b.date.getTime() - a.date.getTime());
 }
+
+export type CustomerDiaryPhoto = { key: string; contentType?: string | null };
+
+export type CustomerDiaryEntry = {
+  id: string;
+  entryDate: Date;
+  savedAt: Date | null;
+  tasksDone: string | null;
+  photos: CustomerDiaryPhoto[];
+  reporter: string | null;
+};
+
+export async function hasProjectConstructionDiary(projectId: string): Promise<boolean> {
+  const row = await prisma.constructionDiary.findFirst({
+    where: { projectId, savedAt: { not: null } },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
+function normalizeDiaryPhotos(value: unknown): CustomerDiaryPhoto[] {
+  if (!Array.isArray(value)) return [];
+  const out: CustomerDiaryPhoto[] = [];
+  for (const item of value) {
+    if (item && typeof item === "object" && typeof (item as { key?: unknown }).key === "string") {
+      out.push({
+        key: (item as { key: string }).key,
+        contentType: typeof (item as { contentType?: unknown }).contentType === "string"
+          ? (item as { contentType: string }).contentType
+          : null,
+      });
+    }
+  }
+  return out;
+}
+
+export async function getCustomerConstructionDiaryEntries(
+  projectId: string,
+  filter: { entryDate?: string | null } = {},
+): Promise<CustomerDiaryEntry[]> {
+  const where: Prisma.ConstructionDiaryWhereInput = {
+    projectId,
+    savedAt: { not: null },
+  };
+  if (filter.entryDate) {
+    const parsed = new Date(`${filter.entryDate}T00:00:00.000Z`);
+    if (!Number.isNaN(parsed.getTime())) {
+      where.entryDate = parsed;
+    }
+  }
+
+  const rows = await prisma.constructionDiary.findMany({
+    where,
+    orderBy: { entryDate: "desc" },
+    select: {
+      id: true,
+      entryDate: true,
+      savedAt: true,
+      tasksDone: true,
+      taskPhotos: true,
+      sitePhotos: true,
+      ks: { select: { fullName: true } },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    entryDate: row.entryDate,
+    savedAt: row.savedAt,
+    tasksDone: row.tasksDone && row.tasksDone.trim().length > 0 ? row.tasksDone : null,
+    photos: [
+      ...normalizeDiaryPhotos(row.taskPhotos),
+      ...normalizeDiaryPhotos(row.sitePhotos),
+    ],
+    reporter: row.ks?.fullName || null,
+  }));
+}
