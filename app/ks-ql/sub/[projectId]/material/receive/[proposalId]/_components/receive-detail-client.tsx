@@ -2,8 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Check, CheckCircle2, Loader2, Trash2, X } from "lucide-react";
+import { Camera, Check, CheckCircle2, Download, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+
+function poCode(id: string) {
+  return `PO-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
 
 type Item = { seq: number; name: string; qty: number; unit: string; task: string };
 type Photo = { key: string };
@@ -27,17 +31,43 @@ export function ReceiveDetailClient({
   orderStatus,
   items,
   initialReceipts,
+  project,
+  ksName,
 }: {
   proposalId: string;
   description: string;
   orderStatus: "ordered" | "received";
   items: Item[];
   initialReceipts: Receipt[];
+  project: { code: string; name: string };
+  ksName: string;
 }) {
   const [receipts, setReceipts] = useState<Map<number, Receipt>>(
     () => new Map(initialReceipts.map((r) => [r.itemSeq, r])),
   );
   const [openSeq, setOpenSeq] = useState<number | null>(null);
+  const poRef = useRef<HTMLDivElement>(null);
+  const [downloadingPo, setDownloadingPo] = useState(false);
+  const code = poCode(proposalId);
+
+  async function downloadPo() {
+    if (!poRef.current) return;
+    setDownloadingPo(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(poRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      const link = document.createElement("a");
+      link.download = `${code}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } finally {
+      setDownloadingPo(false);
+    }
+  }
 
   function updateReceipt(seq: number, r: Receipt | null) {
     setReceipts((prev) => {
@@ -64,10 +94,25 @@ export function ReceiveDetailClient({
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8892b0]">
-          Mô tả PO
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8892b0]">
+              Mô tả PO · <span className="font-mono text-[#5a627a]">{code}</span>
+            </div>
+            <div className="mt-0.5 whitespace-pre-wrap text-sm text-[#f0f2ff]">{description}</div>
+          </div>
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={downloadPo}
+              disabled={downloadingPo}
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <Download className="h-3 w-3" />
+              {downloadingPo ? "Đang tạo..." : "Tải PO"}
+            </button>
+          )}
         </div>
-        <div className="mt-0.5 whitespace-pre-wrap text-sm text-[#f0f2ff]">{description}</div>
         <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[#8892b0]">
           <span>
             Nhận: <b className="text-[#f0f2ff]">{summary.done}</b>/{items.length}
@@ -82,6 +127,16 @@ export function ReceiveDetailClient({
           </span>
         </div>
       </div>
+
+      {items.length > 0 && (
+        <PurchaseOrderTemplate
+          poRef={poRef}
+          code={code}
+          items={items}
+          project={project}
+          ksName={ksName}
+        />
+      )}
 
       <div className="space-y-2">
         {items.map((it) => {
@@ -380,6 +435,217 @@ function ReceiveModal({
           >
             {busy ? "Đang lưu…" : "Lưu nhận"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PurchaseOrderTemplate({
+  poRef,
+  code,
+  items,
+  project,
+  ksName,
+}: {
+  poRef: React.RefObject<HTMLDivElement>;
+  code: string;
+  items: Item[];
+  project: { code: string; name: string };
+  ksName: string;
+}) {
+  const TERRA = "#A55A35";
+  const TERRA_LIGHT = "#D27A52";
+  const GOLD = "#C49A3A";
+  const CREAM = "#FAF6EE";
+  const CREAM_DEEP = "#F3EADA";
+  const INK = "#261C13";
+  const MUTED = "#7A6B55";
+  const today = new Date().toLocaleDateString("vi-VN");
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: "-9999px",
+        width: "800px",
+        background: "#ffffff",
+        color: INK,
+      }}
+    >
+      <div
+        ref={poRef}
+        style={{
+          padding: "36px 40px 32px",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+          background: "#ffffff",
+          color: INK,
+          borderTop: `6px solid ${TERRA}`,
+        }}
+      >
+        <div style={{ display: "flex", gap: "16px", alignItems: "center", paddingBottom: "18px", borderBottom: `1px solid ${CREAM_DEEP}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/a6-logo-256.png"
+            alt="Huỳnh Gia"
+            width={68}
+            height={68}
+            style={{ width: "68px", height: "68px", objectFit: "contain", flexShrink: 0 }}
+          />
+          <div style={{ flex: 1, lineHeight: 1.35 }}>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: GOLD, letterSpacing: "1.5px" }}>
+              CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG VÀ NỘI THẤT
+            </div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: TERRA, letterSpacing: "0.5px", marginTop: "2px" }}>
+              HUỲNH GIA
+            </div>
+            <div style={{ fontSize: "11px", color: MUTED, marginTop: "3px" }}>
+              2157 QL51, Ấp Phước Bình 1, Xã Phước Thái, Tỉnh Đồng Nai
+            </div>
+            <div style={{ fontSize: "11px", color: MUTED, marginTop: "1px" }}>
+              Hotline / Zalo: <span style={{ color: INK, fontWeight: 600 }}>0931 316 513</span>
+              <span style={{ margin: "0 6px", color: CREAM_DEEP }}>·</span>
+              <span style={{ color: INK, fontWeight: 600 }}>huynhgia6.com</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: "20px",
+            background: `linear-gradient(135deg, ${TERRA} 0%, ${TERRA_LIGHT} 100%)`,
+            color: "#ffffff",
+            padding: "12px 18px",
+            borderRadius: "6px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "1px" }}>
+            ĐƠN ĐẶT HÀNG VẬT TƯ
+          </div>
+          <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.92 }}>
+            Số: {code}
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: "16px",
+            background: CREAM,
+            border: `1px solid ${CREAM_DEEP}`,
+            borderLeft: `3px solid ${GOLD}`,
+            padding: "12px 16px",
+            borderRadius: "4px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "6px 24px",
+            fontSize: "13px",
+          }}
+        >
+          <div>
+            <span style={{ color: MUTED }}>Ngày lập:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{today}</span>
+          </div>
+          <div>
+            <span style={{ color: MUTED }}>Mã công trình:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{project.code}</span>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span style={{ color: MUTED }}>Công trình:</span>{" "}
+            <span style={{ fontWeight: 600 }}>{project.name}</span>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span style={{ color: MUTED }}>Người phụ trách (KS):</span>{" "}
+            <span style={{ fontWeight: 600 }}>{ksName}</span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: "14px", fontSize: "13px" }}>
+          <span style={{ color: MUTED }}>Kính gửi Quý Nhà cung cấp:</span>{" "}
+          <span style={{ borderBottom: `1px dotted ${MUTED}`, paddingBottom: "1px", display: "inline-block", minWidth: "320px" }}>
+            &nbsp;
+          </span>
+        </div>
+
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", marginTop: "16px" }}>
+          <thead>
+            <tr style={{ background: TERRA, color: "#ffffff" }}>
+              <th style={{ padding: "10px 8px", textAlign: "center", width: "40px", fontWeight: 700 }}>STT</th>
+              <th style={{ padding: "10px 10px", textAlign: "left", fontWeight: 700 }}>Chủng loại vật tư</th>
+              <th style={{ padding: "10px 8px", textAlign: "right", width: "90px", fontWeight: 700 }}>Số lượng</th>
+              <th style={{ padding: "10px 8px", textAlign: "center", width: "70px", fontWeight: 700 }}>ĐVT</th>
+              <th style={{ padding: "10px 10px", textAlign: "left", width: "200px", fontWeight: 700 }}>Dùng cho công tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr
+                key={i}
+                style={{
+                  background: i % 2 === 0 ? "#ffffff" : CREAM,
+                  borderBottom: `1px solid ${CREAM_DEEP}`,
+                }}
+              >
+                <td style={{ padding: "9px 8px", textAlign: "center", color: MUTED }}>{i + 1}</td>
+                <td style={{ padding: "9px 10px", fontWeight: 600 }}>{it.name}</td>
+                <td style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, color: TERRA }}>
+                  {it.qty.toLocaleString("vi-VN")}
+                </td>
+                <td style={{ padding: "9px 8px", textAlign: "center" }}>{it.unit}</td>
+                <td style={{ padding: "9px 10px", color: MUTED, fontSize: "12px" }}>
+                  {it.task || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            marginTop: "18px",
+            padding: "10px 14px",
+            background: CREAM,
+            border: `1px dashed ${GOLD}`,
+            borderRadius: "4px",
+            fontSize: "12px",
+            color: MUTED,
+            lineHeight: 1.55,
+          }}
+        >
+          <span style={{ color: TERRA, fontWeight: 700 }}>Lưu ý: </span>
+          Vật tư giao đúng chủng loại, đủ số lượng. Hoá đơn / phiếu giao hàng vui lòng ghi rõ Mã PO
+          <span style={{ color: INK, fontWeight: 600 }}> {code}</span> để Huỳnh Gia đối chiếu thanh toán.
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px", fontSize: "13px" }}>
+          <div style={{ textAlign: "center", width: "45%" }}>
+            <div style={{ fontWeight: 700, color: TERRA, marginBottom: "4px" }}>NHÀ CUNG CẤP</div>
+            <div style={{ fontSize: "11px", color: MUTED, fontStyle: "italic" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ height: "70px" }} />
+          </div>
+          <div style={{ textAlign: "center", width: "45%" }}>
+            <div style={{ fontWeight: 700, color: TERRA, marginBottom: "4px" }}>ĐẠI DIỆN HUỲNH GIA</div>
+            <div style={{ fontSize: "11px", color: MUTED, fontStyle: "italic" }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ height: "70px" }} />
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: "20px",
+            paddingTop: "10px",
+            borderTop: `1px solid ${CREAM_DEEP}`,
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "10px",
+            color: MUTED,
+          }}
+        >
+          <div>Huỳnh Gia · 14 năm xây nhà phố TP.HCM · 200+ công trình</div>
+          <div>{code} · {today}</div>
         </div>
       </div>
     </div>

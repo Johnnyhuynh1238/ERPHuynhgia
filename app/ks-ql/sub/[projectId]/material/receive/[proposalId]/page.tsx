@@ -39,7 +39,7 @@ export default async function ReceiveDetailPage({
       laborMode: "subcontract",
       memberAssignments: { some: { userId: user.id, role: "pm_engineer" } },
     },
-    select: { id: true, name: true },
+    select: { id: true, code: true, name: true },
   });
   if (!project) notFound();
 
@@ -57,6 +57,7 @@ export default async function ReceiveDetailPage({
       parsedItems: true,
       orderStatus: true,
       orderedAt: true,
+      ks: { select: { fullName: true } },
       receipts: {
         select: {
           itemSeq: true,
@@ -100,6 +101,8 @@ export default async function ReceiveDetailPage({
         orderStatus={proposal.orderStatus as "ordered" | "received"}
         items={items}
         initialReceipts={receipts}
+        project={{ code: project.code, name: project.name }}
+        ksName={proposal.ks.fullName}
       />
     </SubLayout>
   );
