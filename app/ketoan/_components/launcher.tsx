@@ -52,11 +52,13 @@ type AppDef = {
   buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
 
-// Brand palette rút từ avatar HuynhGia6 (rust + cream + terracotta accent)
-const BRAND_TINT = "#6b2d1c";
-const BRAND_GLYPH = "#f0dcc3";
-const BRAND_ACCENT = "#e78b4a";
-const BRAND_BG = "#0f0906";
+// Luxury dark + brand brown-gold (kiểu Pinterest Media Kit)
+const BRAND_BG = "#0a0806";
+const BRAND_GOLD = "#b8763d";
+const BRAND_GOLD_BRIGHT = "#d99961";
+const BRAND_GLYPH = "#e8c99a";
+const BRAND_TEXT = "rgba(240,232,220,0.95)";
+const BRAND_TEXT_MUTED = "rgba(240,232,220,0.55)";
 
 const APPS: AppDef[] = [
   {
@@ -120,9 +122,8 @@ export function KetoanLauncher() {
       className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] overflow-hidden px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
       style={{
         background: `
-          radial-gradient(60% 42% at 14% 18%, rgba(140,55,32,0.45) 0%, transparent 60%),
-          radial-gradient(55% 40% at 88% 78%, rgba(231,139,74,0.34) 0%, transparent 60%),
-          radial-gradient(40% 30% at 50% 55%, rgba(240,220,195,0.06) 0%, transparent 72%),
+          radial-gradient(60% 45% at 88% 12%, rgba(217,153,97,0.10) 0%, transparent 55%),
+          radial-gradient(50% 35% at 8% 92%, rgba(184,118,61,0.09) 0%, transparent 55%),
           ${BRAND_BG}
         `,
       }}
@@ -137,8 +138,18 @@ export function KetoanLauncher() {
         />
 
         <div className="slide-up delay-2">
-          <div className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
-            Ứng dụng
+          <div
+            className="mb-3 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: BRAND_TEXT_MUTED }}
+          >
+            <span>Ứng dụng</span>
+            <span
+              className="h-px flex-1"
+              style={{
+                background:
+                  "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, transparent 100%)",
+              }}
+            />
           </div>
           <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6">
             {APPS.map((app, idx) => (
@@ -213,14 +224,18 @@ function BalanceHeadline({
 
   return (
     <div className="slide-up delay-1 relative px-1 pt-2">
-      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
-        <Wallet className="h-3 w-3" style={{ color: BRAND_ACCENT }} />
+      <div
+        className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em]"
+        style={{ color: BRAND_TEXT_MUTED }}
+      >
+        <Wallet className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
         <span>Số dư hiện tại</span>
-        <span className="text-white/25">·</span>
+        <span style={{ color: "rgba(240,232,220,0.25)" }}>·</span>
         <button
           type="button"
           onClick={onRefresh}
-          className="smooth-press inline-flex items-center gap-1 text-white/50 hover:text-white/80"
+          className="smooth-press inline-flex items-center gap-1 transition-colors"
+          style={{ color: BRAND_TEXT_MUTED }}
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           <span className="normal-case tracking-normal">
@@ -236,13 +251,26 @@ function BalanceHeadline({
           className="text-[44px] font-bold leading-none tabular-nums tracking-tight"
           style={{
             color: BRAND_GLYPH,
-            textShadow: "0 2px 28px rgba(231,139,74,0.35)",
+            textShadow: "0 2px 26px rgba(217,153,97,0.28)",
           }}
         >
           {formatVnd(animated)}
         </span>
-        <span className="text-xl font-medium text-white/55">đ</span>
+        <span
+          className="text-xl font-medium"
+          style={{ color: BRAND_GOLD_BRIGHT }}
+        >
+          đ
+        </span>
       </div>
+
+      <div
+        className="mt-4 h-px w-full"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, rgba(184,118,61,0.08) 60%, transparent 100%)",
+        }}
+      />
 
       {error ? (
         <div className="mt-3 text-xs text-red-300">{error}</div>
@@ -252,7 +280,7 @@ function BalanceHeadline({
           <div className="h-4 w-32 rounded-md bg-white/5" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="mt-3 text-xs text-amber-200/80">
+        <div className="mt-3 text-xs" style={{ color: BRAND_GOLD_BRIGHT }}>
           Chưa có tài khoản. Vào{" "}
           <Link href="/treasury" className="font-semibold underline">
             Sổ quỹ
@@ -260,20 +288,29 @@ function BalanceHeadline({
           khai báo TK.
         </div>
       ) : (
-        <div className="mt-3 divide-y divide-white/8">
+        <div className="mt-2 divide-y" style={{ borderColor: "rgba(184,118,61,0.14)" }}>
           {accounts.map((a) => (
             <div
               key={a.id}
-              className="flex items-center justify-between py-1.5 text-[13px]"
+              className="flex items-center justify-between border-t py-1.5 text-[13px] first:border-t-0"
+              style={{ borderColor: "rgba(184,118,61,0.14)" }}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-sm">{kindIcon(a.kind)}</span>
-                <span className="truncate text-white/85">{a.name}</span>
-                <span className="hidden text-[11px] text-white/35 sm:inline">
+                <span className="truncate" style={{ color: BRAND_TEXT }}>
+                  {a.name}
+                </span>
+                <span
+                  className="hidden text-[11px] sm:inline"
+                  style={{ color: BRAND_TEXT_MUTED }}
+                >
                   · {a.code}
                 </span>
               </div>
-              <span className="ml-2 shrink-0 font-semibold tabular-nums text-white/95">
+              <span
+                className="ml-2 shrink-0 font-semibold tabular-nums"
+                style={{ color: BRAND_GOLD_BRIGHT }}
+              >
                 {formatVnd(a.currentBalance)}
               </span>
             </div>
@@ -303,41 +340,45 @@ function AppIcon({
         type="button"
         onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
         disabled={disabled}
-        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[22px] sm:h-[68px] sm:w-[68px] ${
-          disabled ? "cursor-not-allowed opacity-55" : ""
+        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[20px] sm:h-[68px] sm:w-[68px] ${
+          disabled ? "cursor-not-allowed opacity-50" : ""
         }`}
         style={{
-          background:
-            "linear-gradient(155deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%), rgba(255,235,210,0.06)",
-          backdropFilter: "blur(36px) saturate(190%)",
-          WebkitBackdropFilter: "blur(36px) saturate(190%)",
+          background: `
+            radial-gradient(circle at 20% 15%, rgba(255,220,175,0.16) 0%, transparent 55%),
+            radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
+            #0f0806
+          `,
           boxShadow: [
-            "inset 0 1px 0 rgba(255,240,215,0.36)",
-            "inset 0 0 0 0.5px rgba(255,240,215,0.16)",
-            "inset 0 -12px 28px -14px rgba(255,240,215,0.06)",
-            "0 12px 30px -14px rgba(0,0,0,0.55)",
+            "inset 0 0 0 0.5px rgba(184,118,61,0.5)",
+            "inset 0 1px 0 rgba(217,153,97,0.55)",
+            "inset 0 -1px 0 rgba(184,118,61,0.15)",
+            "0 0 22px -8px rgba(184,118,61,0.28)",
+            "0 8px 20px -10px rgba(0,0,0,0.6)",
           ].join(", "),
         }}
       >
         <Icon
-          className="relative h-[28px] w-[28px] sm:h-[30px] sm:w-[30px]"
-          strokeWidth={1.75}
-          style={{ color: BRAND_GLYPH }}
+          className="relative h-[26px] w-[26px] sm:h-[28px] sm:w-[28px]"
+          strokeWidth={1.6}
+          style={{ color: BRAND_GOLD_BRIGHT }}
         />
         {badge > 0 && (
           <span
-            className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-            style={{ backgroundColor: BRAND_ACCENT, boxShadow: `0 0 0 2px ${BRAND_BG}` }}
+            className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
+            style={{
+              backgroundColor: BRAND_GOLD_BRIGHT,
+              color: BRAND_BG,
+              boxShadow: `0 0 0 2px ${BRAND_BG}`,
+            }}
           >
             {badge > 99 ? "99+" : badge}
           </span>
         )}
       </button>
       <span
-        className={`text-center text-[11px] font-medium leading-tight sm:text-[12px] ${
-          disabled ? "text-white/35" : ""
-        }`}
-        style={disabled ? undefined : { color: "rgba(240,220,195,0.85)" }}
+        className="text-center text-[11px] font-medium leading-tight sm:text-[12px]"
+        style={{ color: disabled ? "rgba(240,232,220,0.35)" : BRAND_TEXT }}
       >
         {app.label}
       </span>
@@ -472,31 +513,32 @@ function PopItemCard({
   return (
     <Link
       href={item.href}
-      className="smooth-press group flex items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-colors duration-150 hover:brightness-125"
+      className="smooth-press group flex items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-all duration-150 hover:brightness-110"
       style={{
-        background:
-          "linear-gradient(155deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0) 100%), rgba(255,235,210,0.05)",
-        backdropFilter: "blur(32px) saturate(190%)",
-        WebkitBackdropFilter: "blur(32px) saturate(190%)",
+        background: `
+          radial-gradient(circle at 12% 15%, rgba(255,220,175,0.10) 0%, transparent 55%),
+          radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+          #0f0806
+        `,
         boxShadow: [
-          "inset 0 1px 0 rgba(255,240,215,0.28)",
-          "inset 0 0 0 0.5px rgba(255,240,215,0.14)",
-          "0 10px 26px -12px rgba(0,0,0,0.5)",
+          "inset 0 0 0 0.5px rgba(184,118,61,0.42)",
+          "inset 0 1px 0 rgba(217,153,97,0.42)",
+          "0 8px 22px -10px rgba(0,0,0,0.55)",
         ].join(", "),
       }}
     >
       <span
         className="truncate font-medium leading-none"
         style={{
-          color: item.isNew ? BRAND_ACCENT : "rgba(240,220,195,0.92)",
+          color: item.isNew ? BRAND_GOLD_BRIGHT : BRAND_TEXT,
         }}
       >
         {item.label}
       </span>
       {item.badge !== undefined && item.badge > 0 && (
         <span
-          className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
-          style={{ backgroundColor: BRAND_ACCENT }}
+          className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+          style={{ backgroundColor: BRAND_GOLD_BRIGHT, color: BRAND_BG }}
         >
           {item.badge > 99 ? "99+" : item.badge}
         </span>
