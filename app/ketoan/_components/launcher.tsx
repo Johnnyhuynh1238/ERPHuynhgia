@@ -140,7 +140,7 @@ export function KetoanLauncher() {
       <VibrantBackdrop />
 
       <div className="relative space-y-6">
-        <BalanceCard
+        <BalanceHeadline
           data={data}
           loading={loading}
           error={error}
@@ -233,7 +233,7 @@ function useAnimatedNumber(target: number, durationMs = 700) {
   return value;
 }
 
-function BalanceCard({
+function BalanceHeadline({
   data,
   loading,
   error,
@@ -251,63 +251,44 @@ function BalanceCard({
   const animated = useAnimatedNumber(total);
 
   return (
-    <div
-      className="slide-up delay-1 relative overflow-hidden rounded-[26px] border border-white/10 p-5 shadow-2xl shadow-black/40"
-      style={{
-        background:
-          "linear-gradient(140deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.06) 100%)",
-        backdropFilter: "blur(24px) saturate(160%)",
-        WebkitBackdropFilter: "blur(24px) saturate(160%)",
-      }}
-    >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)" }}
-        aria-hidden
-      />
-
-      <div className="relative flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f97316]/25 ring-1 ring-[#f97316]/40 backdrop-blur">
-            <Wallet className="h-4 w-4 text-[#fb923c]" />
-          </div>
-          <span className="text-[13px] font-medium tracking-wide text-white/75">
-            Số dư hiện tại
-          </span>
-        </div>
+    <div className="slide-up delay-1 relative px-1 pt-2">
+      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
+        <Wallet className="h-3 w-3 text-[#fb923c]" />
+        <span>Số dư hiện tại</span>
+        <span className="text-white/25">·</span>
         <button
           type="button"
           onClick={onRefresh}
-          className="smooth-press flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur hover:bg-white/10"
+          className="smooth-press inline-flex items-center gap-1 text-white/50 hover:text-white/80"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-          {refreshedAt
-            ? refreshedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-            : "—"}
+          <span className="normal-case tracking-normal">
+            {refreshedAt
+              ? refreshedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+              : "—"}
+          </span>
         </button>
       </div>
 
-      <div className="relative mt-3 flex items-baseline gap-1.5">
+      <div className="mt-1.5 flex items-baseline gap-1.5">
         <span
-          className="text-[42px] font-bold leading-none tabular-nums tracking-tight text-white"
-          style={{ textShadow: "0 2px 24px rgba(249,115,22,0.35)" }}
+          className="text-[44px] font-bold leading-none tabular-nums tracking-tight text-white"
+          style={{ textShadow: "0 2px 28px rgba(249,115,22,0.45)" }}
         >
           {formatVnd(animated)}
         </span>
-        <span className="text-lg font-medium text-white/60">đ</span>
+        <span className="text-xl font-medium text-white/55">đ</span>
       </div>
 
       {error ? (
-        <div className="relative mt-4 rounded-2xl border border-red-400/25 bg-red-500/15 px-3 py-2 text-xs text-red-200 backdrop-blur">
-          {error}
-        </div>
+        <div className="mt-3 text-xs text-red-300">{error}</div>
       ) : accounts.length === 0 && loading ? (
-        <div className="relative mt-4 space-y-2">
-          <div className="h-10 rounded-xl bg-white/5" />
-          <div className="h-10 rounded-xl bg-white/5" />
+        <div className="mt-3 space-y-1.5">
+          <div className="h-4 w-40 rounded-md bg-white/5" />
+          <div className="h-4 w-32 rounded-md bg-white/5" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="relative mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/15 px-3 py-2 text-xs text-amber-100 backdrop-blur">
+        <div className="mt-3 text-xs text-amber-200/80">
           Chưa có tài khoản. Vào{" "}
           <Link href="/treasury" className="font-semibold underline">
             Sổ quỹ
@@ -315,20 +296,20 @@ function BalanceCard({
           khai báo TK.
         </div>
       ) : (
-        <div className="relative mt-4 grid gap-1.5">
+        <div className="mt-3 divide-y divide-white/8">
           {accounts.map((a) => (
             <div
               key={a.id}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm backdrop-blur"
+              className="flex items-center justify-between py-1.5 text-[13px]"
             >
               <div className="flex items-center gap-2 truncate">
-                <span className="text-base">{kindIcon(a.kind)}</span>
-                <span className="truncate font-medium text-white/95">{a.name}</span>
-                <span className="hidden text-xs text-white/45 sm:inline">
+                <span className="text-sm">{kindIcon(a.kind)}</span>
+                <span className="truncate text-white/85">{a.name}</span>
+                <span className="hidden text-[11px] text-white/35 sm:inline">
                   · {a.code}
                 </span>
               </div>
-              <span className="ml-2 shrink-0 font-semibold tabular-nums text-white">
+              <span className="ml-2 shrink-0 font-semibold tabular-nums text-white/95">
                 {formatVnd(a.currentBalance)}
               </span>
             </div>
