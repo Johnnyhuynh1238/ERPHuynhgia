@@ -155,22 +155,24 @@ body {
 @keyframes popoverIn {
   from {
     opacity: 0;
-    transform: scale(0.86);
+    transform: translateY(4px) scale(0.97);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
 .popover-in {
-  animation: popoverIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: popoverIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 @keyframes popoverItemIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -179,7 +181,7 @@ body {
 }
 
 .popover-item-in {
-  animation: popoverItemIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: popoverItemIn 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes modalBackdropIn {

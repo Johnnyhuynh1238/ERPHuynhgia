@@ -2,7 +2,19 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Wallet, RefreshCw } from "lucide-react";
+import {
+  Wallet,
+  RefreshCw,
+  ArrowRightLeft,
+  Banknote,
+  Package,
+  Receipt,
+  BarChart3,
+  ScrollText,
+  Landmark,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 
 type AccountDto = {
   id: string;
@@ -35,7 +47,7 @@ type PopItem = {
 type AppDef = {
   key: AppKey | null;
   label: string;
-  emoji: string;
+  Icon: LucideIcon;
   tint: string;
   disabled?: boolean;
   buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
@@ -45,7 +57,7 @@ const APPS: AppDef[] = [
   {
     key: "thu-chi",
     label: "Thu - Chi",
-    emoji: "💵",
+    Icon: ArrowRightLeft,
     tint: "#f97316",
     buildItems: (data) => {
       const pb = data?.processBreakdown;
@@ -61,13 +73,13 @@ const APPS: AppDef[] = [
       ];
     },
   },
-  { key: null, label: "Lương",      emoji: "💰", tint: "#10b981", disabled: true },
-  { key: null, label: "Vật tư",     emoji: "🏗️", tint: "#f59e0b", disabled: true },
-  { key: null, label: "HĐ - Nợ KH", emoji: "📋", tint: "#3b82f6", disabled: true },
-  { key: null, label: "Báo cáo",    emoji: "📊", tint: "#a855f7", disabled: true },
-  { key: null, label: "Chứng từ",   emoji: "🧾", tint: "#ec4899", disabled: true },
-  { key: null, label: "Thuế",       emoji: "🏛️", tint: "#64748b", disabled: true },
-  { key: null, label: "Cài đặt",    emoji: "⚙️", tint: "#737373", disabled: true },
+  { key: null, label: "Lương",      Icon: Banknote,      tint: "#10b981", disabled: true },
+  { key: null, label: "Vật tư",     Icon: Package,       tint: "#f59e0b", disabled: true },
+  { key: null, label: "HĐ - Nợ KH", Icon: Receipt,       tint: "#3b82f6", disabled: true },
+  { key: null, label: "Báo cáo",    Icon: BarChart3,     tint: "#a855f7", disabled: true },
+  { key: null, label: "Chứng từ",   Icon: ScrollText,    tint: "#ec4899", disabled: true },
+  { key: null, label: "Thuế",       Icon: Landmark,      tint: "#64748b", disabled: true },
+  { key: null, label: "Cài đặt",    Icon: Settings,      tint: "#737373", disabled: true },
 ];
 
 export function KetoanLauncher() {
@@ -270,6 +282,7 @@ function AppIcon({
   delayClass: string;
 }) {
   const disabled = !!app.disabled;
+  const Icon = app.Icon;
   return (
     <div className={`slide-up ${delayClass} flex flex-col items-center gap-2`}>
       <button
@@ -286,9 +299,11 @@ function AppIcon({
           boxShadow: `inset 0 0 0 1px ${app.tint}55, inset 0 1px 0 rgba(255,255,255,0.18)`,
         }}
       >
-        <span className="relative text-[30px] leading-none sm:text-[32px]">
-          {app.emoji}
-        </span>
+        <Icon
+          className="relative h-[28px] w-[28px] sm:h-[30px] sm:w-[30px]"
+          strokeWidth={1.75}
+          style={{ color: "#ffffff" }}
+        />
         {badge > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b30] px-1 text-[10px] font-bold text-white ring-2 ring-[#0a0b12]">
             {badge > 99 ? "99+" : badge}
@@ -306,9 +321,9 @@ function AppIcon({
   );
 }
 
-const POPOVER_WIDTH = 248;
-const POPOVER_MARGIN = 8;
-const POPOVER_GAP = 10;
+const POPOVER_WIDTH = 260;
+const POPOVER_MARGIN = 10;
+const POPOVER_GAP = 12;
 
 function AppPopover({
   app,
@@ -387,32 +402,43 @@ function AppPopover({
     <div
       className="fixed inset-0 z-50"
       onClick={onClose}
-      style={{ background: "rgba(0,0,0,0.15)" }}
+      style={{ background: "transparent" }}
     >
       <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
-        className="popover-in fixed rounded-2xl border border-white/12"
+        className="popover-in fixed rounded-[18px]"
         style={{
           width: POPOVER_WIDTH,
           top: pos?.top ?? -9999,
           left: pos?.left ?? -9999,
           transformOrigin: pos?.origin ?? "50% 0%",
           visibility: pos ? "visible" : "hidden",
-          background: "rgba(20,22,32,0.82)",
-          backdropFilter: "blur(28px) saturate(180%)",
-          WebkitBackdropFilter: "blur(28px) saturate(180%)",
-          boxShadow: "0 12px 40px -8px rgba(0,0,0,0.6)",
+          background: "rgba(22,24,34,0.68)",
+          backdropFilter: "blur(40px) saturate(200%)",
+          WebkitBackdropFilter: "blur(40px) saturate(200%)",
+          boxShadow:
+            "0 20px 50px -12px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.14), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
-        <div className="flex items-center gap-2 border-b border-white/8 px-3 py-2">
-          <span className="text-[16px] leading-none">{app.emoji}</span>
-          <span className="text-[12px] font-semibold text-white/85">{app.label}</span>
+        <div className="flex items-center gap-2 px-3.5 pt-3 pb-1.5">
+          <app.Icon
+            className="h-3.5 w-3.5"
+            strokeWidth={2}
+            style={{ color: app.tint }}
+          />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
+            {app.label}
+          </span>
         </div>
-        <div className="space-y-1 p-2">
+        <div className="px-1.5 pb-1.5 pt-0.5">
           {items.map((it, idx) =>
             it === "divider" ? (
-              <div key={`d-${idx}`} className="my-1 h-px bg-white/8" />
+              <div
+                key={`d-${idx}`}
+                className="popover-item-in mx-2 my-1 h-px bg-white/8"
+                style={{ animationDelay: `${0.05 + idx * 0.035}s` }}
+              />
             ) : (
               <PopItemRow key={it.href + idx} item={it} tint={app.tint} index={idx} />
             )
@@ -435,21 +461,22 @@ function PopItemRow({
   return (
     <Link
       href={item.href}
-      className="popover-item-in smooth-press flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2 text-[13px] hover:bg-white/[0.08]"
+      className="popover-item-in group flex items-center justify-between rounded-[10px] px-2.5 py-2 text-[13.5px] transition-colors duration-150 hover:bg-white/[0.07]"
       style={{
-        animationDelay: `${0.04 + index * 0.03}s`,
-        borderColor: item.isNew ? `${tint}55` : undefined,
-        backgroundColor: item.isNew ? `${tint}18` : undefined,
+        animationDelay: `${0.05 + index * 0.035}s`,
       }}
     >
       <span
-        className="truncate font-medium"
+        className="truncate font-medium leading-none"
         style={{ color: item.isNew ? tint : "rgba(255,255,255,0.88)" }}
       >
         {item.label}
       </span>
       {item.badge !== undefined && item.badge > 0 && (
-        <span className="ml-2 shrink-0 rounded-full bg-[#ff3b30] px-1.5 py-0.5 text-[10px] font-bold text-white">
+        <span
+          className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+          style={{ backgroundColor: "#ff3b30" }}
+        >
           {item.badge > 99 ? "99+" : item.badge}
         </span>
       )}
