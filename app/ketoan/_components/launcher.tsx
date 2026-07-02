@@ -7,7 +7,6 @@ import {
   Wallet,
   RefreshCw,
   ArrowRightLeft,
-  ArrowLeft,
   Banknote,
   Package,
   Receipt,
@@ -16,11 +15,13 @@ import {
   Landmark,
   Settings,
   ClipboardList,
+  ClipboardCheck,
   ShoppingCart,
   PackageCheck,
   ArrowDownCircle,
   ArrowUpCircle,
   Send,
+  Clock,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -35,9 +36,24 @@ type AccountDto = {
 
 type SummaryDto = {
   balance: { total: number; accounts: AccountDto[] };
-  counts: { create: number; process: number; journal: number; congNo: number };
+  counts: {
+    create: number;
+    process: number;
+    journal: number;
+    congNo: number;
+    donHang: number;
+  };
   processBreakdown: { expense: number; receipt: number; paymentOrder: number };
-  congNoBreakdown: { payableNcc: number; paymentDueKh: number };
+  congNoBreakdown: {
+    payableNccActive: number;
+    paymentDueKhActive: number;
+  };
+  donHangBreakdown: {
+    proposalPending: number;
+    proposalToOrder: number;
+    receiptNeedsDebt: number;
+    proposalPaid: number;
+  };
   todos?: {
     proposalPending: number;
     proposalToOrder: number;
@@ -53,7 +69,7 @@ const formatVnd = (n: number) =>
 
 const kindIcon = (kind: string) => (kind === "cash" ? "💵" : "🏦");
 
-type AppKey = "thu-chi" | "cong-no";
+type AppKey = "thu-chi" | "cong-no" | "don-hang" | "cham-cong";
 
 type PopItem = {
   label: string;
@@ -67,6 +83,8 @@ type AppDef = {
   label: string;
   Icon: LucideIcon;
   disabled?: boolean;
+  // Direct-navigation apps (e.g., Chấm công) use `href`; multi-action apps use `buildItems`.
+  href?: string;
   buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
 
@@ -98,18 +116,40 @@ const APPS: AppDef[] = [
     },
   },
   {
+    key: "don-hang",
+    label: "Đơn hàng",
+    Icon: PackageCheck,
+    buildItems: (data) => {
+      const d = data?.donHangBreakdown;
+      return [
+        { label: "Chờ duyệt đề xuất", href: "/proposals?status=pending", badge: d?.proposalPending ?? 0 },
+        { label: "Cần đặt NCC", href: "/proposals?status=accepted&orderStatus=not_ordered", badge: d?.proposalToOrder ?? 0 },
+        { label: "Chờ ghi công nợ", href: "/proposals?filter=needs_debt", badge: d?.receiptNeedsDebt ?? 0 },
+        { label: "Đã thanh toán", href: "/proposals?orderStatus=paid", badge: d?.proposalPaid ?? 0 },
+        "divider",
+        { label: "Tất cả đơn hàng", href: "/proposals" },
+      ];
+    },
+  },
+  {
     key: "cong-no",
     label: "Công nợ",
     Icon: Receipt,
     buildItems: (data) => {
       const cn = data?.congNoBreakdown;
       return [
-        { label: "Công nợ KH", href: "/payments", badge: cn?.paymentDueKh ?? 0 },
-        { label: "Công nợ NCC", href: "/payables", badge: cn?.payableNcc ?? 0 },
+        { label: "Công nợ KH", href: "/payments", badge: cn?.paymentDueKhActive ?? 0 },
+        { label: "Công nợ NCC", href: "/payables", badge: cn?.payableNccActive ?? 0 },
         "divider",
         { label: "Lệnh TT NCC", href: "/payment-orders" },
       ];
     },
+  },
+  {
+    key: "cham-cong",
+    label: "Chấm công",
+    Icon: Clock,
+    href: "/cham-cong",
   },
   { key: null, label: "Lương",      Icon: Banknote,      disabled: true },
   { key: null, label: "Vật tư",     Icon: Package,       disabled: true },
@@ -161,26 +201,6 @@ export function KetoanLauncher() {
       }}
     >
       <div className="relative space-y-7">
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== "undefined" && window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/");
-            }
-          }}
-          className="smooth-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
-          style={{
-            color: BRAND_TEXT_MUTED,
-            borderColor: "#252840",
-            background: "#13151f",
-          }}
-        >
-          <ArrowLeft className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
-          Quay lại
-        </button>
-
         <BalanceHeadline
           data={data}
           loading={loading}
@@ -204,25 +224,30 @@ export function KetoanLauncher() {
             />
           </div>
           <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6">
-            {APPS.map((app, idx) => (
-              <AppIcon
-                key={app.label}
-                app={app}
-                delayClass={`delay-${Math.min(idx + 1, 6)}`}
-                badge={
-                  app.key === "thu-chi"
-                    ? data?.counts.process ?? 0
-                    : app.key === "cong-no"
-                      ? data?.counts.congNo ?? 0
-                      : 0
-                }
-                onClick={
-                  app.buildItems
-                    ? (rect) => setOpen({ app, anchor: rect })
-                    : undefined
-                }
-              />
-            ))}
+            {APPS.map((app, idx) => {
+              const badge =
+                app.key === "thu-chi"
+                  ? data?.counts.process ?? 0
+                  : app.key === "cong-no"
+                    ? data?.counts.congNo ?? 0
+                    : app.key === "don-hang"
+                      ? data?.counts.donHang ?? 0
+                      : 0;
+              const onClick = app.buildItems
+                ? (rect: DOMRect) => setOpen({ app, anchor: rect })
+                : app.href
+                  ? () => router.push(app.href!)
+                  : undefined;
+              return (
+                <AppIcon
+                  key={app.label}
+                  app={app}
+                  delayClass={`delay-${Math.min(idx + 1, 6)}`}
+                  badge={badge}
+                  onClick={onClick}
+                />
+              );
+            })}
           </div>
         </div>
 

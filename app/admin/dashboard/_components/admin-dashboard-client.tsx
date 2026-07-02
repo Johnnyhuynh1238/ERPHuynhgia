@@ -2,9 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Banknote,
   BarChart3,
   BookOpen,
@@ -196,7 +194,6 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
 };
 
 export function AdminDashboardClient() {
-  const router = useRouter();
   const [data, setData] = useState<SummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,26 +234,6 @@ export function AdminDashboardClient() {
       }}
     >
       <div className="relative space-y-7">
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== "undefined" && window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/");
-            }
-          }}
-          className="smooth-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
-          style={{
-            color: BRAND_TEXT_MUTED,
-            borderColor: "#252840",
-            background: "#13151f",
-          }}
-        >
-          <ArrowLeft className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
-          Quay lại
-        </button>
-
         <Headline
           data={data}
           loading={loading}

@@ -22,8 +22,8 @@ export async function GET() {
     proposalPending,
     proposalToOrder,
     receiptNeedsDebtRows,
-    payableCount,
-    paymentDueCount,
+    proposalPaid,
+    supplierOrderActive,
   ] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
@@ -45,21 +45,16 @@ export async function GET() {
         ON d.proposal_id = r.proposal_id AND d.item_seq = r.item_seq
       WHERE d.id IS NULL
     `,
-    // Công nợ NCC: debt chưa trả + KHÔNG nằm trong lệnh active (pending/approved/paid).
-    prisma.materialProposalItemDebt.count({
-      where: {
-        paidAt: null,
-        paymentOrderItems: {
-          none: { order: { status: { in: ["pending", "approved", "paid"] } } },
-        },
-      },
-    }),
-    // Công nợ KH: PaymentSchedule chưa thu (loại collected/paid/cancelled).
-    prisma.paymentSchedule.count({
-      where: { status: { notIn: ["collected", "paid", "cancelled"] } },
+    // Đơn hàng đã thanh toán (KT đã trả NCC xong).
+    prisma.materialProposal.count({ where: { orderStatus: "paid" } }),
+    // Công nợ NCC "ping": lệnh TT NCC do KT/Admin khởi động — pending (chờ duyệt) + approved (chờ chi).
+    prisma.supplierPaymentOrder.count({
+      where: { status: { in: ["pending", "approved"] } },
     }),
   ]);
   const receiptNeedsDebt = Number(receiptNeedsDebtRows[0]?.count ?? 0);
+  // Công nợ KH "ping": lệnh thu do admin tạo — pending (KT chưa nhận). Dùng lại count đã có.
+  const kkhReceiptActive = receiptPending;
 
   const accountsOut = accounts.map((a) => ({
     id: a.id,
@@ -71,6 +66,9 @@ export async function GET() {
   const totalBalance = accountsOut.reduce((sum, a) => sum + a.currentBalance, 0);
 
   const processTotal = expensePending + receiptPending + paymentOrderApproved;
+  const donHangPing = proposalPending + proposalToOrder + receiptNeedsDebt;
+  // Công nợ badge = ping do admin/KT khởi động lệnh (NCC active + lệnh thu chờ nhận).
+  const congNoPing = supplierOrderActive + kkhReceiptActive;
 
   return NextResponse.json({
     balance: {
@@ -81,7 +79,8 @@ export async function GET() {
       create: 0,
       process: processTotal,
       journal: 0,
-      congNo: payableCount + paymentDueCount,
+      congNo: congNoPing,
+      donHang: donHangPing,
     },
     processBreakdown: {
       expense: expensePending,
@@ -89,8 +88,15 @@ export async function GET() {
       paymentOrder: paymentOrderApproved,
     },
     congNoBreakdown: {
-      payableNcc: payableCount,
-      paymentDueKh: paymentDueCount,
+      // Lệnh do admin/KT vừa tạo — cần KT xử lý ngay.
+      payableNccActive: supplierOrderActive,
+      paymentDueKhActive: kkhReceiptActive,
+    },
+    donHangBreakdown: {
+      proposalPending,
+      proposalToOrder,
+      receiptNeedsDebt,
+      proposalPaid,
     },
     todos: {
       proposalPending,

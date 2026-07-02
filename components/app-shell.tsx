@@ -187,7 +187,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       <div className="bg-glow" />
       <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       <PullToRefresh />
-      {(user.role === "engineer" || user.role === "accountant") && pathname !== "/cham-cong" ? (
+      {user.role === "engineer" && pathname !== "/cham-cong" ? (
         <AttendanceReminder />
       ) : null}
 
