@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Check,
+  CheckCircle2,
   ChevronRight,
   ClipboardList,
   Clock,
   HardHat,
   Loader2,
   PackageCheck,
+  Receipt,
   ShoppingCart,
   Truck,
   UserCircle2,
@@ -30,6 +34,7 @@ type ProposalRow = {
   paidAt: string | null;
   ks: { id: string; fullName: string };
   project: { id: string; code: string; name: string };
+  _count?: { comments: number; debts: number; receipts: number };
 };
 
 type ListResponse = {
@@ -104,6 +109,11 @@ const ORDER_FILTERS: { key: "all" | ProposalRow["orderStatus"]; label: string }[
   { key: "paid", label: "Đã TT" },
 ];
 
+type SpecialFilter = "needs_debt";
+const SPECIAL_FILTERS: { key: SpecialFilter; label: string }[] = [
+  { key: "needs_debt", label: "Chờ ghi công nợ" },
+];
+
 export function ProposalsClient({
   currentRole,
   projectId,
@@ -113,6 +123,22 @@ export function ProposalsClient({
 }) {
   const isAccountantView = currentRole === "accountant" || currentRole === "admin";
   const scopedToProject = Boolean(projectId);
+  const searchParams = useSearchParams();
+
+  const initialStatus = useMemo(() => {
+    const s = searchParams.get("status");
+    return s === "pending" || s === "accepted" || s === "declined" ? s : "all";
+  }, [searchParams]);
+  const initialOrderStatus = useMemo(() => {
+    const s = searchParams.get("orderStatus");
+    return s === "not_ordered" || s === "ordered" || s === "received" || s === "paid"
+      ? s
+      : "all";
+  }, [searchParams]);
+  const initialSpecial = useMemo(() => {
+    const s = searchParams.get("filter");
+    return s === "needs_debt" ? (s as SpecialFilter) : null;
+  }, [searchParams]);
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ProposalRow[]>([]);
@@ -120,20 +146,27 @@ export function ProposalsClient({
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [status, setStatus] = useState<"all" | ProposalRow["status"]>("all");
-  const [orderStatus, setOrderStatus] = useState<"all" | ProposalRow["orderStatus"]>("all");
+  const [status, setStatus] = useState<"all" | ProposalRow["status"]>(initialStatus);
+  const [orderStatus, setOrderStatus] = useState<"all" | ProposalRow["orderStatus"]>(
+    initialOrderStatus,
+  );
+  const [special, setSpecial] = useState<SpecialFilter | null>(initialSpecial);
 
   useEffect(() => {
     setPage(1);
-  }, [status, orderStatus]);
+  }, [status, orderStatus, special]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       const params = new URLSearchParams({ page: String(page), limit: "20" });
-      if (status !== "all") params.set("status", status);
-      if (orderStatus !== "all") params.set("orderStatus", orderStatus);
+      if (special) {
+        params.set("filter", special);
+      } else {
+        if (status !== "all") params.set("status", status);
+        if (orderStatus !== "all") params.set("orderStatus", orderStatus);
+      }
       if (projectId) params.set("projectId", projectId);
       const res = await fetch(`/api/proposals?${params.toString()}`, { cache: "no-store" });
       const data = (await res.json().catch(() => ({}))) as ListResponse;
@@ -151,7 +184,7 @@ export function ProposalsClient({
     return () => {
       cancelled = true;
     };
-  }, [page, status, orderStatus, projectId]);
+  }, [page, status, orderStatus, special, projectId]);
 
   return (
     <div className="space-y-3">
@@ -174,7 +207,31 @@ export function ProposalsClient({
           </div>
         </div>
 
-        <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {isAccountantView && (
+          <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {SPECIAL_FILTERS.map((f) => {
+              const on = special === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setSpecial(on ? null : f.key)}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${
+                    on
+                      ? "bg-[#fb923c] text-[#0b0d16] font-semibold"
+                      : "border border-[#fb923c]/50 bg-[#fb923c]/10 text-[#fb923c]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div
+          className={`-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 ${
+            isAccountantView ? "mt-1.5" : "mt-3"
+          } ${special ? "pointer-events-none opacity-40" : ""}`}
+        >
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.key}
@@ -189,7 +246,11 @@ export function ProposalsClient({
             </button>
           ))}
         </div>
-        <div className="-mx-1 mt-1.5 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div
+          className={`-mx-1 mt-1.5 flex gap-1.5 overflow-x-auto px-1 pb-1 ${
+            special ? "pointer-events-none opacity-40" : ""
+          }`}
+        >
           {ORDER_FILTERS.map((f) => (
             <button
               key={f.key}
@@ -262,6 +323,100 @@ export function ProposalsClient({
   );
 }
 
+type StageKey = "duyet" | "dat" | "nhan" | "ghinh" | "tt";
+
+function stageStates(p: ProposalRow): Record<StageKey, "done" | "current" | "pending"> {
+  if (p.status === "declined") {
+    return { duyet: "pending", dat: "pending", nhan: "pending", ghinh: "pending", tt: "pending" };
+  }
+  const duyet = p.status === "accepted" ? "done" : "current";
+  const dat =
+    p.orderStatus === "ordered" || p.orderStatus === "received" || p.orderStatus === "paid"
+      ? "done"
+      : duyet === "done"
+        ? "current"
+        : "pending";
+  const nhan =
+    p.orderStatus === "received" || p.orderStatus === "paid"
+      ? "done"
+      : dat === "done"
+        ? "current"
+        : "pending";
+  const hasDebt = (p._count?.debts ?? 0) > 0;
+  const ghinh = hasDebt ? "done" : nhan === "done" ? "current" : "pending";
+  const tt = p.orderStatus === "paid" ? "done" : ghinh === "done" ? "current" : "pending";
+  return { duyet, dat, nhan, ghinh, tt };
+}
+
+const STAGE_LABEL: Record<StageKey, string> = {
+  duyet: "Duyệt",
+  dat: "Đặt NCC",
+  nhan: "Nhận",
+  ghinh: "Ghi CN",
+  tt: "TT NCC",
+};
+
+const STAGE_ICON: Record<StageKey, JSX.Element> = {
+  duyet: <CheckCircle2 className="h-3 w-3" />,
+  dat: <ShoppingCart className="h-3 w-3" />,
+  nhan: <PackageCheck className="h-3 w-3" />,
+  ghinh: <Receipt className="h-3 w-3" />,
+  tt: <Wallet className="h-3 w-3" />,
+};
+
+function ProposalPipeline({ p }: { p: ProposalRow }) {
+  const st = stageStates(p);
+  const keys: StageKey[] = ["duyet", "dat", "nhan", "ghinh", "tt"];
+  return (
+    <div className="mt-2 flex items-center">
+      {keys.map((k, idx) => {
+        const state = st[k];
+        const dotCls =
+          state === "done"
+            ? "bg-emerald-500 text-white ring-emerald-500/20"
+            : state === "current"
+              ? "bg-[#fb923c] text-[#0b0d16] ring-[#fb923c]/25 animate-pulse"
+              : "bg-[#252840] text-[#5a627a] ring-transparent";
+        const lineCls =
+          state === "done" || (state === "current" && idx > 0 && st[keys[idx - 1]] === "done")
+            ? "bg-emerald-500/60"
+            : "bg-[#252840]";
+        const labelCls =
+          state === "done"
+            ? "text-emerald-300"
+            : state === "current"
+              ? "text-[#fb923c] font-semibold"
+              : "text-[#5a627a]";
+        return (
+          <div key={k} className="flex flex-1 flex-col items-center">
+            <div className="flex w-full items-center">
+              <div className={`h-[2px] flex-1 ${idx === 0 ? "opacity-0" : lineCls}`} />
+              <div
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-2 ${dotCls}`}
+                title={STAGE_LABEL[k]}
+              >
+                {state === "done" ? (
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                ) : (
+                  STAGE_ICON[k]
+                )}
+              </div>
+              <div
+                className={`h-[2px] flex-1 ${
+                  idx === keys.length - 1 ? "opacity-0" : st[keys[idx + 1]] !== "pending" ? "bg-emerald-500/60" : "bg-[#252840]"
+                }`}
+              />
+            </div>
+            <div className={`mt-0.5 text-[9px] leading-none ${labelCls}`}>
+              {STAGE_LABEL[k]}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProposalCard({
   p,
   isAccountantView,
@@ -278,7 +433,9 @@ function ProposalCard({
     >
       <span className={`absolute inset-y-0 left-0 w-1 ${ORDER_STRIPE[p.orderStatus]}`} />
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <ProposalPipeline p={p} />
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_CHIP[p.status]}`}
         >

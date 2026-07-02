@@ -269,7 +269,7 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
     {
       key: "receipt-needs-debt",
       label: "KS đã nhận hàng — chờ ghi công nợ",
-      href: "/proposals?status=accepted&orderStatus=received",
+      href: "/proposals?filter=needs_debt",
       count: t.receiptNeedsDebt,
       Icon: PackageCheck,
     },

@@ -109,6 +109,7 @@ const listSchema = z.object({
   projectId: z.string().uuid().optional(),
   status: z.enum(["pending", "accepted", "declined"]).optional(),
   orderStatus: z.enum(["not_ordered", "ordered", "received", "paid"]).optional(),
+  filter: z.enum(["needs_debt"]).optional(),
   ksId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -127,6 +128,7 @@ export async function GET(request: Request) {
     projectId: searchParams.get("projectId") || undefined,
     status: searchParams.get("status") || undefined,
     orderStatus: searchParams.get("orderStatus") || undefined,
+    filter: searchParams.get("filter") || undefined,
     ksId: searchParams.get("ksId") || undefined,
     page: searchParams.get("page") || undefined,
     limit: searchParams.get("limit") || undefined,
@@ -155,6 +157,15 @@ export async function GET(request: Request) {
   if (parsed.data.ksId && isAccountantView) {
     where.where = { ...where.where, ksId: parsed.data.ksId };
   }
+  // KT: đơn KS đã nhận hàng nhưng chưa ghi công nợ.
+  if (parsed.data.filter === "needs_debt") {
+    where.where = {
+      ...where.where,
+      status: "accepted",
+      receipts: { some: {} },
+      debts: { none: {} },
+    };
+  }
 
   const [items, total] = await Promise.all([
     prisma.materialProposal.findMany({
@@ -176,7 +187,7 @@ export async function GET(request: Request) {
         paidAt: true,
         ks: { select: { id: true, fullName: true } },
         project: { select: { id: true, code: true, name: true } },
-        _count: { select: { comments: true } },
+        _count: { select: { comments: true, debts: true, receipts: true } },
       },
     }),
     prisma.materialProposal.count({ where: where.where }),
