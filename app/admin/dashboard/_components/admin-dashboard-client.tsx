@@ -1,525 +1,871 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Banknote,
+  BarChart3,
+  BookOpen,
+  Building2,
+  CalendarDays,
+  CheckSquare,
+  ClipboardList,
+  ClipboardCheck,
+  Clock,
+  FileCode,
+  FileSignature,
+  FileText,
+  FolderKanban,
+  HardHat,
+  IdCard,
+  Inbox,
+  Library,
+  ListChecks,
+  Package,
+  Receipt,
+  RefreshCw,
+  Settings,
+  ShoppingCart,
+  Sliders,
+  Target,
+  TrendingUp,
+  UserCog,
+  UserPlus,
+  Users,
+  Wallet,
+  Wrench,
+  Award,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
 
-type Level = "red" | "yellow";
-type CardRow = {
-  id: string;
-  level: Level;
-  title: string;
-  subtitle?: string;
-  href?: string;
-  amount?: number;
-  daysOverdue?: number;
-  dueLabel?: string;
-};
-type InboxRow = {
-  id: string;
-  content: string;
-  source: string;
-  createdAt: string;
-};
-type Dashboard5 = {
-  generatedAt: string;
-  cards: {
-    sale: { designStageCount: number; thin: boolean; rows: CardRow[]; more: number };
-    money: { rows: CardRow[]; more: number };
-    construction: { rows: CardRow[]; more: number };
-    design: { rows: CardRow[]; more: number };
-    inbox: { rows: InboxRow[] };
+type SummaryDto = {
+  headline: {
+    revenueMonth: number;
+    activeProjects: number;
+    cashBalance: number;
+  };
+  todos: {
+    leadsNew: number;
+    proposalPending: number;
+    expensePending: number;
+    receiptAwaitingApproval: number;
+    paymentDue7d: number;
+    inboxOpen: number;
   };
 };
 
-function formatVnd(n: number | undefined | null) {
-  if (n == null) return "";
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2).replace(/\.00$/, "") + " tỷ";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(0) + " tr";
-  return n.toLocaleString("vi-VN") + "đ";
-}
+const BRAND_BG = "#0b0d16";
+const BRAND_GOLD = "#f97316";
+const BRAND_GOLD_BRIGHT = "#fb923c";
+const BRAND_GLYPH = "#f0f2ff";
+const BRAND_TEXT = "#f0f2ff";
+const BRAND_TEXT_MUTED = "#8892b0";
 
-function relTime(iso: string) {
-  const now = Date.now();
-  const t = new Date(iso).getTime();
-  const diff = Math.max(0, now - t);
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "vừa xong";
-  if (m < 60) return `${m} phút trước`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} giờ trước`;
-  const d = Math.floor(h / 24);
-  return `${d} ngày trước`;
-}
+const formatVnd = (n: number) =>
+  new Intl.NumberFormat("vi-VN").format(Math.round(n));
 
-const DOT: Record<Level, string> = {
-  red: "bg-red-500",
-  yellow: "bg-yellow-400",
+const formatVndShort = (n: number) => {
+  if (n >= 1_000_000_000) {
+    const b = n / 1_000_000_000;
+    return `${b.toFixed(b >= 10 ? 1 : 2).replace(/\.?0+$/, "")} tỷ`;
+  }
+  if (n >= 1_000_000) return `${Math.round(n / 1_000_000)} tr`;
+  return formatVnd(n);
 };
 
-const BORDER: Record<Level, string> = {
-  red: "border-l-red-500",
-  yellow: "border-l-yellow-400",
+type AppKey =
+  | "kinh-doanh"
+  | "du-an"
+  | "tai-chinh"
+  | "nhan-su"
+  | "kpi"
+  | "cau-hinh"
+  | "tro-giup";
+
+type PopItem = {
+  label: string;
+  href: string;
+  badge?: number;
+  isNew?: boolean;
 };
 
-function RowLine({ row }: { row: CardRow }) {
-  const content = (
-    <div className={`flex items-start gap-2 border-l-2 px-2 py-1.5 ${BORDER[row.level]} hover:bg-[#1a1d2a] transition rounded-r`}>
-      <span className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${DOT[row.level]}`} />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm text-white truncate">{row.title}</div>
-        {row.subtitle && (
-          <div className="text-xs text-[#8892b0] truncate">
-            {row.subtitle}
-            {row.amount != null && row.amount > 0 ? ` · ${formatVnd(row.amount)}` : ""}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-  if (row.href) {
-    return (
-      <Link href={row.href} className="block">
-        {content}
-      </Link>
-    );
-  }
-  return content;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="px-2 py-4 text-center text-sm text-[#8892b0]">{text}</div>;
-}
-
-function Card({
-  title,
-  headerExtra,
-  children,
-}: {
-  title: string;
-  headerExtra?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-[#252840] bg-[#13151f] p-4">
-      <header className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#cdd3e1]">{title}</h2>
-        {headerExtra}
-      </header>
-      <div className="space-y-0.5">{children}</div>
-    </section>
-  );
-}
-
-function SaleCard({ data, onMore }: { data: Dashboard5["cards"]["sale"]; onMore: () => void }) {
-  const badgeClass = data.thin
-    ? "bg-red-500/20 text-red-300 border border-red-500/40"
-    : "bg-[#1a1d2a] text-[#cdd3e1] border border-[#252840]";
-  return (
-    <Card
-      title="Sale"
-      headerExtra={
-        <span className={`rounded-full px-2 py-0.5 text-[11px] ${badgeClass}`}>
-          {data.thin ? `Pipeline mỏng! Chỉ ${data.designStageCount} HĐ TK` : `${data.designStageCount} HĐ TK đang vẽ`}
-        </span>
-      }
-    >
-      {data.rows.length === 0 ? (
-        <EmptyState text="Pipeline đang chạy đều 👌" />
-      ) : (
-        <>
-          {data.rows.map((r) => (
-            <RowLine key={r.id} row={r} />
-          ))}
-          {data.more > 0 && (
-            <button onClick={onMore} className="mt-1 w-full rounded px-2 py-1 text-xs text-[#8892b0] hover:bg-[#1a1d2a]">
-              Xem thêm ({data.more})
-            </button>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function MoneyCard({ data }: { data: Dashboard5["cards"]["money"] }) {
-  return (
-    <Card title="Tiền">
-      {data.rows.length === 0 ? (
-        <EmptyState text="Không có mốc tiền nào cần lo 👌" />
-      ) : (
-        <>
-          {data.rows.map((r) => (
-            <RowLine key={r.id} row={r} />
-          ))}
-          {data.more > 0 && (
-            <div className="mt-1 px-2 text-xs text-[#8892b0]">
-              <Link href="/payments" className="hover:text-amber-300">Xem thêm ({data.more}) →</Link>
-            </div>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function ConstructionCard({ data }: { data: Dashboard5["cards"]["construction"] }) {
-  return (
-    <Card title="Thi công">
-      {data.rows.length === 0 ? (
-        <EmptyState text="Công trường êm 👌" />
-      ) : (
-        <>
-          {data.rows.map((r) => (
-            <RowLine key={r.id} row={r} />
-          ))}
-          {data.more > 0 && (
-            <div className="mt-1 px-2 text-xs text-[#8892b0]">Xem thêm ({data.more})</div>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function DesignCard({ data }: { data: Dashboard5["cards"]["design"] }) {
-  return (
-    <Card title="Thiết kế & Dự toán">
-      {data.rows.length === 0 ? (
-        <EmptyState text="Bản vẽ & dự toán đúng nhịp 👌" />
-      ) : (
-        <>
-          {data.rows.map((r) => (
-            <RowLine key={r.id} row={r} />
-          ))}
-          {data.more > 0 && (
-            <div className="mt-1 px-2 text-xs text-[#8892b0]">Xem thêm ({data.more})</div>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-type CustomerHit = {
-  customerKey: string;
-  customerName: string;
-  customerPhone: string;
-  stage: number;
-  stageLabel: string;
+type AppDef = {
+  key: AppKey;
+  label: string;
+  Icon: LucideIcon;
+  buildItems: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
 
-function ConvertModal({
-  item,
-  onClose,
-  onDone,
-}: {
-  item: InboxRow;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<CustomerHit[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [picked, setPicked] = useState<CustomerHit | null>(null);
-  const [nextAction, setNextAction] = useState(item.content.slice(0, 200));
-  const [due, setDue] = useState("");
-  const [saving, setSaving] = useState(false);
+const APPS: AppDef[] = [
+  {
+    key: "kinh-doanh",
+    label: "Kinh doanh",
+    Icon: TrendingUp,
+    buildItems: (data) => [
+      { label: "Pipeline KH", href: "/customer-pipeline" },
+      { label: "Lead báo giá", href: "/leads", badge: data?.todos.leadsNew ?? 0 },
+      { label: "Analytics", href: "/admin/analytics" },
+    ],
+  },
+  {
+    key: "du-an",
+    label: "Dự án",
+    Icon: FolderKanban,
+    buildItems: (data) => [
+      { label: "Dự án", href: "/projects" },
+      { label: "Báo cáo KS", href: "/reports" },
+      { label: "Việc TPTC", href: "/tptc/assignments" },
+      { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
+      "divider",
+      { label: "Đề xuất vật tư", href: "/proposals", badge: data?.todos.proposalPending ?? 0 },
+      { label: "NCC vật tư", href: "/admin/suppliers" },
+      "divider",
+      { label: "Thầu phụ", href: "/subcontractors" },
+      { label: "HĐ thầu phụ", href: "/sub-contracts" },
+      { label: "Chi thầu phụ", href: "/sub-payments" },
+    ],
+  },
+  {
+    key: "tai-chinh",
+    label: "Tài chính",
+    Icon: Banknote,
+    buildItems: (data) => [
+      { label: "Lệnh thu", href: "/receipts", badge: data?.todos.receiptAwaitingApproval ?? 0 },
+      { label: "Lệnh chi", href: "/expenses", badge: data?.todos.expensePending ?? 0 },
+      { label: "Công nợ NCC", href: "/payables" },
+      { label: "Lệnh TT NCC", href: "/payment-orders" },
+      "divider",
+      { label: "Sổ quỹ", href: "/treasury" },
+    ],
+  },
+  {
+    key: "nhan-su",
+    label: "Nhân sự",
+    Icon: Users,
+    buildItems: () => [
+      { label: "Chấm công NV", href: "/admin/attendance" },
+      { label: "Bảng công thợ", href: "/admin/worker-attendance" },
+      { label: "Hồ sơ thợ", href: "/admin/workers" },
+      { label: "Ca làm việc", href: "/admin/shifts" },
+      "divider",
+      { label: "Lương KS", href: "/admin/engineers/salary" },
+      { label: "User & phân quyền", href: "/admin/users" },
+    ],
+  },
+  {
+    key: "kpi",
+    label: "KPI",
+    Icon: Target,
+    buildItems: () => [
+      { label: "KPI tổng", href: "/admin/kpi" },
+      { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
+    ],
+  },
+  {
+    key: "cau-hinh",
+    label: "Cấu hình",
+    Icon: Settings,
+    buildItems: () => [
+      { label: "Template", href: "/admin/templates" },
+      { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
+      { label: "Chuyên môn", href: "/admin/specialties" },
+      { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
+    ],
+  },
+  {
+    key: "tro-giup",
+    label: "Trợ giúp",
+    Icon: BookOpen,
+    buildItems: () => [
+      { label: "Hướng dẫn app", href: "/huongdanapp" },
+    ],
+  },
+];
 
-  useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    setSearching(true);
-    const id = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/admin/customer-pipeline?q=${encodeURIComponent(term)}`, { cache: "no-store" });
-        if (!res.ok) throw new Error("search failed");
-        const json = await res.json();
-        if (!cancelled) setHits((json.items ?? []).slice(0, 8));
-      } catch {
-        if (!cancelled) setHits([]);
-      } finally {
-        if (!cancelled) setSearching(false);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(id);
-    };
-  }, [q]);
-
-  async function submit() {
-    if (!picked) {
-      toast.error("Chưa chọn khách");
-      return;
-    }
-    if (!nextAction.trim() || !due) {
-      toast.error("Nhập nextAction + ngày hạn");
-      return;
-    }
-    setSaving(true);
-    try {
-      const r1 = await fetch("/api/admin/customer-pipeline/meta", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          customerName: picked.customerName,
-          customerPhone: picked.customerPhone,
-          nextAction: nextAction.trim(),
-          nextActionDue: due,
-        }),
-      });
-      if (!r1.ok) throw new Error(await r1.text());
-      const r2 = await fetch(`/api/admin/inbox/${item.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "done", convertedTo: `${picked.customerName} (${picked.customerPhone})` }),
-      });
-      if (!r2.ok) throw new Error(await r2.text());
-      onDone();
-      onClose();
-    } catch (e) {
-      toast.error("Lỗi: " + (e instanceof Error ? e.message : "unknown"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-2xl border border-[#252840] bg-[#13151f] p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <h3 className="text-base font-semibold text-white">Chuyển inbox thành việc cần làm</h3>
-          <button onClick={onClose} className="text-[#8892b0] hover:text-white">✕</button>
-        </div>
-        <div className="mb-3 rounded-lg bg-[#0f1117] px-3 py-2 text-sm text-[#cdd3e1]">{item.content}</div>
-
-        <label className="mb-1 block text-xs text-[#8892b0]">Chọn khách (tên hoặc SĐT)</label>
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setPicked(null); }}
-          placeholder="Gõ tên hoặc số điện thoại..."
-          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white placeholder:text-[#5b6478]"
-        />
-        {picked ? (
-          <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-            ✓ {picked.customerName} — {picked.customerPhone} · {picked.stageLabel}
-            <button onClick={() => setPicked(null)} className="ml-2 text-xs text-[#8892b0] hover:text-white">đổi</button>
-          </div>
-        ) : (
-          <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-[#252840]">
-            {searching ? (
-              <div className="px-3 py-2 text-xs text-[#8892b0]">Đang tìm...</div>
-            ) : hits.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-[#5b6478]">{q.trim().length < 2 ? "Gõ ≥ 2 ký tự" : "Không tìm thấy"}</div>
-            ) : (
-              hits.map((h) => (
-                <button
-                  key={h.customerKey}
-                  onClick={() => setPicked(h)}
-                  className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-[#1a1d2a]"
-                >
-                  <div>{h.customerName}</div>
-                  <div className="text-[11px] text-[#8892b0]">{h.customerPhone} · {h.stageLabel}</div>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-
-        <label className="mt-3 mb-1 block text-xs text-[#8892b0]">Việc kế tiếp</label>
-        <input
-          type="text"
-          value={nextAction}
-          onChange={(e) => setNextAction(e.target.value)}
-          maxLength={300}
-          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white"
-        />
-
-        <label className="mt-3 mb-1 block text-xs text-[#8892b0]">Hạn</label>
-        <input
-          type="date"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-          className="w-full rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-2 text-sm text-white"
-        />
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Huỷ</Button>
-          <Button
-            onClick={submit}
-            disabled={saving || !picked || !nextAction.trim() || !due}
-            className="bg-amber-500 text-black hover:bg-amber-400"
-          >
-            {saving ? "Đang lưu..." : "Chuyển + DONE"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InboxCard({ data, onChange }: { data: Dashboard5["cards"]["inbox"]; onChange: () => void }) {
-  const [adding, setAdding] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [convertItem, setConvertItem] = useState<InboxRow | null>(null);
-
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    const content = adding.trim();
-    if (!content) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/inbox", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setAdding("");
-      onChange();
-    } catch (e) {
-      toast.error("Lỗi: " + (e instanceof Error ? e.message : "unknown"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function markDone(id: string) {
-    try {
-      const res = await fetch(`/api/admin/inbox/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "done" }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      onChange();
-    } catch (e) {
-      toast.error("Lỗi: " + (e instanceof Error ? e.message : "unknown"));
-    }
-  }
-
-  return (
-    <Card title="Inbox">
-      <form onSubmit={add} className="mb-2 flex gap-2">
-        <input
-          type="text"
-          value={adding}
-          onChange={(e) => setAdding(e.target.value)}
-          placeholder="Ghi nhanh việc cần làm..."
-          maxLength={500}
-          className="flex-1 rounded-lg border border-[#2d3249] bg-[#0f1117] px-3 py-1.5 text-sm text-white placeholder:text-[#5b6478]"
-        />
-        <Button type="submit" disabled={saving || !adding.trim()} className="h-8 bg-amber-500 px-3 text-xs text-black hover:bg-amber-400">
-          Thêm
-        </Button>
-      </form>
-      {data.rows.length === 0 ? (
-        <EmptyState text="Inbox trống — não được phép nghỉ 😴" />
-      ) : (
-        <ul className="space-y-1">
-          {data.rows.map((it) => (
-            <li key={it.id} className="group flex items-start gap-2 rounded px-2 py-1.5 hover:bg-[#1a1d2a]">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-white">{it.content}</div>
-                <div className="text-[11px] text-[#5b6478]">
-                  {it.source === "openclaw" ? "🤖 OpenClaw · " : ""}
-                  {relTime(it.createdAt)}
-                </div>
-              </div>
-              <button
-                onClick={() => setConvertItem(it)}
-                className="rounded p-1 text-[#8892b0] hover:bg-amber-500/20 hover:text-amber-300"
-                title="Chuyển thành việc cần làm"
-              >
-                →
-              </button>
-              <button
-                onClick={() => markDone(it.id)}
-                className="rounded p-1 text-[#8892b0] hover:bg-emerald-500/20 hover:text-emerald-300"
-                title="Đánh dấu xong"
-              >
-                ✓
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {convertItem && (
-        <ConvertModal
-          item={convertItem}
-          onClose={() => setConvertItem(null)}
-          onDone={onChange}
-        />
-      )}
-    </Card>
-  );
-}
+const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
+  "kinh-doanh": ["leadsNew"],
+  "du-an": ["proposalPending"],
+  "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
+  "nhan-su": [],
+  "kpi": [],
+  "cau-hinh": [],
+  "tro-giup": [],
+};
 
 export function AdminDashboardClient() {
-  const [data, setData] = useState<Dashboard5 | null>(null);
+  const router = useRouter();
+  const [data, setData] = useState<SummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [open, setOpen] = useState<null | { app: AppDef; anchor: DOMRect }>(null);
 
-  const load = useCallback(async () => {
+  const load = async () => {
     try {
-      const res = await fetch("/api/admin/dashboard5", { cache: "no-store" });
-      if (!res.ok) throw new Error("load failed");
-      const json: Dashboard5 = await res.json();
+      setLoading(true);
+      const res = await fetch("/api/admin/launcher-summary", { cache: "no-store" });
+      if (!res.ok) throw new Error(await res.text());
+      const json = (await res.json()) as SummaryDto;
       setData(json);
-    } catch {
-      toast.error("Không tải được dashboard");
+      setRefreshedAt(new Date());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     load();
-  }, [load]);
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
-  if (loading) {
+  return (
+    <div
+      className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] overflow-hidden px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
+      style={{
+        background: `
+          radial-gradient(60% 45% at 88% 12%, rgba(251,146,60,0.10) 0%, transparent 55%),
+          radial-gradient(50% 35% at 8% 92%, rgba(249,115,22,0.09) 0%, transparent 55%),
+          ${BRAND_BG}
+        `,
+      }}
+    >
+      <div className="relative space-y-7">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/");
+            }
+          }}
+          className="smooth-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
+          style={{
+            color: BRAND_TEXT_MUTED,
+            borderColor: "#252840",
+            background: "#13151f",
+          }}
+        >
+          <ArrowLeft className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+          Quay lại
+        </button>
+
+        <Headline
+          data={data}
+          loading={loading}
+          error={error}
+          refreshedAt={refreshedAt}
+          onRefresh={load}
+        />
+
+        <div className="slide-up delay-2">
+          <div
+            className="mb-3 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: BRAND_TEXT_MUTED }}
+          >
+            <span>Ứng dụng</span>
+            <span
+              className="h-px flex-1"
+              style={{
+                background:
+                  "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, transparent 100%)",
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6">
+            {APPS.map((app, idx) => {
+              const badge = data
+                ? APP_BADGE_KEYS[app.key].reduce(
+                    (sum, k) => sum + (data.todos[k] ?? 0),
+                    0,
+                  )
+                : 0;
+              return (
+                <AppIcon
+                  key={app.key}
+                  app={app}
+                  delayClass={`delay-${Math.min(idx + 1, 6)}`}
+                  badge={badge}
+                  onClick={(rect) => setOpen({ app, anchor: rect })}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        <WorkQueue data={data} loading={loading} />
+      </div>
+
+      {open && (
+        <AppPopover
+          app={open.app}
+          anchor={open.anchor}
+          items={open.app.buildItems(data)}
+          onClose={() => setOpen(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+type TodoRow = {
+  key: string;
+  label: string;
+  href: string;
+  count: number;
+  Icon: LucideIcon;
+};
+
+function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
+  if (!t) return [];
+  const raw: TodoRow[] = [
+    {
+      key: "leads-new",
+      label: "Lead mới — chưa liên hệ",
+      href: "/leads",
+      count: t.leadsNew,
+      Icon: UserPlus,
+    },
+    {
+      key: "proposal-pending",
+      label: "Đề xuất vật tư — chờ duyệt",
+      href: "/proposals?status=pending",
+      count: t.proposalPending,
+      Icon: ShoppingCart,
+    },
+    {
+      key: "expense-pending",
+      label: "Lệnh chi — chờ chuyển",
+      href: "/expenses?status=pending",
+      count: t.expensePending,
+      Icon: Receipt,
+    },
+    {
+      key: "receipt-pending",
+      label: "Lệnh thu — chờ duyệt",
+      href: "/receipts?status=awaiting_approval",
+      count: t.receiptAwaitingApproval,
+      Icon: Receipt,
+    },
+    {
+      key: "payment-due",
+      label: "Mốc thu KH — trong 7 ngày",
+      href: "/payments",
+      count: t.paymentDue7d,
+      Icon: ClipboardCheck,
+    },
+    {
+      key: "inbox-open",
+      label: "Inbox — chưa xử lý",
+      href: "/admin/dashboard?tab=inbox",
+      count: t.inboxOpen,
+      Icon: Inbox,
+    },
+  ];
+  return raw.filter((r) => r.count > 0);
+}
+
+function WorkQueue({
+  data,
+  loading,
+}: {
+  data: SummaryDto | null;
+  loading: boolean;
+}) {
+  const rows = buildTodoRows(data?.todos);
+
+  if (!data && loading) {
     return (
-      <div className="space-y-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-2xl border border-[#252840] bg-[#13151f]" />
-        ))}
+      <div className="slide-up delay-3 space-y-2">
+        <div className="h-4 w-32 rounded-md bg-white/5" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
       </div>
     );
   }
-  if (!data) {
-    return <div className="rounded-2xl border border-[#252840] bg-[#13151f] p-6 text-center text-[#8892b0]">Không tải được dashboard.</div>;
-  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Dashboard GĐ</h1>
-          <p className="text-xs text-[#5b6478]">Cập nhật {relTime(data.generatedAt)}</p>
-        </div>
-        <Button variant="outline" onClick={load} className="h-9">
-          ↻ Làm mới
-        </Button>
+    <div className="slide-up delay-3">
+      <div
+        className="mb-3 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+        style={{ color: BRAND_TEXT_MUTED }}
+      >
+        <ClipboardList className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+        <span>Việc cần làm</span>
+        {rows.length > 0 && (
+          <span
+            className="rounded-full px-1.5 py-[1px] text-[10px] font-bold tracking-normal"
+            style={{ backgroundColor: BRAND_GOLD, color: "#0b0d16" }}
+          >
+            {rows.length}
+          </span>
+        )}
+        <span
+          className="h-px flex-1"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, transparent 100%)",
+          }}
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <SaleCard data={data.cards.sale} onMore={() => { window.location.href = "/customer-pipeline"; }} />
-        <MoneyCard data={data.cards.money} />
-        <ConstructionCard data={data.cards.construction} />
-        <DesignCard data={data.cards.design} />
-        <div className="lg:col-span-2">
-          <InboxCard data={data.cards.inbox} onChange={load} />
+      {rows.length === 0 ? (
+        <div
+          className="rounded-2xl px-4 py-4 text-center text-[13px]"
+          style={{
+            background: `
+              radial-gradient(circle at 12% 15%, rgba(251,146,60,0.08) 0%, transparent 55%),
+              radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+              #13151f
+            `,
+            boxShadow: [
+              "inset 0 0 0 0.5px rgba(249,115,22,0.35)",
+              "inset 0 1px 0 rgba(251,146,60,0.35)",
+            ].join(", "),
+            color: BRAND_TEXT_MUTED,
+          }}
+        >
+          Không còn việc nào chờ xử lý — êm đẹp 👌
         </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <TodoCard key={r.key} row={r} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodoCard({ row }: { row: TodoRow }) {
+  const Icon = row.Icon;
+  return (
+    <Link
+      href={row.href}
+      className="smooth-press group flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-150 hover:brightness-110"
+      style={{
+        background: `
+          radial-gradient(circle at 12% 15%, rgba(251,146,60,0.10) 0%, transparent 55%),
+          radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+          #13151f
+        `,
+        boxShadow: [
+          "inset 0 0 0 0.5px rgba(249,115,22,0.42)",
+          "inset 0 1px 0 rgba(251,146,60,0.42)",
+          "0 8px 22px -10px rgba(0,0,0,0.55)",
+        ].join(", "),
+      }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
+            radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
+            #13151f
+          `,
+          boxShadow: [
+            "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
+            "inset 0 1px 0 rgba(251,146,60,0.55)",
+          ].join(", "),
+        }}
+      >
+        <Icon
+          className="h-[18px] w-[18px]"
+          strokeWidth={1.8}
+          style={{ color: BRAND_GOLD_BRIGHT }}
+        />
+      </span>
+      <span
+        className="flex-1 truncate text-[13.5px] font-medium leading-tight"
+        style={{ color: BRAND_TEXT }}
+      >
+        {row.label}
+      </span>
+      <span
+        className="ml-1 shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold leading-none tabular-nums"
+        style={{ backgroundColor: BRAND_GOLD_BRIGHT, color: BRAND_BG }}
+      >
+        {row.count > 99 ? "99+" : row.count}
+      </span>
+      <ChevronRight
+        className="ml-0.5 h-4 w-4 shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5 group-hover:opacity-80"
+        style={{ color: BRAND_GOLD_BRIGHT }}
+      />
+    </Link>
+  );
+}
+
+function useAnimatedNumber(target: number, durationMs = 700) {
+  const [value, setValue] = useState(target);
+  const fromRef = useRef(target);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    fromRef.current = value;
+    startRef.current = null;
+    let raf = 0;
+    const step = (ts: number) => {
+      if (startRef.current === null) startRef.current = ts;
+      const t = Math.min(1, (ts - startRef.current) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(fromRef.current + (target - fromRef.current) * eased);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+
+  return value;
+}
+
+function Headline({
+  data,
+  loading,
+  error,
+  refreshedAt,
+  onRefresh,
+}: {
+  data: SummaryDto | null;
+  loading: boolean;
+  error: string | null;
+  refreshedAt: Date | null;
+  onRefresh: () => void;
+}) {
+  const revenue = data?.headline.revenueMonth ?? 0;
+  const activeProjects = data?.headline.activeProjects ?? 0;
+  const cash = data?.headline.cashBalance ?? 0;
+  const animatedRevenue = useAnimatedNumber(revenue);
+
+  const monthLabel = new Date().toLocaleDateString("vi-VN", {
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  return (
+    <div className="slide-up delay-1 relative px-1 pt-2">
+      <div
+        className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em]"
+        style={{ color: BRAND_TEXT_MUTED }}
+      >
+        <TrendingUp className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+        <span>Doanh số {monthLabel}</span>
+        <span style={{ color: "rgba(240,242,255,0.25)" }}>·</span>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="smooth-press inline-flex items-center gap-1 transition-colors"
+          style={{ color: BRAND_TEXT_MUTED }}
+        >
+          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          <span className="normal-case tracking-normal">
+            {refreshedAt
+              ? refreshedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+              : "—"}
+          </span>
+        </button>
+      </div>
+
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span
+          className="text-[44px] font-bold leading-none tabular-nums tracking-tight"
+          style={{
+            color: BRAND_GLYPH,
+            textShadow: "0 2px 26px rgba(251,146,60,0.28)",
+          }}
+        >
+          {formatVnd(animatedRevenue)}
+        </span>
+        <span
+          className="text-xl font-medium"
+          style={{ color: BRAND_GOLD_BRIGHT }}
+        >
+          đ
+        </span>
+      </div>
+
+      <div
+        className="mt-4 h-px w-full"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, rgba(249,115,22,0.08) 60%, transparent 100%)",
+        }}
+      />
+
+      {error ? (
+        <div className="mt-3 text-xs text-red-300">{error}</div>
+      ) : (
+        <div
+          className="mt-2 grid grid-cols-2 divide-x"
+          style={{ borderColor: "rgba(249,115,22,0.14)" }}
+        >
+          <div className="pr-3 py-1.5">
+            <div
+              className="text-[10px] font-medium uppercase tracking-[0.18em]"
+              style={{ color: BRAND_TEXT_MUTED }}
+            >
+              <FolderKanban className="mr-1 inline h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+              Dự án đang chạy
+            </div>
+            <div
+              className="mt-1 text-[22px] font-bold leading-none tabular-nums"
+              style={{ color: BRAND_TEXT }}
+            >
+              {activeProjects}
+            </div>
+          </div>
+          <div
+            className="pl-3 py-1.5"
+            style={{ borderColor: "rgba(249,115,22,0.18)" }}
+          >
+            <div
+              className="text-[10px] font-medium uppercase tracking-[0.18em]"
+              style={{ color: BRAND_TEXT_MUTED }}
+            >
+              <Wallet className="mr-1 inline h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+              Tồn quỹ
+            </div>
+            <div
+              className="mt-1 text-[22px] font-bold leading-none tabular-nums"
+              style={{ color: BRAND_TEXT }}
+            >
+              {formatVndShort(cash)}
+              <span
+                className="ml-0.5 text-[13px] font-medium"
+                style={{ color: BRAND_GOLD_BRIGHT }}
+              >
+                đ
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AppIcon({
+  app,
+  badge = 0,
+  onClick,
+  delayClass,
+}: {
+  app: AppDef;
+  badge?: number;
+  onClick?: (rect: DOMRect) => void;
+  delayClass: string;
+}) {
+  const Icon = app.Icon;
+  return (
+    <div className={`slide-up ${delayClass} flex flex-col items-center gap-2`}>
+      <span className="relative inline-block">
+        <button
+          type="button"
+          onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
+          className="smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[20px] sm:h-[68px] sm:w-[68px]"
+          style={{
+            background: `
+              radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
+              radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
+              #13151f
+            `,
+            boxShadow: [
+              "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
+              "inset 0 1px 0 rgba(251,146,60,0.55)",
+              "inset 0 -1px 0 rgba(249,115,22,0.15)",
+              "0 0 22px -8px rgba(249,115,22,0.28)",
+              "0 8px 20px -10px rgba(0,0,0,0.6)",
+            ].join(", "),
+          }}
+        >
+          <Icon
+            className="relative h-[26px] w-[26px] sm:h-[28px] sm:w-[28px]"
+            strokeWidth={1.6}
+            style={{ color: BRAND_GOLD_BRIGHT }}
+          />
+        </button>
+        {badge > 0 && (
+          <span
+            className="pointer-events-none absolute -right-1.5 -top-1.5 z-10 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none tabular-nums"
+            style={{
+              backgroundColor: BRAND_GOLD_BRIGHT,
+              color: BRAND_BG,
+              boxShadow: `0 0 0 2px ${BRAND_BG}`,
+            }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </span>
+      <span
+        className="text-center text-[11px] font-medium leading-tight sm:text-[12px]"
+        style={{ color: BRAND_TEXT }}
+      >
+        {app.label}
+      </span>
+    </div>
+  );
+}
+
+const POPOVER_WIDTH = 224;
+const POPOVER_MARGIN = 10;
+const POPOVER_GAP = 12;
+
+function AppPopover({
+  anchor,
+  items,
+  onClose,
+}: {
+  app: AppDef;
+  anchor: DOMRect;
+  items: Array<PopItem | "divider">;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    origin: string;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const anchorCenterY = anchor.top + anchor.height / 2;
+      const width = POPOVER_WIDTH;
+      const height = rect.height;
+
+      let left = anchor.right + POPOVER_GAP;
+      let side: "right" | "left" | "bottom" = "right";
+      if (left + width > vw - POPOVER_MARGIN) {
+        const leftPos = anchor.left - width - POPOVER_GAP;
+        if (leftPos >= POPOVER_MARGIN) {
+          left = leftPos;
+          side = "left";
+        } else {
+          left = Math.max(
+            POPOVER_MARGIN,
+            Math.min(vw - width - POPOVER_MARGIN, anchor.left + anchor.width / 2 - width / 2),
+          );
+          side = "bottom";
+        }
+      }
+
+      let top: number;
+      let origin: string;
+      if (side === "bottom") {
+        top = anchor.bottom + POPOVER_GAP;
+        if (top + height > vh - POPOVER_MARGIN) {
+          const above = anchor.top - height - POPOVER_GAP;
+          top = above >= POPOVER_MARGIN ? above : Math.max(POPOVER_MARGIN, vh - height - POPOVER_MARGIN);
+        }
+        const anchorCenterX = anchor.left + anchor.width / 2;
+        const originXpx = Math.max(0, Math.min(width, anchorCenterX - left));
+        origin = `${((originXpx / width) * 100).toFixed(1)}% 0%`;
+      } else {
+        top = anchorCenterY - height / 2;
+        top = Math.max(POPOVER_MARGIN, Math.min(vh - height - POPOVER_MARGIN, top));
+        const originYpx = Math.max(0, Math.min(height, anchorCenterY - top));
+        const originYpc = (originYpx / height) * 100;
+        origin = side === "right" ? `0% ${originYpc.toFixed(1)}%` : `100% ${originYpc.toFixed(1)}%`;
+      }
+
+      setPos({ top, left, origin });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [anchor]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50"
+      onClick={onClose}
+      style={{ background: "transparent" }}
+    >
+      <div
+        ref={ref}
+        onClick={(e) => e.stopPropagation()}
+        className="popover-in fixed flex flex-col gap-[6px]"
+        style={{
+          width: POPOVER_WIDTH,
+          top: pos?.top ?? -9999,
+          left: pos?.left ?? -9999,
+          transformOrigin: pos?.origin ?? "0% 50%",
+          visibility: pos ? "visible" : "hidden",
+        }}
+      >
+        {items.map((it, idx) =>
+          it === "divider" ? (
+            <div key={`d-${idx}`} className="h-[4px]" />
+          ) : (
+            <PopItemCard key={it.href + idx} item={it} />
+          )
+        )}
       </div>
     </div>
+  );
+}
+
+function PopItemCard({ item }: { item: PopItem }) {
+  return (
+    <Link
+      href={item.href}
+      className="smooth-press group flex items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-all duration-150 hover:brightness-110"
+      style={{
+        background: `
+          radial-gradient(circle at 12% 15%, rgba(251,146,60,0.10) 0%, transparent 55%),
+          radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+          #13151f
+        `,
+        boxShadow: [
+          "inset 0 0 0 0.5px rgba(249,115,22,0.42)",
+          "inset 0 1px 0 rgba(251,146,60,0.42)",
+          "0 8px 22px -10px rgba(0,0,0,0.55)",
+        ].join(", "),
+      }}
+    >
+      <span
+        className="truncate font-medium leading-none"
+        style={{
+          color: item.isNew ? BRAND_GOLD_BRIGHT : BRAND_TEXT,
+        }}
+      >
+        {item.label}
+      </span>
+      {item.badge !== undefined && item.badge > 0 && (
+        <span
+          className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+          style={{ backgroundColor: BRAND_GOLD_BRIGHT, color: BRAND_BG }}
+        >
+          {item.badge > 99 ? "99+" : item.badge}
+        </span>
+      )}
+    </Link>
   );
 }
