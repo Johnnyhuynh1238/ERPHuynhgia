@@ -1,6 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 
+// KS đi flow /ks-ql/sub → link notification cho họ phải trỏ về màn sub, không phải /proposals cũ.
+const KS_QL_ENGINEER_IDS = new Set(["aa42319b-e694-4be2-bae0-faef83601ab5"]);
+
+function proposalLink(recipientId: string, projectId: string, proposalId: string) {
+  if (KS_QL_ENGINEER_IDS.has(recipientId)) {
+    return `/ks-ql/sub/${projectId}/material/propose/${proposalId}`;
+  }
+  return `/proposals/${proposalId}`;
+}
+
 async function pushOne(
   recipientId: string,
   payload: { title: string; body: string; link: string; tag: string; requireInteraction?: boolean },
@@ -82,6 +92,7 @@ export async function notifyMaterialProposalUpdate(input: {
   title: string;
   body: string;
 }) {
+  const link = proposalLink(input.recipientId, input.projectId, input.proposalId);
   await prisma.staffNotification.create({
     data: {
       recipientId: input.recipientId,
@@ -91,7 +102,7 @@ export async function notifyMaterialProposalUpdate(input: {
       kind: "material_proposal_update" as const,
       title: input.title,
       body: input.body,
-      link: `/proposals/${input.proposalId}`,
+      link,
       refType: "material_proposal",
       refId: input.proposalId,
     },
@@ -99,7 +110,7 @@ export async function notifyMaterialProposalUpdate(input: {
   await pushOne(input.recipientId, {
     title: input.title,
     body: input.body,
-    link: `/proposals/${input.proposalId}`,
+    link,
     tag: `material-proposal-${input.proposalId}`,
   });
 }
@@ -137,7 +148,6 @@ export async function notifyMaterialProposalComment(input: {
   const title = `Trao đổi đề xuất: ${input.projectName}`;
   const shortBody = input.body.length > 140 ? `${input.body.slice(0, 137)}…` : input.body;
   const body = `${input.authorRoleLabel} ${input.authorName}: ${shortBody}`;
-  const link = `/proposals/${input.proposalId}`;
 
   await prisma.staffNotification.createMany({
     data: targets.map((rid) => ({
@@ -148,7 +158,7 @@ export async function notifyMaterialProposalComment(input: {
       kind: "material_proposal_update" as const,
       title,
       body,
-      link,
+      link: proposalLink(rid, input.projectId, input.proposalId),
       refType: "material_proposal",
       refId: input.proposalId,
     })),
@@ -158,7 +168,7 @@ export async function notifyMaterialProposalComment(input: {
       pushOne(rid, {
         title,
         body,
-        link,
+        link: proposalLink(rid, input.projectId, input.proposalId),
         tag: `material-proposal-comment-${input.proposalId}`,
       }),
     ),

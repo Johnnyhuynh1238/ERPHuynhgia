@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
+import { NotificationsBell } from "@/components/notifications-bell";
+import { PushEnableButton } from "@/components/push-enable-button";
+import { SubPushPrompt } from "./sub-push-prompt";
 
 export function SubLayout({
   title,
@@ -15,16 +18,25 @@ export function SubLayout({
 }) {
   return (
     <div className="min-h-screen bg-[#0f1320] text-[#f5ede4]">
+      <SubPushPrompt />
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-10 pt-6">
-        {backHref ? (
-          <Link
-            href={backHref}
-            className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f5ede4] hover:bg-[#252840]"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Quay lại
-          </Link>
-        ) : null}
+        <div className="mb-4 flex items-center justify-between gap-2">
+          {backHref ? (
+            <Link
+              href={backHref}
+              className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f5ede4] hover:bg-[#252840]"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Quay lại
+            </Link>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <PushEnableButton />
+            <NotificationsBell apiBase="/api/notifications" listHref="/notifications" />
+          </div>
+        </div>
 
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-orange-300">{title}</h1>

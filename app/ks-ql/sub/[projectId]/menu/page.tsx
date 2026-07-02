@@ -24,7 +24,6 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
     <SubLayout
       title={project.name}
       subtitle={`Chủ nhà: ${project.customerName}`}
-      backHref="/ks-ql/sub"
     >
       <BigCard
         icon={<Package className="h-8 w-8" />}
