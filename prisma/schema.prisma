@@ -548,6 +548,7 @@ model User {
   materialProposalCommentsAuthored MaterialProposalComment[]     @relation("MatProposalCommentAuthor")
   materialReceiptsLogged           MaterialProposalItemReceipt[] @relation("MatProposalItemReceiptReceiver")
   materialDebtsRecorded            MaterialProposalItemDebt[]    @relation("MatProposalItemDebtRecorder")
+  materialDeliveriesLogged         MaterialProposalDelivery[]    @relation("MatProposalDeliveryReceiver")
   constructionDiariesAsKs          ConstructionDiary[]           @relation("ConstructionDiaryKs")
   supplierPayOrdersCreated         SupplierPaymentOrder[]        @relation("SupplierPayOrderCreator")
   supplierPayOrdersApproved        SupplierPaymentOrder[]        @relation("SupplierPayOrderApprover")
@@ -2736,9 +2737,10 @@ model MaterialProposal {
   project   Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   processor User?                         @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
   closer    User?                         @relation("MatProposalCloser", fields: [closedBy], references: [id], onDelete: SetNull)
-  comments  MaterialProposalComment[]
-  receipts  MaterialProposalItemReceipt[]
-  debts     MaterialProposalItemDebt[]
+  comments   MaterialProposalComment[]
+  receipts   MaterialProposalItemReceipt[]
+  debts      MaterialProposalItemDebt[]
+  deliveries MaterialProposalDelivery[]
 
   @@index([projectId, status])
   @@index([ksId, createdAt(sort: Desc)])
@@ -2807,6 +2809,25 @@ model MaterialProposalItemDebt {
   @@unique([proposalId, itemSeq])
   @@index([supplierId, paidAt])
   @@map("material_proposal_item_debts")
+}
+
+// Mỗi đợt KS Phúc nhận hàng tại công trình (nhận nhiều đợt cho 1 đơn PO).
+// Bắt buộc ảnh phiếu giao hàng NCC + ảnh hàng hoá thực tế cho từng đợt.
+model MaterialProposalDelivery {
+  id             String   @id @default(uuid()) @db.Uuid
+  proposalId     String   @map("proposal_id") @db.Uuid
+  deliveredAt    DateTime @default(now()) @map("delivered_at")
+  receivedBy     String   @map("received_by") @db.Uuid
+  invoicePhotos  Json     @default("[]") @map("invoice_photos") // ảnh phiếu giao hàng NCC (>=1)
+  goodsPhotos    Json     @default("[]") @map("goods_photos")   // ảnh hàng hoá thực tế (>=1)
+  itemsSnapshot  Json     @default("[]") @map("items_snapshot") // [{itemSeq, qty}] số nhận đợt này
+  note           String?  @db.Text
+
+  proposal MaterialProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  receiver User             @relation("MatProposalDeliveryReceiver", fields: [receivedBy], references: [id])
+
+  @@index([proposalId, deliveredAt(sort: Desc)])
+  @@map("material_proposal_deliveries")
 }
 
 // Lệnh thanh toán NCC: KT tạo, Admin duyệt, KT chi.

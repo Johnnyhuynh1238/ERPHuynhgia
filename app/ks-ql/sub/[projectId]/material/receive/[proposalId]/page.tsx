@@ -16,14 +16,7 @@ type ParsedItem = {
   task?: string;
 };
 
-type ReceiptRow = {
-  itemSeq: number;
-  receivedQty: number;
-  qcChecked: boolean;
-  photos: Array<{ key: string }>;
-  note: string | null;
-  receivedAt: string;
-};
+type StoredPhoto = { key: string; contentType?: string };
 
 export default async function ReceiveDetailPage({
   params,
@@ -62,10 +55,18 @@ export default async function ReceiveDetailPage({
         select: {
           itemSeq: true,
           receivedQty: true,
-          qcChecked: true,
-          photos: true,
+        },
+      },
+      deliveries: {
+        orderBy: { deliveredAt: "desc" },
+        select: {
+          id: true,
+          deliveredAt: true,
+          invoicePhotos: true,
+          goodsPhotos: true,
+          itemsSnapshot: true,
           note: true,
-          receivedAt: true,
+          receiver: { select: { fullName: true } },
         },
       },
     },
@@ -80,13 +81,22 @@ export default async function ReceiveDetailPage({
     task: it.task ?? "",
   }));
 
-  const receipts: ReceiptRow[] = proposal.receipts.map((r) => ({
-    itemSeq: r.itemSeq,
-    receivedQty: Number(r.receivedQty),
-    qcChecked: r.qcChecked,
-    photos: ((r.photos as unknown as Array<{ key: string }> | null) ?? []).map((p) => ({ key: p.key })),
-    note: r.note,
-    receivedAt: r.receivedAt.toISOString(),
+  const receivedByItem: Record<number, number> = {};
+  for (const r of proposal.receipts) {
+    receivedByItem[r.itemSeq] = (receivedByItem[r.itemSeq] ?? 0) + Number(r.receivedQty);
+  }
+
+  const initialDeliveries = proposal.deliveries.map((d) => ({
+    id: d.id,
+    deliveredAt: d.deliveredAt.toISOString(),
+    invoicePhotos: ((d.invoicePhotos as unknown as StoredPhoto[] | null) ?? []).map((p) => ({ key: p.key })),
+    goodsPhotos: ((d.goodsPhotos as unknown as StoredPhoto[] | null) ?? []).map((p) => ({ key: p.key })),
+    itemsSnapshot: ((d.itemsSnapshot as unknown as Array<{ itemSeq: number; qty: number }> | null) ?? []).map((s) => ({
+      itemSeq: s.itemSeq,
+      qty: Number(s.qty),
+    })),
+    note: d.note,
+    receiverName: d.receiver.fullName,
   }));
 
   return (
@@ -100,7 +110,8 @@ export default async function ReceiveDetailPage({
         description={proposal.description}
         orderStatus={proposal.orderStatus as "ordered" | "received"}
         items={items}
-        initialReceipts={receipts}
+        receivedByItem={receivedByItem}
+        initialDeliveries={initialDeliveries}
         project={{ code: project.code, name: project.name }}
         ksName={proposal.ks.fullName}
       />

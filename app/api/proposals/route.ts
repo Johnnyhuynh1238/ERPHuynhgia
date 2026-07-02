@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { prisma } from "@/lib/prisma";
@@ -157,14 +157,26 @@ export async function GET(request: Request) {
   if (parsed.data.ksId && isAccountantView) {
     where.where = { ...where.where, ksId: parsed.data.ksId };
   }
-  // KT: đơn KS đã nhận hàng nhưng chưa ghi công nợ.
+  // KT: đơn KS đã nhận hàng nhưng chưa ghi công nợ HẾT các item đã nhận.
+  // Prisma where không so được count(receipt) vs count(debt) → dùng raw SQL lấy id.
+  let idFilter: string[] | null = null;
   if (parsed.data.filter === "needs_debt") {
-    where.where = {
-      ...where.where,
-      status: "accepted",
-      receipts: { some: {} },
-      debts: { none: {} },
-    };
+    where.where = { ...where.where, status: "accepted" };
+    const extraProjectCond = parsed.data.projectId
+      ? Prisma.sql`AND p.project_id = ${parsed.data.projectId}::uuid`
+      : Prisma.empty;
+    const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT DISTINCT p.id::text AS id
+      FROM material_proposals p
+      JOIN material_proposal_item_receipts r ON r.proposal_id = p.id
+      LEFT JOIN material_proposal_item_debts d
+        ON d.proposal_id = p.id AND d.item_seq = r.item_seq
+      WHERE p.status = 'accepted'::"MaterialProposalStatus"
+        AND d.id IS NULL
+        ${extraProjectCond}
+    `);
+    idFilter = rows.map((r) => r.id);
+    where.where = { ...where.where, id: { in: idFilter } };
   }
 
   const [items, total] = await Promise.all([

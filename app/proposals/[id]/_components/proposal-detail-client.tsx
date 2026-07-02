@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { ProposalComments } from "./proposal-comments";
+import { ProposalDeliveries } from "./proposal-deliveries";
 import { ProposalKtItems } from "./proposal-kt-items";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
@@ -177,11 +178,24 @@ export function ProposalDetailClient({
       <ProposalItemsCard proposal={proposal} />
 
       {isAccountantView && proposal.status === "accepted" && proposal.orderStatus !== "not_ordered" && (
-        <ProposalKtItems
-          proposalId={proposal.id}
-          currentUserRole={currentRole}
-          onProposalUpdated={reload}
-        />
+        <>
+          <ProposalDeliveries
+            proposalId={proposal.id}
+            parsedItems={(proposal.parsedItems ?? []) as unknown as Array<{
+              name?: string;
+              ten?: string;
+              qty?: number;
+              sl?: number;
+              unit?: string;
+              dvt?: string;
+            }>}
+          />
+          <ProposalKtItems
+            proposalId={proposal.id}
+            currentUserRole={currentRole}
+            onProposalUpdated={reload}
+          />
+        </>
       )}
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
