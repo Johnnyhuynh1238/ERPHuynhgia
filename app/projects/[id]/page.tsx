@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
 import { ProjectHubGrid } from "./_components/project-hub-grid";
+import { DiaryApprovalPanel } from "./_components/diary-approval-panel";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 
 function startOfTodayUtc() {
@@ -122,6 +123,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
       currentUserId={user.id}
       todaySiteRest={todaySiteRest ? JSON.parse(JSON.stringify(todaySiteRest)) : null}
     />
+      {isAdmin ? <DiaryApprovalPanel projectId={project.id} /> : null}
     </div>
   );
 }

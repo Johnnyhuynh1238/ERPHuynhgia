@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
   if (!key) return NextResponse.json({ message: "Thiếu key" }, { status: 400 });
 
   const diaries = await prisma.constructionDiary.findMany({
-    where: { projectId: access.project.id },
+    where: { projectId: access.project.id, approvedAt: { not: null } },
     select: { taskPhotos: true, sitePhotos: true },
   });
 

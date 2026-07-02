@@ -98,6 +98,12 @@ export async function POST(
       { status: 400 },
     );
   }
+  if (diary.approvedAt) {
+    return NextResponse.json(
+      { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
+      { status: 403 },
+    );
+  }
   const field = kind === "task" ? "taskPhotos" : "sitePhotos";
   const existing = ((diary[field] as unknown as StoredPhoto[]) || []).slice();
   if (existing.length + files.length > MAX_PHOTOS_PER_KIND) {
@@ -155,6 +161,12 @@ export async function DELETE(
     where: { projectId_ksId_entryDate: { projectId: project.id, ksId: user.id, entryDate } },
   });
   if (!diary) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
+  if (diary.approvedAt) {
+    return NextResponse.json(
+      { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
+      { status: 403 },
+    );
+  }
 
   const field = kind === "task" ? "taskPhotos" : "sitePhotos";
   const photos = ((diary[field] as unknown as StoredPhoto[]) || []).filter((p) => p.key !== key);

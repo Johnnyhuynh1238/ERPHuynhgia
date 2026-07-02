@@ -50,6 +50,7 @@ export async function GET(
           entryDate,
         },
       },
+      include: { approvedBy: { select: { fullName: true } } },
     }),
     prisma.materialProposal.findMany({
       where: {
@@ -134,6 +135,8 @@ export async function GET(
           taskPhotos: (diary.taskPhotos as unknown as Array<{ key: string; contentType: string }>) || [],
           sitePhotos: (diary.sitePhotos as unknown as Array<{ key: string; contentType: string }>) || [],
           savedAt: diary.savedAt?.toISOString() ?? null,
+          approvedAt: diary.approvedAt?.toISOString() ?? null,
+          approvedByName: diary.approvedBy?.fullName ?? null,
           updatedAt: diary.updatedAt.toISOString(),
         }
       : null,
@@ -169,6 +172,23 @@ export async function POST(
   }
   if (!tasksDone) {
     return NextResponse.json({ message: "Cần điền mục công việc hôm nay" }, { status: 400 });
+  }
+
+  const existing = await prisma.constructionDiary.findUnique({
+    where: {
+      projectId_ksId_entryDate: {
+        projectId: project.id,
+        ksId: user.id,
+        entryDate,
+      },
+    },
+    select: { approvedAt: true },
+  });
+  if (existing?.approvedAt) {
+    return NextResponse.json(
+      { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
+      { status: 403 },
+    );
   }
 
   const now = new Date();

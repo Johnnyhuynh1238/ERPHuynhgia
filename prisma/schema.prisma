@@ -550,6 +550,7 @@ model User {
   materialDebtsRecorded            MaterialProposalItemDebt[]    @relation("MatProposalItemDebtRecorder")
   materialDeliveriesLogged         MaterialProposalDelivery[]    @relation("MatProposalDeliveryReceiver")
   constructionDiariesAsKs          ConstructionDiary[]           @relation("ConstructionDiaryKs")
+  constructionDiariesApproved      ConstructionDiary[]           @relation("ConstructionDiaryApprover")
   supplierPayOrdersCreated         SupplierPaymentOrder[]        @relation("SupplierPayOrderCreator")
   supplierPayOrdersApproved        SupplierPaymentOrder[]        @relation("SupplierPayOrderApprover")
   supplierPayOrdersRejected        SupplierPaymentOrder[]        @relation("SupplierPayOrderRejecter")
@@ -3860,14 +3861,18 @@ model ConstructionDiary {
   issues      String?  @db.Text
   taskPhotos  Json     @default("[]") @map("task_photos") // mảng {key, contentType, width, height}
   sitePhotos  Json     @default("[]") @map("site_photos")
-  savedAt     DateTime? @map("saved_at")
+  savedAt      DateTime? @map("saved_at")
+  approvedAt   DateTime? @map("approved_at")
+  approvedById String?   @map("approved_by") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  ks      User    @relation("ConstructionDiaryKs", fields: [ksId], references: [id])
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ks         User    @relation("ConstructionDiaryKs", fields: [ksId], references: [id])
+  approvedBy User?   @relation("ConstructionDiaryApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([projectId, ksId, entryDate])
   @@index([projectId, entryDate(sort: Desc)])
+  @@index([projectId, approvedAt(sort: Desc)])
   @@map("construction_diaries")
 }

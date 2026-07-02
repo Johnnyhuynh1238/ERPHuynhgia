@@ -17,6 +17,8 @@ import {
   History,
   Pencil,
   Plus,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
 
 type Photo = { key: string; contentType: string };
@@ -37,6 +39,8 @@ type DiaryDay = {
   taskPhotos: Photo[];
   sitePhotos: Photo[];
   savedAt: string | null;
+  approvedAt: string | null;
+  approvedByName: string | null;
   updatedAt: string;
 };
 
@@ -56,6 +60,8 @@ type HistoryItem = {
   taskCount: number;
   siteCount: number;
   savedAt: string | null;
+  approvedAt: string | null;
+  approvedByName: string | null;
 };
 
 function fmtDateVn(ymd: string) {
@@ -196,6 +202,8 @@ export function DiaryClient({
   const taskPhotos = data?.diary?.taskPhotos ?? [];
   const sitePhotos = data?.diary?.sitePhotos ?? [];
   const finalized = !!data?.diary?.savedAt;
+  const approved = !!data?.diary?.approvedAt;
+  const locked = approved;
 
   const canFinalize = useMemo(() => {
     return workerCount > 0 && tasksDone.trim().length > 0;
@@ -233,12 +241,22 @@ export function DiaryClient({
       {showModal ? (
         <DiaryModal onClose={() => setShowModal(false)} title={`Nhật ký ${fmtDateVn(todayYmd)}`}>
 
+      {locked ? (
+        <div className="flex items-center gap-2 rounded-xl border-2 border-[#4a8cf7]/40 bg-[#0f1a2e] px-4 py-3 text-sm text-[#a3c7f7]">
+          <ShieldCheck className="h-5 w-5 shrink-0" />
+          <span>
+            ADMIN đã duyệt nhật ký này{data?.diary?.approvedByName ? ` (${data.diary.approvedByName})` : ""} — không thể sửa nữa.
+          </span>
+        </div>
+      ) : null}
+
       <Section icon={<Users className="h-5 w-5" />} idx={1} title="Hôm nay thợ có mấy người?">
         <div className="flex items-center gap-3">
           <button
             type="button"
+            disabled={locked}
             onClick={() => setWorkerCount((n) => Math.max(0, n - 1))}
-            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95"
+            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95 disabled:opacity-50"
           >
             −
           </button>
@@ -246,16 +264,18 @@ export function DiaryClient({
             type="number"
             inputMode="numeric"
             min={0}
+            disabled={locked}
             value={workerCount}
             onChange={(e) =>
               setWorkerCount(Math.max(0, Math.min(500, Number(e.target.value) || 0)))
             }
-            className="h-12 w-24 rounded-xl border-2 border-[#252840] bg-[#0f1320] text-center text-2xl font-bold text-orange-300"
+            className="h-12 w-24 rounded-xl border-2 border-[#252840] bg-[#0f1320] text-center text-2xl font-bold text-orange-300 disabled:opacity-60"
           />
           <button
             type="button"
+            disabled={locked}
             onClick={() => setWorkerCount((n) => Math.min(500, n + 1))}
-            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95"
+            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95 disabled:opacity-50"
           >
             +
           </button>
@@ -270,10 +290,11 @@ export function DiaryClient({
       >
         <textarea
           value={tasksDone}
+          disabled={locked}
           onChange={(e) => setTasksDone(e.target.value.slice(0, 4000))}
           rows={4}
           placeholder="VD: Tô tường tầng 2 phòng ngủ chính + chống thấm sân thượng…"
-          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d]"
+          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
         />
         <p className="mt-1 text-right text-xs text-[#8892b0]">{tasksDone.length}/4000</p>
       </Section>
@@ -287,33 +308,38 @@ export function DiaryClient({
         <PhotoGrid
           projectId={projectId}
           photos={taskPhotos}
+          readOnly={locked}
           onDelete={(k) => deletePhoto("task", k)}
         />
-        <input
-          ref={taskFileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          hidden
-          onChange={(e) => {
-            uploadPhotos("task", e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          disabled={uploadingTask || taskPhotos.length >= 20 || !finalized}
-          onClick={() => taskFileRef.current?.click()}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
-        >
-          {uploadingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Tải ảnh hạng mục
-        </button>
-        {!finalized && (
-          <p className="mt-1 text-center text-xs text-[#E0B855]">
-            Chốt nhật ký trước khi tải ảnh
-          </p>
-        )}
+        {!locked ? (
+          <>
+            <input
+              ref={taskFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              hidden
+              onChange={(e) => {
+                uploadPhotos("task", e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              disabled={uploadingTask || taskPhotos.length >= 20 || !finalized}
+              onClick={() => taskFileRef.current?.click()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
+            >
+              {uploadingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Tải ảnh hạng mục
+            </button>
+            {!finalized && (
+              <p className="mt-1 text-center text-xs text-[#E0B855]">
+                Chốt nhật ký trước khi tải ảnh
+              </p>
+            )}
+          </>
+        ) : null}
       </Section>
 
       <Section
@@ -325,33 +351,38 @@ export function DiaryClient({
         <PhotoGrid
           projectId={projectId}
           photos={sitePhotos}
+          readOnly={locked}
           onDelete={(k) => deletePhoto("site", k)}
         />
-        <input
-          ref={siteFileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          hidden
-          onChange={(e) => {
-            uploadPhotos("site", e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          disabled={uploadingSite || sitePhotos.length >= 20 || !finalized}
-          onClick={() => siteFileRef.current?.click()}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
-        >
-          {uploadingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Tải ảnh toàn cảnh
-        </button>
-        {!finalized && (
-          <p className="mt-1 text-center text-xs text-[#E0B855]">
-            Chốt nhật ký trước khi tải ảnh
-          </p>
-        )}
+        {!locked ? (
+          <>
+            <input
+              ref={siteFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              hidden
+              onChange={(e) => {
+                uploadPhotos("site", e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              disabled={uploadingSite || sitePhotos.length >= 20 || !finalized}
+              onClick={() => siteFileRef.current?.click()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
+            >
+              {uploadingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Tải ảnh toàn cảnh
+            </button>
+            {!finalized && (
+              <p className="mt-1 text-center text-xs text-[#E0B855]">
+                Chốt nhật ký trước khi tải ảnh
+              </p>
+            )}
+          </>
+        ) : null}
       </Section>
 
       <Section
@@ -361,30 +392,33 @@ export function DiaryClient({
       >
         <textarea
           value={issues}
+          disabled={locked}
           onChange={(e) => setIssues(e.target.value.slice(0, 4000))}
           rows={3}
           placeholder="Để trống nếu không có…"
-          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d]"
+          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
         />
         <p className="mt-1 text-right text-xs text-[#8892b0]">{issues.length}/4000</p>
       </Section>
 
-      <div className="flex flex-col gap-2 rounded-2xl border-2 border-[#ff8a3d]/40 bg-[#1a1d2e] p-3 shadow-xl">
-        <button
-          type="button"
-          onClick={saveDiary}
-          disabled={saving || !canFinalize}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-4 text-base font-bold text-black active:scale-[0.99] disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-          {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
-        </button>
-        {!canFinalize && (
-          <p className="text-center text-xs text-[#E0B855]">
-            Cần điền số thợ &gt; 0 và mục công việc trước khi chốt.
-          </p>
-        )}
-      </div>
+      {!locked ? (
+        <div className="flex flex-col gap-2 rounded-2xl border-2 border-[#ff8a3d]/40 bg-[#1a1d2e] p-3 shadow-xl">
+          <button
+            type="button"
+            onClick={saveDiary}
+            disabled={saving || !canFinalize}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-4 text-base font-bold text-black active:scale-[0.99] disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+            {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
+          </button>
+          {!canFinalize && (
+            <p className="text-center text-xs text-[#E0B855]">
+              Cần điền số thợ &gt; 0 và mục công việc trước khi chốt.
+            </p>
+          )}
+        </div>
+      ) : null}
         </DiaryModal>
       ) : null}
 
@@ -413,7 +447,12 @@ export function DiaryClient({
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      {h.savedAt ? (
+                      {h.approvedAt ? (
+                        <span className="flex items-center gap-1 rounded-full bg-[#4a8cf7]/20 px-2 py-0.5 text-[#a3c7f7]">
+                          <ShieldCheck className="h-3 w-3" />
+                          Đã duyệt
+                        </span>
+                      ) : h.savedAt ? (
                         <span className="rounded-full bg-[#6FA677]/20 px-2 py-0.5 text-[#a3d3a8]">
                           Đã chốt
                         </span>
@@ -471,16 +510,21 @@ function TodayCard({
   onOpen: () => void;
 }) {
   const finalized = !!diary?.savedAt;
+  const approved = !!diary?.approvedAt;
   return (
     <div
       className={`rounded-2xl border-2 p-4 ${
-        finalized
-          ? "border-[#6FA677]/40 bg-[#152418]"
-          : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
+        approved
+          ? "border-[#4a8cf7]/50 bg-[#0f1a2e]"
+          : finalized
+            ? "border-[#6FA677]/40 bg-[#152418]"
+            : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
       }`}
     >
       <div className="flex items-center gap-2 text-sm">
-        {finalized ? (
+        {approved ? (
+          <ShieldCheck className="h-5 w-5 shrink-0 text-[#a3c7f7]" />
+        ) : finalized ? (
           <CheckCircle2 className="h-5 w-5 shrink-0 text-[#a3d3a8]" />
         ) : (
           <Plus className="h-5 w-5 shrink-0 text-orange-300" />
@@ -490,11 +534,15 @@ function TodayCard({
             Nhật ký {fmtDateVn(todayYmd)}
           </div>
           <div
-            className={`text-xs ${finalized ? "text-[#a3d3a8]" : "text-[#8892b0]"}`}
+            className={`text-xs ${
+              approved ? "text-[#a3c7f7]" : finalized ? "text-[#a3d3a8]" : "text-[#8892b0]"
+            }`}
           >
-            {finalized
-              ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}`
-              : "Hôm nay chưa chốt nhật ký"}
+            {approved
+              ? `ADMIN đã duyệt${diary?.approvedByName ? ` · ${diary.approvedByName}` : ""}`
+              : finalized
+                ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}`
+                : "Hôm nay chưa chốt nhật ký"}
           </div>
         </div>
       </div>
@@ -502,13 +550,21 @@ function TodayCard({
         type="button"
         onClick={onOpen}
         className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-bold active:scale-[0.99] ${
-          finalized
-            ? "border-2 border-[#ff8a3d]/60 bg-transparent text-orange-300"
-            : "bg-[#ff8a3d] text-black"
+          approved
+            ? "border-2 border-[#4a8cf7]/50 bg-transparent text-[#a3c7f7]"
+            : finalized
+              ? "border-2 border-[#ff8a3d]/60 bg-transparent text-orange-300"
+              : "bg-[#ff8a3d] text-black"
         }`}
       >
-        {finalized ? <Pencil className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
-        {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
+        {approved ? (
+          <Eye className="h-4 w-4" />
+        ) : finalized ? (
+          <Pencil className="h-4 w-4" />
+        ) : (
+          <Plus className="h-5 w-5" />
+        )}
+        {approved ? "Xem nhật ký (đã duyệt)" : finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
       </button>
     </div>
   );
@@ -557,20 +613,26 @@ function HistoryDetailModal({
         <>
           <div
             className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm ${
-              diary.savedAt
-                ? "border-[#6FA677]/40 bg-[#152418] text-[#a3d3a8]"
-                : "border-[#D26B6B]/40 bg-[#241414] text-[#D26B6B]"
+              diary.approvedAt
+                ? "border-[#4a8cf7]/40 bg-[#0f1a2e] text-[#a3c7f7]"
+                : diary.savedAt
+                  ? "border-[#6FA677]/40 bg-[#152418] text-[#a3d3a8]"
+                  : "border-[#D26B6B]/40 bg-[#241414] text-[#D26B6B]"
             }`}
           >
-            {diary.savedAt ? (
+            {diary.approvedAt ? (
+              <ShieldCheck className="h-5 w-5 shrink-0" />
+            ) : diary.savedAt ? (
               <CheckCircle2 className="h-5 w-5 shrink-0" />
             ) : (
               <AlertTriangle className="h-5 w-5 shrink-0" />
             )}
             <span>
-              {diary.savedAt
-                ? `Đã chốt lúc ${fmtTimeVn(diary.savedAt)}`
-                : "Chưa chốt — dữ liệu cũ, KS cần điền + bấm Chốt"}
+              {diary.approvedAt
+                ? `ADMIN đã duyệt${diary.approvedByName ? ` · ${diary.approvedByName}` : ""} — khoá không sửa`
+                : diary.savedAt
+                  ? `Đã chốt lúc ${fmtTimeVn(diary.savedAt)}`
+                  : "Chưa chốt — dữ liệu cũ, KS cần điền + bấm Chốt"}
             </span>
           </div>
 
@@ -774,10 +836,12 @@ function PhotoGrid({
   projectId,
   photos,
   onDelete,
+  readOnly,
 }: {
   projectId: string;
   photos: Photo[];
   onDelete: (key: string) => void;
+  readOnly?: boolean;
 }) {
   if (!photos.length) {
     return (
@@ -801,14 +865,16 @@ function PhotoGrid({
             className="object-cover"
             unoptimized
           />
-          <button
-            type="button"
-            onClick={() => onDelete(p.key)}
-            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white active:scale-95"
-            aria-label="Xoá"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          {!readOnly ? (
+            <button
+              type="button"
+              onClick={() => onDelete(p.key)}
+              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white active:scale-95"
+              aria-label="Xoá"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
         </div>
       ))}
     </div>
