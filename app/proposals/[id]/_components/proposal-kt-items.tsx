@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   CircleDashed,
   ClipboardList,
@@ -54,6 +55,13 @@ type SupplierLite = {
   code: string;
   name: string;
   phone: string | null;
+};
+type CatalogPrice = {
+  id: string;
+  materialName: string;
+  unit: string;
+  supplierItemCode: string | null;
+  unitPrice: number;
 };
 
 function fmtVnd(n: number) {
@@ -540,6 +548,10 @@ function DebtModal({
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogPrice[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogQ, setCatalogQ] = useState("");
 
   const loadSuppliers = useCallback(async (search: string) => {
     const url = new URL("/api/admin/suppliers", window.location.origin);
@@ -591,6 +603,47 @@ function DebtModal({
     setPickerOpen(false);
     setQ("");
   }
+
+  // Load bảng giá NCC khi đổi supplier để KT có dropdown chọn mã hàng.
+  useEffect(() => {
+    if (!supplierId) {
+      setCatalog([]);
+      return;
+    }
+    setCatalogLoading(true);
+    (async () => {
+      const res = await fetch(`/api/admin/suppliers/${supplierId}`, {
+        cache: "no-store",
+      });
+      const j = await res.json().catch(() => ({}));
+      setCatalogLoading(false);
+      if (res.ok) {
+        const prices = (j.supplier?.prices ?? []) as CatalogPrice[];
+        setCatalog(prices);
+      } else {
+        setCatalog([]);
+      }
+    })();
+  }, [supplierId]);
+
+  function pickCatalogItem(p: CatalogPrice) {
+    setSupplierItemCode(p.supplierItemCode || "");
+    setUnitPrice(String(p.unitPrice));
+    setCatalogOpen(false);
+    setCatalogQ("");
+    toast.success(`Đã chọn: ${p.materialName}`);
+  }
+
+  const filteredCatalog = useMemo(() => {
+    const q = catalogQ.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter(
+      (p) =>
+        p.materialName.toLowerCase().includes(q) ||
+        (p.supplierItemCode ?? "").toLowerCase().includes(q) ||
+        p.unit.toLowerCase().includes(q),
+    );
+  }, [catalog, catalogQ]);
 
   async function createSupplier(form: { name: string; phone: string; address: string }) {
     const res = await fetch("/api/admin/suppliers", {
@@ -771,17 +824,79 @@ function DebtModal({
             )}
           </div>
 
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">
-              Mã hàng của NCC
+          <div className="block">
+            <div className="mb-0.5 flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-wide text-[#8892b0]">
+                Mã hàng của NCC
+              </div>
+              {supplierId && (
+                <button
+                  type="button"
+                  onClick={() => setCatalogOpen((v) => !v)}
+                  disabled={catalogLoading}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#2d3249] bg-[#0f1220] px-2 py-0.5 text-[10px] font-semibold text-[#fb923c] hover:border-[#ff8a3d]/60 disabled:opacity-50"
+                >
+                  {catalogLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  )}
+                  Chọn từ bảng giá ({catalog.length})
+                </button>
+              )}
             </div>
             <input
               value={supplierItemCode}
               onChange={(e) => setSupplierItemCode(e.target.value)}
-              placeholder="VD: SAT-D10"
+              placeholder={supplierId ? "Chọn từ bảng giá hoặc tự nhập" : "Chọn NCC trước"}
               className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
             />
-          </label>
+            {catalogOpen && supplierId && (
+              <div className="mt-1 rounded-lg border border-[#2d3249] bg-[#0f1220] p-1">
+                <div className="flex items-center gap-2 border-b border-[#252840] px-2 py-1">
+                  <Search className="h-3.5 w-3.5 text-[#8892b0]" />
+                  <input
+                    autoFocus
+                    value={catalogQ}
+                    onChange={(e) => setCatalogQ(e.target.value)}
+                    placeholder="Tìm theo tên / mã / đơn vị"
+                    className="flex-1 bg-transparent text-sm text-[#f0f2ff] outline-none"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {catalog.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[#8892b0]">
+                      NCC này chưa có bảng giá. Nhập tay hoặc tick &ldquo;Cập nhật bảng giá&rdquo; bên dưới để tạo.
+                    </div>
+                  ) : filteredCatalog.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[#8892b0]">Không tìm thấy.</div>
+                  ) : (
+                    filteredCatalog.map((p) => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => pickCatalogItem(p)}
+                        className="block w-full px-3 py-1.5 text-left hover:bg-[#252840]"
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="min-w-0 flex-1 truncate text-xs font-semibold text-[#f0f2ff]">
+                            {p.materialName}
+                          </div>
+                          <div className="shrink-0 text-[11px] font-bold text-emerald-300 tabular-nums">
+                            {fmtVnd(p.unitPrice)}₫
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-[#8892b0]">
+                          {p.supplierItemCode ? `${p.supplierItemCode} · ` : ""}
+                          {p.unit}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
