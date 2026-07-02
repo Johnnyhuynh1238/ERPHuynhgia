@@ -5,13 +5,17 @@ import { getCurrentUser, requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { logProjectActivity } from "@/lib/project-activity-log";
 
+const legacy4digits = /^\d{4}$/;
+const customStrong = /^[A-Za-z0-9!@#$%^&*_-]{6,32}$/;
+
 const schema = z.object({
   password: z
     .string()
     .trim()
-    .min(6, "Mật khẩu tối thiểu 6 ký tự")
-    .max(32, "Mật khẩu tối đa 32 ký tự")
-    .regex(/^[A-Za-z0-9!@#$%^&*_-]+$/, "Mật khẩu chỉ chứa chữ, số và ký tự ! @ # $ % ^ & * _ -"),
+    .refine(
+      (value) => legacy4digits.test(value) || customStrong.test(value),
+      "Mật khẩu phải là 4 chữ số hoặc 6-32 ký tự (chữ, số, ! @ # $ % ^ & * _ -)",
+    ),
 });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -28,7 +32,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ message: "Mật khẩu không hợp lệ" }, { status: 400 });
+    const detail = parsed.error.issues[0]?.message || "Mật khẩu không hợp lệ";
+    return NextResponse.json({ message: detail }, { status: 400 });
   }
 
   const hashed = await bcrypt.hash(parsed.data.password, 10);
