@@ -69,13 +69,13 @@ type AppDef = {
   buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
 };
 
-// Luxury dark + brand brown-gold (kiểu Pinterest Media Kit)
-const BRAND_BG = "#0a0806";
-const BRAND_GOLD = "#b8763d";
-const BRAND_GOLD_BRIGHT = "#d99961";
-const BRAND_GLYPH = "#e8c99a";
-const BRAND_TEXT = "rgba(240,232,220,0.95)";
-const BRAND_TEXT_MUTED = "rgba(240,232,220,0.55)";
+// Đồng bộ palette /admin/menu — dark card + orange accent
+const BRAND_BG = "#0b0d16";
+const BRAND_GOLD = "#f97316";
+const BRAND_GOLD_BRIGHT = "#fb923c";
+const BRAND_GLYPH = "#f0f2ff";
+const BRAND_TEXT = "#f0f2ff";
+const BRAND_TEXT_MUTED = "#8892b0";
 
 const APPS: AppDef[] = [
   {
@@ -140,8 +140,8 @@ export function KetoanLauncher() {
       className="relative -mx-4 -mt-4 -mb-24 min-h-[calc(100vh-56px)] overflow-hidden px-4 pt-5 pb-28 md:-m-6 md:min-h-[calc(100vh-96px)] md:px-6 md:pt-8 md:pb-8"
       style={{
         background: `
-          radial-gradient(60% 45% at 88% 12%, rgba(217,153,97,0.10) 0%, transparent 55%),
-          radial-gradient(50% 35% at 8% 92%, rgba(184,118,61,0.09) 0%, transparent 55%),
+          radial-gradient(60% 45% at 88% 12%, rgba(251,146,60,0.10) 0%, transparent 55%),
+          radial-gradient(50% 35% at 8% 92%, rgba(249,115,22,0.09) 0%, transparent 55%),
           ${BRAND_BG}
         `,
       }}
@@ -159,8 +159,8 @@ export function KetoanLauncher() {
           className="smooth-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
           style={{
             color: BRAND_TEXT_MUTED,
-            borderColor: "rgba(184,118,61,0.28)",
-            background: "rgba(15,10,7,0.55)",
+            borderColor: "#252840",
+            background: "#13151f",
           }}
         >
           <ArrowLeft className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
@@ -185,7 +185,7 @@ export function KetoanLauncher() {
               className="h-px flex-1"
               style={{
                 background:
-                  "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, transparent 100%)",
+                  "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, transparent 100%)",
               }}
             />
           </div>
@@ -308,7 +308,7 @@ function WorkQueue({
         {rows.length > 0 && (
           <span
             className="rounded-full px-1.5 py-[1px] text-[10px] font-bold tracking-normal"
-            style={{ backgroundColor: BRAND_GOLD, color: "#1a1108" }}
+            style={{ backgroundColor: BRAND_GOLD, color: "#0b0d16" }}
           >
             {rows.length}
           </span>
@@ -317,7 +317,7 @@ function WorkQueue({
           className="h-px flex-1"
           style={{
             background:
-              "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, transparent 100%)",
+              "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, transparent 100%)",
           }}
         />
       </div>
@@ -328,7 +328,7 @@ function WorkQueue({
           style={{
             background:
               "linear-gradient(155deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
-            border: "0.5px solid rgba(232,201,154,0.10)",
+            border: "0.5px solid rgba(240,242,255,0.10)",
             color: BRAND_TEXT_MUTED,
           }}
         >
@@ -353,12 +353,12 @@ function TodoCard({ row }: { row: TodoRow }) {
       className="smooth-press group flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 transition-colors duration-150 hover:brightness-125"
       style={{
         background:
-          "linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 60%, rgba(255,255,255,0) 100%), rgba(232,201,154,0.03)",
+          "linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 60%, rgba(255,255,255,0) 100%), rgba(240,242,255,0.03)",
         backdropFilter: "blur(24px) saturate(180%)",
         WebkitBackdropFilter: "blur(24px) saturate(180%)",
         boxShadow: [
-          "inset 0 1px 0 rgba(232,201,154,0.22)",
-          "inset 0 0 0 0.5px rgba(232,201,154,0.12)",
+          "inset 0 1px 0 rgba(240,242,255,0.22)",
+          "inset 0 0 0 0.5px rgba(240,242,255,0.12)",
           "0 10px 24px -14px rgba(0,0,0,0.55)",
         ].join(", "),
       }}
@@ -367,8 +367,8 @@ function TodoCard({ row }: { row: TodoRow }) {
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
         style={{
           background:
-            "linear-gradient(155deg, rgba(217,153,97,0.25) 0%, rgba(184,118,61,0.10) 100%)",
-          border: "0.5px solid rgba(232,201,154,0.20)",
+            "linear-gradient(155deg, rgba(251,146,60,0.25) 0%, rgba(249,115,22,0.10) 100%)",
+          border: "0.5px solid rgba(240,242,255,0.20)",
         }}
       >
         <Icon
@@ -385,7 +385,7 @@ function TodoCard({ row }: { row: TodoRow }) {
       </span>
       <span
         className="ml-1 shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold leading-none tabular-nums"
-        style={{ backgroundColor: BRAND_GOLD, color: "#1a1108" }}
+        style={{ backgroundColor: BRAND_GOLD, color: "#0b0d16" }}
       >
         {row.count > 99 ? "99+" : row.count}
       </span>
@@ -446,7 +446,7 @@ function BalanceHeadline({
       >
         <Wallet className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
         <span>Số dư hiện tại</span>
-        <span style={{ color: "rgba(240,232,220,0.25)" }}>·</span>
+        <span style={{ color: "rgba(240,242,255,0.25)" }}>·</span>
         <button
           type="button"
           onClick={onRefresh}
@@ -467,7 +467,7 @@ function BalanceHeadline({
           className="text-[44px] font-bold leading-none tabular-nums tracking-tight"
           style={{
             color: BRAND_GLYPH,
-            textShadow: "0 2px 26px rgba(217,153,97,0.28)",
+            textShadow: "0 2px 26px rgba(251,146,60,0.28)",
           }}
         >
           {formatVnd(animated)}
@@ -484,7 +484,7 @@ function BalanceHeadline({
         className="mt-4 h-px w-full"
         style={{
           background:
-            "linear-gradient(90deg, rgba(184,118,61,0.35) 0%, rgba(184,118,61,0.08) 60%, transparent 100%)",
+            "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, rgba(249,115,22,0.08) 60%, transparent 100%)",
         }}
       />
 
@@ -504,12 +504,12 @@ function BalanceHeadline({
           khai báo TK.
         </div>
       ) : (
-        <div className="mt-2 divide-y" style={{ borderColor: "rgba(184,118,61,0.14)" }}>
+        <div className="mt-2 divide-y" style={{ borderColor: "rgba(249,115,22,0.14)" }}>
           {accounts.map((a) => (
             <div
               key={a.id}
               className="flex items-center justify-between border-t py-1.5 text-[13px] first:border-t-0"
-              style={{ borderColor: "rgba(184,118,61,0.14)" }}
+              style={{ borderColor: "rgba(249,115,22,0.14)" }}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-sm">{kindIcon(a.kind)}</span>
@@ -561,15 +561,15 @@ function AppIcon({
         }`}
         style={{
           background: `
-            radial-gradient(circle at 20% 15%, rgba(255,220,175,0.16) 0%, transparent 55%),
+            radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
             radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
-            #0f0806
+            #13151f
           `,
           boxShadow: [
-            "inset 0 0 0 0.5px rgba(184,118,61,0.5)",
-            "inset 0 1px 0 rgba(217,153,97,0.55)",
-            "inset 0 -1px 0 rgba(184,118,61,0.15)",
-            "0 0 22px -8px rgba(184,118,61,0.28)",
+            "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
+            "inset 0 1px 0 rgba(251,146,60,0.55)",
+            "inset 0 -1px 0 rgba(249,115,22,0.15)",
+            "0 0 22px -8px rgba(249,115,22,0.28)",
             "0 8px 20px -10px rgba(0,0,0,0.6)",
           ].join(", "),
         }}
@@ -594,7 +594,7 @@ function AppIcon({
       </button>
       <span
         className="text-center text-[11px] font-medium leading-tight sm:text-[12px]"
-        style={{ color: disabled ? "rgba(240,232,220,0.35)" : BRAND_TEXT }}
+        style={{ color: disabled ? "rgba(240,242,255,0.35)" : BRAND_TEXT }}
       >
         {app.label}
       </span>
@@ -732,13 +732,13 @@ function PopItemCard({
       className="smooth-press group flex items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-2.5 text-[13.5px] transition-all duration-150 hover:brightness-110"
       style={{
         background: `
-          radial-gradient(circle at 12% 15%, rgba(255,220,175,0.10) 0%, transparent 55%),
+          radial-gradient(circle at 12% 15%, rgba(251,146,60,0.10) 0%, transparent 55%),
           radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
-          #0f0806
+          #13151f
         `,
         boxShadow: [
-          "inset 0 0 0 0.5px rgba(184,118,61,0.42)",
-          "inset 0 1px 0 rgba(217,153,97,0.42)",
+          "inset 0 0 0 0.5px rgba(249,115,22,0.42)",
+          "inset 0 1px 0 rgba(251,146,60,0.42)",
           "0 8px 22px -10px rgba(0,0,0,0.55)",
         ].join(", "),
       }}
