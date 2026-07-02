@@ -48,19 +48,9 @@ async function ensureKsProject(projectId: string, userId: string) {
   });
 }
 
-async function getOrCreateDiary(projectId: string, ksId: string, entryDate: Date) {
-  return prisma.constructionDiary.upsert({
+async function loadDiary(projectId: string, ksId: string, entryDate: Date) {
+  return prisma.constructionDiary.findUnique({
     where: { projectId_ksId_entryDate: { projectId, ksId, entryDate } },
-    create: {
-      projectId,
-      ksId,
-      entryDate,
-      workerCount: 0,
-      tasksDone: "",
-      taskPhotos: [] as unknown as Prisma.InputJsonValue,
-      sitePhotos: [] as unknown as Prisma.InputJsonValue,
-    },
-    update: {},
   });
 }
 
@@ -101,7 +91,13 @@ export async function POST(
     }
   }
 
-  const diary = await getOrCreateDiary(project.id, user.id, entryDate);
+  const diary = await loadDiary(project.id, user.id, entryDate);
+  if (!diary || !diary.savedAt) {
+    return NextResponse.json(
+      { message: "Hãy chốt nhật ký trước khi tải ảnh" },
+      { status: 400 },
+    );
+  }
   const field = kind === "task" ? "taskPhotos" : "sitePhotos";
   const existing = ((diary[field] as unknown as StoredPhoto[]) || []).slice();
   if (existing.length + files.length > MAX_PHOTOS_PER_KIND) {

@@ -130,7 +130,7 @@ export function DiaryClient({
     setTimeout(() => setMsg(null), 3000);
   };
 
-  const upsertDiary = async (finalize: boolean) => {
+  const saveDiary = async () => {
     setSaving(true);
     try {
       const res = await fetch(`/api/ks-ql/projects/${projectId}/diary`, {
@@ -141,7 +141,6 @@ export function DiaryClient({
           workerCount,
           tasksDone,
           issues,
-          finalize,
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -149,9 +148,9 @@ export function DiaryClient({
         flash("err", j.message || "Lưu thất bại");
         return false;
       }
-      flash("ok", finalize ? "Đã chốt nhật ký hôm nay" : "Đã lưu nháp");
+      flash("ok", data?.diary?.savedAt ? "Đã cập nhật nhật ký" : "Đã chốt nhật ký hôm nay");
       await loadAll();
-      if (finalize) setShowModal(false);
+      setShowModal(false);
       return true;
     } finally {
       setSaving(false);
@@ -303,13 +302,18 @@ export function DiaryClient({
         />
         <button
           type="button"
-          disabled={uploadingTask || taskPhotos.length >= 20}
+          disabled={uploadingTask || taskPhotos.length >= 20 || !finalized}
           onClick={() => taskFileRef.current?.click()}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
         >
           {uploadingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           Tải ảnh hạng mục
         </button>
+        {!finalized && (
+          <p className="mt-1 text-center text-xs text-[#E0B855]">
+            Chốt nhật ký trước khi tải ảnh
+          </p>
+        )}
       </Section>
 
       <Section
@@ -336,13 +340,18 @@ export function DiaryClient({
         />
         <button
           type="button"
-          disabled={uploadingSite || sitePhotos.length >= 20}
+          disabled={uploadingSite || sitePhotos.length >= 20 || !finalized}
           onClick={() => siteFileRef.current?.click()}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
         >
           {uploadingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           Tải ảnh toàn cảnh
         </button>
+        {!finalized && (
+          <p className="mt-1 text-center text-xs text-[#E0B855]">
+            Chốt nhật ký trước khi tải ảnh
+          </p>
+        )}
       </Section>
 
       <Section
@@ -363,26 +372,17 @@ export function DiaryClient({
       <div className="flex flex-col gap-2 rounded-2xl border-2 border-[#ff8a3d]/40 bg-[#1a1d2e] p-3 shadow-xl">
         <button
           type="button"
-          onClick={() => upsertDiary(true)}
+          onClick={saveDiary}
           disabled={saving || !canFinalize}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-4 text-base font-bold text-black active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-          {finalized ? "Cập nhật & chốt lại" : "Lưu nhật ký hôm nay"}
+          {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
         </button>
-        {!canFinalize ? (
+        {!canFinalize && (
           <p className="text-center text-xs text-[#E0B855]">
             Cần điền số thợ &gt; 0 và mục công việc trước khi chốt.
           </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => upsertDiary(false)}
-            disabled={saving}
-            className="w-full rounded-xl border border-[#252840] bg-[#0f1320] px-4 py-2 text-sm text-[#8892b0] active:scale-[0.99] disabled:opacity-50"
-          >
-            Lưu nháp (chưa chốt)
-          </button>
         )}
       </div>
         </DiaryModal>
@@ -418,8 +418,8 @@ export function DiaryClient({
                           Đã chốt
                         </span>
                       ) : (
-                        <span className="rounded-full bg-[#E0B855]/20 px-2 py-0.5 text-[#E0B855]">
-                          Nháp
+                        <span className="rounded-full bg-[#D26B6B]/20 px-2 py-0.5 text-[#D26B6B]">
+                          Chưa chốt
                         </span>
                       )}
                     </div>
@@ -470,23 +470,18 @@ function TodayCard({
   diary: DiaryDay | null;
   onOpen: () => void;
 }) {
-  const has = !!diary;
   const finalized = !!diary?.savedAt;
   return (
     <div
       className={`rounded-2xl border-2 p-4 ${
         finalized
           ? "border-[#6FA677]/40 bg-[#152418]"
-          : has
-            ? "border-[#E0B855]/40 bg-[#1f1a14]"
-            : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
+          : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
       }`}
     >
       <div className="flex items-center gap-2 text-sm">
         {finalized ? (
           <CheckCircle2 className="h-5 w-5 shrink-0 text-[#a3d3a8]" />
-        ) : has ? (
-          <Pencil className="h-5 w-5 shrink-0 text-[#E0B855]" />
         ) : (
           <Plus className="h-5 w-5 shrink-0 text-orange-300" />
         )}
@@ -495,15 +490,11 @@ function TodayCard({
             Nhật ký {fmtDateVn(todayYmd)}
           </div>
           <div
-            className={`text-xs ${
-              finalized ? "text-[#a3d3a8]" : has ? "text-[#E0B855]" : "text-[#8892b0]"
-            }`}
+            className={`text-xs ${finalized ? "text-[#a3d3a8]" : "text-[#8892b0]"}`}
           >
             {finalized
               ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}`
-              : has
-                ? "Đang là nháp — chưa chốt"
-                : "Hôm nay chưa có nhật ký"}
+              : "Hôm nay chưa chốt nhật ký"}
           </div>
         </div>
       </div>
@@ -511,13 +502,13 @@ function TodayCard({
         type="button"
         onClick={onOpen}
         className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-bold active:scale-[0.99] ${
-          has
+          finalized
             ? "border-2 border-[#ff8a3d]/60 bg-transparent text-orange-300"
             : "bg-[#ff8a3d] text-black"
         }`}
       >
-        {has ? <Pencil className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
-        {has ? "Cập nhật nhật ký hôm nay" : "Tạo nhật ký hôm nay"}
+        {finalized ? <Pencil className="h-4 w-4" /> : <Plus className="h-5 w-5" />}
+        {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
       </button>
     </div>
   );
@@ -568,18 +559,18 @@ function HistoryDetailModal({
             className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm ${
               diary.savedAt
                 ? "border-[#6FA677]/40 bg-[#152418] text-[#a3d3a8]"
-                : "border-[#E0B855]/40 bg-[#1f1a14] text-[#E0B855]"
+                : "border-[#D26B6B]/40 bg-[#241414] text-[#D26B6B]"
             }`}
           >
             {diary.savedAt ? (
               <CheckCircle2 className="h-5 w-5 shrink-0" />
             ) : (
-              <Pencil className="h-5 w-5 shrink-0" />
+              <AlertTriangle className="h-5 w-5 shrink-0" />
             )}
             <span>
               {diary.savedAt
                 ? `Đã chốt lúc ${fmtTimeVn(diary.savedAt)}`
-                : "Đang là nháp — chưa chốt"}
+                : "Chưa chốt — dữ liệu cũ, KS cần điền + bấm Chốt"}
             </span>
           </div>
 

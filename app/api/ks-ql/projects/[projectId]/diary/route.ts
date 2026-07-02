@@ -160,11 +160,18 @@ export async function POST(
 
   const entryDate = parseDateParam(typeof body.date === "string" ? body.date : null);
   const workerCount = Math.max(0, Math.min(500, Math.floor(Number(body.workerCount) || 0)));
-  const tasksDone = String(body.tasksDone ?? "").slice(0, 4000);
+  const tasksDone = String(body.tasksDone ?? "").slice(0, 4000).trim();
   const issuesRaw = body.issues == null ? null : String(body.issues).slice(0, 4000);
   const issues = issuesRaw && issuesRaw.trim() ? issuesRaw : null;
-  const finalize = body.finalize === true;
 
+  if (workerCount <= 0) {
+    return NextResponse.json({ message: "Số thợ phải > 0" }, { status: 400 });
+  }
+  if (!tasksDone) {
+    return NextResponse.json({ message: "Cần điền mục công việc hôm nay" }, { status: 400 });
+  }
+
+  const now = new Date();
   const saved = await prisma.constructionDiary.upsert({
     where: {
       projectId_ksId_entryDate: {
@@ -182,13 +189,13 @@ export async function POST(
       issues,
       taskPhotos: [] as unknown as Prisma.InputJsonValue,
       sitePhotos: [] as unknown as Prisma.InputJsonValue,
-      savedAt: finalize ? new Date() : null,
+      savedAt: now,
     },
     update: {
       workerCount,
       tasksDone,
       issues,
-      savedAt: finalize ? new Date() : undefined,
+      savedAt: now,
     },
   });
 
