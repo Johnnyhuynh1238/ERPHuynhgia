@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2, FolderPlus, Tag } from "lucide-react";
+import { Pencil, Plus, Trash2, FolderPlus, Tag } from "lucide-react";
 import { toast } from "sonner";
 
 type Group = { id: string; name: string; sortOrder: number; _count: { prices: number } };
@@ -124,12 +123,6 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4">
       <div className="flex items-center gap-3">
-        <Link
-          href="/admin/suppliers"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#252840] bg-[#1a1d2e] text-[#8892b0] hover:text-[#f0f2ff]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
         <div className="flex-1">
           <div className="text-[11px] font-semibold text-[#8892b0]">{supplier.code}</div>
           <h1 className="text-lg font-bold text-[#f0f2ff]">{supplier.name}</h1>

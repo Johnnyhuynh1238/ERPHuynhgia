@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
 import '@/src/styles/hg-design-system.css'
@@ -7,7 +7,6 @@ export const metadata: Metadata = {
   title: "ERP Huỳnh Gia",
   description: "Hệ thống quản lý nội bộ công ty xây dựng",
   manifest: "/manifest.webmanifest",
-  themeColor: "#0f1015",
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -15,6 +14,16 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
+};
+
+// Khoá zoom toàn ứng dụng: chặn iOS auto-zoom khi focus input + pinch-zoom.
+export const viewport: Viewport = {
+  themeColor: "#0f1015",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

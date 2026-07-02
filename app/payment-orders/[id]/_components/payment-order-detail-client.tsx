@@ -13,7 +13,6 @@ import {
   XCircle,
 } from "lucide-react";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
-import { KetoanBackButton } from "@/app/ketoan/_components/back-button";
 
 type Status = "pending" | "approved" | "paid" | "rejected" | "cancelled";
 
@@ -186,8 +185,6 @@ export function PaymentOrderDetailClient({
 
   return (
     <div className="space-y-3">
-      <KetoanBackButton fallback="/payment-orders" label="Danh sách lệnh" />
-
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>

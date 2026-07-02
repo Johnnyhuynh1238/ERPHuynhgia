@@ -155,10 +155,7 @@ export function ProposalDetailClient({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <Link href="/proposals" className="text-xs text-[#8892b0] hover:text-[#fb923c]">
-          ‹ Quay lại danh sách
-        </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs text-[#8892b0]">{proposal.project.code}</div>
             <h1 className="text-xl font-bold text-[#f0f2ff]">{proposal.project.name}</h1>

@@ -3,7 +3,6 @@
 import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
-import { KetoanBackButton } from "@/app/ketoan/_components/back-button";
 
 type ProjectOption = { id: string; code: string; name: string };
 
@@ -292,7 +291,6 @@ export function ReceiptsClient({
 
   return (
     <div className="space-y-3">
-      <KetoanBackButton />
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div>
           <h1 className="text-xl font-semibold text-orange-300">Lệnh thu</h1>

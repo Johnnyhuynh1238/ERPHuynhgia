@@ -28,6 +28,24 @@ import { KsInstallPushModal } from "@/components/ks-install-push-modal";
 import { PushEnableButton } from "@/components/push-enable-button";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { AttendanceReminder } from "@/components/attendance-reminder";
+import { AppCloseButton } from "@/components/app-close-button";
+
+// Các đường dẫn "gốc" (dashboard/login/profile) — không hiện nút X đóng.
+const CLOSE_HIDDEN_PREFIXES = [
+  "/",
+  "/ketoan",
+  "/admin/dashboard",
+  "/admin/menu",
+  "/login",
+  "/profile",
+];
+
+function shouldShowClose(pathname: string) {
+  if (pathname === "/") return false;
+  return !CLOSE_HIDDEN_PREFIXES.some(
+    (p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)),
+  );
+}
 
 type AppUser = {
   id: string;
@@ -261,6 +279,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             </div>
 
             <div className="flex items-center gap-2">
+              {shouldShowClose(pathname) && <AppCloseButton userRole={user.role} />}
               <PushEnableButton />
               <NotificationsBell
                 apiBase="/api/notifications"
@@ -296,6 +315,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             ) : null}
             <PushEnableButton />
             <NotificationsBell apiBase="/api/notifications" listHref="/notifications" />
+            {shouldShowClose(pathname) && <AppCloseButton userRole={user.role} />}
           </div>
         </div>
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -322,15 +321,6 @@ export function ChamCongClient() {
 
   return (
     <div className="space-y-4">
-      <div className="slide-up">
-        <Link
-          href="/"
-          className="smooth-press inline-flex items-center gap-1 rounded-full border border-[#2d3249] bg-[#13151f]/80 px-3 py-1.5 text-xs font-semibold text-[#d9def3] hover:border-[#f97316]/50 hover:text-[#fb923c]"
-        >
-          ← Quay lại
-        </Link>
-      </div>
-
       <div
         className="slide-up delay-1 relative overflow-hidden rounded-2xl border p-4"
         style={{

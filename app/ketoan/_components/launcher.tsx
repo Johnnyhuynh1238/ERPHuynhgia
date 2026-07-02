@@ -663,6 +663,11 @@ function AppIcon({
 
 const POPOVER_WIDTH = 300;
 
+const POPOVER_ANIM_DURATION = 260;
+const POPOVER_ANIM_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const POPOVER_CLOSE_EASING = "cubic-bezier(0.4, 0, 0.6, 1)";
+const POPOVER_CLOSE_DURATION = 200;
+
 function AppPopover({
   app,
   items,
@@ -681,7 +686,7 @@ function AppPopover({
 
   const handleClose = () => {
     setVisible(false);
-    setTimeout(onClose, 180);
+    setTimeout(onClose, POPOVER_CLOSE_DURATION);
   };
 
   useEffect(() => {
@@ -695,19 +700,25 @@ function AppPopover({
 
   const AppIconGlyph = app.Icon;
 
+  // Đồng bộ backdrop + popup: cùng duration + easing, tránh cảm giác lệch.
+  const dur = visible ? POPOVER_ANIM_DURATION : POPOVER_CLOSE_DURATION;
+  const easing = visible ? POPOVER_ANIM_EASING : POPOVER_CLOSE_EASING;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
       onClick={handleClose}
     >
-      {/* Backdrop mờ */}
+      {/* Backdrop mờ — cùng duration + easing với popup */}
       <div
-        className="absolute inset-0 transition-opacity duration-200 ease-out"
+        className="absolute inset-0"
         style={{
           background: "rgba(11,13,22,0.62)",
           backdropFilter: "blur(6px)",
           WebkitBackdropFilter: "blur(6px)",
           opacity: visible ? 1 : 0,
+          transition: `opacity ${dur}ms ${easing}`,
+          willChange: "opacity",
         }}
       />
       {/* Popup zoom */}
@@ -717,9 +728,11 @@ function AppPopover({
         style={{
           width: POPOVER_WIDTH,
           maxWidth: "calc(100vw - 32px)",
-          transform: visible ? "scale(1)" : "scale(0.9)",
+          transform: visible ? "scale(1)" : "scale(0.88)",
           opacity: visible ? 1 : 0,
-          transition: "transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out",
+          transition: `transform ${dur}ms ${easing}, opacity ${dur}ms ${easing}`,
+          willChange: "transform, opacity",
+          transformOrigin: "center center",
           background: `
             radial-gradient(circle at 15% 10%, rgba(251,146,60,0.10) 0%, transparent 55%),
             radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
