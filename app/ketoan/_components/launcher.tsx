@@ -552,36 +552,38 @@ function AppIcon({
   const Icon = app.Icon;
   return (
     <div className={`slide-up ${delayClass} flex flex-col items-center gap-2`}>
-      <button
-        type="button"
-        onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
-        disabled={disabled}
-        className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[20px] sm:h-[68px] sm:w-[68px] ${
-          disabled ? "cursor-not-allowed opacity-50" : ""
-        }`}
-        style={{
-          background: `
-            radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
-            radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
-            #13151f
-          `,
-          boxShadow: [
-            "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
-            "inset 0 1px 0 rgba(251,146,60,0.55)",
-            "inset 0 -1px 0 rgba(249,115,22,0.15)",
-            "0 0 22px -8px rgba(249,115,22,0.28)",
-            "0 8px 20px -10px rgba(0,0,0,0.6)",
-          ].join(", "),
-        }}
-      >
-        <Icon
-          className="relative h-[26px] w-[26px] sm:h-[28px] sm:w-[28px]"
-          strokeWidth={1.6}
-          style={{ color: BRAND_GOLD_BRIGHT }}
-        />
+      <span className="relative inline-block">
+        <button
+          type="button"
+          onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
+          disabled={disabled}
+          className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[20px] sm:h-[68px] sm:w-[68px] ${
+            disabled ? "cursor-not-allowed opacity-50" : ""
+          }`}
+          style={{
+            background: `
+              radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
+              radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
+              #13151f
+            `,
+            boxShadow: [
+              "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
+              "inset 0 1px 0 rgba(251,146,60,0.55)",
+              "inset 0 -1px 0 rgba(249,115,22,0.15)",
+              "0 0 22px -8px rgba(249,115,22,0.28)",
+              "0 8px 20px -10px rgba(0,0,0,0.6)",
+            ].join(", "),
+          }}
+        >
+          <Icon
+            className="relative h-[26px] w-[26px] sm:h-[28px] sm:w-[28px]"
+            strokeWidth={1.6}
+            style={{ color: BRAND_GOLD_BRIGHT }}
+          />
+        </button>
         {badge > 0 && (
           <span
-            className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
+            className="pointer-events-none absolute -right-1.5 -top-1.5 z-10 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none tabular-nums"
             style={{
               backgroundColor: BRAND_GOLD_BRIGHT,
               color: BRAND_BG,
@@ -591,7 +593,7 @@ function AppIcon({
             {badge > 99 ? "99+" : badge}
           </span>
         )}
-      </button>
+      </span>
       <span
         className="text-center text-[11px] font-medium leading-tight sm:text-[12px]"
         style={{ color: disabled ? "rgba(240,242,255,0.35)" : BRAND_TEXT }}
