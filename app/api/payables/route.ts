@@ -42,6 +42,7 @@ export async function GET(request: Request) {
       supplierItemCode: true,
       unitPrice: true,
       qty: true,
+      debtUnit: true,
       totalAmount: true,
       note: true,
       recordedAt: true,
@@ -62,12 +63,15 @@ export async function GET(request: Request) {
     const items = debts.map((d) => {
       const parsed = Array.isArray(d.proposal.parsedItems) ? d.proposal.parsedItems : [];
       const it = parsed[d.itemSeq] as { ten?: string; name?: string; dvt?: string; unit?: string } | undefined;
+      const proposalUnit = (it?.unit ?? it?.dvt ?? "").trim();
       return {
         debtId: d.id,
         proposalId: d.proposalId,
         itemSeq: d.itemSeq,
         materialName: (it?.name ?? it?.ten ?? "").trim() || "—",
-        unit: (it?.unit ?? it?.dvt ?? "").trim(),
+        unit: d.debtUnit ?? proposalUnit,
+        proposalUnit,
+        debtUnit: d.debtUnit,
         supplierItemCode: d.supplierItemCode,
         unitPrice: Number(d.unitPrice),
         qty: Number(d.qty),

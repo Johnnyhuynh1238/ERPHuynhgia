@@ -23,6 +23,8 @@ type Item = {
   proposalId: string;
   materialName: string;
   unit: string;
+  proposalUnit: string;
+  debtUnit: string | null;
   supplierItemCode: string | null;
   unitPrice: number;
   qty: number;
@@ -312,7 +314,16 @@ export function PaymentOrderDetailClient({
                     {it.materialName}
                   </div>
                   <div className="mt-0.5 text-[11px] text-[#8892b0]">
-                    {it.qty.toLocaleString("vi-VN")} {it.unit} × {vnd(it.unitPrice)}
+                    {it.qty.toLocaleString("vi-VN")}{" "}
+                    {it.debtUnit && it.debtUnit !== it.proposalUnit ? (
+                      <span className="font-semibold text-amber-300">
+                        {it.debtUnit}
+                        <span className="text-[#5a627a]"> (KS đặt {it.proposalUnit})</span>
+                      </span>
+                    ) : (
+                      it.unit
+                    )}{" "}
+                    × {vnd(it.unitPrice)}
                   </div>
                   <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#8892b0]">
                     <FileText className="h-3 w-3" />

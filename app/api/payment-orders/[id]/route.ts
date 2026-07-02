@@ -58,6 +58,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
               supplierItemCode: true,
               unitPrice: true,
               qty: true,
+              debtUnit: true,
               note: true,
               proposal: {
                 select: {
@@ -77,6 +78,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const items = order.items.map((it) => {
     const parsed = Array.isArray(it.debt.proposal.parsedItems) ? it.debt.proposal.parsedItems : [];
     const p = parsed[it.debt.itemSeq] as { ten?: string; name?: string; dvt?: string; unit?: string } | undefined;
+    const proposalUnit = (p?.unit ?? p?.dvt ?? "").trim();
     return {
       id: it.id,
       amount: Number(it.amount),
@@ -84,7 +86,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       proposalId: it.debt.proposalId,
       itemSeq: it.debt.itemSeq,
       materialName: (p?.name ?? p?.ten ?? "").trim() || "—",
-      unit: (p?.unit ?? p?.dvt ?? "").trim(),
+      unit: it.debt.debtUnit ?? proposalUnit,
+      proposalUnit,
+      debtUnit: it.debt.debtUnit,
       supplierItemCode: it.debt.supplierItemCode,
       unitPrice: Number(it.debt.unitPrice),
       qty: Number(it.debt.qty),

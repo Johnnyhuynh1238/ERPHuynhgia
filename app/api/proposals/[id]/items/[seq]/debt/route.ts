@@ -34,6 +34,7 @@ const upsertSchema = z.object({
   supplierItemCode: z.string().trim().max(100).nullable().optional(),
   unitPrice: z.coerce.number().positive(),
   qty: z.coerce.number().positive(),
+  debtUnit: z.string().trim().max(50).nullable().optional(),
   groupId: z.string().uuid().nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
   saveToSupplierCatalog: z.boolean().optional(),
@@ -104,6 +105,8 @@ export async function POST(
     if (!g) return NextResponse.json({ message: "Nhóm hàng không thuộc NCC này" }, { status: 400 });
   }
 
+  const debtUnitClean = parsed.data.debtUnit?.trim() || null;
+  const debtUnitFinal = debtUnitClean && debtUnitClean !== mUnit ? debtUnitClean : null;
   const totalAmount = parsed.data.unitPrice * parsed.data.qty;
   const debt = await prisma.materialProposalItemDebt.upsert({
     where: { proposalId_itemSeq: { proposalId: proposal.id, itemSeq: seq } },
@@ -114,6 +117,7 @@ export async function POST(
       supplierItemCode: parsed.data.supplierItemCode || null,
       unitPrice: new Prisma.Decimal(parsed.data.unitPrice),
       qty: new Prisma.Decimal(parsed.data.qty),
+      debtUnit: debtUnitFinal,
       totalAmount: new Prisma.Decimal(totalAmount),
       note: parsed.data.note || null,
       recordedBy: user.id,
@@ -123,6 +127,7 @@ export async function POST(
       supplierItemCode: parsed.data.supplierItemCode || null,
       unitPrice: new Prisma.Decimal(parsed.data.unitPrice),
       qty: new Prisma.Decimal(parsed.data.qty),
+      debtUnit: debtUnitFinal,
       totalAmount: new Prisma.Decimal(totalAmount),
       note: parsed.data.note || null,
       recordedBy: user.id,
@@ -135,6 +140,7 @@ export async function POST(
       supplierItemCode: true,
       unitPrice: true,
       qty: true,
+      debtUnit: true,
       totalAmount: true,
       note: true,
       recordedAt: true,
@@ -142,19 +148,21 @@ export async function POST(
   });
 
   // Cập nhật bảng giá NCC (upsert SupplierMaterialPrice) khi KT tick.
-  if (parsed.data.saveToSupplierCatalog && mName && mUnit) {
+  // Ưu tiên lưu theo unit ghi CN (VD "kg") thay vì unit đề xuất ("Cái").
+  const catalogUnit = (debtUnitFinal ?? mUnit).trim();
+  if (parsed.data.saveToSupplierCatalog && mName && catalogUnit) {
     await prisma.supplierMaterialPrice.upsert({
       where: {
         supplierId_materialName_unit: {
           supplierId: supplier.id,
           materialName: mName,
-          unit: mUnit,
+          unit: catalogUnit,
         },
       },
       create: {
         supplierId: supplier.id,
         materialName: mName,
-        unit: mUnit,
+        unit: catalogUnit,
         supplierItemCode: parsed.data.supplierItemCode || null,
         unitPrice: new Prisma.Decimal(parsed.data.unitPrice),
         groupId: parsed.data.groupId ?? null,

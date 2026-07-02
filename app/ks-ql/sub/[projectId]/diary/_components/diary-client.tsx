@@ -163,6 +163,14 @@ export function DiaryClient({
     }
   };
 
+  const applyPhotos = (kind: "task" | "site", photos: Photo[]) => {
+    setData((prev) => {
+      if (!prev || !prev.diary) return prev;
+      const field = kind === "task" ? "taskPhotos" : "sitePhotos";
+      return { ...prev, diary: { ...prev.diary, [field]: photos } };
+    });
+  };
+
   const uploadPhotos = async (kind: "task" | "site", files: FileList | null) => {
     if (!files || !files.length) return;
     const setUploading = kind === "task" ? setUploadingTask : setUploadingSite;
@@ -179,7 +187,8 @@ export function DiaryClient({
         flash("err", j.message || "Upload thất bại");
         return;
       }
-      await loadAll();
+      if (Array.isArray(j.photos)) applyPhotos(kind, j.photos as Photo[]);
+      flash("ok", "Đã tải ảnh lên");
     } finally {
       setUploading(false);
     }
@@ -191,12 +200,12 @@ export function DiaryClient({
       `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${todayYmd}&key=${encodeURIComponent(key)}`,
       { method: "DELETE" },
     );
+    const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
       flash("err", j.message || "Xoá thất bại");
       return;
     }
-    await loadAll();
+    if (Array.isArray(j.photos)) applyPhotos(kind, j.photos as Photo[]);
   };
 
   const taskPhotos = data?.diary?.taskPhotos ?? [];

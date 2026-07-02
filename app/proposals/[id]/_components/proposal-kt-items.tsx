@@ -36,6 +36,7 @@ type DebtInfo = {
   supplierItemCode: string | null;
   unitPrice: number;
   qty: number;
+  debtUnit: string | null;
   totalAmount: number;
   note: string | null;
   recordedAt: string;
@@ -477,6 +478,9 @@ function ItemCard({
                 </div>
                 <div className="text-[10px] text-[#8892b0] tabular-nums">
                   {fmtVnd(it.debt.unitPrice)}₫ × {fmtQty(it.debt.qty)}
+                  {it.debt.debtUnit && it.debt.debtUnit !== it.unit && (
+                    <span className="font-semibold text-amber-300"> {it.debt.debtUnit}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -543,6 +547,7 @@ function DebtModal({
   const [qty, setQty] = useState<string>(
     item.debt ? String(item.debt.qty) : String(item.receipt?.receivedQty ?? item.qty),
   );
+  const [debtUnit, setDebtUnit] = useState<string>(item.debt?.debtUnit ?? "");
   const [note, setNote] = useState<string>(item.debt?.note ?? "");
   const [saveToCatalog, setSaveToCatalog] = useState<boolean>(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
@@ -695,6 +700,7 @@ function DebtModal({
         supplierItemCode: supplierItemCode.trim() || null,
         unitPrice: priceNum,
         qty: qtyNum,
+        debtUnit: debtUnit.trim() || null,
         note: note.trim() || null,
         saveToSupplierCatalog: saveToCatalog,
       }),
@@ -726,6 +732,9 @@ function DebtModal({
   }
 
   const total = (Number(unitPrice.replace(/[^0-9.]/g, "")) || 0) * (Number(qty.replace(",", ".")) || 0);
+  const debtUnitClean = debtUnit.trim();
+  const effectiveUnit = debtUnitClean || item.unit;
+  const unitMismatch = !!debtUnitClean && debtUnitClean !== item.unit;
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -898,7 +907,7 @@ function DebtModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-[1fr_1fr_80px] gap-2">
             <label className="block">
               <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">
                 Đơn giá (₫) *
@@ -912,7 +921,7 @@ function DebtModal({
             </label>
             <label className="block">
               <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">
-                Số lượng ({item.unit}) *
+                Số lượng ({effectiveUnit}) *
               </div>
               <input
                 inputMode="decimal"
@@ -921,7 +930,29 @@ function DebtModal({
                 className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm font-semibold text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
               />
             </label>
+            <label className="block">
+              <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">
+                Đvt NCC
+              </div>
+              <input
+                value={debtUnit}
+                onChange={(e) => setDebtUnit(e.target.value)}
+                placeholder={item.unit}
+                className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-2 py-2 text-sm font-semibold text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              />
+            </label>
           </div>
+
+          {unitMismatch && (
+            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+              <div className="font-semibold">Đơn vị NCC khác đơn vị đề xuất</div>
+              <div className="mt-0.5 text-amber-100/90">
+                KS đặt <b>{fmtQty(item.qty)} {item.unit}</b>
+                {item.receipt && ` · KS nhận ${fmtQty(item.receipt.receivedQty)} ${item.unit}`}
+                {" · "}KT ghi CN <b>{qty || 0} {effectiveUnit}</b>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
             <Wallet className="mr-1 inline h-4 w-4" />
@@ -936,7 +967,7 @@ function DebtModal({
               className="mt-0.5 h-4 w-4 accent-[#ff8a3d]"
             />
             <span>
-              Cập nhật bảng giá NCC này ({item.name} — {item.unit}). Lần sau sẽ tự auto-fill giá.
+              Cập nhật bảng giá NCC này ({item.name} — {effectiveUnit}). Lần sau sẽ tự auto-fill giá.
             </span>
           </label>
 
