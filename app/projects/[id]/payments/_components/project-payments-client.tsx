@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 
 type PaymentStatus = "not_collected" | "request_sent" | "collected" | "customer_late";
 
+type ReceiptRefStatus = "pending" | "awaiting_approval" | "received" | "cancelled";
+
 type PaymentRow = {
   id: string;
   phaseNumber: number;
@@ -17,6 +19,7 @@ type PaymentRow = {
   actualPaidAmount: number | null;
   status: PaymentStatus;
   notes: string | null;
+  activeReceipt: { id: string; code: string; status: ReceiptRefStatus } | null;
 };
 
 type ProjectInfo = {
@@ -73,7 +76,9 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [canEdit, setCanEdit] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<PaymentRow | null>(null);
   const [status, setStatus] = useState<PaymentStatus>("not_collected");
@@ -97,6 +102,40 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
     setProject(json.project);
     setRows(json.payments || []);
     setCanEdit(!!json.canEdit);
+    setIsAdmin(!!json.isAdmin);
+  }
+
+  async function requestCollection(row: PaymentRow) {
+    if (!window.confirm(`Gửi lệnh thu ${fmtMoney(row.amount)} — Đợt ${row.phaseNumber} cho kế toán?`)) return;
+    setPendingId(row.id);
+    const res = await fetch(`/api/projects/${projectId}/payments/${row.id}/request-collection`, {
+      method: "POST",
+    });
+    const json = await res.json().catch(() => ({}));
+    setPendingId(null);
+    if (!res.ok) {
+      toast.error(json.message || "Gửi lệnh thu thất bại");
+      return;
+    }
+    toast.success(json.message || "Đã gửi cho KT");
+    await loadData();
+  }
+
+  async function cancelCollection(row: PaymentRow) {
+    if (!row.activeReceipt) return;
+    if (!window.confirm(`Huỷ lệnh thu ${row.activeReceipt.code}?`)) return;
+    setPendingId(row.id);
+    const res = await fetch(`/api/projects/${projectId}/payments/${row.id}/request-collection`, {
+      method: "DELETE",
+    });
+    const json = await res.json().catch(() => ({}));
+    setPendingId(null);
+    if (!res.ok) {
+      toast.error(json.message || "Huỷ lệnh thu thất bại");
+      return;
+    }
+    toast.success(json.message || "Đã huỷ lệnh thu");
+    await loadData();
   }
 
   useEffect(() => {
@@ -249,17 +288,37 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
                   </div>
                 ) : null}
 
+                {row.activeReceipt ? (
+                  <div className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+                    <div className="font-medium">
+                      {row.activeReceipt.status === "received" ? "Đã thu" : "Đang chờ KT thu"} — {row.activeReceipt.code}
+                    </div>
+                  </div>
+                ) : null}
+
                 {canEdit ? (
                   <div className="mt-auto flex flex-wrap gap-2 pt-1">
+                    {isAdmin && !row.activeReceipt && row.status !== "collected" ? (
+                      <Button
+                        className="h-8 bg-orange-500 px-3 text-xs hover:bg-orange-600"
+                        onClick={() => requestCollection(row)}
+                        disabled={pendingId === row.id}
+                      >
+                        {pendingId === row.id ? "Đang gửi..." : "Yêu cầu KT thu"}
+                      </Button>
+                    ) : null}
+                    {isAdmin && row.activeReceipt && row.activeReceipt.status !== "received" ? (
+                      <Button
+                        variant="outline"
+                        className="h-8 border-red-200 px-3 text-xs text-red-700 hover:bg-red-50"
+                        onClick={() => cancelCollection(row)}
+                        disabled={pendingId === row.id}
+                      >
+                        Huỷ lệnh thu
+                      </Button>
+                    ) : null}
                     <Button variant="outline" className="h-8 px-3 text-xs" onClick={() => openEdit(row)}>
                       Sửa
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-8 px-3 text-xs"
-                      onClick={() => toast.info("In đề nghị thanh toán sẽ làm ở Phase 2")}
-                    >
-                      In đề nghị thanh toán
                     </Button>
                   </div>
                 ) : null}

@@ -74,6 +74,14 @@ export async function GET(request: Request) {
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
       project: { select: { id: true, code: true, name: true } },
+      paymentSchedule: {
+        select: {
+          id: true,
+          phaseNumber: true,
+          milestoneDescription: true,
+          description: true,
+        },
+      },
       creator: { select: { id: true, fullName: true } },
       receiver: { select: { id: true, fullName: true } },
     },

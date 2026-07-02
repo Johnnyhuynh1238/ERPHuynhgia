@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ReceiptStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, ReceiptStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -21,21 +21,33 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const row = await prisma.receipt.findUnique({ where: { id: params.id }, select: { id: true, status: true, code: true } });
+  const row = await prisma.receipt.findUnique({
+    where: { id: params.id },
+    select: { id: true, status: true, code: true, paymentScheduleId: true },
+  });
   if (!row) return NextResponse.json({ message: "Không tìm thấy lệnh thu" }, { status: 404 });
   if (row.status !== ReceiptStatus.pending) {
     return NextResponse.json({ message: "Chỉ huỷ được lệnh đang chờ thu" }, { status: 400 });
   }
 
   const reason = parsed.data.reason.trim();
-  await prisma.receipt.update({
-    where: { id: row.id },
-    data: {
-      status: ReceiptStatus.cancelled,
-      cancelledBy: user.id,
-      cancelledAt: new Date(),
-      cancelledReason: reason,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.receipt.update({
+      where: { id: row.id },
+      data: {
+        status: ReceiptStatus.cancelled,
+        cancelledBy: user.id,
+        cancelledAt: new Date(),
+        cancelledReason: reason,
+      },
+    });
+
+    if (row.paymentScheduleId) {
+      await tx.paymentSchedule.update({
+        where: { id: row.paymentScheduleId },
+        data: { status: PaymentStatus.not_collected },
+      });
+    }
   });
 
   fireAndForget(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PaymentStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, ReceiptStatus, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
@@ -87,10 +87,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       paymentNote: true,
       status: true,
       notes: true,
+      receipts: {
+        where: { status: { in: [ReceiptStatus.pending, ReceiptStatus.awaiting_approval, ReceiptStatus.received] } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true, code: true, status: true },
+      },
     },
   });
 
   const canEdit = user.role === "admin" || user.role === "accountant";
+  const isAdmin = user.role === UserRole.admin;
 
   return NextResponse.json({
     project: {
@@ -99,15 +106,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
     payments: rows.map((row) => {
       const normalized = normalizePaymentSchedule(row);
+      const activeReceipt = row.receipts[0] || null;
+      const { receipts, ...rest } = row;
+      void receipts;
       return {
-        ...row,
+        ...rest,
         percent: Number(row.percent),
         amount: Number(row.amount),
         actualPaidAmount: row.actualPaidAmount ? Number(row.actualPaidAmount) : null,
         paidAmount: row.paidAmount ? Number(row.paidAmount) : null,
         normalized,
+        activeReceipt,
       };
     }),
     canEdit,
+    isAdmin,
   });
 }

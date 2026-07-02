@@ -1478,8 +1478,9 @@ model PaymentSchedule {
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  creator User?   @relation("PaymentScheduleCreator", fields: [createdBy], references: [id])
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator  User?     @relation("PaymentScheduleCreator", fields: [createdBy], references: [id])
+  receipts Receipt[] @relation("ReceiptOnSchedule")
 
   @@index([projectId, phaseNumber])
   @@index([projectId, dueDate])
@@ -3757,6 +3758,7 @@ model Receipt {
   code               String        @unique
   source             ReceiptSource
   projectId          String?       @map("project_id") @db.Uuid
+  paymentScheduleId  String?       @map("payment_schedule_id") @db.Uuid
   amount             Decimal       @db.Decimal(18, 2)
   payer              String?
   paymentMethod      String?       @map("payment_method")
@@ -3778,15 +3780,17 @@ model Receipt {
   approvedAt     DateTime? @map("approved_at")
   rejectedReason String?   @map("rejected_reason") @db.Text
 
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  creator   User     @relation("ReceiptCreator", fields: [createdBy], references: [id])
-  receiver  User?    @relation("ReceiptReceiver", fields: [receivedBy], references: [id], onDelete: SetNull)
-  canceller User?    @relation("ReceiptCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
-  approver  User?    @relation("ReceiptApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  paymentSchedule PaymentSchedule? @relation("ReceiptOnSchedule", fields: [paymentScheduleId], references: [id], onDelete: SetNull)
+  creator         User             @relation("ReceiptCreator", fields: [createdBy], references: [id])
+  receiver        User?            @relation("ReceiptReceiver", fields: [receivedBy], references: [id], onDelete: SetNull)
+  canceller       User?            @relation("ReceiptCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
+  approver        User?            @relation("ReceiptApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([source, createdAt(sort: Desc)])
+  @@index([paymentScheduleId])
   @@map("receipts")
 }
 

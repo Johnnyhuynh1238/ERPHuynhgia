@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, ReceiptStatus, UserRole } from "@prisma/client";
+import { PaymentStatus, Prisma, ReceiptStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -75,6 +75,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
         note: `${receipt.code} — ${SOURCE_LABEL[receipt.source] || receipt.source}${receipt.payer ? ` / ${receipt.payer}` : ""}${data.receivedNote ? ` — ${data.receivedNote}` : ""}`,
         createdBy: user.id,
       });
+
+      if (receipt.paymentScheduleId) {
+        await tx.paymentSchedule.update({
+          where: { id: receipt.paymentScheduleId },
+          data: {
+            status: PaymentStatus.collected,
+            actualPaidDate: receivedAt,
+            actualPaidAmount: new Prisma.Decimal(data.receivedAmount),
+            paidAt: receivedAt,
+            paidAmount: new Prisma.Decimal(data.receivedAmount),
+          },
+        });
+      }
+
       return upd;
     });
 

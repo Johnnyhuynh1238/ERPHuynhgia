@@ -28,6 +28,12 @@ type Receipt = {
   cancelledAt: string | null;
   cancelledReason: string | null;
   project: ProjectOption | null;
+  paymentSchedule: {
+    id: string;
+    phaseNumber: number;
+    milestoneDescription: string;
+    description: string | null;
+  } | null;
   creator: { id: string; fullName: string };
   receiver: { id: string; fullName: string } | null;
 };
@@ -574,6 +580,11 @@ export function ReceiptsClient({
                         {r.project && (
                           <div className="text-[11px] text-[#8b95b7]">
                             {r.project.code} — {r.project.name}
+                          </div>
+                        )}
+                        {r.paymentSchedule && (
+                          <div className="mt-0.5 inline-block rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-medium text-orange-300">
+                            Đợt {r.paymentSchedule.phaseNumber} — {r.paymentSchedule.milestoneDescription}
                           </div>
                         )}
                       </td>
