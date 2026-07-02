@@ -306,6 +306,29 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
   });
 
+  // Legacy: các đợt nhận trước khi có bảng MaterialProposalDelivery (flow cũ).
+  // Ảnh nằm ở MaterialProposalItemReceipt.photos — trả về để KT vẫn xem được lúc ghi công nợ.
+  const legacyRows = await prisma.materialProposalItemReceipt.findMany({
+    where: { proposalId: params.id },
+    orderBy: { itemSeq: "asc" },
+    select: {
+      itemSeq: true,
+      receivedQty: true,
+      receivedAt: true,
+      photos: true,
+      receiver: { select: { fullName: true } },
+    },
+  });
+  const legacyReceipts = legacyRows
+    .map((r) => ({
+      itemSeq: r.itemSeq,
+      receivedQty: Number(r.receivedQty),
+      receivedAt: r.receivedAt.toISOString(),
+      receiverName: r.receiver?.fullName ?? "",
+      photos: (r.photos as unknown as Array<{ key: string; contentType?: string }>) ?? [],
+    }))
+    .filter((r) => r.photos.length > 0);
+
   return NextResponse.json({
     deliveries: rows.map((r) => ({
       id: r.id,
@@ -316,5 +339,6 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       note: r.note,
       receiverName: r.receiver.fullName,
     })),
+    legacyReceipts,
   });
 }

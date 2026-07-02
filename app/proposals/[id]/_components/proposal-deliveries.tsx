@@ -13,6 +13,13 @@ type Delivery = {
   note: string | null;
   receiverName: string;
 };
+type LegacyReceipt = {
+  itemSeq: number;
+  receivedQty: number;
+  receivedAt: string;
+  receiverName: string;
+  photos: Photo[];
+};
 
 type ParsedItem = {
   name?: string;
@@ -54,6 +61,7 @@ export function ProposalDeliveries({
   parsedItems: ParsedItem[];
 }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [legacyReceipts, setLegacyReceipts] = useState<LegacyReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState<string | null>(null);
 
@@ -64,7 +72,10 @@ export function ProposalDeliveries({
       try {
         const res = await fetch(`/api/proposals/${proposalId}/deliveries`, { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok) setDeliveries(json.deliveries ?? []);
+        if (!cancelled && res.ok) {
+          setDeliveries(json.deliveries ?? []);
+          setLegacyReceipts(json.legacyReceipts ?? []);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -73,6 +84,8 @@ export function ProposalDeliveries({
       cancelled = true;
     };
   }, [proposalId]);
+
+  const hasAny = deliveries.length > 0 || legacyReceipts.length > 0;
 
   return (
     <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
@@ -85,7 +98,7 @@ export function ProposalDeliveries({
         <div className="flex items-center gap-2 text-sm text-[#8892b0]">
           <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
         </div>
-      ) : deliveries.length === 0 ? (
+      ) : !hasAny ? (
         <div className="rounded-xl border border-dashed border-[#2d3249] bg-[#13151f] px-3 py-4 text-center text-xs text-[#5a627a]">
           Chưa có đợt giao hàng nào.
         </div>
@@ -140,6 +153,39 @@ export function ProposalDeliveries({
               />
             </div>
           ))}
+
+          {legacyReceipts.length > 0 && (
+            <div className="rounded-xl border border-[#252840] bg-[#13151f] p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-[#f0f2ff]">Ảnh nhận hàng (đợt cũ)</div>
+                <div className="text-[10px] uppercase tracking-wide text-amber-300/80">flow cũ</div>
+              </div>
+              <div className="space-y-2">
+                {legacyReceipts.map((r) => (
+                  <div key={r.itemSeq} className="rounded-lg border border-[#252840] bg-[#0b0d16] p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
+                      <div>
+                        <span className="text-[#8892b0]">{itemLabel(parsedItems, r.itemSeq)}:</span>{" "}
+                        <span className="font-semibold text-emerald-300">
+                          {fmtQty(r.receivedQty)} {itemUnit(parsedItems, r.itemSeq)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#5a627a]">
+                        {fmtDate(r.receivedAt)}
+                        {r.receiverName ? ` · KS: ${r.receiverName}` : ""}
+                      </div>
+                    </div>
+                    <LegacyPhotoStrip
+                      photos={r.photos}
+                      proposalId={proposalId}
+                      itemSeq={r.itemSeq}
+                      onOpen={setZoom}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -189,6 +235,47 @@ function PhotoStrip({
       <div className="mb-1 flex items-center gap-1.5 text-[11px] text-[#8892b0]">
         <FileImage className="h-3 w-3" />
         {label} ({photos.length})
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto">
+        {photos.slice(0, 8).map((p) => {
+          const src = urlOf(p);
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => onOpen(src)}
+              className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16]"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LegacyPhotoStrip({
+  photos,
+  proposalId,
+  itemSeq,
+  onOpen,
+}: {
+  photos: Photo[];
+  proposalId: string;
+  itemSeq: number;
+  onOpen: (url: string) => void;
+}) {
+  if (!photos.length) return null;
+  const urlOf = (p: Photo) =>
+    `/api/proposals/${proposalId}/items/${itemSeq}/receipt/photos/file?key=${encodeURIComponent(p.key)}`;
+
+  return (
+    <div className="mt-2">
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] text-[#8892b0]">
+        <FileImage className="h-3 w-3" />
+        Ảnh nhận hàng ({photos.length})
       </div>
       <div className="flex gap-1.5 overflow-x-auto">
         {photos.slice(0, 8).map((p) => {
