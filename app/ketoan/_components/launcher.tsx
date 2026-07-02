@@ -326,9 +326,15 @@ function WorkQueue({
         <div
           className="rounded-2xl px-4 py-4 text-center text-[13px]"
           style={{
-            background:
-              "linear-gradient(155deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
-            border: "0.5px solid rgba(240,242,255,0.10)",
+            background: `
+              radial-gradient(circle at 12% 15%, rgba(251,146,60,0.08) 0%, transparent 55%),
+              radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+              #13151f
+            `,
+            boxShadow: [
+              "inset 0 0 0 0.5px rgba(249,115,22,0.35)",
+              "inset 0 1px 0 rgba(251,146,60,0.35)",
+            ].join(", "),
             color: BRAND_TEXT_MUTED,
           }}
         >
@@ -350,31 +356,38 @@ function TodoCard({ row }: { row: TodoRow }) {
   return (
     <Link
       href={row.href}
-      className="smooth-press group flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 transition-colors duration-150 hover:brightness-125"
+      className="smooth-press group flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-150 hover:brightness-110"
       style={{
-        background:
-          "linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 60%, rgba(255,255,255,0) 100%), rgba(240,242,255,0.03)",
-        backdropFilter: "blur(24px) saturate(180%)",
-        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        background: `
+          radial-gradient(circle at 12% 15%, rgba(251,146,60,0.10) 0%, transparent 55%),
+          radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+          #13151f
+        `,
         boxShadow: [
-          "inset 0 1px 0 rgba(240,242,255,0.22)",
-          "inset 0 0 0 0.5px rgba(240,242,255,0.12)",
-          "0 10px 24px -14px rgba(0,0,0,0.55)",
+          "inset 0 0 0 0.5px rgba(249,115,22,0.42)",
+          "inset 0 1px 0 rgba(251,146,60,0.42)",
+          "0 8px 22px -10px rgba(0,0,0,0.55)",
         ].join(", "),
       }}
     >
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
         style={{
-          background:
-            "linear-gradient(155deg, rgba(251,146,60,0.25) 0%, rgba(249,115,22,0.10) 100%)",
-          border: "0.5px solid rgba(240,242,255,0.20)",
+          background: `
+            radial-gradient(circle at 20% 15%, rgba(251,146,60,0.16) 0%, transparent 55%),
+            radial-gradient(circle at 85% 90%, rgba(0,0,0,0.35) 0%, transparent 55%),
+            #13151f
+          `,
+          boxShadow: [
+            "inset 0 0 0 0.5px rgba(249,115,22,0.5)",
+            "inset 0 1px 0 rgba(251,146,60,0.55)",
+          ].join(", "),
         }}
       >
         <Icon
           className="h-[18px] w-[18px]"
           strokeWidth={1.8}
-          style={{ color: BRAND_GLYPH }}
+          style={{ color: BRAND_GOLD_BRIGHT }}
         />
       </span>
       <span
@@ -385,13 +398,13 @@ function TodoCard({ row }: { row: TodoRow }) {
       </span>
       <span
         className="ml-1 shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold leading-none tabular-nums"
-        style={{ backgroundColor: BRAND_GOLD, color: "#0b0d16" }}
+        style={{ backgroundColor: BRAND_GOLD_BRIGHT, color: BRAND_BG }}
       >
         {row.count > 99 ? "99+" : row.count}
       </span>
       <ChevronRight
-        className="ml-0.5 h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5 group-hover:opacity-70"
-        style={{ color: BRAND_GLYPH }}
+        className="ml-0.5 h-4 w-4 shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5 group-hover:opacity-80"
+        style={{ color: BRAND_GOLD_BRIGHT }}
       />
     </Link>
   );
