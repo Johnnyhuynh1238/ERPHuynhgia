@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -165,7 +165,7 @@ export function KetoanLauncher() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
-  const [open, setOpen] = useState<null | { app: AppDef; anchor: DOMRect }>(null);
+  const [open, setOpen] = useState<AppDef | null>(null);
 
   const load = async () => {
     try {
@@ -234,7 +234,7 @@ export function KetoanLauncher() {
                       ? data?.counts.donHang ?? 0
                       : 0;
               const onClick = app.buildItems
-                ? (rect: DOMRect) => setOpen({ app, anchor: rect })
+                ? () => setOpen(app)
                 : app.href
                   ? () => router.push(app.href!)
                   : undefined;
@@ -254,11 +254,10 @@ export function KetoanLauncher() {
         <WorkQueue data={data} loading={loading} />
       </div>
 
-      {open && open.app.buildItems && (
+      {open && open.buildItems && (
         <AppPopover
-          app={open.app}
-          anchor={open.anchor}
-          items={open.app.buildItems(data)}
+          app={open}
+          items={open.buildItems(data)}
           onClose={() => setOpen(null)}
         />
       )}
@@ -603,7 +602,7 @@ function AppIcon({
 }: {
   app: AppDef;
   badge?: number;
-  onClick?: (rect: DOMRect) => void;
+  onClick?: () => void;
   delayClass: string;
 }) {
   const disabled = !!app.disabled;
@@ -613,7 +612,7 @@ function AppIcon({
       <span className="relative inline-block">
         <button
           type="button"
-          onClick={(e) => onClick?.(e.currentTarget.getBoundingClientRect())}
+          onClick={() => onClick?.()}
           disabled={disabled}
           className={`smooth-press relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-[20px] sm:h-[68px] sm:w-[68px] ${
             disabled ? "cursor-not-allowed opacity-50" : ""
@@ -662,117 +661,122 @@ function AppIcon({
   );
 }
 
-const POPOVER_WIDTH = 224;
-const POPOVER_MARGIN = 10;
-const POPOVER_GAP = 12;
+const POPOVER_WIDTH = 300;
 
 function AppPopover({
-  anchor,
+  app,
   items,
   onClose,
 }: {
   app: AppDef;
-  anchor: DOMRect;
   items: Array<PopItem | "divider">;
   onClose: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{
-    top: number;
-    left: number;
-    origin: string;
-  } | null>(null);
+  const [visible, setVisible] = useState(false);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const anchorCenterY = anchor.top + anchor.height / 2;
-      const width = POPOVER_WIDTH;
-      const height = rect.height;
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
-      // Prefer right of icon
-      let left = anchor.right + POPOVER_GAP;
-      let side: "right" | "left" | "bottom" = "right";
-      if (left + width > vw - POPOVER_MARGIN) {
-        const leftPos = anchor.left - width - POPOVER_GAP;
-        if (leftPos >= POPOVER_MARGIN) {
-          left = leftPos;
-          side = "left";
-        } else {
-          // Not enough side space (narrow phone): fall back to below icon
-          left = Math.max(
-            POPOVER_MARGIN,
-            Math.min(vw - width - POPOVER_MARGIN, anchor.left + anchor.width / 2 - width / 2),
-          );
-          side = "bottom";
-        }
-      }
-
-      let top: number;
-      let origin: string;
-      if (side === "bottom") {
-        top = anchor.bottom + POPOVER_GAP;
-        if (top + height > vh - POPOVER_MARGIN) {
-          const above = anchor.top - height - POPOVER_GAP;
-          top = above >= POPOVER_MARGIN ? above : Math.max(POPOVER_MARGIN, vh - height - POPOVER_MARGIN);
-        }
-        const anchorCenterX = anchor.left + anchor.width / 2;
-        const originXpx = Math.max(0, Math.min(width, anchorCenterX - left));
-        origin = `${((originXpx / width) * 100).toFixed(1)}% 0%`;
-      } else {
-        top = anchorCenterY - height / 2;
-        top = Math.max(POPOVER_MARGIN, Math.min(vh - height - POPOVER_MARGIN, top));
-        const originYpx = Math.max(0, Math.min(height, anchorCenterY - top));
-        const originYpc = (originYpx / height) * 100;
-        origin = side === "right" ? `0% ${originYpc.toFixed(1)}%` : `100% ${originYpc.toFixed(1)}%`;
-      }
-
-      setPos({ top, left, origin });
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [anchor]);
+  const handleClose = () => {
+    setVisible(false);
+    setTimeout(onClose, 180);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const AppIconGlyph = app.Icon;
 
   return (
     <div
-      className="fixed inset-0 z-50"
-      onClick={onClose}
-      style={{ background: "transparent" }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      onClick={handleClose}
     >
+      {/* Backdrop mờ */}
       <div
-        ref={ref}
+        className="absolute inset-0 transition-opacity duration-200 ease-out"
+        style={{
+          background: "rgba(11,13,22,0.62)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          opacity: visible ? 1 : 0,
+        }}
+      />
+      {/* Popup zoom */}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="popover-in fixed flex flex-col gap-[6px]"
+        className="relative flex flex-col gap-[8px] rounded-[22px] p-3"
         style={{
           width: POPOVER_WIDTH,
-          top: pos?.top ?? -9999,
-          left: pos?.left ?? -9999,
-          transformOrigin: pos?.origin ?? "0% 50%",
-          visibility: pos ? "visible" : "hidden",
+          maxWidth: "calc(100vw - 32px)",
+          transform: visible ? "scale(1)" : "scale(0.9)",
+          opacity: visible ? 1 : 0,
+          transition: "transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out",
+          background: `
+            radial-gradient(circle at 15% 10%, rgba(251,146,60,0.10) 0%, transparent 55%),
+            radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+            #13151f
+          `,
+          boxShadow: [
+            "inset 0 0 0 0.5px rgba(249,115,22,0.35)",
+            "inset 0 1px 0 rgba(251,146,60,0.35)",
+            "0 30px 60px -20px rgba(0,0,0,0.75)",
+            "0 0 0 1px rgba(249,115,22,0.10)",
+          ].join(", "),
         }}
       >
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-1.5 pb-1 pt-0.5">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-[10px]"
+            style={{
+              background: `
+                radial-gradient(circle at 20% 15%, rgba(251,146,60,0.18) 0%, transparent 55%),
+                #13151f
+              `,
+              boxShadow: [
+                "inset 0 0 0 0.5px rgba(249,115,22,0.55)",
+                "inset 0 1px 0 rgba(251,146,60,0.55)",
+              ].join(", "),
+            }}
+          >
+            <AppIconGlyph className="h-4 w-4" strokeWidth={1.8} style={{ color: BRAND_GOLD_BRIGHT }} />
+          </span>
+          <span className="flex-1 text-[14px] font-semibold" style={{ color: BRAND_TEXT }}>
+            {app.label}
+          </span>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="smooth-press flex h-7 w-7 items-center justify-center rounded-full"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              color: BRAND_TEXT_MUTED,
+              boxShadow: "inset 0 0 0 0.5px rgba(249,115,22,0.25)",
+            }}
+            aria-label="Đóng"
+          >
+            ✕
+          </button>
+        </div>
+
         {items.map((it, idx) =>
           it === "divider" ? (
-            <div key={`d-${idx}`} className="h-[4px]" />
+            <div
+              key={`d-${idx}`}
+              className="mx-2 my-0.5 h-px"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.28), transparent)" }}
+            />
           ) : (
-            <PopItemCard key={it.href + idx} item={it} index={idx} />
+            <PopItemCard key={it.href + idx} item={it} />
           )
         )}
       </div>
@@ -780,12 +784,7 @@ function AppPopover({
   );
 }
 
-function PopItemCard({
-  item,
-}: {
-  item: PopItem;
-  index: number;
-}) {
+function PopItemCard({ item }: { item: PopItem }) {
   return (
     <Link
       href={item.href}
