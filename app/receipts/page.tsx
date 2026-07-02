@@ -19,15 +19,7 @@ export default async function ReceiptsPage() {
 
   return (
     <ProtectedLayout>
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold text-emerald-300">Lệnh thu</h1>
-          <p className="text-sm text-[#8b95b7]">
-            Admin tạo lệnh thu (thu từ khách, vay, hoàn ứng, khác). Khi KT xác nhận đã thu sẽ cộng vào số dư công ty trong sổ quỹ.
-          </p>
-        </div>
-        <ReceiptsClient role={user.role} projects={projects} />
-      </div>
+      <ReceiptsClient role={user.role} projects={projects} />
     </ProtectedLayout>
   );
 }
