@@ -2,10 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Wallet,
   RefreshCw,
   ArrowRightLeft,
+  ArrowLeft,
   Banknote,
   Package,
   Receipt,
@@ -104,6 +106,7 @@ const APPS: AppDef[] = [
 ];
 
 export function KetoanLauncher() {
+  const router = useRouter();
   const [data, setData] = useState<SummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +147,26 @@ export function KetoanLauncher() {
       }}
     >
       <div className="relative space-y-7">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/");
+            }
+          }}
+          className="smooth-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
+          style={{
+            color: BRAND_TEXT_MUTED,
+            borderColor: "rgba(184,118,61,0.28)",
+            background: "rgba(15,10,7,0.55)",
+          }}
+        >
+          <ArrowLeft className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
+          Quay lại
+        </button>
+
         <BalanceHeadline
           data={data}
           loading={loading}
