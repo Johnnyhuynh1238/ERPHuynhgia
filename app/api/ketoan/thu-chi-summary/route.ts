@@ -22,6 +22,8 @@ export async function GET() {
     proposalPending,
     proposalToOrder,
     receiptNeedsDebtRows,
+    payableCount,
+    paymentDueCount,
   ] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
@@ -43,6 +45,19 @@ export async function GET() {
         ON d.proposal_id = r.proposal_id AND d.item_seq = r.item_seq
       WHERE d.id IS NULL
     `,
+    // Công nợ NCC: debt chưa trả + KHÔNG nằm trong lệnh active (pending/approved/paid).
+    prisma.materialProposalItemDebt.count({
+      where: {
+        paidAt: null,
+        paymentOrderItems: {
+          none: { order: { status: { in: ["pending", "approved", "paid"] } } },
+        },
+      },
+    }),
+    // Công nợ KH: PaymentSchedule chưa thu (loại collected/paid/cancelled).
+    prisma.paymentSchedule.count({
+      where: { status: { notIn: ["collected", "paid", "cancelled"] } },
+    }),
   ]);
   const receiptNeedsDebt = Number(receiptNeedsDebtRows[0]?.count ?? 0);
 
@@ -66,11 +81,16 @@ export async function GET() {
       create: 0,
       process: processTotal,
       journal: 0,
+      congNo: payableCount + paymentDueCount,
     },
     processBreakdown: {
       expense: expensePending,
       receipt: receiptPending,
       paymentOrder: paymentOrderApproved,
+    },
+    congNoBreakdown: {
+      payableNcc: payableCount,
+      paymentDueKh: paymentDueCount,
     },
     todos: {
       proposalPending,

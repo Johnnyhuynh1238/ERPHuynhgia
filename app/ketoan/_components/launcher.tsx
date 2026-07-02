@@ -35,8 +35,9 @@ type AccountDto = {
 
 type SummaryDto = {
   balance: { total: number; accounts: AccountDto[] };
-  counts: { create: number; process: number; journal: number };
+  counts: { create: number; process: number; journal: number; congNo: number };
   processBreakdown: { expense: number; receipt: number; paymentOrder: number };
+  congNoBreakdown: { payableNcc: number; paymentDueKh: number };
   todos?: {
     proposalPending: number;
     proposalToOrder: number;
@@ -52,7 +53,7 @@ const formatVnd = (n: number) =>
 
 const kindIcon = (kind: string) => (kind === "cash" ? "💵" : "🏦");
 
-type AppKey = "thu-chi";
+type AppKey = "thu-chi" | "cong-no";
 
 type PopItem = {
   label: string;
@@ -96,9 +97,22 @@ const APPS: AppDef[] = [
       ];
     },
   },
+  {
+    key: "cong-no",
+    label: "Công nợ",
+    Icon: Receipt,
+    buildItems: (data) => {
+      const cn = data?.congNoBreakdown;
+      return [
+        { label: "Công nợ KH", href: "/payments", badge: cn?.paymentDueKh ?? 0 },
+        { label: "Công nợ NCC", href: "/payables", badge: cn?.payableNcc ?? 0 },
+        "divider",
+        { label: "Lệnh TT NCC", href: "/payment-orders" },
+      ];
+    },
+  },
   { key: null, label: "Lương",      Icon: Banknote,      disabled: true },
   { key: null, label: "Vật tư",     Icon: Package,       disabled: true },
-  { key: null, label: "HĐ - Nợ KH", Icon: Receipt,       disabled: true },
   { key: null, label: "Báo cáo",    Icon: BarChart3,     disabled: true },
   { key: null, label: "Chứng từ",   Icon: ScrollText,    disabled: true },
   { key: null, label: "Thuế",       Icon: Landmark,      disabled: true },
@@ -195,7 +209,13 @@ export function KetoanLauncher() {
                 key={app.label}
                 app={app}
                 delayClass={`delay-${Math.min(idx + 1, 6)}`}
-                badge={app.key === "thu-chi" ? data?.counts.process ?? 0 : 0}
+                badge={
+                  app.key === "thu-chi"
+                    ? data?.counts.process ?? 0
+                    : app.key === "cong-no"
+                      ? data?.counts.congNo ?? 0
+                      : 0
+                }
                 onClick={
                   app.buildItems
                     ? (rect) => setOpen({ app, anchor: rect })
