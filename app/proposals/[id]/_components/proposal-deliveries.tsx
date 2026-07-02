@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileImage, Loader2, PackageCheck, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { FileImage, Loader2, Minus, PackageCheck, Plus, RotateCcw, X } from "lucide-react";
 
 type Photo = { key: string; contentType?: string };
 type Delivery = {
@@ -189,25 +190,203 @@ export function ProposalDeliveries({
         </div>
       )}
 
-      {zoom && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-          onClick={() => setZoom(null)}
-        >
-          <button
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"
-            onClick={(e) => {
-              e.stopPropagation();
-              setZoom(null);
-            }}
-          >
-            <X className="h-5 w-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoom} alt="preview" className="max-h-full max-w-full rounded-xl object-contain" />
-        </div>
-      )}
+      {zoom && <PhotoLightbox src={zoom} onClose={() => setZoom(null)} />}
     </div>
+  );
+}
+
+function PhotoLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const dragOrigin = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const pinchOrigin = useRef<{ dist: number; scale: number } | null>(null);
+  const lastTap = useRef(0);
+
+  const MIN = 1;
+  const MAX = 5;
+  const clampScale = (s: number) => Math.min(MAX, Math.max(MIN, s));
+  const reset = () => {
+    setScale(1);
+    setTx(0);
+    setTy(0);
+  };
+  const bumpScale = (delta: number) => {
+    setScale((s) => {
+      const next = clampScale(s + delta);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "+" || e.key === "=") bumpScale(0.5);
+      else if (e.key === "-" || e.key === "_") bumpScale(-0.5);
+      else if (e.key === "0") reset();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = e.clientX - rect.left - rect.width / 2;
+    const cy = e.clientY - rect.top - rect.height / 2;
+    const delta = -e.deltaY * 0.002;
+    setScale((s) => {
+      const next = clampScale(s * Math.exp(delta));
+      const ratio = next / s;
+      setTx((prev) => cx - (cx - prev) * ratio);
+      setTy((prev) => cy - (cy - prev) * ratio);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+      return next;
+    });
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      const [a, b] = Array.from(pointers.current.values());
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      pinchOrigin.current = { dist, scale };
+      dragOrigin.current = null;
+    } else if (pointers.current.size === 1 && scale > 1) {
+      dragOrigin.current = { x: e.clientX, y: e.clientY, tx, ty };
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2 && pinchOrigin.current) {
+      const [a, b] = Array.from(pointers.current.values());
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const next = clampScale((dist / pinchOrigin.current.dist) * pinchOrigin.current.scale);
+      setScale(next);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+    } else if (pointers.current.size === 1 && dragOrigin.current) {
+      setTx(dragOrigin.current.tx + (e.clientX - dragOrigin.current.x));
+      setTy(dragOrigin.current.ty + (e.clientY - dragOrigin.current.y));
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchOrigin.current = null;
+    if (pointers.current.size === 0) dragOrigin.current = null;
+  };
+
+  const onImgClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      if (scale > 1) reset();
+      else setScale(2.5);
+    }
+    lastTap.current = now;
+  };
+
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/90"
+      onClick={onClose}
+      style={{ touchAction: "none" }}
+    >
+      <button
+        className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white active:bg-white/20"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      >
+        <X className="h-5 w-5" />
+      </button>
+
+      <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/10 p-1.5 backdrop-blur">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            bumpScale(-0.5);
+          }}
+          className="rounded-full bg-white/10 p-2 text-white active:bg-white/20"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <div className="min-w-[46px] text-center text-xs font-semibold text-white">
+          {Math.round(scale * 100)}%
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            bumpScale(0.5);
+          }}
+          className="rounded-full bg-white/10 p-2 text-white active:bg-white/20"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            reset();
+          }}
+          className="rounded-full bg-white/10 p-2 text-white active:bg-white/20"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="flex h-full w-full items-center justify-center"
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="preview"
+          onClick={onImgClick}
+          onDragStart={(e) => e.preventDefault()}
+          className="max-h-full max-w-full select-none rounded-xl object-contain"
+          style={{
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            transition: pointers.current.size ? "none" : "transform 0.15s ease-out",
+            cursor: scale > 1 ? "grab" : "zoom-in",
+          }}
+          draggable={false}
+        />
+      </div>
+    </div>,
+    document.body,
   );
 }
 
