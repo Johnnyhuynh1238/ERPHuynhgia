@@ -101,47 +101,49 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
                   <span className="font-mono text-[11px] text-[#5a627a]">{poCode(p.id)}</span>
                 </div>
 
-                {/* Hàng 2: tiến độ nhận — thông tin chính, to nhất */}
-                <div className="mt-2.5 flex items-baseline gap-1.5">
+                {/* Chủng loại hàng — TO NHẤT, KS nhìn phát biết đơn chở gì */}
+                {items.length > 0 ? (
+                  <>
+                    <div className="mt-2.5 text-[19px] font-bold leading-snug text-[#f0f2ff]">
+                      {items[0].ten}
+                      <span className="ml-1.5 text-[15px] font-semibold text-[#ff8a3d]">
+                        {items[0].sl}
+                        {items[0].dvt}
+                      </span>
+                    </div>
+                    {items.length > 1 && (
+                      <div className="mt-1 line-clamp-1 text-[13px] text-[#8892b0]">
+                        +{items.length - 1} loại khác:{" "}
+                        {items
+                          .slice(1, 4)
+                          .map((it) => it.ten)
+                          .join(", ")}
+                        {items.length > 4 ? ", …" : ""}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-2.5 line-clamp-2 text-[17px] font-bold leading-snug text-[#f0f2ff]">
+                    {p.description}
+                  </div>
+                )}
+
+                {/* Tiến độ nhận — phụ */}
+                <div className="mt-2.5 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#252840]">
+                    <div
+                      className={`h-full rounded-full ${accent === "emerald" ? "bg-emerald-400" : "bg-cyan-400"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                   <span
-                    className={`text-2xl font-bold leading-none tabular-nums ${
-                      isDone ? "text-emerald-300" : "text-[#f0f2ff]"
+                    className={`shrink-0 text-[12px] tabular-nums ${
+                      isDone ? "font-semibold text-emerald-300" : "text-[#8892b0]"
                     }`}
                   >
-                    {doneCount}/{totalItems}
+                    <b className={isDone ? "" : "text-[#f0f2ff]"}>{doneCount}</b>/{totalItems} dòng
                   </span>
-                  <span className="text-sm text-[#8892b0]">dòng nhận đủ</span>
                 </div>
-
-                {/* Progress bar */}
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#252840]">
-                  <div
-                    className={`h-full rounded-full ${accent === "emerald" ? "bg-emerald-400" : "bg-cyan-400"}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-
-                {/* Vật tư trong đơn — nhận diện đơn */}
-                {items.length > 0 ? (
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {items.slice(0, 4).map((it, i) => (
-                      <span
-                        key={i}
-                        className="rounded-md bg-[#0f1220] px-2 py-1 text-xs text-[#8892b0]"
-                      >
-                        <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
-                        {it.dvt}
-                      </span>
-                    ))}
-                    {items.length > 4 && (
-                      <span className="rounded-md px-1.5 py-1 text-xs text-[#5a627a]">
-                        +{items.length - 4}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-2.5 line-clamp-1 text-sm text-[#cfd4e8]">{p.description}</div>
-                )}
 
                 {/* Footer: thông tin phụ, nhỏ nhất */}
                 <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[#5a627a]">
