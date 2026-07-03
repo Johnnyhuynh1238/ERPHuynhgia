@@ -40,8 +40,6 @@ const upsertSchema = z.object({
   saveToSupplierCatalog: z.boolean().optional(),
 });
 
-const THEP_RE = /th[ée]p|sắt/i;
-
 export async function POST(
   request: Request,
   { params }: { params: { id: string; seq: string } },
@@ -91,16 +89,6 @@ export async function POST(
   const parsed = upsertSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ message: "Dữ liệu sai", details: parsed.error.flatten() }, { status: 400 });
-  }
-
-  const isThep = THEP_RE.test(mName);
-  if (!isThep) {
-    if (parsed.data.unitPrice <= 0) {
-      return NextResponse.json({ message: "Đơn giá phải > 0" }, { status: 400 });
-    }
-    if (parsed.data.qty <= 0) {
-      return NextResponse.json({ message: "Số lượng phải > 0" }, { status: 400 });
-    }
   }
 
   const supplier = await prisma.supplier.findUnique({
