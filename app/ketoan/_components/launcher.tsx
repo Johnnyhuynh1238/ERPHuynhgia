@@ -16,6 +16,7 @@ import {
   Settings,
   ClipboardList,
   ClipboardCheck,
+  LayoutGrid,
   ShoppingCart,
   PackageCheck,
   ArrowDownCircle,
@@ -76,6 +77,9 @@ type PopItem = {
   href: string;
   badge?: number;
   isNew?: boolean;
+  /** Tính năng chưa mở — hiện chip "Sắp ra mắt", không điều hướng */
+  comingSoon?: boolean;
+  Icon?: LucideIcon;
 };
 
 type AppDef = {
@@ -151,12 +155,19 @@ const APPS: AppDef[] = [
     Icon: Clock,
     href: "/cham-cong",
   },
-  { key: null, label: "Lương",      Icon: Banknote,      disabled: true },
-  { key: null, label: "Vật tư",     Icon: Package,       disabled: true },
-  { key: null, label: "Báo cáo",    Icon: BarChart3,     disabled: true },
-  { key: null, label: "Chứng từ",   Icon: ScrollText,    disabled: true },
-  { key: null, label: "Thuế",       Icon: Landmark,      disabled: true },
-  { key: null, label: "Cài đặt",    Icon: Settings,      disabled: true },
+  {
+    key: null,
+    label: "Sắp ra mắt",
+    Icon: LayoutGrid,
+    buildItems: () => [
+      { label: "Lương", href: "#", comingSoon: true, Icon: Banknote },
+      { label: "Vật tư", href: "#", comingSoon: true, Icon: Package },
+      { label: "Báo cáo", href: "#", comingSoon: true, Icon: BarChart3 },
+      { label: "Chứng từ", href: "#", comingSoon: true, Icon: ScrollText },
+      { label: "Thuế", href: "#", comingSoon: true, Icon: Landmark },
+      { label: "Cài đặt", href: "#", comingSoon: true, Icon: Settings },
+    ],
+  },
 ];
 
 export function KetoanLauncher() {
@@ -798,6 +809,34 @@ function AppPopover({
 }
 
 function PopItemCard({ item }: { item: PopItem }) {
+  const ItemIcon = item.Icon;
+  if (item.comingSoon) {
+    return (
+      <div
+        className="flex items-center justify-between rounded-[14px] px-3.5 py-2.5 text-[13.5px] opacity-60"
+        style={{
+          background: `
+            radial-gradient(circle at 12% 15%, rgba(251,146,60,0.06) 0%, transparent 55%),
+            #13151f
+          `,
+          boxShadow: "inset 0 0 0 0.5px rgba(249,115,22,0.22)",
+        }}
+      >
+        <span className="flex items-center gap-2.5 truncate font-medium leading-none" style={{ color: BRAND_TEXT }}>
+          {ItemIcon && (
+            <ItemIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} style={{ color: BRAND_TEXT_MUTED }} />
+          )}
+          {item.label}
+        </span>
+        <span
+          className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+          style={{ background: "rgba(249,115,22,0.14)", color: BRAND_GOLD_BRIGHT }}
+        >
+          Sắp ra mắt
+        </span>
+      </div>
+    );
+  }
   return (
     <Link
       href={item.href}

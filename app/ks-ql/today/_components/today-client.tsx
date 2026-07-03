@@ -175,7 +175,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #fbbf24 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -199,7 +199,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 }}
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   active
-                    ? "border-[#E0B855]/50 bg-[#E0B855]/15 text-[#E0B855]"
+                    ? "border-[#fbbf24]/50 bg-[#fbbf24]/15 text-[#fbbf24]"
                     : "border-[#2a221c] bg-[#181410] text-[#d4c8b8] hover:border-[#3a2d22] hover:bg-[#221b15]"
                 }`}
               >
@@ -213,7 +213,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
       {project ? (
         <Link
           href={`/ks-ql/project/${project.id}`}
-          className="group block overflow-hidden rounded-2xl border border-[#2a221c] p-4 transition-all hover:-translate-y-px hover:border-[#E0B855]/40 hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
+          className="group block overflow-hidden rounded-2xl border border-[#2a221c] p-4 transition-all hover:-translate-y-px hover:border-[#fbbf24]/40 hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
           style={{
             background:
               "linear-gradient(135deg, #1f1812 0%, #181410 50%, #120e0b 100%)",
@@ -230,7 +230,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 </span>
                 <span
                   className="text-[10px] uppercase tracking-wider"
-                  style={{ color: project.status === "in_progress" ? "#6FA677" : "#E0B855" }}
+                  style={{ color: project.status === "in_progress" ? "#34d399" : "#fbbf24" }}
                 >
                   {project.status === "in_progress" ? "Đang thi công" : "Đang chuẩn bị"}
                 </span>
@@ -239,7 +239,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
               {project.address ? (
                 <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{project.address}</div>
               ) : null}
-              <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#E0B855] opacity-80 transition-opacity group-hover:opacity-100">
+              <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#fbbf24] opacity-80 transition-opacity group-hover:opacity-100">
                 <span>Mở chi tiết dự án</span>
                 <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
               </div>
@@ -269,7 +269,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   "linear-gradient(135deg, rgba(210,107,107,0.12) 0%, rgba(224,184,85,0.05) 100%)",
               }}
             >
-              <div className="mb-2 flex items-center gap-2" style={{ color: "#D26B6B" }}>
+              <div className="mb-2 flex items-center gap-2" style={{ color: "#f87171" }}>
                 <AlertTriangle className="h-4 w-4" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider">Cần xử lý ngay</span>
               </div>
@@ -278,7 +278,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   <li key={a.id} className="flex items-start gap-2 text-sm text-[#f0f2ff]">
                     <span
                       className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: "#D26B6B" }}
+                      style={{ background: "#f87171" }}
                     />
                     <span>{a.text}</span>
                   </li>
@@ -494,7 +494,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 {selectedProjectId ? (
                   <Link
                     href={`/projects/${selectedProjectId}/budget`}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#E0B855] hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#fbbf24] hover:underline"
                   >
                     Xem dự toán chi tiết
                     <ChevronRight className="h-3 w-3" />
@@ -831,9 +831,9 @@ const ACCENT_STYLES: Record<
     borderColor: "rgba(224,184,85,0.4)",
     bgGrad: "linear-gradient(135deg, rgba(224,184,85,0.08) 0%, transparent 60%), #181410",
     iconBg: "rgba(224,184,85,0.15)",
-    iconColor: "#E0B855",
+    iconColor: "#fbbf24",
     chipBg: "rgba(224,184,85,0.18)",
-    chipColor: "#E0B855",
+    chipColor: "#fbbf24",
   },
   terra: {
     borderColor: "rgba(210,122,82,0.4)",
@@ -847,9 +847,9 @@ const ACCENT_STYLES: Record<
     borderColor: "rgba(111,166,119,0.4)",
     bgGrad: "linear-gradient(135deg, rgba(111,166,119,0.08) 0%, transparent 60%), #181410",
     iconBg: "rgba(111,166,119,0.15)",
-    iconColor: "#6FA677",
+    iconColor: "#34d399",
     chipBg: "rgba(111,166,119,0.18)",
-    chipColor: "#6FA677",
+    chipColor: "#34d399",
   },
   purple: {
     borderColor: "rgba(167,139,250,0.4)",
@@ -872,10 +872,10 @@ const ACCENT_STYLES: Record<
 type BadgeTone = "ok" | "warn" | "todo" | "alert" | "muted";
 
 const BADGE_STYLES: Record<BadgeTone, { bg: string; color: string; label: string }> = {
-  ok: { bg: "rgba(111,166,119,0.18)", color: "#6FA677", label: "Ổn" },
-  warn: { bg: "rgba(224,184,85,0.18)", color: "#E0B855", label: "Cần xem" },
-  todo: { bg: "rgba(224,184,85,0.18)", color: "#E0B855", label: "Cần làm" },
-  alert: { bg: "rgba(210,107,107,0.18)", color: "#D26B6B", label: "Cảnh báo" },
+  ok: { bg: "rgba(111,166,119,0.18)", color: "#34d399", label: "Ổn" },
+  warn: { bg: "rgba(224,184,85,0.18)", color: "#fbbf24", label: "Cần xem" },
+  todo: { bg: "rgba(224,184,85,0.18)", color: "#fbbf24", label: "Cần làm" },
+  alert: { bg: "rgba(210,107,107,0.18)", color: "#f87171", label: "Cảnh báo" },
   muted: { bg: "rgba(154,143,128,0.15)", color: "#9a8f80", label: "—" },
 };
 
@@ -961,9 +961,9 @@ function MetricBox({ label, value }: { label: string; value: string }) {
 }
 
 const TONE_DOT: Record<Tone, string | null> = {
-  done: "#6FA677",
-  todo: "#E0B855",
-  warn: "#D26B6B",
+  done: "#34d399",
+  todo: "#fbbf24",
+  warn: "#f87171",
   muted: null,
 };
 

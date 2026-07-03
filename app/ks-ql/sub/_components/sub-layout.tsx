@@ -69,9 +69,9 @@ export function BigCard({
   const palette = {
     primary: "bg-[#1a1d2e] border-[#ff8a3d]/40 hover:border-[#ff8a3d] active:scale-[0.99]",
     muted: "bg-[#13151f] border-[#252840] opacity-60",
-    danger: "bg-[#2a1518] border-[#D26B6B]/50 hover:border-[#D26B6B]",
-    success: "bg-[#152418] border-[#6FA677]/50 hover:border-[#6FA677]",
-    warn: "bg-[#2a2415] border-[#E0B855]/50 hover:border-[#E0B855]",
+    danger: "bg-[#2a1518] border-[#f87171]/50 hover:border-[#f87171]",
+    success: "bg-[#152418] border-[#34d399]/50 hover:border-[#34d399]",
+    warn: "bg-[#2a2415] border-[#fbbf24]/50 hover:border-[#fbbf24]",
   }[tone];
 
   const inner = (

@@ -67,7 +67,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
           <Link href="/ks-ql/today" className="flex items-center gap-2.5 min-w-0">
             <span
               className="grid h-9 w-9 place-items-center rounded-xl text-sm font-bold text-[#1a120a] shadow-lg shadow-[#D27A52]/30 transition-transform hover:scale-105"
-              style={{ background: "linear-gradient(135deg, #E0B855 0%, #D27A52 100%)" }}
+              style={{ background: "linear-gradient(135deg, #fbbf24 0%, #D27A52 100%)" }}
             >
               KS
             </span>
@@ -75,7 +75,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
               <div
                 className="truncate text-[15px] font-semibold leading-tight tracking-tight"
                 style={{
-                  background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
+                  background: "linear-gradient(90deg, #f0f2ff 0%, #fbbf24 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                 }}
@@ -90,7 +90,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
             <button
               type="button"
               aria-label="Thông báo"
-              className="relative grid h-9 w-9 place-items-center rounded-full border border-[#2a221c] bg-[#181410] text-[#d4c8b8] transition-all hover:scale-105 hover:border-[#E0B855]/40 hover:bg-[#221b15] hover:text-[#f0f2ff]"
+              className="relative grid h-9 w-9 place-items-center rounded-full border border-[#2a221c] bg-[#181410] text-[#d4c8b8] transition-all hover:scale-105 hover:border-[#fbbf24]/40 hover:bg-[#221b15] hover:text-[#f0f2ff]"
             >
               <Bell className="h-4 w-4" />
             </button>
@@ -99,11 +99,11 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-full border border-[#2a221c] bg-[#181410] py-1 pl-1 pr-2 transition-all hover:border-[#E0B855]/40 hover:bg-[#221b15]"
+                className="flex items-center gap-1.5 rounded-full border border-[#2a221c] bg-[#181410] py-1 pl-1 pr-2 transition-all hover:border-[#fbbf24]/40 hover:bg-[#221b15]"
               >
                 <span
                   className="grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold text-[#0d0b09]"
-                  style={{ background: "linear-gradient(135deg, #6FA677 0%, #4d8a6b 100%)" }}
+                  style={{ background: "linear-gradient(135deg, #34d399 0%, #4d8a6b 100%)" }}
                 >
                   {initials}
                 </span>
@@ -171,7 +171,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
                 key={t.href}
                 href={t.href}
                 className={`relative flex flex-col items-center gap-0.5 px-2 py-2.5 text-[11px] font-medium transition-colors ${
-                  active ? "text-[#E0B855]" : "text-[#9a8f80] hover:text-[#f0f2ff]"
+                  active ? "text-[#fbbf24]" : "text-[#9a8f80] hover:text-[#f0f2ff]"
                 }`}
               >
                 <span

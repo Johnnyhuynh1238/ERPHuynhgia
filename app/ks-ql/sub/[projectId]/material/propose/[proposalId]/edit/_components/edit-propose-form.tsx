@@ -102,15 +102,15 @@ export function EditProposeForm({
         </div>
 
         {declineNote ? (
-          <div className="mb-5 flex items-start gap-3 rounded-2xl border-2 border-[#D26B6B]/40 bg-[#D26B6B]/10 px-4 py-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#D26B6B]" />
+          <div className="mb-5 flex items-start gap-3 rounded-2xl border-2 border-[#f87171]/40 bg-[#f87171]/10 px-4 py-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#f87171]" />
             <div className="text-sm text-[#f0f2ff]">
-              <div className="mb-1 font-semibold text-[#D26B6B]">TPTC từ chối với lý do:</div>
+              <div className="mb-1 font-semibold text-[#f87171]">TPTC từ chối với lý do:</div>
               <div className="whitespace-pre-wrap">{declineNote}</div>
             </div>
           </div>
         ) : (
-          <div className="mb-5 rounded-2xl border-2 border-[#D26B6B]/40 bg-[#D26B6B]/10 px-4 py-3 text-sm text-[#f0f2ff]">
+          <div className="mb-5 rounded-2xl border-2 border-[#f87171]/40 bg-[#f87171]/10 px-4 py-3 text-sm text-[#f0f2ff]">
             TPTC đã từ chối đề xuất này. Sửa lại nội dung rồi gửi duyệt lần nữa.
           </div>
         )}
@@ -128,7 +128,7 @@ export function EditProposeForm({
                     type="button"
                     onClick={() => removeCard(c.cid)}
                     aria-label="Xoá vật tư"
-                    className="rounded-full bg-[#2a1518] p-2 text-[#D26B6B] hover:bg-[#3a1a20]"
+                    className="rounded-full bg-[#2a1518] p-2 text-[#f87171] hover:bg-[#3a1a20]"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>

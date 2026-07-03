@@ -25,7 +25,7 @@ export default async function KsQlProjectsPage() {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #fbbf24 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -49,7 +49,7 @@ export default async function KsQlProjectsPage() {
               <Link
                 key={p.id}
                 href={`/ks-ql/project/${p.id}`}
-                className="group block overflow-hidden rounded-2xl border border-[#2a221c] bg-[#181410] p-4 transition-all hover:-translate-y-px hover:border-[#E0B855]/40 hover:bg-[#1f1812] hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
+                className="group block overflow-hidden rounded-2xl border border-[#2a221c] bg-[#181410] p-4 transition-all hover:-translate-y-px hover:border-[#fbbf24]/40 hover:bg-[#1f1812] hover:shadow-[0_4px_16px_-8px_rgba(210,122,82,0.4)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -65,7 +65,7 @@ export default async function KsQlProjectsPage() {
                       </span>
                       <span
                         className="text-[10px] uppercase tracking-wider"
-                        style={{ color: inProgress ? "#6FA677" : "#E0B855" }}
+                        style={{ color: inProgress ? "#34d399" : "#fbbf24" }}
                       >
                         {inProgress ? "Đang thi công" : "Đang chuẩn bị"}
                       </span>
@@ -75,7 +75,7 @@ export default async function KsQlProjectsPage() {
                       <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{p.address}</div>
                     ) : null}
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#9a8f80] transition-transform group-hover:translate-x-0.5 group-hover:text-[#E0B855]" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#9a8f80] transition-transform group-hover:translate-x-0.5 group-hover:text-[#fbbf24]" />
                 </div>
               </Link>
             );

@@ -102,7 +102,7 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                     type="button"
                     onClick={() => removeCard(c.cid)}
                     aria-label="Xoá vật tư"
-                    className="rounded-full bg-[#2a1518] p-2 text-[#D26B6B] hover:bg-[#3a1a20]"
+                    className="rounded-full bg-[#2a1518] p-2 text-[#f87171] hover:bg-[#3a1a20]"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>

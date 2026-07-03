@@ -58,11 +58,11 @@ type Props = {
 function statusBadge(status: string): { label: string; bg: string; color: string } {
   switch (status) {
     case "in_progress":
-      return { label: "Đang thi công", bg: "rgba(111,166,119,0.18)", color: "#6FA677" };
+      return { label: "Đang thi công", bg: "rgba(111,166,119,0.18)", color: "#34d399" };
     case "completed":
       return { label: "Hoàn thành", bg: "rgba(167,139,250,0.18)", color: "#a78bfa" };
     case "paused":
-      return { label: "Tạm ngưng", bg: "rgba(224,184,85,0.18)", color: "#E0B855" };
+      return { label: "Tạm ngưng", bg: "rgba(224,184,85,0.18)", color: "#fbbf24" };
     default:
       return { label: "Đang chuẩn bị", bg: "rgba(154,143,128,0.18)", color: "#9a8f80" };
   }
@@ -83,8 +83,8 @@ function fmtDate(s: string) {
 }
 
 function phaseMarker(p: Phase): { icon: string; color: string } {
-  if (p.status === "completed") return { icon: "✓", color: "#6FA677" };
-  if (p.status === "in_progress") return { icon: "◐", color: "#E0B855" };
+  if (p.status === "completed") return { icon: "✓", color: "#34d399" };
+  if (p.status === "in_progress") return { icon: "◐", color: "#fbbf24" };
   return { icon: "○", color: "#5a4f42" };
 }
 
@@ -99,11 +99,11 @@ function taskStatusOrder(s: string): number {
 
 function taskStatusBadge(s: string): { label: string; bg: string; color: string } {
   if (s === "in_progress")
-    return { label: "Đang làm", bg: "rgba(224,184,85,0.18)", color: "#E0B855" };
+    return { label: "Đang làm", bg: "rgba(224,184,85,0.18)", color: "#fbbf24" };
   if (s === "delayed")
-    return { label: "Trễ", bg: "rgba(210,107,107,0.18)", color: "#D26B6B" };
+    return { label: "Trễ", bg: "rgba(210,107,107,0.18)", color: "#f87171" };
   if (DONE_STATUSES.has(s))
-    return { label: "Xong", bg: "rgba(111,166,119,0.18)", color: "#6FA677" };
+    return { label: "Xong", bg: "rgba(111,166,119,0.18)", color: "#34d399" };
   return { label: "Chưa làm", bg: "rgba(154,143,128,0.18)", color: "#9a8f80" };
 }
 
@@ -182,17 +182,17 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
   };
 
   const shortcuts: Shortcut[] = [
-    { Icon: ListChecks, label: "Tiến độ", href: `/projects/${project.id}/tasks`, color: "#E0B855", bg: "rgba(224,184,85,0.12)" },
+    { Icon: ListChecks, label: "Tiến độ", href: `/projects/${project.id}/tasks`, color: "#fbbf24", bg: "rgba(224,184,85,0.12)" },
     { Icon: Briefcase, label: "Dự toán", href: `/projects/${project.id}/budget`, color: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
     { Icon: ClipboardList, label: "Giao việc", href: `/projects/${project.id}/work-orders`, color: "#D27A52", bg: "rgba(210,122,82,0.12)" },
-    { Icon: Sun, label: "Cuối ngày", href: `/projects/${project.id}/eod`, color: "#6FA677", bg: "rgba(111,166,119,0.12)" },
+    { Icon: Sun, label: "Cuối ngày", href: `/projects/${project.id}/eod`, color: "#34d399", bg: "rgba(111,166,119,0.12)" },
     { Icon: Package, label: "Đề xuất VT", href: `/projects/${project.id}/material-proposals`, color: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
-    { Icon: Wallet, label: "Lương tuần", href: `/projects/${project.id}/payroll`, color: "#E0B855", bg: "rgba(224,184,85,0.12)" },
+    { Icon: Wallet, label: "Lương tuần", href: `/projects/${project.id}/payroll`, color: "#fbbf24", bg: "rgba(224,184,85,0.12)" },
     { Icon: Users, label: "Thầu phụ", href: `/projects/${project.id}/sub-contracts`, color: "#D27A52", bg: "rgba(210,122,82,0.12)" },
     { Icon: BookOpen, label: "Nhật ký", href: `/projects/${project.id}/construction-log`, color: "#9a8f80", bg: "rgba(154,143,128,0.12)" },
     { Icon: FileText, label: "Hồ sơ", href: `/projects/${project.id}/documents`, color: "#9a8f80", bg: "rgba(154,143,128,0.12)" },
     ...(canViewPayments
-      ? [{ Icon: Banknote as Shortcut["Icon"], label: "Lịch TT", href: `/projects/${project.id}/payments`, color: "#E0B855", bg: "rgba(224,184,85,0.12)" }]
+      ? [{ Icon: Banknote as Shortcut["Icon"], label: "Lịch TT", href: `/projects/${project.id}/payments`, color: "#fbbf24", bg: "rgba(224,184,85,0.12)" }]
       : []),
     ...(canViewMembers
       ? [{ Icon: Users as Shortcut["Icon"], label: "Thành viên", href: `/projects/${project.id}/members`, color: "#9a8f80", bg: "rgba(154,143,128,0.12)" }]
@@ -204,7 +204,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
     <div className="space-y-4">
       <Link
         href="/ks-ql/today"
-        className="inline-flex items-center gap-1.5 text-xs text-[#9a8f80] transition-colors hover:text-[#E0B855]"
+        className="inline-flex items-center gap-1.5 text-xs text-[#9a8f80] transition-colors hover:text-[#fbbf24]"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         <span>Về App KS</span>
@@ -263,7 +263,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
             <div
               className="text-[26px] font-bold leading-none"
               style={{
-                background: "linear-gradient(90deg, #E0B855 0%, #D27A52 100%)",
+                background: "linear-gradient(90deg, #fbbf24 0%, #D27A52 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
               }}
@@ -288,7 +288,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                   key={p.id}
                   type="button"
                   onClick={() => setSelectedPhase(p)}
-                  className="group block w-full rounded-xl border border-[#2a221c] bg-[#0d0b09] p-3 text-left transition-colors hover:border-[#E0B855]/40"
+                  className="group block w-full rounded-xl border border-[#2a221c] bg-[#0d0b09] p-3 text-left transition-colors hover:border-[#fbbf24]/40"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -309,13 +309,13 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                           <span className="text-[#d4c8b8]">{prog.done}</span>/{prog.total} xong
                         </span>
                         {prog.doing > 0 ? (
-                          <span className="inline-flex items-center gap-1" style={{ color: "#E0B855" }}>
+                          <span className="inline-flex items-center gap-1" style={{ color: "#fbbf24" }}>
                             <Loader className="h-3 w-3" />
                             {prog.doing} đang làm
                           </span>
                         ) : null}
                         {prog.delayed > 0 ? (
-                          <span className="inline-flex items-center gap-1" style={{ color: "#D26B6B" }}>
+                          <span className="inline-flex items-center gap-1" style={{ color: "#f87171" }}>
                             {prog.delayed} trễ
                           </span>
                         ) : null}
@@ -333,8 +333,8 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                           width: `${prog.pct}%`,
                           background:
                             p.status === "completed"
-                              ? "#6FA677"
-                              : "linear-gradient(90deg, #E0B855 0%, #D27A52 100%)",
+                              ? "#34d399"
+                              : "linear-gradient(90deg, #fbbf24 0%, #D27A52 100%)",
                         }}
                       />
                     </div>
@@ -359,7 +359,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
               >
                 <span
                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
-                  style={{ background: "rgba(210,107,107,0.18)", color: "#D26B6B" }}
+                  style={{ background: "rgba(210,107,107,0.18)", color: "#f87171" }}
                 >
                   Trễ
                 </span>
@@ -380,7 +380,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
               >
                 <span
                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
-                  style={{ background: "rgba(224,184,85,0.18)", color: "#E0B855" }}
+                  style={{ background: "rgba(224,184,85,0.18)", color: "#fbbf24" }}
                 >
                   Đang
                 </span>
@@ -461,7 +461,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                       <Link
                         key={t.id}
                         href={`/tasks/${t.id}`}
-                        className="block rounded-xl border border-[#2a221c] bg-[#181410] p-3 transition-colors hover:border-[#E0B855]/40"
+                        className="block rounded-xl border border-[#2a221c] bg-[#181410] p-3 transition-colors hover:border-[#fbbf24]/40"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">

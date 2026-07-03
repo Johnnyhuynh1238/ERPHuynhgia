@@ -233,8 +233,8 @@ export function DiaryClient({
         <div
           className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl px-4 py-2 text-sm font-medium shadow-lg ${
             msg.type === "ok"
-              ? "bg-[#6FA677] text-black"
-              : "bg-[#D26B6B] text-white"
+              ? "bg-[#34d399] text-black"
+              : "bg-[#f87171] text-white"
           }`}
         >
           {msg.text}
@@ -343,7 +343,7 @@ export function DiaryClient({
               Tải ảnh hạng mục
             </button>
             {!finalized && (
-              <p className="mt-1 text-center text-xs text-[#E0B855]">
+              <p className="mt-1 text-center text-xs text-[#fbbf24]">
                 Chốt nhật ký trước khi tải ảnh
               </p>
             )}
@@ -386,7 +386,7 @@ export function DiaryClient({
               Tải ảnh toàn cảnh
             </button>
             {!finalized && (
-              <p className="mt-1 text-center text-xs text-[#E0B855]">
+              <p className="mt-1 text-center text-xs text-[#fbbf24]">
                 Chốt nhật ký trước khi tải ảnh
               </p>
             )}
@@ -422,7 +422,7 @@ export function DiaryClient({
             {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
           </button>
           {!canFinalize && (
-            <p className="text-center text-xs text-[#E0B855]">
+            <p className="text-center text-xs text-[#fbbf24]">
               Cần điền số thợ &gt; 0 và mục công việc trước khi chốt.
             </p>
           )}
@@ -462,11 +462,11 @@ export function DiaryClient({
                           Đã duyệt
                         </span>
                       ) : h.savedAt ? (
-                        <span className="rounded-full bg-[#6FA677]/20 px-2 py-0.5 text-[#a3d3a8]">
+                        <span className="rounded-full bg-[#34d399]/20 px-2 py-0.5 text-[#a3d3a8]">
                           Đã chốt
                         </span>
                       ) : (
-                        <span className="rounded-full bg-[#D26B6B]/20 px-2 py-0.5 text-[#D26B6B]">
+                        <span className="rounded-full bg-[#f87171]/20 px-2 py-0.5 text-[#f87171]">
                           Chưa chốt
                         </span>
                       )}
@@ -490,7 +490,7 @@ export function DiaryClient({
                     <p className="mt-2 line-clamp-2 text-sm text-[#f0f2ff]">{h.tasksDone}</p>
                   ) : null}
                   {h.issues ? (
-                    <p className="mt-1 line-clamp-2 text-xs text-[#D26B6B]">⚠ {h.issues}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-[#f87171]">⚠ {h.issues}</p>
                   ) : null}
                 </li>
               ))}
@@ -526,7 +526,7 @@ function TodayCard({
         approved
           ? "border-[#4a8cf7]/50 bg-[#0f1a2e]"
           : finalized
-            ? "border-[#6FA677]/40 bg-[#152418]"
+            ? "border-[#34d399]/40 bg-[#152418]"
             : "border-[#ff8a3d]/40 bg-[#1a1d2e]"
       }`}
     >
@@ -625,8 +625,8 @@ function HistoryDetailModal({
               diary.approvedAt
                 ? "border-[#4a8cf7]/40 bg-[#0f1a2e] text-[#a3c7f7]"
                 : diary.savedAt
-                  ? "border-[#6FA677]/40 bg-[#152418] text-[#a3d3a8]"
-                  : "border-[#D26B6B]/40 bg-[#241414] text-[#D26B6B]"
+                  ? "border-[#34d399]/40 bg-[#152418] text-[#a3d3a8]"
+                  : "border-[#f87171]/40 bg-[#241414] text-[#f87171]"
             }`}
           >
             {diary.approvedAt ? (
@@ -702,7 +702,7 @@ function DetailRow({
         {label}
       </div>
       <div
-        className={`text-sm ${warn ? "text-[#D26B6B]" : "text-[#f0f2ff]"} ${
+        className={`text-sm ${warn ? "text-[#f87171]" : "text-[#f0f2ff]"} ${
           multiline ? "whitespace-pre-wrap" : ""
         }`}
       >

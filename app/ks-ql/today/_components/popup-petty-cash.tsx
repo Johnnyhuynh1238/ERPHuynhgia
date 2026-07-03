@@ -50,10 +50,10 @@ function fmtTimeShort(s: string) {
 }
 
 function statusBadge(e: Expense): { label: string; bg: string; color: string } {
-  if (e.status === "tptc_pending") return { label: "Chờ TPTC duyệt", bg: "rgba(224,184,85,0.18)", color: "#E0B855" };
+  if (e.status === "tptc_pending") return { label: "Chờ TPTC duyệt", bg: "rgba(224,184,85,0.18)", color: "#fbbf24" };
   if (e.status === "pending") return { label: "TPTC duyệt · KT chưa chi", bg: "rgba(167,139,250,0.18)", color: "#a78bfa" };
-  if (e.status === "paid") return { label: "Đã chi", bg: "rgba(111,166,119,0.18)", color: "#6FA677" };
-  return { label: "Từ chối", bg: "rgba(210,107,107,0.18)", color: "#D26B6B" };
+  if (e.status === "paid") return { label: "Đã chi", bg: "rgba(111,166,119,0.18)", color: "#34d399" };
+  return { label: "Từ chối", bg: "rgba(210,107,107,0.18)", color: "#f87171" };
 }
 
 export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
@@ -302,7 +302,7 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
                 onClick={() => setPriority("urgent")}
                 className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
                   priority === "urgent"
-                    ? "border-[#D26B6B] bg-[#D26B6B]/15 text-[#D26B6B]"
+                    ? "border-[#f87171] bg-[#f87171]/15 text-[#f87171]"
                     : "border-[#2a221c] text-[#9a8f80]"
                 }`}
               >
@@ -365,7 +365,7 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
                       <span className="text-[11px] text-[#9a8f80]">{e.code} · {fmtTimeShort(e.createdAt)}</span>
                       {e.priority === "urgent" ? (
                         <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-                              style={{ background: "rgba(210,107,107,0.18)", color: "#D26B6B" }}>
+                              style={{ background: "rgba(210,107,107,0.18)", color: "#f87171" }}>
                           Khẩn
                         </span>
                       ) : null}

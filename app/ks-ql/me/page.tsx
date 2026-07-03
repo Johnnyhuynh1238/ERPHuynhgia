@@ -17,7 +17,7 @@ export default async function KsQlMePage() {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #fbbf24 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -35,8 +35,8 @@ export default async function KsQlMePage() {
       >
         <div className="flex items-center gap-3">
           <span
-            className="grid h-14 w-14 place-items-center rounded-2xl text-lg font-bold text-[#0d0b09] shadow-lg shadow-[#6FA677]/20"
-            style={{ background: "linear-gradient(135deg, #6FA677 0%, #4d8a6b 100%)" }}
+            className="grid h-14 w-14 place-items-center rounded-2xl text-lg font-bold text-[#0d0b09] shadow-lg shadow-[#34d399]/20"
+            style={{ background: "linear-gradient(135deg, #34d399 0%, #4d8a6b 100%)" }}
           >
             {initials || "K"}
           </span>
@@ -58,7 +58,7 @@ export default async function KsQlMePage() {
       </section>
 
       <section className="rounded-2xl border border-[#2a221c] bg-[#181410] p-5 text-center">
-        <Sparkles className="mx-auto mb-2 h-6 w-6 text-[#E0B855]" />
+        <Sparkles className="mx-auto mb-2 h-6 w-6 text-[#fbbf24]" />
         <div className="text-sm font-medium text-[#f0f2ff]">KPI gain-share</div>
         <p className="mt-1 text-xs leading-relaxed text-[#9a8f80]">
           Sắp ra mắt — đang nối với dữ liệu rải công + dự toán nhân công theo giai đoạn.

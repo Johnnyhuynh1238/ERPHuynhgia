@@ -42,10 +42,10 @@ function fmtTimeShort(s: string) {
 
 function statusBadge(p: Proposal): { label: string; bg: string; color: string } {
   if (p.status === "declined") {
-    return { label: "Từ chối", bg: "rgba(210,107,107,0.18)", color: "#D26B6B" };
+    return { label: "Từ chối", bg: "rgba(210,107,107,0.18)", color: "#f87171" };
   }
   if (p.status === "pending") {
-    return { label: "Chờ duyệt", bg: "rgba(224,184,85,0.18)", color: "#E0B855" };
+    return { label: "Chờ duyệt", bg: "rgba(224,184,85,0.18)", color: "#fbbf24" };
   }
   if (p.orderStatus === "not_ordered") {
     return { label: "Đã duyệt · KT chưa đặt", bg: "rgba(167,139,250,0.18)", color: "#a78bfa" };
@@ -54,9 +54,9 @@ function statusBadge(p: Proposal): { label: string; bg: string; color: string } 
     return { label: "Đang về", bg: "rgba(210,122,82,0.18)", color: "#D27A52" };
   }
   if (p.orderStatus === "received") {
-    return { label: "Đã nhận", bg: "rgba(111,166,119,0.18)", color: "#6FA677" };
+    return { label: "Đã nhận", bg: "rgba(111,166,119,0.18)", color: "#34d399" };
   }
-  return { label: "Đã trả tiền", bg: "rgba(111,166,119,0.12)", color: "#6FA677" };
+  return { label: "Đã trả tiền", bg: "rgba(111,166,119,0.12)", color: "#34d399" };
 }
 
 export function PopupOrderMaterial({ projectId, projectName, currentUserId, onClose }: Props) {

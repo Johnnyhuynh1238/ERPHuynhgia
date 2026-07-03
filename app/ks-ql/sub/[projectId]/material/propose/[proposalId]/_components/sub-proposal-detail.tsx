@@ -88,8 +88,8 @@ export function SubProposalDetail({
           <span className="ml-auto text-xs text-[#8892b0]">Gửi lúc {fmt(proposal.createdAt)}</span>
         </div>
         {proposal.processedNote ? (
-          <div className="mt-3 rounded-xl border border-[#D26B6B]/30 bg-[#D26B6B]/10 px-3 py-2 text-sm text-[#f0f2ff]">
-            <span className="text-[#D26B6B] font-semibold">Ghi chú từ TPTC:</span> {proposal.processedNote}
+          <div className="mt-3 rounded-xl border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-sm text-[#f0f2ff]">
+            <span className="text-[#f87171] font-semibold">Ghi chú từ TPTC:</span> {proposal.processedNote}
           </div>
         ) : null}
         {isDeclined ? (
@@ -169,8 +169,8 @@ function Row({
   active: boolean;
   variant?: "default" | "declined";
 }) {
-  const dot = variant === "declined" ? "bg-[#D26B6B]" : active ? "bg-[#6FA677]" : "bg-[#2d3249]";
-  const text = variant === "declined" ? "text-[#D26B6B]" : active ? "text-[#f0f2ff]" : "text-[#5a627a]";
+  const dot = variant === "declined" ? "bg-[#f87171]" : active ? "bg-[#34d399]" : "bg-[#2d3249]";
+  const text = variant === "declined" ? "text-[#f87171]" : active ? "text-[#f0f2ff]" : "text-[#5a627a]";
   return (
     <div className="flex items-start gap-3">
       <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
