@@ -79,7 +79,7 @@ export default async function ProposeListPage({ params }: { params: { projectId:
           Chưa có đề xuất nào.
         </div>
       ) : (
-        proposals.map((p) => {
+        proposals.map((p, cardIdx) => {
           const st = ksState(p.status as ProposalStatus, p.orderStatus as OrderStatus);
           const items = ((p.parsedItems as unknown[] | null) ?? []).map(normalizeItem);
           const canReceive =
@@ -87,7 +87,8 @@ export default async function ProposeListPage({ params }: { params: { projectId:
           return (
             <div
               key={p.id}
-              className="relative overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+              className="ksql-tap ksql-card-in relative overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+              style={{ animationDelay: `${Math.min(cardIdx, 8) * 45}ms` }}
             >
               {/* Cả card bấm vào chi tiết đề xuất */}
               <Link

@@ -60,7 +60,7 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
         </div>
       ) : (
         <div className="space-y-3">
-          {proposals.map((p) => {
+          {proposals.map((p, cardIdx) => {
             const items = ((p.parsedItems as unknown[] | null) ?? []).map(normalizeItem);
             const totalItems = items.length;
             const recvByIdx = new Map(p.receipts.map((r) => [r.itemSeq, Number(r.receivedQty)]));
@@ -80,7 +80,8 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
               <Link
                 key={p.id}
                 href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
-                className="relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+                className="ksql-tap ksql-card-in relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+                style={{ animationDelay: `${Math.min(cardIdx, 8) * 45}ms` }}
               >
                 <span
                   className={`absolute inset-y-0 left-0 w-1 ${isDone ? "bg-emerald-400" : "bg-cyan-400"}`}

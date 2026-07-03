@@ -123,6 +123,7 @@ body {
 }
 
 .ksql-tap {
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
     background-color 0.18s ease,

@@ -148,7 +148,7 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                     key={u}
                     type="button"
                     onClick={() => update(c.cid, { unit: u })}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    className={`ksql-tap shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium ${
                       c.unit === u
                         ? "border-[#ff8a3d] bg-[#ff8a3d]/15 text-orange-300"
                         : "border-[#2d3249] bg-[#0f1015] text-[#8892b0] active:bg-[#252840]"

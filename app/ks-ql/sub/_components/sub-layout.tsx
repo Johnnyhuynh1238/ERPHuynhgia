@@ -67,7 +67,7 @@ export function BigCard({
   disabled?: boolean;
 }) {
   const palette = {
-    primary: "bg-[#1a1d2e] border-[#ff8a3d]/40 hover:border-[#ff8a3d] active:scale-[0.99]",
+    primary: "bg-[#1a1d2e] border-[#ff8a3d]/40 hover:border-[#ff8a3d]",
     muted: "bg-[#13151f] border-[#252840] opacity-60",
     danger: "bg-[#2a1518] border-[#f87171]/50 hover:border-[#f87171]",
     success: "bg-[#152418] border-[#34d399]/50 hover:border-[#34d399]",
@@ -76,7 +76,7 @@ export function BigCard({
 
   const inner = (
     <div
-      className={`flex w-full items-center gap-4 rounded-2xl border-2 px-5 py-6 text-left transition ${palette} ${disabled ? "pointer-events-none" : ""}`}
+      className={`ksql-tap flex w-full items-center gap-4 rounded-2xl border-2 px-5 py-6 text-left ${palette} ${disabled ? "pointer-events-none" : ""}`}
     >
       {icon ? <div className="shrink-0 text-orange-300">{icon}</div> : null}
       <div className="min-w-0 flex-1">

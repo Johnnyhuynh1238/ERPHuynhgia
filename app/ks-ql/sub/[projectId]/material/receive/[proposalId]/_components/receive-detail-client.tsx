@@ -417,7 +417,7 @@ export function ReceiveDetailClient({
             type="button"
             onClick={submitDelivery}
             disabled={!canSubmit}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] py-3 text-base font-bold text-[#1a120a] transition hover:bg-[#fb923c] disabled:opacity-40"
+            className="ksql-tap mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] py-3 text-base font-bold text-[#1a120a] hover:bg-[#fb923c] disabled:opacity-40"
           >
             {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
             Xác nhận đợt nhận
