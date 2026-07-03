@@ -178,15 +178,7 @@ export function ProposalPipeline({ p }: { p: ProposalCardRow }) {
   );
 }
 
-export function ProposalCard({
-  p,
-  href,
-  footer,
-}: {
-  p: ProposalCardRow;
-  href: string;
-  footer?: React.ReactNode;
-}) {
+export function ProposalCard({ p, href }: { p: ProposalCardRow; href: string }) {
   const items = (p.parsedItems ?? []).map(normalizeItem);
   return (
     <Link
@@ -240,8 +232,6 @@ export function ProposalCard({
           )}
         </div>
       )}
-
-      {footer}
     </Link>
   );
 }

@@ -1,18 +1,19 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Inbox } from "lucide-react";
+import { ChevronRight, Inbox } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout } from "@/app/ks-ql/sub/_components/sub-layout";
-import {
-  ProposalCard,
-  normalizeItem,
-  type ProposalCardRow,
-} from "../_components/proposal-card";
+import { normalizeItem } from "../_components/proposal-card";
 
 export const dynamic = "force-dynamic";
 
 function poCode(id: string) {
   return `PO-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
+
+function fmtDate(d: Date) {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export default async function ReceiveListPage({ params }: { params: { projectId: string } }) {
@@ -40,11 +41,9 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
     select: {
       id: true,
       description: true,
-      status: true,
       orderStatus: true,
+      orderedAt: true,
       parsedItems: true,
-      createdAt: true,
-      _count: { select: { debts: true } },
       receipts: { select: { itemSeq: true, receivedQty: true, qcChecked: true, photos: true } },
     },
   });
@@ -66,36 +65,93 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
             const totalItems = items.length;
             const recvByIdx = new Map(p.receipts.map((r) => [r.itemSeq, Number(r.receivedQty)]));
             const doneCount = items.reduce((acc, it, i) => {
-              const need = it.sl;
               const got = recvByIdx.get(i) ?? 0;
-              return acc + (need > 0 && got + 1e-6 >= need ? 1 : 0);
+              return acc + (it.sl > 0 && got + 1e-6 >= it.sl ? 1 : 0);
             }, 0);
             const qcDone = p.receipts.filter((r) => r.qcChecked).length;
             const photoTotal = p.receipts.reduce(
               (acc, r) => acc + ((r.photos as unknown[] | null)?.length ?? 0),
               0,
             );
+            const isDone = p.orderStatus === "received";
+            const pct = totalItems > 0 ? Math.round((doneCount / totalItems) * 100) : 0;
+            const accent = isDone ? "emerald" : "cyan";
             return (
-              <ProposalCard
+              <Link
                 key={p.id}
-                p={p as unknown as ProposalCardRow}
                 href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
-                footer={
-                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#252840] pt-2 text-[11px] text-[#8892b0]">
-                    <span className="font-mono font-semibold">{poCode(p.id)}</span>
-                    <span>·</span>
-                    <span>
-                      Nhận:{" "}
-                      <span className="font-semibold text-[#f0f2ff]">{doneCount}</span>/{totalItems}{" "}
-                      dòng
-                    </span>
-                    <span>·</span>
-                    <span>QC: {qcDone}/{totalItems}</span>
-                    <span>·</span>
-                    <span>Ảnh: {photoTotal}</span>
+                className="relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+              >
+                <span
+                  className={`absolute inset-y-0 left-0 w-1 ${isDone ? "bg-emerald-400" : "bg-cyan-400"}`}
+                />
+
+                {/* Hàng 1: trạng thái + mã PO (phụ) */}
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      isDone
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-cyan-500/15 text-cyan-300"
+                    }`}
+                  >
+                    {isDone ? "Đã nhận đủ" : "Đang nhận"}
+                  </span>
+                  <span className="font-mono text-[11px] text-[#5a627a]">{poCode(p.id)}</span>
+                </div>
+
+                {/* Hàng 2: tiến độ nhận — thông tin chính, to nhất */}
+                <div className="mt-2.5 flex items-baseline gap-1.5">
+                  <span
+                    className={`text-2xl font-bold leading-none tabular-nums ${
+                      isDone ? "text-emerald-300" : "text-[#f0f2ff]"
+                    }`}
+                  >
+                    {doneCount}/{totalItems}
+                  </span>
+                  <span className="text-sm text-[#8892b0]">dòng nhận đủ</span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#252840]">
+                  <div
+                    className={`h-full rounded-full ${accent === "emerald" ? "bg-emerald-400" : "bg-cyan-400"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+
+                {/* Vật tư trong đơn — nhận diện đơn */}
+                {items.length > 0 ? (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {items.slice(0, 4).map((it, i) => (
+                      <span
+                        key={i}
+                        className="rounded-md bg-[#0f1220] px-2 py-1 text-xs text-[#8892b0]"
+                      >
+                        <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
+                        {it.dvt}
+                      </span>
+                    ))}
+                    {items.length > 4 && (
+                      <span className="rounded-md px-1.5 py-1 text-xs text-[#5a627a]">
+                        +{items.length - 4}
+                      </span>
+                    )}
                   </div>
-                }
-              />
+                ) : (
+                  <div className="mt-2.5 line-clamp-1 text-sm text-[#cfd4e8]">{p.description}</div>
+                )}
+
+                {/* Footer: thông tin phụ, nhỏ nhất */}
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[#5a627a]">
+                  <span>Đặt {p.orderedAt ? fmtDate(new Date(p.orderedAt)) : "—"}</span>
+                  <span>·</span>
+                  <span>QC {qcDone}/{totalItems}</span>
+                  <span>·</span>
+                  <span>Ảnh {photoTotal}</span>
+                  <ChevronRight className="ml-auto h-4 w-4 text-[#5a627a]" />
+                </div>
+              </Link>
             );
           })}
         </div>
