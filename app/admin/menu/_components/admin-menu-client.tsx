@@ -88,6 +88,7 @@ const SECTIONS: MenuSection[] = [
     title: "Tài chính",
     icon: Banknote,
     items: [
+      { label: "Tài chính công ty", href: "/finance", icon: TrendingUp, desc: "Doanh thu, chi phí, công nợ toàn cty" },
       { label: "Lệnh thu", href: "/receipts", icon: Receipt, desc: "Tạo lệnh thu (KH, vay, hoàn ứng…)" },
       { label: "Lệnh chi", href: "/expenses", icon: Receipt, desc: "Tạo lệnh chi gửi kế toán" },
       { label: "Công nợ NCC", href: "/payables", icon: Wallet, desc: "Công nợ phải trả NCC vật tư" },

@@ -70,6 +70,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Thầu phụ", href: "/subcontractors" },
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
     { label: "Chi thầu phụ", href: "/sub-payments" },
+    { label: "Tài chính cty", href: "/finance" },
     { label: "Lệnh thu", href: "/receipts" },
     { label: "Lệnh chi", href: "/expenses" },
     { label: "Sổ quỹ", href: "/treasury" },
@@ -176,7 +177,7 @@ function navIcon(href: string, label: string) {
   if (href.includes("kpi")) return Target;
   if (href.includes("users")) return Users;
   if (href.includes("templates")) return Settings;
-  if (href.includes("treasury") || href.includes("expenses")) return Wallet;
+  if (href.includes("finance") || href.includes("treasury") || href.includes("expenses")) return Wallet;
   if (href.includes("receipts")) return Receipt;
   if (href.includes("payments")) return Receipt;
   if (href.includes("subcontractors")) return Users;
