@@ -14,14 +14,14 @@ type OrderStatus = "not_ordered" | "ordered" | "received" | "paid";
 /** Trạng thái tổng hợp duy nhất theo góc nhìn KS (không phân biệt Ghi CN / TT — việc của KT). */
 function ksState(status: ProposalStatus, orderStatus: OrderStatus) {
   if (status === "declined")
-    return { label: "Bị từ chối — sửa & gửi lại", chip: "bg-red-500/15 text-red-300", stripe: "bg-red-400" };
+    return { label: "Bị từ chối — sửa & gửi lại", chip: "bg-red-500/15 text-red-300" };
   if (status === "pending")
-    return { label: "Chờ TPTC duyệt", chip: "bg-amber-500/15 text-amber-300", stripe: "bg-amber-400" };
+    return { label: "Chờ TPTC duyệt", chip: "bg-amber-500/15 text-amber-300" };
   if (orderStatus === "not_ordered")
-    return { label: "Đã duyệt · chờ đặt hàng", chip: "bg-blue-500/15 text-blue-300", stripe: "bg-blue-400" };
+    return { label: "Đã duyệt · chờ đặt hàng", chip: "bg-blue-500/15 text-blue-300" };
   if (orderStatus === "ordered")
-    return { label: "Đã đặt · hàng đang về", chip: "bg-cyan-500/15 text-cyan-300", stripe: "bg-cyan-400" };
-  return { label: "Đã nhận đủ", chip: "bg-emerald-500/15 text-emerald-300", stripe: "bg-emerald-400" };
+    return { label: "Đã đặt · hàng đang về", chip: "bg-cyan-500/15 text-cyan-300" };
+  return { label: "Đã nhận đủ", chip: "bg-emerald-500/15 text-emerald-300" };
 }
 
 function fmtTime(d: Date) {
@@ -87,7 +87,7 @@ export default async function ProposeListPage({ params }: { params: { projectId:
           return (
             <div
               key={p.id}
-              className="ksql-tap ksql-card-in relative overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 pl-5 hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+              className="ksql-tap ksql-card-in relative rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
               style={{ animationDelay: `${Math.min(cardIdx, 8) * 45}ms` }}
             >
               {/* Cả card bấm vào chi tiết đề xuất */}
@@ -96,9 +96,8 @@ export default async function ProposeListPage({ params }: { params: { projectId:
                 className="absolute inset-0"
                 aria-label="Chi tiết đề xuất"
               />
-              <span className={`absolute inset-y-0 left-0 w-1 ${st.stripe}`} />
 
-              {/* Hàng 1: trạng thái (chính) + ngày gửi (phụ) */}
+              {/* Hàng 1: trạng thái + ngày gửi */}
               <div className="flex items-center justify-between gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${st.chip}`}>
                   {st.label}
@@ -106,42 +105,43 @@ export default async function ProposeListPage({ params }: { params: { projectId:
                 <span className="text-[11px] text-[#5a627a]">{fmtTime(p.createdAt)}</span>
               </div>
 
-              {/* Vật tư — nhận diện đơn */}
+              {/* Hàng 2: chủng loại hàng — to nhất */}
               {items.length > 0 ? (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {items.slice(0, 4).map((it, i) => (
-                    <span
-                      key={i}
-                      className="rounded-md bg-[#0f1220] px-2 py-1 text-xs text-[#8892b0]"
-                    >
-                      <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
-                      {it.dvt}
+                <>
+                  <div className="mt-2.5 text-[19px] font-bold leading-snug text-[#f0f2ff]">
+                    {items[0].ten}
+                    <span className="ml-1.5 text-[15px] font-semibold text-[#ff8a3d]">
+                      {items[0].sl}
+                      {items[0].dvt}
                     </span>
-                  ))}
-                  {items.length > 4 && (
-                    <span className="rounded-md px-1.5 py-1 text-xs text-[#5a627a]">
-                      +{items.length - 4}
-                    </span>
+                  </div>
+                  {items.length > 1 && (
+                    <div className="mt-1 line-clamp-1 text-[13px] text-[#8892b0]">
+                      +{items.length - 1} loại khác:{" "}
+                      {items
+                        .slice(1, 4)
+                        .map((it) => it.ten)
+                        .join(", ")}
+                      {items.length > 4 ? ", …" : ""}
+                    </div>
                   )}
-                </div>
+                </>
               ) : (
-                <div className="mt-2.5 line-clamp-2 text-sm text-[#cfd4e8]">{p.description}</div>
+                <div className="mt-2.5 line-clamp-2 text-[17px] font-bold leading-snug text-[#f0f2ff]">
+                  {p.description}
+                </div>
               )}
 
-              {/* Hành động: đơn đã đặt/đang nhận → nhảy thẳng màn nhận hàng */}
-              {canReceive ? (
+              {/* Đơn đã đặt/đang nhận → nút nhận hàng */}
+              {canReceive && (
                 <Link
                   href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
-                  className="relative z-10 mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#ff8a3d]/15 px-3.5 py-2 text-[13px] font-bold text-orange-300 transition active:scale-[0.98] hover:bg-[#ff8a3d]/25"
+                  className="ksql-tap relative z-10 mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#ff8a3d]/15 px-3.5 py-2 text-[13px] font-bold text-orange-300 hover:bg-[#ff8a3d]/25"
                 >
                   <PackageCheck className="h-4 w-4" />
                   Nhận hàng
                   <ChevronRight className="h-4 w-4" />
                 </Link>
-              ) : (
-                <div className="mt-3 flex items-center justify-end">
-                  <ChevronRight className="h-4 w-4 text-[#5a627a]" />
-                </div>
               )}
             </div>
           );
