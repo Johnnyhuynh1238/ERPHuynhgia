@@ -1,28 +1,250 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  PackageCheck,
+  PlusCircle,
+  Receipt,
+  ShoppingCart,
+  Truck,
+  Wallet,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
 
 export const dynamic = "force-dynamic";
 
-function statusLabel(p: { status: string; orderStatus: string }) {
-  if (p.status === "declined") return { label: "Bị từ chối", tone: "danger" as const };
-  if (p.status === "pending") return { label: "Chờ duyệt", tone: "warn" as const };
-  if (p.orderStatus === "not_ordered") return { label: "Đã duyệt · chưa đặt", tone: "primary" as const };
-  if (p.orderStatus === "ordered") return { label: "Đang về", tone: "primary" as const };
-  if (p.orderStatus === "received") return { label: "Đã nhận", tone: "success" as const };
-  return { label: "Đã trả tiền", tone: "success" as const };
+type ProposalStatus = "pending" | "accepted" | "declined";
+type OrderStatus = "not_ordered" | "ordered" | "received" | "paid";
+
+type ParsedItem = { ten: string; sl: number; dvt: string };
+
+type ProposalRow = {
+  id: string;
+  description: string;
+  status: ProposalStatus;
+  orderStatus: OrderStatus;
+  parsedItems: ParsedItem[] | null;
+  createdAt: Date;
+  acceptedAt: Date | null;
+  orderedAt: Date | null;
+  receivedAt: Date | null;
+  paidAt: Date | null;
+  _count: { debts: number };
+};
+
+const STATUS_LABEL: Record<ProposalStatus, string> = {
+  pending: "Chờ duyệt",
+  accepted: "Đã duyệt",
+  declined: "Từ chối",
+};
+
+const STATUS_CHIP: Record<ProposalStatus, string> = {
+  pending: "bg-amber-500/15 text-amber-300",
+  accepted: "bg-blue-500/15 text-blue-300",
+  declined: "bg-red-500/15 text-red-300",
+};
+
+const ORDER_LABEL: Record<OrderStatus, string> = {
+  not_ordered: "Chưa đặt",
+  ordered: "Đã đặt",
+  received: "Đã nhận",
+  paid: "Đã TT",
+};
+
+const ORDER_CHIP: Record<OrderStatus, string> = {
+  not_ordered: "bg-slate-500/15 text-slate-300",
+  ordered: "bg-cyan-500/15 text-cyan-300",
+  received: "bg-emerald-500/15 text-emerald-300",
+  paid: "bg-emerald-600/25 text-emerald-200",
+};
+
+const ORDER_ICON: Record<OrderStatus, JSX.Element> = {
+  not_ordered: <ShoppingCart className="h-3 w-3" />,
+  ordered: <Truck className="h-3 w-3" />,
+  received: <PackageCheck className="h-3 w-3" />,
+  paid: <Wallet className="h-3 w-3" />,
+};
+
+const ORDER_STRIPE: Record<OrderStatus, string> = {
+  not_ordered: "bg-slate-500",
+  ordered: "bg-cyan-400",
+  received: "bg-emerald-400",
+  paid: "bg-emerald-500",
+};
+
+type StageKey = "duyet" | "dat" | "nhan" | "ghinh" | "tt";
+
+const STAGE_LABEL: Record<StageKey, string> = {
+  duyet: "Duyệt",
+  dat: "Đặt NCC",
+  nhan: "Nhận",
+  ghinh: "Ghi CN",
+  tt: "TT NCC",
+};
+
+const STAGE_ICON: Record<StageKey, JSX.Element> = {
+  duyet: <CheckCircle2 className="h-3 w-3" />,
+  dat: <ShoppingCart className="h-3 w-3" />,
+  nhan: <PackageCheck className="h-3 w-3" />,
+  ghinh: <Receipt className="h-3 w-3" />,
+  tt: <Wallet className="h-3 w-3" />,
+};
+
+function fmtTime(d: Date) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const HH = String(d.getHours()).padStart(2, "0");
+  const MM = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm} ${HH}:${MM}`;
 }
 
-function summarizeItems(parsed: unknown): string {
-  if (!Array.isArray(parsed) || parsed.length === 0) return "(không có chi tiết)";
-  const first = parsed
-    .slice(0, 3)
-    .map((it: any) => `${it.name} ${it.qty} ${it.unit}`)
-    .join(" · ");
-  return parsed.length > 3 ? `${first} · …` : first;
+function normalizeItem(raw: unknown): ParsedItem {
+  const it = (raw ?? {}) as Record<string, unknown>;
+  const ten = String(it.ten ?? it.name ?? "");
+  const dvt = String(it.dvt ?? it.unit ?? "");
+  const sl = Number(it.sl ?? it.qty ?? 0);
+  return { ten, sl, dvt };
+}
+
+function stageStates(p: ProposalRow): Record<StageKey, "done" | "current" | "pending"> {
+  if (p.status === "declined") {
+    return { duyet: "pending", dat: "pending", nhan: "pending", ghinh: "pending", tt: "pending" };
+  }
+  const duyet = p.status === "accepted" ? "done" : "current";
+  const dat =
+    p.orderStatus === "ordered" || p.orderStatus === "received" || p.orderStatus === "paid"
+      ? "done"
+      : duyet === "done"
+        ? "current"
+        : "pending";
+  const nhan =
+    p.orderStatus === "received" || p.orderStatus === "paid"
+      ? "done"
+      : dat === "done"
+        ? "current"
+        : "pending";
+  const hasDebt = (p._count?.debts ?? 0) > 0;
+  const ghinh = hasDebt ? "done" : nhan === "done" ? "current" : "pending";
+  const tt = p.orderStatus === "paid" ? "done" : ghinh === "done" ? "current" : "pending";
+  return { duyet, dat, nhan, ghinh, tt };
+}
+
+function ProposalPipeline({ p }: { p: ProposalRow }) {
+  const st = stageStates(p);
+  const keys: StageKey[] = ["duyet", "dat", "nhan", "ghinh", "tt"];
+  return (
+    <div className="mt-2 flex items-center">
+      {keys.map((k, idx) => {
+        const state = st[k];
+        const dotCls =
+          state === "done"
+            ? "bg-emerald-500 text-white ring-emerald-500/20"
+            : state === "current"
+              ? "bg-[#fb923c] text-[#0b0d16] ring-[#fb923c]/25 animate-pulse"
+              : "bg-[#252840] text-[#5a627a] ring-transparent";
+        const lineCls =
+          state === "done" || (state === "current" && idx > 0 && st[keys[idx - 1]] === "done")
+            ? "bg-emerald-500/60"
+            : "bg-[#252840]";
+        const labelCls =
+          state === "done"
+            ? "text-emerald-300"
+            : state === "current"
+              ? "text-[#fb923c] font-semibold"
+              : "text-[#5a627a]";
+        return (
+          <div key={k} className="flex flex-1 flex-col items-center">
+            <div className="flex w-full items-center">
+              <div className={`h-[2px] flex-1 ${idx === 0 ? "opacity-0" : lineCls}`} />
+              <div
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-2 ${dotCls}`}
+                title={STAGE_LABEL[k]}
+              >
+                {state === "done" ? (
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                ) : (
+                  STAGE_ICON[k]
+                )}
+              </div>
+              <div
+                className={`h-[2px] flex-1 ${
+                  idx === keys.length - 1
+                    ? "opacity-0"
+                    : st[keys[idx + 1]] !== "pending"
+                      ? "bg-emerald-500/60"
+                      : "bg-[#252840]"
+                }`}
+              />
+            </div>
+            <div className={`mt-0.5 text-[9px] leading-none ${labelCls}`}>{STAGE_LABEL[k]}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProposalCard({ p, href }: { p: ProposalRow; href: string }) {
+  const items = (p.parsedItems ?? []).map(normalizeItem);
+  return (
+    <Link
+      href={href}
+      className="relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 pl-4 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
+    >
+      <span className={`absolute inset-y-0 left-0 w-1 ${ORDER_STRIPE[p.orderStatus]}`} />
+
+      <ProposalPipeline p={p} />
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_CHIP[p.status]}`}
+        >
+          {STATUS_LABEL[p.status]}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${ORDER_CHIP[p.orderStatus]}`}
+        >
+          {ORDER_ICON[p.orderStatus]}
+          {ORDER_LABEL[p.orderStatus]}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-[#5a627a]">
+          <Clock className="h-3 w-3" />
+          {fmtTime(p.createdAt)}
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-[#5a627a]" />
+      </div>
+
+      {p.description && (
+        <div className="mt-2 text-[12.5px] leading-snug text-[#cfd4e8] line-clamp-2">
+          {p.description}
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {items.slice(0, 6).map((it, i) => (
+            <span
+              key={i}
+              className="rounded-md bg-[#0f1220] px-1.5 py-0.5 text-[10px] text-[#8892b0]"
+            >
+              <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
+              {it.dvt}
+            </span>
+          ))}
+          {items.length > 6 && (
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] text-[#5a627a]">
+              +{items.length - 6}
+            </span>
+          )}
+        </div>
+      )}
+    </Link>
+  );
 }
 
 export default async function ProposeListPage({ params }: { params: { projectId: string } }) {
@@ -50,6 +272,11 @@ export default async function ProposeListPage({ params }: { params: { projectId:
       orderStatus: true,
       parsedItems: true,
       createdAt: true,
+      acceptedAt: true,
+      orderedAt: true,
+      receivedAt: true,
+      paidAt: true,
+      _count: { select: { debts: true } },
     },
   });
 
@@ -71,41 +298,13 @@ export default async function ProposeListPage({ params }: { params: { projectId:
           Chưa có đề xuất nào.
         </div>
       ) : (
-        proposals.map((p) => {
-          const st = statusLabel({ status: p.status, orderStatus: p.orderStatus });
-          return (
-            <Link
-              key={p.id}
-              href={`/ks-ql/sub/${project.id}/material/propose/${p.id}`}
-              className="block rounded-2xl border-2 border-[#252840] bg-[#13151f] px-5 py-4 transition hover:border-[#ff8a3d]/40"
-            >
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="text-xs text-[#8892b0]">
-                  {new Date(p.createdAt).toLocaleString("vi-VN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    st.tone === "danger"
-                      ? "bg-[#D26B6B]/20 text-[#D26B6B]"
-                      : st.tone === "warn"
-                        ? "bg-[#E0B855]/20 text-[#E0B855]"
-                        : st.tone === "success"
-                          ? "bg-[#6FA677]/20 text-[#6FA677]"
-                          : "bg-[#ff8a3d]/20 text-[#ff8a3d]"
-                  }`}
-                >
-                  {st.label}
-                </span>
-              </div>
-              <div className="text-base text-[#f5ede4]">{summarizeItems(p.parsedItems)}</div>
-            </Link>
-          );
-        })
+        proposals.map((p) => (
+          <ProposalCard
+            key={p.id}
+            p={p as unknown as ProposalRow}
+            href={`/ks-ql/sub/${project.id}/material/propose/${p.id}`}
+          />
+        ))
       )}
     </SubLayout>
   );
