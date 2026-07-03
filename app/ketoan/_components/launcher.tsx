@@ -37,6 +37,7 @@ type AccountDto = {
 
 type SummaryDto = {
   balance: { total: number; accounts: AccountDto[] };
+  todayFlow?: { in: number; out: number; net: number };
   counts: {
     create: number;
     process: number;
@@ -547,6 +548,37 @@ function BalanceHeadline({
           đ
         </span>
       </div>
+
+      {data?.todayFlow && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] tabular-nums">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
+            style={{
+              background:
+                data.todayFlow.net > 0
+                  ? "rgba(52,211,153,0.12)"
+                  : data.todayFlow.net < 0
+                    ? "rgba(248,113,113,0.12)"
+                    : "rgba(136,146,176,0.10)",
+              color:
+                data.todayFlow.net > 0
+                  ? "#34d399"
+                  : data.todayFlow.net < 0
+                    ? "#f87171"
+                    : BRAND_TEXT_MUTED,
+            }}
+          >
+            {data.todayFlow.net > 0 ? "▲" : data.todayFlow.net < 0 ? "▼" : "•"}{" "}
+            {data.todayFlow.net > 0 ? "+" : ""}
+            {formatVnd(data.todayFlow.net)} đ hôm nay
+          </span>
+          {(data.todayFlow.in > 0 || data.todayFlow.out > 0) && (
+            <span style={{ color: BRAND_TEXT_MUTED }}>
+              thu {formatVnd(data.todayFlow.in)} · chi {formatVnd(data.todayFlow.out)}
+            </span>
+          )}
+        </div>
+      )}
 
       <div
         className="mt-4 h-px w-full"

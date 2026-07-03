@@ -14,6 +14,12 @@ export async function GET() {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
   }
 
+  // Đầu ngày hôm nay theo giờ VN (server có thể chạy UTC)
+  const vnDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(new Date());
+  const startOfTodayVn = new Date(`${vnDateStr}T00:00:00+07:00`);
+
   const [
     accounts,
     expensePending,
@@ -24,6 +30,7 @@ export async function GET() {
     receiptNeedsDebtRows,
     proposalPaid,
     supplierOrderActive,
+    todayFlowRows,
   ] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
@@ -51,7 +58,15 @@ export async function GET() {
     prisma.supplierPaymentOrder.count({
       where: { status: { in: ["pending", "approved"] } },
     }),
+    // Dòng tiền hôm nay (giờ VN) — bỏ chuyển nội bộ giữa 2 quỹ (không đổi tổng số dư).
+    prisma.cashTransaction.groupBy({
+      by: ["direction"],
+      where: { occurredAt: { gte: startOfTodayVn }, counterAccountId: null },
+      _sum: { amount: true },
+    }),
   ]);
+  const todayIn = Number(todayFlowRows.find((r) => r.direction === "in")?._sum.amount ?? 0);
+  const todayOut = Number(todayFlowRows.find((r) => r.direction === "out")?._sum.amount ?? 0);
   const receiptNeedsDebt = Number(receiptNeedsDebtRows[0]?.count ?? 0);
   // Công nợ KH "ping": lệnh thu do admin tạo — pending (KT chưa nhận). Dùng lại count đã có.
   const kkhReceiptActive = receiptPending;
@@ -74,6 +89,11 @@ export async function GET() {
     balance: {
       total: totalBalance,
       accounts: accountsOut,
+    },
+    todayFlow: {
+      in: todayIn,
+      out: todayOut,
+      net: todayIn - todayOut,
     },
     counts: {
       create: 0,
