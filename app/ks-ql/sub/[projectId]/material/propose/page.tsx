@@ -97,12 +97,22 @@ export default async function ProposeListPage({ params }: { params: { projectId:
                 aria-label="Chi tiết đề xuất"
               />
 
-              {/* Hàng 1: trạng thái + ngày gửi */}
-              <div className="flex items-center justify-between gap-2">
+              {/* Hàng 1: trạng thái + ngày gửi + nút nhận hàng (nếu có) */}
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${st.chip}`}>
                   {st.label}
                 </span>
-                <span className="text-[11px] text-[#5a627a]">{fmtTime(p.createdAt)}</span>
+                <span className="ml-auto text-[11px] text-[#5a627a]">{fmtTime(p.createdAt)}</span>
+                {canReceive && (
+                  <Link
+                    href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
+                    className="ksql-tap relative z-10 inline-flex items-center gap-1 rounded-lg bg-[#ff8a3d]/15 px-2.5 py-1 text-[12px] font-bold text-orange-300 hover:bg-[#ff8a3d]/25"
+                  >
+                    <PackageCheck className="h-3.5 w-3.5" />
+                    Nhận hàng
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
               </div>
 
               {/* Hàng 2: chủng loại hàng — to nhất */}
@@ -132,17 +142,6 @@ export default async function ProposeListPage({ params }: { params: { projectId:
                 </div>
               )}
 
-              {/* Đơn đã đặt/đang nhận → nút nhận hàng */}
-              {canReceive && (
-                <Link
-                  href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
-                  className="ksql-tap relative z-10 mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#ff8a3d]/15 px-3.5 py-2 text-[13px] font-bold text-orange-300 hover:bg-[#ff8a3d]/25"
-                >
-                  <PackageCheck className="h-4 w-4" />
-                  Nhận hàng
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              )}
             </div>
           );
         })
