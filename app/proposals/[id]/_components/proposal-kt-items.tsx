@@ -632,12 +632,14 @@ function DebtModal({
   }, [supplierId]);
 
   function pickCatalogItem(p: CatalogPrice) {
-    setSupplierItemCode(p.supplierItemCode || "");
+    setSupplierItemCode(p.supplierItemCode?.trim() || p.materialName);
     setUnitPrice(String(p.unitPrice));
     setCatalogOpen(false);
     setCatalogQ("");
     toast.success(`Đã chọn: ${p.materialName}`);
   }
+
+  const isThepItem = /th[ée]p|sắt/i.test(item.name);
 
   const filteredCatalog = useMemo(() => {
     const q = catalogQ.trim().toLowerCase();
@@ -683,12 +685,13 @@ function DebtModal({
     }
     const priceNum = Number(unitPrice.replace(/[^0-9.]/g, ""));
     const qtyNum = Number(qty.replace(",", "."));
-    if (!Number.isFinite(priceNum) || priceNum <= 0) {
-      toast.error("Đơn giá phải > 0");
+    const minAllowed = isThepItem ? 0 : 0.0001;
+    if (!Number.isFinite(priceNum) || priceNum < minAllowed) {
+      toast.error(isThepItem ? "Đơn giá không hợp lệ" : "Đơn giá phải > 0");
       return;
     }
-    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-      toast.error("Số lượng phải > 0");
+    if (!Number.isFinite(qtyNum) || qtyNum < minAllowed) {
+      toast.error(isThepItem ? "Số lượng không hợp lệ" : "Số lượng phải > 0");
       return;
     }
     setBusy(true);
