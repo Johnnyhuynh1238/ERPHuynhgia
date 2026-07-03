@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -190,7 +191,7 @@ export function AdminSpecialtiesClient({ canWrite }: { canWrite: boolean }) {
 
   async function handleDelete(item: Specialty) {
     if (!canWrite) return;
-    const ok = window.confirm(`Xóa chuyên môn ${item.name}?`);
+    const ok = await confirmDialog(`Xóa chuyên môn ${item.name}?`);
     if (!ok) return;
 
     const res = await fetch(`/api/specialties/${item.id}`, { method: "DELETE" });

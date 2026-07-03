@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { FileText, GripVertical, Star, Upload } from "lucide-react";
@@ -477,7 +478,7 @@ export function SubContractDetailClient({
 
   async function deleteFile(fileId: string) {
     if (!contract) return;
-    if (!window.confirm("Xóa tài liệu này?")) return;
+    if (!await confirmDialog("Xóa tài liệu này?")) return;
 
     const res = await fetch(`/api/sub-contracts/${contract.id}/files/${fileId}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
@@ -550,7 +551,7 @@ export function SubContractDetailClient({
   }
 
   async function removePayment(paymentId: string) {
-    if (!window.confirm("Xóa/Hủy đợt thanh toán này?")) return;
+    if (!await confirmDialog("Xóa/Hủy đợt thanh toán này?")) return;
 
     const res = await fetch(`/api/sub-payments/${paymentId}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
@@ -753,7 +754,7 @@ export function SubContractDetailClient({
   }
 
   async function deleteEvaluation(item: SubEvaluation) {
-    if (!window.confirm("Xóa đánh giá này?")) return;
+    if (!await confirmDialog("Xóa đánh giá này?")) return;
 
     const res = await fetch(`/api/sub-evaluations/${item.id}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));

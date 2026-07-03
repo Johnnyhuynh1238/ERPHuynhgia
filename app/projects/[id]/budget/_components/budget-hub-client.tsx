@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -290,7 +291,7 @@ function ExcelToolbar({ projectId, itemCount }: { projectId: string; itemCount: 
     const f = e.target.files?.[0];
     if (!f) return;
     if (itemCount > 0) {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         `Dự án đang có ${itemCount} công tác. Upload sẽ XOÁ TOÀN BỘ và thay bằng file Excel. Tiếp tục?`,
       );
       if (!ok) {

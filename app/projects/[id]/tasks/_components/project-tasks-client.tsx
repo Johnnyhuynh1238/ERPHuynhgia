@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -541,7 +542,7 @@ export function ProjectTasksClient({ projectId }: { projectId: string }) {
     event.preventDefault();
     event.stopPropagation();
     if (!canDeleteTask) return;
-    if (!window.confirm(`Xóa task ${task.code} - ${task.name}?`)) return;
+    if (!await confirmDialog(`Xóa task ${task.code} - ${task.name}?`)) return;
 
     setDeletingTaskId(task.id);
     try {

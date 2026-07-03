@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -100,7 +101,7 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
   };
 
   const unapprove = async (id: string) => {
-    if (!confirm("Bỏ duyệt để KS sửa lại nhật ký này?")) return;
+    if (!await confirmDialog("Bỏ duyệt để KS sửa lại nhật ký này?")) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/admin/construction-diaries/${id}/unapprove`, {

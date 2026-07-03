@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -157,7 +158,7 @@ export function WorkOrdersClient({ projectId, canEdit }: Props) {
   }
 
   async function remove(id: string) {
-    if (!confirm("Xóa phiếu này?")) return;
+    if (!await confirmDialog("Xóa phiếu này?")) return;
     const res = await fetch(`/api/projects/${projectId}/work-orders/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -170,7 +171,7 @@ export function WorkOrdersClient({ projectId, canEdit }: Props) {
 
   async function duplicateFromYesterday() {
     const sourceDate = yesterdayStr(date);
-    if (!confirm(`Nhân bản từ ${sourceDate} sang ${date}? (Ngày đích phải chưa có phiếu)`)) return;
+    if (!await confirmDialog(`Nhân bản từ ${sourceDate} sang ${date}? (Ngày đích phải chưa có phiếu)`)) return;
     const res = await fetch(`/api/projects/${projectId}/work-orders/duplicate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -121,7 +122,7 @@ export function ProposalKtItems({
   }, [items]);
 
   async function closePo() {
-    if (!window.confirm("Đóng PO này? Sau khi đóng, KS không nhận thêm được. Cần admin để mở lại.")) return;
+    if (!await confirmDialog("Đóng PO này? Sau khi đóng, KS không nhận thêm được. Cần admin để mở lại.")) return;
     setClosing(true);
     const res = await fetch(`/api/proposals/${proposalId}/close`, { method: "POST" });
     setClosing(false);
@@ -136,7 +137,7 @@ export function ProposalKtItems({
   }
 
   async function reopenPo() {
-    if (!window.confirm("Mở lại PO này?")) return;
+    if (!await confirmDialog("Mở lại PO này?")) return;
     const res = await fetch(`/api/proposals/${proposalId}/close`, { method: "DELETE" });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -717,7 +718,7 @@ function DebtModal({
 
   async function deleteDebt() {
     if (!item.debt) return;
-    if (!window.confirm("Xoá công nợ của vật tư này?")) return;
+    if (!await confirmDialog("Xoá công nợ của vật tư này?")) return;
     setDeleting(true);
     const res = await fetch(`/api/proposals/${proposalId}/items/${item.seq}/debt`, {
       method: "DELETE",

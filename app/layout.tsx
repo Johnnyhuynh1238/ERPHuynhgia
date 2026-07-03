@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import "./globals.css";
 import '@/src/styles/hg-design-system.css'
 
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className="font-sans bg-black text-zinc-100">
         <div className="hg-page-enter">{children}</div>
         <Toaster richColors position="top-right" closeButton />
+        <ConfirmHost />
       </body>
     </html>
   );

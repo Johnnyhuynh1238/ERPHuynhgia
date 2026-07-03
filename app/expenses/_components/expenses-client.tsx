@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
@@ -1026,7 +1027,7 @@ export function ExpensesClient({
                       <>
                         <button
                           onClick={async () => {
-                            if (!window.confirm(`Duyệt lệnh chi ${r.code}?`)) return;
+                            if (!await confirmDialog(`Duyệt lệnh chi ${r.code}?`)) return;
                             const res = await fetch(`/api/expenses/${r.id}/approve`, { method: "POST" });
                             const j = await res.json().catch(() => ({}));
                             if (!res.ok) {

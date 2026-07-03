@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Filter, Plus, Receipt as ReceiptIcon, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -272,7 +273,7 @@ export function ReceiptsClient({
       toast.error("Nhập lý do huỷ");
       return;
     }
-    if (!window.confirm(`Huỷ lệnh thu ${openCancel.code}?`)) return;
+    if (!await confirmDialog(`Huỷ lệnh thu ${openCancel.code}?`)) return;
     setCancelling(true);
     const res = await fetch(`/api/receipts/${openCancel.id}/cancel`, {
       method: "POST",
@@ -592,7 +593,7 @@ export function ReceiptsClient({
                                       type="button"
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        if (!window.confirm(`Duyệt lệnh thu ${r.code}?`)) return;
+                                        if (!await confirmDialog(`Duyệt lệnh thu ${r.code}?`)) return;
                                         const res = await fetch(`/api/receipts/${r.id}/approve`, { method: "POST" });
                                         const j = await res.json().catch(() => ({}));
                                         if (!res.ok) {

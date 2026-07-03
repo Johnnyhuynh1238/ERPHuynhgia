@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   }
 
   async function requestCollection(row: PaymentRow) {
-    if (!window.confirm(`Gửi lệnh thu ${fmtMoney(row.amount)} — Đợt ${row.phaseNumber} cho kế toán?`)) return;
+    if (!await confirmDialog(`Gửi lệnh thu ${fmtMoney(row.amount)} — Đợt ${row.phaseNumber} cho kế toán?`)) return;
     setPendingId(row.id);
     const res = await fetch(`/api/projects/${projectId}/payments/${row.id}/request-collection`, {
       method: "POST",
@@ -123,7 +124,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
   async function cancelCollection(row: PaymentRow) {
     if (!row.activeReceipt) return;
-    if (!window.confirm(`Huỷ lệnh thu ${row.activeReceipt.code}?`)) return;
+    if (!await confirmDialog(`Huỷ lệnh thu ${row.activeReceipt.code}?`)) return;
     setPendingId(row.id);
     const res = await fetch(`/api/projects/${projectId}/payments/${row.id}/request-collection`, {
       method: "DELETE",
@@ -172,7 +173,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
       const delta = Math.abs(Number(actualPaidAmount) - Number(editing.amount));
       const threshold = Number(editing.amount) * 0.1;
       if (delta > threshold) {
-        const ok = window.confirm("Số tiền thu chênh lệch lớn. Xác nhận?");
+        const ok = await confirmDialog("Số tiền thu chênh lệch lớn. Xác nhận?");
         if (!ok) return;
       }
     }

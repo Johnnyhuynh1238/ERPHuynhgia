@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Priority = "normal" | "important" | "urgent" | "critical";
@@ -321,7 +322,7 @@ export function TptcAssignmentsClient({
   }
 
   async function cancel(id: string) {
-    if (!window.confirm("Xác nhận hủy việc này?")) return;
+    if (!await confirmDialog("Xác nhận hủy việc này?")) return;
     try {
       await callAction(`/api/tptc-assignments/${id}/cancel`, {});
       await loadRows();

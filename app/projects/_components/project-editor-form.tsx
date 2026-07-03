@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1059,7 +1060,7 @@ export function ProjectEditorForm({ mode, projectId, initialDraftId, currentUser
     if (!projectId) return;
     const currentStartDate = dateInput(initialValues?.startDate);
     if (currentStartDate && values.startDate !== currentStartDate) {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         "Việc đổi ngày khởi công sẽ tự cập nhật lại ngày dự kiến của công tác và các đợt thanh toán. Các ngày THỰC TẾ đã nhập không bị ảnh hưởng.",
       );
       if (!ok) return;

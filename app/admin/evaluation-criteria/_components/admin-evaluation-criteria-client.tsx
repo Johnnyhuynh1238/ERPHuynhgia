@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -205,7 +206,7 @@ export function AdminEvaluationCriteriaClient({ canWrite }: { canWrite: boolean 
 
   async function handleDelete(item: Criterion) {
     if (!canWrite) return;
-    const ok = window.confirm(`Xóa tiêu chí ${item.name}?`);
+    const ok = await confirmDialog(`Xóa tiêu chí ${item.name}?`);
     if (!ok) return;
 
     const res = await fetch(`/api/evaluation-criteria/${item.id}`, { method: "DELETE" });

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -183,7 +184,7 @@ function MaterialRow({
   };
 
   const remove = async () => {
-    if (!window.confirm(`Xoá "${row.name}" (${row.unit}) khỏi bảng giá?`)) return;
+    if (!await confirmDialog(`Xoá "${row.name}" (${row.unit}) khỏi bảng giá?`)) return;
     const r = await fetch(`/api/prices/materials/${row.id}`, { method: "DELETE" });
     if (r.ok) onChange();
   };
@@ -315,7 +316,7 @@ function LaborRow({
     }
   };
   const remove = async () => {
-    if (!window.confirm(`Xoá bậc ${row.grade}?`)) return;
+    if (!await confirmDialog(`Xoá bậc ${row.grade}?`)) return;
     const r = await fetch(`/api/prices/labor/${row.id}`, { method: "DELETE" });
     if (r.ok) onChange();
   };
@@ -422,7 +423,7 @@ function MachineRow({
     }
   };
   const remove = async () => {
-    if (!window.confirm(`Xoá "${row.name}"?`)) return;
+    if (!await confirmDialog(`Xoá "${row.name}"?`)) return;
     const r = await fetch(`/api/prices/machines/${row.id}`, { method: "DELETE" });
     if (r.ok) onChange();
   };

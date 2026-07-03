@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,7 @@ export function PayrollClient({ projectId, canClose, canReady, canMarkPaid, canE
 
   const closeWeek = useCallback(async () => {
     if (!data?.preview) return;
-    if (!confirm(`Chốt bảng lương tuần ${weekKey}?\n\nSau khi chốt, các điều chỉnh đang chờ sẽ được áp vào tuần này và không thể thay đổi.`)) return;
+    if (!await confirmDialog(`Chốt bảng lương tuần ${weekKey}?\n\nSau khi chốt, các điều chỉnh đang chờ sẽ được áp vào tuần này và không thể thay đổi.`)) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/projects/${projectId}/payroll/close-week`, {
@@ -213,7 +214,7 @@ export function PayrollClient({ projectId, canClose, canReady, canMarkPaid, canE
 
   const markPaid = useCallback(async () => {
     if (!data?.payroll) return;
-    if (!confirm(`Xác nhận ĐÃ CHI bảng lương tuần ${weekKey}?\n\nTổng: ${fmt(data.payroll.totalPayable)}đ`)) return;
+    if (!await confirmDialog(`Xác nhận ĐÃ CHI bảng lương tuần ${weekKey}?\n\nTổng: ${fmt(data.payroll.totalPayable)}đ`)) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/projects/${projectId}/payroll/${data.payroll.id}/paid`, {

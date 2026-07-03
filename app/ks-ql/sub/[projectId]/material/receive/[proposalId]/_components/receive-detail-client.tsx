@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -196,7 +197,7 @@ export function ReceiveDetailClient({
       const detail = overLines
         .map((o) => `• ${o.name}: vượt ${fmtQty(o.over)} ${o.unit}`)
         .join("\n");
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         `ĐƠN NÀY CÓ ${overLines.length} DÒNG NHẬN VƯỢT SỐ ĐẶT:\n\n${detail}\n\nKiểm tra lại số nhập. Vẫn lưu đợt nhận này?`,
       );
       if (!ok) return;

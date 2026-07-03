@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, FolderPlus, Tag } from "lucide-react";
 import { toast } from "sonner";
@@ -78,7 +79,7 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
       toast.error("Xoá toàn bộ vật tư trong nhóm trước");
       return;
     }
-    if (!window.confirm(`Xoá nhóm "${g.name}"?`)) return;
+    if (!await confirmDialog(`Xoá nhóm "${g.name}"?`)) return;
     const res = await fetch(`/api/admin/suppliers/${supplierId}/groups/${g.id}`, { method: "DELETE" });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -90,7 +91,7 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
   }
 
   async function deletePrice(p: Price) {
-    if (!window.confirm(`Xoá vật tư "${p.materialName}"?`)) return;
+    if (!await confirmDialog(`Xoá vật tư "${p.materialName}"?`)) return;
     const res = await fetch(`/api/admin/suppliers/${supplierId}/prices/${p.id}`, { method: "DELETE" });
     if (!res.ok) {
       toast.error("Lỗi xoá");

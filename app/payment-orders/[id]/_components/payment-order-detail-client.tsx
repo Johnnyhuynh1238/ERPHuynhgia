@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -159,7 +160,7 @@ export function PaymentOrderDetailClient({
   }
 
   async function cancel() {
-    if (!window.confirm("Huỷ lệnh thanh toán này?")) return;
+    if (!await confirmDialog("Huỷ lệnh thanh toán này?")) return;
     setBusy(true);
     const res = await fetch(`/api/payment-orders/${orderId}/cancel`, { method: "POST" });
     const j = await res.json().catch(() => ({}));

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -85,7 +86,7 @@ export function WorkerDetailClient({
       if (r === null) return;
       rejectReason = r.trim() || null;
     } else if (
-      !window.confirm("Duyệt đề xuất này? Bậc và công nhật sẽ cập nhật ngay.")
+      !await confirmDialog("Duyệt đề xuất này? Bậc và công nhật sẽ cập nhật ngay.")
     ) {
       return;
     }

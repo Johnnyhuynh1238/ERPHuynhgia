@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -238,7 +239,7 @@ export function ProjectInfoClient({
 
   async function submitProject() {
     if (projectForm.startDate !== data.startDate.slice(0, 10)) {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         "Việc đổi ngày khởi công sẽ tự cập nhật lại ngày dự kiến của 69 công tác và 6 đợt thanh toán. Các ngày THỰC TẾ đã nhập không bị ảnh hưởng.",
       );
       if (!ok) return;
@@ -347,7 +348,7 @@ export function ProjectInfoClient({
 
   async function removeSiteRest() {
     if (!todayRest) return;
-    const ok = window.confirm("Xác nhận hủy đánh dấu công trường nghỉ hôm nay?");
+    const ok = await confirmDialog("Xác nhận hủy đánh dấu công trường nghỉ hôm nay?");
     if (!ok) return;
 
     const res = await fetch(`/api/projects/${data.id}/site-rest/${todayRest.id}`, { method: "DELETE" });
@@ -433,7 +434,7 @@ export function ProjectInfoClient({
   }
 
   async function resetPortalLink() {
-    const ok = window.confirm("Reset sẽ vô hiệu link cũ + sinh link mới. Tiếp tục?");
+    const ok = await confirmDialog("Reset sẽ vô hiệu link cũ + sinh link mới. Tiếp tục?");
     if (!ok) return;
 
     const res = await fetch(`/api/projects/${data.id}/customer-portal/reset`, { method: "POST" });

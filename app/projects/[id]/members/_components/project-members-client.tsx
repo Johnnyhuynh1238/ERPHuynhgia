@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -135,7 +136,7 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
   }
 
   async function removeMember(member: MemberRow) {
-    const confirmDelete = window.confirm(`Xóa member ${member.user.email} khỏi dự án?`);
+    const confirmDelete = await confirmDialog(`Xóa member ${member.user.email} khỏi dự án?`);
     if (!confirmDelete) return;
 
     let res = await fetch(`/api/projects/${projectId}/members/${member.id}`, {
@@ -145,7 +146,7 @@ export function ProjectMembersClient({ projectId }: { projectId: string }) {
     let json = await res.json().catch(() => ({}));
 
     if (res.status === 409 && json.requiresConfirm) {
-      const confirmAssigned = window.confirm(json.message || "User đang phụ trách task, bạn có chắc chắn xóa?");
+      const confirmAssigned = await confirmDialog(json.message || "User đang phụ trách task, bạn có chắc chắn xóa?");
       if (!confirmAssigned) return;
 
       res = await fetch(`/api/projects/${projectId}/members/${member.id}?confirm=1`, {

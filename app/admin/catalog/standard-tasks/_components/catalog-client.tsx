@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export function CatalogClient() {
 
   async function toggleRetire(row: Row) {
     const willRetire = !row.retiredAt;
-    if (willRetire && !confirm(`Retire ${row.phaseCode}-${row.taskCode} "${row.taskName}"? Mã giữ vĩnh viễn, không tái sử dụng.`)) {
+    if (willRetire && !await confirmDialog(`Retire ${row.phaseCode}-${row.taskCode} "${row.taskName}"? Mã giữ vĩnh viễn, không tái sử dụng.`)) {
       return;
     }
     const res = await fetch(`/api/admin/catalog/standard-tasks/${row.id}`, {

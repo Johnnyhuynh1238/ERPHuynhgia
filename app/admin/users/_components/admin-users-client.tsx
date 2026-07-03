@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -219,7 +220,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
 
   async function handleToggleActive(user: UserItem) {
     const actionText = user.isActive ? "vô hiệu hóa" : "kích hoạt lại";
-    if (!window.confirm(`Xác nhận ${actionText} user ${user.email}?`)) return;
+    if (!await confirmDialog(`Xác nhận ${actionText} user ${user.email}?`)) return;
 
     const res = await fetch(`/api/admin/users/${user.id}/toggle-active`, {
       method: "POST",
@@ -236,7 +237,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   }
 
   async function handleResetPassword(user: UserItem) {
-    if (!window.confirm(`Xác nhận reset password cho ${user.email}?`)) return;
+    if (!await confirmDialog(`Xác nhận reset password cho ${user.email}?`)) return;
 
     const res = await fetch(`/api/admin/users/${user.id}/reset-password`, {
       method: "POST",

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -109,7 +110,7 @@ export function AssignmentItemsTab({
   }
 
   async function removeItem(itemId: string) {
-    if (!confirm("Xóa nhiệm vụ checklist này?")) return;
+    if (!await confirmDialog("Xóa nhiệm vụ checklist này?")) return;
 
     const res = await fetch(`/api/admin/assignment-items/${itemId}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));

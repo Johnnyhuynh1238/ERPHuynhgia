@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DAYS_OF_WEEK, dayLabels } from "@/lib/shifts";
@@ -178,7 +179,7 @@ export function ShiftsAdminClient({ candidates }: { candidates: Candidate[] }) {
                     </button>
                     <button
                       onClick={async () => {
-                        if (!confirm(`Xóa ca "${s.name}"? Mọi gán sẽ bị gỡ.`)) return;
+                        if (!await confirmDialog(`Xóa ca "${s.name}"? Mọi gán sẽ bị gỡ.`)) return;
                         const res = await fetch(`/api/admin/shifts/${s.id}`, {
                           method: "DELETE",
                         });
@@ -312,7 +313,7 @@ function UserRow({
   }
 
   async function removeAssignment(shiftId: string, shiftName: string) {
-    if (!confirm(`Gỡ ${user.fullName} khỏi ca "${shiftName}"?`)) return;
+    if (!await confirmDialog(`Gỡ ${user.fullName} khỏi ca "${shiftName}"?`)) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/shifts/${shiftId}/assignments`, {

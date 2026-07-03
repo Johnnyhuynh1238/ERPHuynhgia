@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -195,7 +196,7 @@ export function DiaryClient({
   };
 
   const deletePhoto = async (kind: "task" | "site", key: string) => {
-    if (!confirm("Xoá ảnh này?")) return;
+    if (!await confirmDialog("Xoá ảnh này?")) return;
     const res = await fetch(
       `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${todayYmd}&key=${encodeURIComponent(key)}`,
       { method: "DELETE" },

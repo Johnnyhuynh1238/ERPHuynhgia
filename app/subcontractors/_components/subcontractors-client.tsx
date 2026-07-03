@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Phone, Plus, Search, ShieldAlert } from "lucide-react";
@@ -223,7 +224,7 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
 
   async function handleDelete(item: SubcontractorItem) {
     if (!canWrite) return;
-    if (!window.confirm(`Ngưng hoạt động thầu phụ ${item.name}?`)) return;
+    if (!await confirmDialog(`Ngưng hoạt động thầu phụ ${item.name}?`)) return;
 
     const res = await fetch(`/api/subcontractors/${item.id}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
@@ -239,7 +240,7 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
 
   async function handleBlacklist(item: SubcontractorItem) {
     if (!canWrite) return;
-    if (!window.confirm(`Đưa thầu phụ ${item.name} vào blacklist?`)) return;
+    if (!await confirmDialog(`Đưa thầu phụ ${item.name} vào blacklist?`)) return;
 
     const res = await fetch(`/api/subcontractors/${item.id}/blacklist`, {
       method: "POST",

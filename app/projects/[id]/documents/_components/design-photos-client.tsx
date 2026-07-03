@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { UserRole } from "@prisma/client";
 import { toast } from "sonner";
@@ -203,7 +204,7 @@ function GroupCard({
   }
 
   async function handleDeletePhoto(photoId: string) {
-    if (!confirm("Xoá ảnh này?")) return;
+    if (!await confirmDialog("Xoá ảnh này?")) return;
     const res = await fetch(`/api/projects/${projectId}/design-groups/${group.id}/photos/${photoId}`, {
       method: "DELETE",
     });
@@ -216,7 +217,7 @@ function GroupCard({
   }
 
   async function handleDeleteGroup() {
-    if (!confirm(`Xoá nhóm "${group.title}" và toàn bộ ảnh trong nhóm?`)) return;
+    if (!await confirmDialog(`Xoá nhóm "${group.title}" và toàn bộ ảnh trong nhóm?`)) return;
     const res = await fetch(`/api/projects/${projectId}/design-groups/${group.id}`, { method: "DELETE" });
     if (!res.ok) {
       toast.error("Xoá nhóm thất bại");

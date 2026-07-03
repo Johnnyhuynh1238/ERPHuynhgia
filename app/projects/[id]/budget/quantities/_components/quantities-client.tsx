@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -211,7 +212,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
 
   async function deleteComponent(c: Component) {
     if (!canEdit) return;
-    if (!window.confirm(`Xoá cấu kiện "${c.name}"?`)) return;
+    if (!await confirmDialog(`Xoá cấu kiện "${c.name}"?`)) return;
     try {
       const r = await fetch(`/api/projects/${projectId}/budget/components/${c.id}`, { method: "DELETE" });
       if (!r.ok) {
@@ -275,7 +276,7 @@ export function QuantitiesClient({ projectId, projectName, projectCode, canEdit 
 
   async function deleteItem(it: Item) {
     if (!canEdit) return;
-    if (!window.confirm(`Xoá công tác "${it.name}"?`)) return;
+    if (!await confirmDialog(`Xoá công tác "${it.name}"?`)) return;
     try {
       const r = await fetch(`/api/projects/${projectId}/budget/items/${it.id}`, { method: "DELETE" });
       if (!r.ok) {

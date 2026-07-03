@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useRef, useState } from "react";
 import { ProjectDocumentCategory, UserRole } from "@prisma/client";
 import { toast } from "sonner";
@@ -113,7 +114,7 @@ export function DocumentsClient({
   }
 
   async function handleDelete(doc: DocumentDto) {
-    if (!confirm(`Xóa hồ sơ "${doc.title}"? Hành động không thể hoàn tác.`)) return;
+    if (!await confirmDialog(`Xóa hồ sơ "${doc.title}"? Hành động không thể hoàn tác.`)) return;
     const res = await fetch(`/api/projects/${projectId}/documents/${doc.id}`, { method: "DELETE" });
     const data = (await res.json().catch(() => ({}))) as { message?: string };
     if (!res.ok) {

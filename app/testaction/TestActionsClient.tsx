@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { ACTION_GROUPS, ALL_ACTIONS } from "./actions";
 
@@ -77,8 +78,8 @@ export function TestActionsClient() {
     });
   }
 
-  function clearAll() {
-    if (!confirm("Xóa toàn bộ trạng thái test trên máy này?")) return;
+  async function clearAll() {
+    if (!(await confirmDialog("Xóa toàn bộ trạng thái test trên máy này?"))) return;
     setState({});
     saveState({});
   }

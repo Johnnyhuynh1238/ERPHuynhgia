@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
@@ -124,7 +125,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
   }
 
   async function deletePayment(payment: Payment) {
-    if (!window.confirm(`Xóa đợt ${payment.installmentNo}?`)) return;
+    if (!await confirmDialog(`Xóa đợt ${payment.installmentNo}?`)) return;
     const res = await fetch(`/api/payment-schedules/${payment.id}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -220,7 +221,7 @@ export function PaymentManagementClient({ projects, isAdmin }: { projects: Proje
   }
 
   async function deleteDrawing(drawing: Drawing) {
-    if (!window.confirm(`Xóa bản vẽ ${drawing.name}?`)) return;
+    if (!await confirmDialog(`Xóa bản vẽ ${drawing.name}?`)) return;
     const res = await fetch(`/api/drawings/${drawing.id}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {

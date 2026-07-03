@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -232,7 +233,7 @@ export function ProjectBudgetClient({
     const msg = its.length > 0
       ? `Xóa cấu kiện "${c.name}"? Cấu kiện đang có ${its.length} công tác — phải xóa hết công tác trước.`
       : `Xóa cấu kiện "${c.name}"?`;
-    if (!confirm(msg)) return;
+    if (!await confirmDialog(msg)) return;
     setSavingFlag(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/budget/components/${c.id}`, { method: "DELETE" });
@@ -243,7 +244,7 @@ export function ProjectBudgetClient({
   }
 
   async function deleteItem(it: Item) {
-    if (!confirm(`Xóa công tác "${it.name}" (${fmtVND(it.amount)}đ)?`)) return;
+    if (!await confirmDialog(`Xóa công tác "${it.name}" (${fmtVND(it.amount)}đ)?`)) return;
     setSavingFlag(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/budget/items/${it.id}`, { method: "DELETE" });
@@ -255,7 +256,7 @@ export function ProjectBudgetClient({
 
   async function lockBudget() {
     if (!canLock || locked) return;
-    if (!confirm("Chốt dự toán? Sau khi chốt sẽ không thể sửa trực tiếp.")) return;
+    if (!await confirmDialog("Chốt dự toán? Sau khi chốt sẽ không thể sửa trực tiếp.")) return;
     const res = await fetch(`/api/projects/${projectId}/budget/lock`, { method: "POST" });
     if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(err.message || "Chốt thất bại"); return; }
     toast.success("Đã chốt dự toán");

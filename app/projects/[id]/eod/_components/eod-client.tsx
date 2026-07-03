@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -312,7 +313,7 @@ export function EodClient({ projectId, canEdit, canTickQc, canApproveOutput, bac
 
   const deletePhoto = async (photoId: string) => {
     if (!canEdit) return;
-    if (!confirm("Xoá ảnh này?")) return;
+    if (!await confirmDialog("Xoá ảnh này?")) return;
     const r = await fetch(`/api/projects/${projectId}/eod/photos?photoId=${photoId}`, { method: "DELETE" });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
