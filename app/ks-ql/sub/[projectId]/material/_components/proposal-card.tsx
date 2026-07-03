@@ -1,9 +1,6 @@
-import Link from "next/link";
 import {
   Check,
   CheckCircle2,
-  ChevronRight,
-  Clock,
   PackageCheck,
   Receipt,
   ShoppingCart,
@@ -59,13 +56,6 @@ export const ORDER_ICON: Record<OrderStatus, JSX.Element> = {
   paid: <Wallet className="h-3 w-3" />,
 };
 
-const ORDER_STRIPE: Record<OrderStatus, string> = {
-  not_ordered: "bg-slate-500",
-  ordered: "bg-cyan-400",
-  received: "bg-emerald-400",
-  paid: "bg-emerald-500",
-};
-
 type StageKey = "duyet" | "dat" | "nhan" | "ghinh" | "tt";
 
 const STAGE_LABEL: Record<StageKey, string> = {
@@ -83,14 +73,6 @@ const STAGE_ICON: Record<StageKey, JSX.Element> = {
   ghinh: <Receipt className="h-3 w-3" />,
   tt: <Wallet className="h-3 w-3" />,
 };
-
-function fmtTime(d: Date) {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const HH = String(d.getHours()).padStart(2, "0");
-  const MM = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm} ${HH}:${MM}`;
-}
 
 export function normalizeItem(raw: unknown): ParsedItem {
   const it = (raw ?? {}) as Record<string, unknown>;
@@ -175,63 +157,5 @@ export function ProposalPipeline({ p }: { p: ProposalCardRow }) {
         );
       })}
     </div>
-  );
-}
-
-export function ProposalCard({ p, href }: { p: ProposalCardRow; href: string }) {
-  const items = (p.parsedItems ?? []).map(normalizeItem);
-  return (
-    <Link
-      href={href}
-      className="relative block overflow-hidden rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 pl-4 transition hover:border-[#ff8a3d]/60 active:bg-[#13151f]"
-    >
-      <span className={`absolute inset-y-0 left-0 w-1 ${ORDER_STRIPE[p.orderStatus]}`} />
-
-      <ProposalPipeline p={p} />
-
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_CHIP[p.status]}`}
-        >
-          {STATUS_LABEL[p.status]}
-        </span>
-        <span
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${ORDER_CHIP[p.orderStatus]}`}
-        >
-          {ORDER_ICON[p.orderStatus]}
-          {ORDER_LABEL[p.orderStatus]}
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-[#5a627a]">
-          <Clock className="h-3 w-3" />
-          {fmtTime(p.createdAt)}
-        </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-[#5a627a]" />
-      </div>
-
-      {p.description && (
-        <div className="mt-2 text-[12.5px] leading-snug text-[#cfd4e8] line-clamp-2">
-          {p.description}
-        </div>
-      )}
-
-      {items.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {items.slice(0, 6).map((it, i) => (
-            <span
-              key={i}
-              className="rounded-md bg-[#0f1220] px-1.5 py-0.5 text-[10px] text-[#8892b0]"
-            >
-              <b className="text-[#cfd4e8]">{it.ten}</b> · {it.sl}
-              {it.dvt}
-            </span>
-          ))}
-          {items.length > 6 && (
-            <span className="rounded-md px-1.5 py-0.5 text-[10px] text-[#5a627a]">
-              +{items.length - 6}
-            </span>
-          )}
-        </div>
-      )}
-    </Link>
   );
 }
