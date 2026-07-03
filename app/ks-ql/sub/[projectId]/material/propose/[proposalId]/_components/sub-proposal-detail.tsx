@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { ProposalComments } from "@/app/proposals/[id]/_components/proposal-comments";
+import {
+  ProposalPipeline,
+  STATUS_LABEL,
+  STATUS_CHIP,
+  ORDER_LABEL,
+  ORDER_CHIP,
+  ORDER_ICON,
+  type ProposalCardRow,
+} from "../../../_components/proposal-card";
 
 type RawItem = Record<string, unknown>;
 
@@ -18,6 +27,7 @@ type Proposal = {
   orderedAt: string | null;
   receivedAt: string | null;
   paidAt: string | null;
+  debtCount: number;
 };
 
 type Item = { name: string; qty: number; unit: string; task: string };
@@ -36,15 +46,6 @@ function fmt(iso: string | null) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function statusInfo(p: Proposal): { label: string; cls: string } {
-  if (p.status === "declined") return { label: "Bị từ chối", cls: "bg-[#D26B6B]/20 text-[#D26B6B]" };
-  if (p.status === "pending") return { label: "Chờ TPTC duyệt", cls: "bg-[#E0B855]/20 text-[#E0B855]" };
-  if (p.orderStatus === "not_ordered") return { label: "Đã duyệt · chưa đặt", cls: "bg-[#ff8a3d]/20 text-[#ff8a3d]" };
-  if (p.orderStatus === "ordered") return { label: "Đang về", cls: "bg-[#ff8a3d]/20 text-[#ff8a3d]" };
-  if (p.orderStatus === "received") return { label: "Đã nhận", cls: "bg-[#6FA677]/20 text-[#6FA677]" };
-  return { label: "Đã thanh toán", cls: "bg-[#6FA677]/20 text-[#6FA677]" };
-}
-
 export function SubProposalDetail({
   proposal,
   projectId,
@@ -56,18 +57,38 @@ export function SubProposalDetail({
 }) {
   const items: Item[] = (proposal.parsedItems || []).map(normalize);
   const hasItems = items.length > 0;
-  const st = statusInfo(proposal);
   const isDeclined = proposal.status === "declined";
+  const pipelineRow: ProposalCardRow = {
+    id: proposal.id,
+    description: proposal.description,
+    status: proposal.status,
+    orderStatus: proposal.orderStatus,
+    parsedItems: null,
+    createdAt: new Date(proposal.createdAt),
+    _count: { debts: proposal.debtCount },
+  };
 
   return (
     <>
       <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-[#8892b0]">Gửi lúc {fmt(proposal.createdAt)}</span>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${st.cls}`}>{st.label}</span>
+        <ProposalPipeline p={pipelineRow} />
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_CHIP[proposal.status]}`}
+          >
+            {STATUS_LABEL[proposal.status]}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ORDER_CHIP[proposal.orderStatus]}`}
+          >
+            {ORDER_ICON[proposal.orderStatus]}
+            {ORDER_LABEL[proposal.orderStatus]}
+          </span>
+          <span className="ml-auto text-xs text-[#8892b0]">Gửi lúc {fmt(proposal.createdAt)}</span>
         </div>
         {proposal.processedNote ? (
-          <div className="mt-3 rounded-xl border border-[#D26B6B]/30 bg-[#D26B6B]/10 px-3 py-2 text-sm text-[#f5ede4]">
+          <div className="mt-3 rounded-xl border border-[#D26B6B]/30 bg-[#D26B6B]/10 px-3 py-2 text-sm text-[#f0f2ff]">
             <span className="text-[#D26B6B] font-semibold">Ghi chú từ TPTC:</span> {proposal.processedNote}
           </div>
         ) : null}
@@ -88,7 +109,7 @@ export function SubProposalDetail({
           <div className="overflow-x-auto rounded-xl border border-[#252840]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#0f1320] text-left text-[11px] uppercase tracking-wide text-[#8892b0]">
+                <tr className="bg-[#0f1015] text-left text-[11px] uppercase tracking-wide text-[#8892b0]">
                   <th className="px-3 py-2 w-8">#</th>
                   <th className="px-3 py-2">Chủng loại</th>
                   <th className="px-3 py-2 text-right w-16">SL</th>
@@ -98,7 +119,7 @@ export function SubProposalDetail({
               </thead>
               <tbody>
                 {items.map((it, i) => (
-                  <tr key={i} className="border-t border-[#252840] text-[#f5ede4]">
+                  <tr key={i} className="border-t border-[#252840] text-[#f0f2ff]">
                     <td className="px-3 py-2 text-[#8892b0]">{i + 1}</td>
                     <td className="px-3 py-2 font-medium">{it.name || "—"}</td>
                     <td className="px-3 py-2 text-right font-semibold text-[#ff8a3d]">{it.qty.toLocaleString("vi-VN")}</td>
@@ -110,7 +131,7 @@ export function SubProposalDetail({
             </table>
           </div>
         ) : (
-          <div className="whitespace-pre-wrap rounded-xl border border-[#252840] bg-[#0f1320] px-3 py-2.5 text-sm text-[#f5ede4]">
+          <div className="whitespace-pre-wrap rounded-xl border border-[#252840] bg-[#0f1015] px-3 py-2.5 text-sm text-[#f0f2ff]">
             {proposal.description}
           </div>
         )}
@@ -119,7 +140,7 @@ export function SubProposalDetail({
       <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] p-5">
         <div className="mb-3 text-sm font-semibold text-orange-300">Tiến độ xử lý</div>
         <div className="space-y-2 text-sm">
-          <Row label="Anh chốt đề xuất" time={proposal.createdAt} active />
+          <Row label="KS gửi đề xuất" time={proposal.createdAt} active />
           <Row label="TPTC duyệt" time={proposal.acceptedAt} active={!!proposal.acceptedAt} />
           {proposal.status === "declined" ? (
             <Row label="TPTC từ chối" time={proposal.acceptedAt} active variant="declined" />
@@ -149,7 +170,7 @@ function Row({
   variant?: "default" | "declined";
 }) {
   const dot = variant === "declined" ? "bg-[#D26B6B]" : active ? "bg-[#6FA677]" : "bg-[#2d3249]";
-  const text = variant === "declined" ? "text-[#D26B6B]" : active ? "text-[#f5ede4]" : "text-[#5a627a]";
+  const text = variant === "declined" ? "text-[#D26B6B]" : active ? "text-[#f0f2ff]" : "text-[#5a627a]";
   return (
     <div className="flex items-start gap-3">
       <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />

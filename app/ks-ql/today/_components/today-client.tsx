@@ -162,7 +162,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
     return (
       <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-8 text-center">
         <HardHat className="mx-auto mb-3 h-8 w-8 text-[#9a8f80]" />
-        <div className="text-base font-medium text-[#f5ede4]">Chưa có dự án nào</div>
+        <div className="text-base font-medium text-[#f0f2ff]">Chưa có dự án nào</div>
         <p className="mt-1 text-sm text-[#9a8f80]">Liên hệ TPTC để được phân dự án.</p>
       </div>
     );
@@ -175,7 +175,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f5ede4 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -235,7 +235,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                   {project.status === "in_progress" ? "Đang thi công" : "Đang chuẩn bị"}
                 </span>
               </div>
-              <div className="mt-1 truncate text-[17px] font-semibold text-[#f5ede4]">{project.name}</div>
+              <div className="mt-1 truncate text-[17px] font-semibold text-[#f0f2ff]">{project.name}</div>
               {project.address ? (
                 <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{project.address}</div>
               ) : null}
@@ -275,7 +275,7 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
               </div>
               <ul className="space-y-1.5">
                 {data.alerts.map((a) => (
-                  <li key={a.id} className="flex items-start gap-2 text-sm text-[#f5ede4]">
+                  <li key={a.id} className="flex items-start gap-2 text-sm text-[#f0f2ff]">
                     <span
                       className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
                       style={{ background: "#D26B6B" }}
@@ -724,7 +724,7 @@ function SopBubble({
             <HelpCircle className="h-3 w-3" />
             SOP 11 — gợi ý nhanh
           </div>
-          <div className="mt-1 text-[14px] font-semibold leading-snug text-[#f5ede4]">
+          <div className="mt-1 text-[14px] font-semibold leading-snug text-[#f0f2ff]">
             {hint.title}
           </div>
           <p className="mt-1 text-[13px] leading-relaxed text-[#d4c8b8]">{hint.body}</p>
@@ -923,7 +923,7 @@ function ResponsibilitySection({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-[#f5ede4]">{title}</span>
+            <span className="text-[15px] font-semibold text-[#f0f2ff]">{title}</span>
             {badge && badgeTone !== "muted" ? (
               <span
                 className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
@@ -955,7 +955,7 @@ function MetricBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[#2a221c] bg-[#120e0b] p-2.5">
       <div className="text-[10px] uppercase tracking-wider text-[#9a8f80]">{label}</div>
-      <div className="mt-0.5 text-base font-semibold text-[#f5ede4]">{value}</div>
+      <div className="mt-0.5 text-base font-semibold text-[#f0f2ff]">{value}</div>
     </div>
   );
 }
@@ -1044,7 +1044,7 @@ function IconTile({
           const r = helpRef.current?.getBoundingClientRect();
           if (r) onHint(tile.sop, r);
         }}
-        className="absolute right-0.5 top-0.5 z-10 grid h-5 w-5 place-items-center rounded-full text-[#6e6457] transition-colors hover:bg-[#221b15] hover:text-[#f5ede4]"
+        className="absolute right-0.5 top-0.5 z-10 grid h-5 w-5 place-items-center rounded-full text-[#6e6457] transition-colors hover:bg-[#221b15] hover:text-[#f0f2ff]"
       >
         <HelpCircle className="h-3 w-3" />
       </button>

@@ -25,7 +25,7 @@ export default async function KsQlProjectsPage() {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f5ede4 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -38,7 +38,7 @@ export default async function KsQlProjectsPage() {
       {projects.length === 0 ? (
         <div className="rounded-2xl border border-[#2a221c] bg-[#181410] p-8 text-center">
           <FolderOpen className="mx-auto mb-3 h-8 w-8 text-[#9a8f80]" />
-          <div className="text-base font-medium text-[#f5ede4]">Chưa có dự án</div>
+          <div className="text-base font-medium text-[#f0f2ff]">Chưa có dự án</div>
           <div className="mt-1 text-xs text-[#9a8f80]">Liên hệ TPTC để được phân dự án.</div>
         </div>
       ) : (
@@ -70,7 +70,7 @@ export default async function KsQlProjectsPage() {
                         {inProgress ? "Đang thi công" : "Đang chuẩn bị"}
                       </span>
                     </div>
-                    <div className="mt-1 text-[15px] font-semibold text-[#f5ede4]">{p.name}</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#f0f2ff]">{p.name}</div>
                     {p.address ? (
                       <div className="mt-0.5 truncate text-xs text-[#9a8f80]">{p.address}</div>
                     ) : null}

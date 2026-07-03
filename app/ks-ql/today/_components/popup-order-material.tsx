@@ -153,11 +153,11 @@ export function PopupOrderMaterial({ projectId, projectName, currentUserId, onCl
         <div className="flex items-center justify-between gap-3 border-b border-[#2a221c] px-4 py-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-[#a78bfa]">Đặt VT/Máy</div>
-            <div className="truncate text-[15px] font-semibold text-[#f5ede4]">{projectName}</div>
+            <div className="truncate text-[15px] font-semibold text-[#f0f2ff]">{projectName}</div>
           </div>
           <button
             onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f5ede4]"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f0f2ff]"
             aria-label="Đóng"
           >
             <X className="h-4 w-4" />
@@ -178,7 +178,7 @@ export function PopupOrderMaterial({ projectId, projectName, currentUserId, onCl
 - 10 bao xi măng PCB40
 - 2 m3 cát vàng
 - Thuê 1 máy đầm cóc 2 ngày`}
-              className="w-full resize-y rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-sm text-[#f5ede4] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
+              className="w-full resize-y rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-sm text-[#f0f2ff] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
             />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <div className="text-[11px] text-[#5a4f42]">
@@ -248,7 +248,7 @@ export function PopupOrderMaterial({ projectId, projectName, currentUserId, onCl
                           {fmtTimeShort(p.createdAt)}
                         </span>
                       </div>
-                      <div className="whitespace-pre-wrap text-sm leading-snug text-[#f5ede4]">
+                      <div className="whitespace-pre-wrap text-sm leading-snug text-[#f0f2ff]">
                         {p.description}
                       </div>
                       {p.processedNote && (

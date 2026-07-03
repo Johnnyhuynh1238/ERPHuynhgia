@@ -64,7 +64,7 @@ export function SubPushPrompt() {
             <BellRing className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-lg font-bold text-[#f5ede4]">Bật thông báo</div>
+            <div className="text-lg font-bold text-[#f0f2ff]">Bật thông báo</div>
             <div className="mt-1 text-sm text-[#aab2cf]">
               Nhận cập nhật ngay khi kế toán duyệt đơn vật tư, đặt NCC hoặc trao đổi trên đề xuất của anh.
             </div>
@@ -73,7 +73,7 @@ export function SubPushPrompt() {
             type="button"
             onClick={handleLater}
             aria-label="Đóng"
-            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8892b0] hover:bg-[#1a1d2e] hover:text-[#f5ede4]"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8892b0] hover:bg-[#1a1d2e] hover:text-[#f0f2ff]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -97,7 +97,7 @@ export function SubPushPrompt() {
           <button
             type="button"
             onClick={handleLater}
-            className="w-full rounded-xl border border-[#252840] bg-[#1a1d2e] px-4 py-2.5 text-sm font-medium text-[#8892b0] transition hover:text-[#f5ede4]"
+            className="w-full rounded-xl border border-[#252840] bg-[#1a1d2e] px-4 py-2.5 text-sm font-medium text-[#8892b0] transition hover:text-[#f0f2ff]"
           >
             Để sau
           </button>

@@ -265,7 +265,7 @@ export function DiaryClient({
             type="button"
             disabled={locked}
             onClick={() => setWorkerCount((n) => Math.max(0, n - 1))}
-            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95 disabled:opacity-50"
+            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f0f2ff] active:scale-95 disabled:opacity-50"
           >
             −
           </button>
@@ -278,13 +278,13 @@ export function DiaryClient({
             onChange={(e) =>
               setWorkerCount(Math.max(0, Math.min(500, Number(e.target.value) || 0)))
             }
-            className="h-12 w-24 rounded-xl border-2 border-[#252840] bg-[#0f1320] text-center text-2xl font-bold text-orange-300 disabled:opacity-60"
+            className="h-12 w-24 rounded-xl border-2 border-[#252840] bg-[#0f1015] text-center text-2xl font-bold text-orange-300 disabled:opacity-60"
           />
           <button
             type="button"
             disabled={locked}
             onClick={() => setWorkerCount((n) => Math.min(500, n + 1))}
-            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f5ede4] active:scale-95 disabled:opacity-50"
+            className="h-12 w-12 rounded-xl bg-[#252840] text-2xl font-bold text-[#f0f2ff] active:scale-95 disabled:opacity-50"
           >
             +
           </button>
@@ -303,7 +303,7 @@ export function DiaryClient({
           onChange={(e) => setTasksDone(e.target.value.slice(0, 4000))}
           rows={4}
           placeholder="VD: Tô tường tầng 2 phòng ngủ chính + chống thấm sân thượng…"
-          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
+          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1015] px-3 py-3 text-base text-[#f0f2ff] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
         />
         <p className="mt-1 text-right text-xs text-[#8892b0]">{tasksDone.length}/4000</p>
       </Section>
@@ -405,7 +405,7 @@ export function DiaryClient({
           onChange={(e) => setIssues(e.target.value.slice(0, 4000))}
           rows={3}
           placeholder="Để trống nếu không có…"
-          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1320] px-3 py-3 text-base text-[#f5ede4] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
+          className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1015] px-3 py-3 text-base text-[#f0f2ff] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
         />
         <p className="mt-1 text-right text-xs text-[#8892b0]">{issues.length}/4000</p>
       </Section>
@@ -444,11 +444,11 @@ export function DiaryClient({
                 <li
                   key={h.id}
                   onClick={() => setDetailDate(h.entryDate)}
-                  className="cursor-pointer rounded-xl border border-[#252840] bg-[#0f1320] px-3 py-3 transition-colors hover:border-[#ff8a3d]/40 active:scale-[0.99]"
+                  className="cursor-pointer rounded-xl border border-[#252840] bg-[#0f1015] px-3 py-3 transition-colors hover:border-[#ff8a3d]/40 active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-bold text-[#f5ede4]">{fmtDateVn(h.entryDate)}</div>
+                      <div className="text-sm font-bold text-[#f0f2ff]">{fmtDateVn(h.entryDate)}</div>
                       {h.entryDate === todayYmd && (
                         <span className="rounded-full bg-[#ff8a3d]/20 px-2 py-0.5 text-[10px] font-semibold text-orange-300">
                           Hôm nay
@@ -475,19 +475,19 @@ export function DiaryClient({
                   <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-[#8892b0]">
                     <div>
                       <div className="text-[10px] uppercase">Thợ</div>
-                      <div className="text-sm font-semibold text-[#f5ede4]">{h.workerCount}</div>
+                      <div className="text-sm font-semibold text-[#f0f2ff]">{h.workerCount}</div>
                     </div>
                     <div>
                       <div className="text-[10px] uppercase">Ảnh hạng mục</div>
-                      <div className="text-sm font-semibold text-[#f5ede4]">{h.taskCount}</div>
+                      <div className="text-sm font-semibold text-[#f0f2ff]">{h.taskCount}</div>
                     </div>
                     <div>
                       <div className="text-[10px] uppercase">Ảnh toàn cảnh</div>
-                      <div className="text-sm font-semibold text-[#f5ede4]">{h.siteCount}</div>
+                      <div className="text-sm font-semibold text-[#f0f2ff]">{h.siteCount}</div>
                     </div>
                   </div>
                   {h.tasksDone ? (
-                    <p className="mt-2 line-clamp-2 text-sm text-[#f5ede4]">{h.tasksDone}</p>
+                    <p className="mt-2 line-clamp-2 text-sm text-[#f0f2ff]">{h.tasksDone}</p>
                   ) : null}
                   {h.issues ? (
                     <p className="mt-1 line-clamp-2 text-xs text-[#D26B6B]">⚠ {h.issues}</p>
@@ -539,7 +539,7 @@ function TodayCard({
           <Plus className="h-5 w-5 shrink-0 text-orange-300" />
         )}
         <div className="flex-1">
-          <div className="font-semibold text-[#f5ede4]">
+          <div className="font-semibold text-[#f0f2ff]">
             Nhật ký {fmtDateVn(todayYmd)}
           </div>
           <div
@@ -702,7 +702,7 @@ function DetailRow({
         {label}
       </div>
       <div
-        className={`text-sm ${warn ? "text-[#D26B6B]" : "text-[#f5ede4]"} ${
+        className={`text-sm ${warn ? "text-[#D26B6B]" : "text-[#f0f2ff]"} ${
           multiline ? "whitespace-pre-wrap" : ""
         }`}
       >
@@ -731,7 +731,7 @@ function DetailPhotos({
         <span className="ml-auto text-[10px] normal-case text-[#8892b0]">{photos.length} ảnh</span>
       </div>
       {photos.length === 0 ? (
-        <div className="flex items-center justify-center rounded-lg border border-dashed border-[#252840] bg-[#0f1320] px-4 py-4 text-xs text-[#8892b0]">
+        <div className="flex items-center justify-center rounded-lg border border-dashed border-[#252840] bg-[#0f1015] px-4 py-4 text-xs text-[#8892b0]">
           Không có ảnh
         </div>
       ) : (
@@ -742,7 +742,7 @@ function DetailPhotos({
               href={photoSrc(projectId, p.key)}
               target="_blank"
               rel="noreferrer"
-              className="relative block aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1320]"
+              className="relative block aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1015]"
             >
               <Image
                 src={photoSrc(projectId, p.key)}
@@ -793,14 +793,14 @@ function DiaryModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="modal-sheet-in flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl border border-[#252840] bg-[#0f1320] sm:rounded-2xl"
+        className="modal-sheet-in flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl border border-[#252840] bg-[#0f1015] sm:rounded-2xl"
       >
         <div className="flex items-center justify-between gap-2 border-b border-[#252840] px-4 py-3">
-          <div className="text-base font-bold text-[#f5ede4]">{title}</div>
+          <div className="text-base font-bold text-[#f0f2ff]">{title}</div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f5ede4]"
+            className="rounded-lg p-1 text-[#8892b0] hover:bg-[#252840] hover:text-[#f0f2ff]"
             aria-label="Đóng"
           >
             <X className="h-5 w-5" />
@@ -833,7 +833,7 @@ function Section({
           {idx}
         </span>
         <div className="text-orange-300">{icon}</div>
-        <h3 className="flex-1 text-sm font-semibold text-[#f5ede4]">{title}</h3>
+        <h3 className="flex-1 text-sm font-semibold text-[#f0f2ff]">{title}</h3>
         {right ? <span className="text-xs text-[#8892b0]">{right}</span> : null}
       </div>
       {children}
@@ -854,7 +854,7 @@ function PhotoGrid({
 }) {
   if (!photos.length) {
     return (
-      <div className="flex items-center justify-center rounded-xl border border-dashed border-[#252840] bg-[#0f1320] px-4 py-6 text-xs text-[#8892b0]">
+      <div className="flex items-center justify-center rounded-xl border border-dashed border-[#252840] bg-[#0f1015] px-4 py-6 text-xs text-[#8892b0]">
         Chưa có ảnh
       </div>
     );
@@ -864,7 +864,7 @@ function PhotoGrid({
       {photos.map((p) => (
         <div
           key={p.key}
-          className="relative aspect-square overflow-hidden rounded-xl border border-[#252840] bg-[#0f1320]"
+          className="relative aspect-square overflow-hidden rounded-xl border border-[#252840] bg-[#0f1015]"
         >
           <Image
             src={photoSrc(projectId, p.key)}

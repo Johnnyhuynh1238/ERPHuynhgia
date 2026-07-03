@@ -1,26 +1,15 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Inbox, Package } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout } from "@/app/ks-ql/sub/_components/sub-layout";
+import {
+  ProposalCard,
+  normalizeItem,
+  type ProposalCardRow,
+} from "../_components/proposal-card";
 
 export const dynamic = "force-dynamic";
-
-type ParsedItem = {
-  ten?: string;
-  sl?: number;
-  dvt?: string;
-  name?: string;
-  qty?: number;
-  unit?: string;
-};
-
-function itemQty(it: ParsedItem) {
-  if (typeof it.qty === "number") return it.qty;
-  if (typeof it.sl === "number") return it.sl;
-  return 0;
-}
 
 function poCode(id: string) {
   return `PO-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -51,9 +40,11 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
     select: {
       id: true,
       description: true,
-      parsedItems: true,
+      status: true,
       orderStatus: true,
-      orderedAt: true,
+      parsedItems: true,
+      createdAt: true,
+      _count: { select: { debts: true } },
       receipts: { select: { itemSeq: true, receivedQty: true, qcChecked: true, photos: true } },
     },
   });
@@ -71,11 +62,11 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
       ) : (
         <div className="space-y-3">
           {proposals.map((p) => {
-            const items = (p.parsedItems as ParsedItem[] | null) ?? [];
+            const items = ((p.parsedItems as unknown[] | null) ?? []).map(normalizeItem);
             const totalItems = items.length;
             const recvByIdx = new Map(p.receipts.map((r) => [r.itemSeq, Number(r.receivedQty)]));
             const doneCount = items.reduce((acc, it, i) => {
-              const need = itemQty(it);
+              const need = it.sl;
               const got = recvByIdx.get(i) ?? 0;
               return acc + (need > 0 && got + 1e-6 >= need ? 1 : 0);
             }, 0);
@@ -85,50 +76,26 @@ export default async function ReceiveListPage({ params }: { params: { projectId:
               0,
             );
             return (
-              <Link
+              <ProposalCard
                 key={p.id}
+                p={p as unknown as ProposalCardRow}
                 href={`/ks-ql/sub/${project.id}/material/receive/${p.id}`}
-                className="block rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 transition hover:border-[#ff8a3d]/40"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-[#ff8a3d]/10 p-2 text-[#ff8a3d]">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-mono font-semibold text-[#8892b0]">
-                        {poCode(p.id)}
-                      </div>
-                      <div className="line-clamp-2 text-sm font-semibold text-[#f0f2ff]">
-                        {p.description}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-[#8892b0]">
-                        {p.orderedAt
-                          ? `Đặt: ${new Date(p.orderedAt).toLocaleDateString("vi-VN")}`
-                          : "—"}
-                      </div>
-                    </div>
+                footer={
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#252840] pt-2 text-[11px] text-[#8892b0]">
+                    <span className="font-mono font-semibold">{poCode(p.id)}</span>
+                    <span>·</span>
+                    <span>
+                      Nhận:{" "}
+                      <span className="font-semibold text-[#f0f2ff]">{doneCount}</span>/{totalItems}{" "}
+                      dòng
+                    </span>
+                    <span>·</span>
+                    <span>QC: {qcDone}/{totalItems}</span>
+                    <span>·</span>
+                    <span>Ảnh: {photoTotal}</span>
                   </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      p.orderStatus === "received"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : "bg-cyan-500/20 text-cyan-300"
-                    }`}
-                  >
-                    {p.orderStatus === "received" ? "Đã nhận" : "Đang nhận"}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[#8892b0]">
-                  <span>
-                    Nhận: <span className="font-semibold text-[#f0f2ff]">{doneCount}</span>/{totalItems} dòng
-                  </span>
-                  <span>·</span>
-                  <span>QC: {qcDone}/{totalItems}</span>
-                  <span>·</span>
-                  <span>Ảnh: {photoTotal}</span>
-                </div>
-              </Link>
+                }
+              />
             );
           })}
         </div>

@@ -53,7 +53,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0b09] text-[#f5ede4]">
+    <div className="min-h-screen bg-[#0d0b09] text-[#f0f2ff]">
       <div
         className="pointer-events-none fixed inset-x-0 top-0 -z-0 h-72"
         style={{
@@ -75,7 +75,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
               <div
                 className="truncate text-[15px] font-semibold leading-tight tracking-tight"
                 style={{
-                  background: "linear-gradient(90deg, #f5ede4 0%, #E0B855 100%)",
+                  background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                 }}
@@ -90,7 +90,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
             <button
               type="button"
               aria-label="Thông báo"
-              className="relative grid h-9 w-9 place-items-center rounded-full border border-[#2a221c] bg-[#181410] text-[#d4c8b8] transition-all hover:scale-105 hover:border-[#E0B855]/40 hover:bg-[#221b15] hover:text-[#f5ede4]"
+              className="relative grid h-9 w-9 place-items-center rounded-full border border-[#2a221c] bg-[#181410] text-[#d4c8b8] transition-all hover:scale-105 hover:border-[#E0B855]/40 hover:bg-[#221b15] hover:text-[#f0f2ff]"
             >
               <Bell className="h-4 w-4" />
             </button>
@@ -121,7 +121,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
                 }`}
               >
                 <div className="border-b border-[#2a221c] px-3 py-2.5">
-                  <div className="truncate text-sm font-medium text-[#f5ede4]">{user.name}</div>
+                  <div className="truncate text-sm font-medium text-[#f0f2ff]">{user.name}</div>
                   <div className="truncate text-xs text-[#9a8f80]">{user.email}</div>
                 </div>
                 <button
@@ -130,14 +130,14 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
                     setMenuOpen(false);
                     router.push("/");
                   }}
-                  className="block w-full px-3 py-2 text-left text-sm text-[#d4c8b8] transition-colors hover:bg-[#221b15] hover:text-[#f5ede4]"
+                  className="block w-full px-3 py-2 text-left text-sm text-[#d4c8b8] transition-colors hover:bg-[#221b15] hover:text-[#f0f2ff]"
                 >
                   Về ERP cũ
                 </button>
                 <button
                   type="button"
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#d4c8b8] transition-colors hover:bg-[#221b15] hover:text-[#f5ede4]"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#d4c8b8] transition-colors hover:bg-[#221b15] hover:text-[#f0f2ff]"
                 >
                   <LogOut className="h-4 w-4" />
                   Đăng xuất
@@ -171,7 +171,7 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
                 key={t.href}
                 href={t.href}
                 className={`relative flex flex-col items-center gap-0.5 px-2 py-2.5 text-[11px] font-medium transition-colors ${
-                  active ? "text-[#E0B855]" : "text-[#9a8f80] hover:text-[#f5ede4]"
+                  active ? "text-[#E0B855]" : "text-[#9a8f80] hover:text-[#f0f2ff]"
                 }`}
               >
                 <span

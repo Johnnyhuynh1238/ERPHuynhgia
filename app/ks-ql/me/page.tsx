@@ -17,7 +17,7 @@ export default async function KsQlMePage() {
         <h1
           className="mt-0.5 text-[26px] font-semibold tracking-tight"
           style={{
-            background: "linear-gradient(90deg, #f5ede4 0%, #E0B855 100%)",
+            background: "linear-gradient(90deg, #f0f2ff 0%, #E0B855 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -41,7 +41,7 @@ export default async function KsQlMePage() {
             {initials || "K"}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-semibold text-[#f5ede4]">{user.name}</div>
+            <div className="truncate text-base font-semibold text-[#f0f2ff]">{user.name}</div>
             <div className="truncate text-xs text-[#9a8f80]">{user.email}</div>
             <div
               className="mt-1 inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
@@ -59,7 +59,7 @@ export default async function KsQlMePage() {
 
       <section className="rounded-2xl border border-[#2a221c] bg-[#181410] p-5 text-center">
         <Sparkles className="mx-auto mb-2 h-6 w-6 text-[#E0B855]" />
-        <div className="text-sm font-medium text-[#f5ede4]">KPI gain-share</div>
+        <div className="text-sm font-medium text-[#f0f2ff]">KPI gain-share</div>
         <p className="mt-1 text-xs leading-relaxed text-[#9a8f80]">
           Sắp ra mắt — đang nối với dữ liệu rải công + dự toán nhân công theo giai đoạn.
         </p>

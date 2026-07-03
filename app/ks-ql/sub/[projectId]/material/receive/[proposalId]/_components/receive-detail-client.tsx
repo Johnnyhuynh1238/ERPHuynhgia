@@ -1,9 +1,54 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, CheckCircle2, Download, FileImage, Loader2, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  Download,
+  FileImage,
+  Loader2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+
+/** Nén ảnh client-side: cạnh dài tối đa 1600px, JPEG q=0.82. Lỗi decode (định dạng lạ) thì giữ file gốc. */
+async function compressImage(file: File): Promise<File> {
+  try {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = document.createElement("img");
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("decode fail"));
+        img.src = url;
+      });
+      const MAX = 1600;
+      const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(img, 0, 0, w, h);
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.82),
+      );
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+        type: "image/jpeg",
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    return file;
+  }
+}
 
 function poCode(id: string) {
   return `PO-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -82,6 +127,20 @@ export function ReceiveDetailClient({
   const canSubmit =
     !submitting && draftRows.length > 0 && invoiceFiles.length > 0 && goodsFiles.length > 0;
 
+  // Cảnh báo cả đơn: các dòng mà (đã nhận + đợt này) vượt số đặt
+  const overLines = useMemo(() => {
+    return draftRows
+      .map((r) => {
+        const it = items.find((i) => i.seq === r.itemSeq);
+        if (!it || it.qty <= 0) return null;
+        const total = (received[it.seq] ?? 0) + r.qty;
+        return total > it.qty + 1e-6
+          ? { name: it.name, over: total - it.qty, unit: it.unit }
+          : null;
+      })
+      .filter(Boolean) as Array<{ name: string; over: number; unit: string }>;
+  }, [draftRows, items, received]);
+
   async function downloadPo() {
     if (!poRef.current) return;
     setDownloadingPo(true);
@@ -133,6 +192,15 @@ export function ReceiveDetailClient({
       else if (goodsFiles.length === 0) toast.error("Bắt buộc ≥1 ảnh hàng hoá");
       return;
     }
+    if (overLines.length > 0) {
+      const detail = overLines
+        .map((o) => `• ${o.name}: vượt ${fmtQty(o.over)} ${o.unit}`)
+        .join("\n");
+      const ok = window.confirm(
+        `ĐƠN NÀY CÓ ${overLines.length} DÒNG NHẬN VƯỢT SỐ ĐẶT:\n\n${detail}\n\nKiểm tra lại số nhập. Vẫn lưu đợt nhận này?`,
+      );
+      if (!ok) return;
+    }
     setSubmitting(true);
     const fd = new FormData();
     fd.append("items", JSON.stringify(draftRows));
@@ -178,16 +246,12 @@ export function ReceiveDetailClient({
     toast.success("Đã lưu đợt nhận");
   }
 
-  function addFiles(pool: File[], setPool: (f: File[]) => void, files: FileList) {
-    const next = [...pool];
-    for (const f of Array.from(files)) {
-      if (next.length >= 10) {
-        toast.error("Tối đa 10 ảnh / nhóm");
-        break;
-      }
-      next.push(f);
-    }
-    setPool(next);
+  async function addFiles(pool: File[], setPool: (f: File[]) => void, files: FileList) {
+    const incoming = Array.from(files).slice(0, Math.max(0, 10 - pool.length));
+    if (incoming.length < files.length) toast.error("Tối đa 10 ảnh / nhóm");
+    if (incoming.length === 0) return;
+    const compressed = await Promise.all(incoming.map(compressImage));
+    setPool([...pool, ...compressed]);
   }
 
   function removeFile(pool: File[], setPool: (f: File[]) => void, idx: number) {
@@ -332,6 +396,22 @@ export function ReceiveDetailClient({
             />
           </label>
 
+          {overLines.length > 0 && (
+            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-[12px] font-bold text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Đơn này có {overLines.length} dòng nhận vượt số đặt
+              </div>
+              <div className="mt-1 space-y-0.5 text-[11px] text-amber-200/90">
+                {overLines.map((o, i) => (
+                  <div key={i}>
+                    {o.name}: vượt <b>{fmtQty(o.over)}</b> {o.unit}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={submitDelivery}
@@ -422,11 +502,10 @@ function PhotoPicker({
 
 function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
-  useMemo(() => {
+  useEffect(() => {
     const u = URL.createObjectURL(file);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
   return (
     <div className="relative aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1220]">

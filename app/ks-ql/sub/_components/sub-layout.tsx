@@ -17,14 +17,14 @@ export function SubLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#0f1320] text-[#f5ede4]">
+    <div className="min-h-screen bg-[#0f1015] text-[#f0f2ff]">
       <SubPushPrompt />
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-10 pt-6">
         <div className="mb-4 flex items-center justify-between gap-2">
           {backHref ? (
             <Link
               href={backHref}
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f5ede4] hover:bg-[#252840]"
+              className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f0f2ff] hover:bg-[#252840]"
             >
               <ArrowLeft className="h-5 w-5" />
               Quay lại
@@ -80,7 +80,7 @@ export function BigCard({
     >
       {icon ? <div className="shrink-0 text-orange-300">{icon}</div> : null}
       <div className="min-w-0 flex-1">
-        <div className="text-xl font-bold text-[#f5ede4]">{title}</div>
+        <div className="text-xl font-bold text-[#f0f2ff]">{title}</div>
         {subtitle ? <div className="mt-1 text-sm text-[#8892b0]">{subtitle}</div> : null}
       </div>
     </div>

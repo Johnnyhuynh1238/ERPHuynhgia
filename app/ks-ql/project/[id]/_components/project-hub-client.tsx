@@ -228,7 +228,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
             {sb.label}
           </span>
         </div>
-        <h1 className="mt-1.5 text-[20px] font-semibold leading-tight text-[#f5ede4]">
+        <h1 className="mt-1.5 text-[20px] font-semibold leading-tight text-[#f0f2ff]">
           {project.name}
         </h1>
         <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs text-[#9a8f80] sm:grid-cols-2">
@@ -255,7 +255,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-[#9a8f80]">Hạng mục công tác</div>
-            <div className="mt-0.5 text-[15px] font-semibold text-[#f5ede4]">
+            <div className="mt-0.5 text-[15px] font-semibold text-[#f0f2ff]">
               {doneTasks}/{totalTasks} công tác đã xong
             </div>
           </div>
@@ -302,7 +302,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-[#D27A52]">
                           {p.code}
                         </span>
-                        <span className="truncate text-[13px] font-medium text-[#f5ede4]">{p.name}</span>
+                        <span className="truncate text-[13px] font-medium text-[#f0f2ff]">{p.name}</span>
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#9a8f80]">
                         <span>
@@ -322,7 +322,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-sm font-semibold text-[#f5ede4]">{prog.pct}%</div>
+                      <div className="text-sm font-semibold text-[#f0f2ff]">{prog.pct}%</div>
                     </div>
                   </div>
                   {prog.total > 0 ? (
@@ -432,7 +432,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                 <div className="text-[11px] uppercase tracking-wider text-[#D27A52]">
                   Giai đoạn {selectedPhase.code}
                 </div>
-                <div className="truncate text-[15px] font-semibold text-[#f5ede4]">
+                <div className="truncate text-[15px] font-semibold text-[#f0f2ff]">
                   {selectedPhase.name}
                 </div>
                 <div className="mt-0.5 text-[11px] text-[#9a8f80]">
@@ -441,7 +441,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
               </div>
               <button
                 onClick={() => setSelectedPhase(null)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f5ede4]"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f0f2ff]"
                 aria-label="Đóng"
               >
                 <X className="h-4 w-4" />
@@ -474,7 +474,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
                               </span>
                               <span className="text-[10px] text-[#5a4f42]">{t.code}</span>
                             </div>
-                            <div className="mt-1 text-sm font-medium leading-snug text-[#f5ede4]">
+                            <div className="mt-1 text-sm font-medium leading-snug text-[#f0f2ff]">
                               {t.name}
                             </div>
                             {t.plannedEndDate ? (

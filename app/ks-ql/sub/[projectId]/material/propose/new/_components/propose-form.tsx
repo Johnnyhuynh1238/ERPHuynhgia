@@ -73,12 +73,12 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1320] text-[#f5ede4]">
+    <div className="min-h-screen bg-[#0f1015] text-[#f0f2ff]">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-32 pt-6">
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f5ede4] hover:bg-[#252840]"
+          className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-[#1a1d2e] px-4 py-2 text-base font-medium text-[#f0f2ff] hover:bg-[#252840]"
         >
           <ArrowLeft className="h-5 w-5" />
           Huỷ
@@ -115,7 +115,7 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                 value={c.name}
                 onChange={(e) => update(c.cid, { name: e.target.value })}
                 placeholder="VD: Xi măng PC40"
-                className="mb-4 w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+                className="mb-4 w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1015] px-4 py-3 text-lg text-[#f0f2ff] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
               />
 
               <div className="mb-4 grid grid-cols-[1fr_140px] gap-3">
@@ -127,25 +127,36 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                     value={c.qty}
                     onChange={(e) => update(c.cid, { qty: e.target.value })}
                     placeholder="0"
-                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-xl text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1015] px-4 py-3 text-xl text-[#f0f2ff] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm text-[#8892b0]">Đơn vị</label>
                   <input
                     type="text"
-                    list={`units-${c.cid}`}
                     value={c.unit}
                     onChange={(e) => update(c.cid, { unit: e.target.value })}
                     placeholder="bao"
-                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-3 py-3 text-center text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+                    className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1015] px-3 py-3 text-center text-lg text-[#f0f2ff] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
                   />
-                  <datalist id={`units-${c.cid}`}>
-                    {COMMON_UNITS.map((u) => (
-                      <option key={u} value={u} />
-                    ))}
-                  </datalist>
                 </div>
+              </div>
+
+              <div className="-mt-2 mb-4 flex gap-1.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                {COMMON_UNITS.map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => update(c.cid, { unit: u })}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      c.unit === u
+                        ? "border-[#ff8a3d] bg-[#ff8a3d]/15 text-orange-300"
+                        : "border-[#2d3249] bg-[#0f1015] text-[#8892b0] active:bg-[#252840]"
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
               </div>
 
               <label className="mb-1 block text-sm text-[#8892b0]">Dùng cho công tác</label>
@@ -154,7 +165,7 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
                 value={c.task}
                 onChange={(e) => update(c.cid, { task: e.target.value })}
                 placeholder="VD: Đổ cột tầng trệt"
-                className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1320] px-4 py-3 text-lg text-[#f5ede4] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
+                className="w-full rounded-xl border-2 border-[#2d3249] bg-[#0f1015] px-4 py-3 text-lg text-[#f0f2ff] placeholder:text-[#5b6481] focus:border-[#ff8a3d]/60 focus:outline-none"
               />
             </div>
           ))}
@@ -169,7 +180,7 @@ export function ProposeForm({ projectId, projectName }: { projectId: string; pro
           </button>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-[#0f1320] to-transparent px-4 pb-5 pt-8">
+        <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-[#0f1015] to-transparent px-4 pb-5 pt-8">
           <div className="mx-auto max-w-xl">
             <button
               type="button"

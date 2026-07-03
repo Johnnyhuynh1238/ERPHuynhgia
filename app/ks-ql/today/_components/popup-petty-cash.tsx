@@ -195,11 +195,11 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
         <div className="flex items-center justify-between gap-3 border-b border-[#2a221c] px-4 py-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-[#a78bfa]">Yêu cầu chi mua lẻ</div>
-            <div className="truncate text-[15px] font-semibold text-[#f5ede4]">{projectName}</div>
+            <div className="truncate text-[15px] font-semibold text-[#f0f2ff]">{projectName}</div>
           </div>
           <button
             onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f5ede4]"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#2a221c] text-[#9a8f80] transition-colors hover:bg-[#181410] hover:text-[#f0f2ff]"
             aria-label="Đóng"
           >
             <X className="h-4 w-4" />
@@ -220,7 +220,7 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
                 value={amount}
                 onChange={(e) => setAmount(formatAmountInput(e.target.value))}
                 placeholder="120.000"
-                className="w-full rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-base font-medium text-[#f5ede4] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
+                className="w-full rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-base font-medium text-[#f0f2ff] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
               />
             </label>
 
@@ -235,7 +235,7 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
 - 2 ổ điện + 5m dây 2.5
 - 1 kg đinh 5 phân
 - Cơm trưa cho thợ ngày mưa`}
-                className="w-full resize-y rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-sm text-[#f5ede4] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
+                className="w-full resize-y rounded-lg border border-[#2a221c] bg-[#0d0b09] px-3 py-2 text-sm text-[#f0f2ff] placeholder:text-[#5a4f42] focus:border-[#a78bfa] focus:outline-none"
               />
             </label>
 
@@ -370,7 +370,7 @@ export function PopupPettyCash({ projectId, projectName, onClose }: Props) {
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-[15px] font-semibold text-[#f5ede4]">
+                    <div className="text-[15px] font-semibold text-[#f0f2ff]">
                       {fmtVnd(e.amount)}
                     </div>
                     {e.note ? (

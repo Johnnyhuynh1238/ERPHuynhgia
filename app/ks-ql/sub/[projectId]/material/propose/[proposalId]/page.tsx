@@ -38,6 +38,7 @@ export default async function SubProposalDetailPage({
       orderedAt: true,
       receivedAt: true,
       paidAt: true,
+      _count: { select: { debts: true } },
     },
   });
   if (!proposal) notFound();
@@ -63,6 +64,7 @@ export default async function SubProposalDetailPage({
           orderedAt: proposal.orderedAt?.toISOString() ?? null,
           receivedAt: proposal.receivedAt?.toISOString() ?? null,
           paidAt: proposal.paidAt?.toISOString() ?? null,
+          debtCount: proposal._count.debts,
         }}
       />
     </SubLayout>
