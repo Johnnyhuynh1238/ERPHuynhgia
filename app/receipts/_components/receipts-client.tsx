@@ -104,6 +104,7 @@ export function ReceiptsClient({
   projects: ProjectOption[];
 }) {
   const isAdmin = role === "admin";
+  const isKt = role === "accountant";
   const canCreate = role === "admin" || role === "accountant";
   const canMarkReceived = role === "admin" || role === "accountant";
 
@@ -311,7 +312,9 @@ export function ReceiptsClient({
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold text-[#f0f2ff]">Lệnh thu</h1>
             <p className="mt-0.5 text-xs text-[#8892b0]">
-              Ghi nhận khoản thu từ khách hàng, hoàn ứng, vay và các nguồn khác. KT xác nhận đã thu sẽ ghi vào sổ quỹ.
+              {isKt
+                ? "KT tạo lệnh thu → admin duyệt → KT xác nhận đã thu, ghi vào sổ quỹ."
+                : "Ghi nhận khoản thu từ khách hàng, hoàn ứng, vay và các nguồn khác. KT xác nhận đã thu sẽ ghi vào sổ quỹ."}
             </p>
           </div>
           {canCreate && (
@@ -789,13 +792,18 @@ export function ReceiptsClient({
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
             </label>
+            {isKt && (
+              <div className="rounded-lg bg-violet-500/10 px-3 py-2 text-xs text-violet-300">
+                Lệnh thu do KT tạo sẽ chờ admin duyệt trước khi xác nhận thu.
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
                 disabled={creating}
                 className="rounded-lg bg-[#f97316] px-4 py-2 text-sm font-semibold text-[#0b0d16] hover:bg-[#fb923c] disabled:opacity-50"
               >
-                {creating ? "Đang lưu…" : "Tạo lệnh thu"}
+                {creating ? "Đang lưu…" : isKt ? "Gửi admin duyệt" : "Tạo lệnh thu"}
               </button>
               <button
                 type="button"

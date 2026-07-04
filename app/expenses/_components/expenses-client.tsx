@@ -702,7 +702,8 @@ export function ExpensesClient({
             </div>
           </div>
 
-          {/* Bank info for KT to "Chuyển khoản" */}
+          {/* Bank info for KT to "Chuyển khoản" — KT tạo thì không cần (admin duyệt xong KT tự chi) */}
+          {!isKt && (
           <div className="rounded-lg border border-[#2d3249] bg-[#0b0d16] p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold text-[#cfd4e8]">Tài khoản nhận (để KT bấm “Chuyển khoản”)</div>
@@ -771,8 +772,10 @@ export function ExpensesClient({
               </div>
             )}
           </div>
+          )}
 
-          {/* Priority toggle */}
+          {/* Priority toggle — reminder chỉ chạy khi lệnh vào hàng chờ KT chi, KT tạo phải qua admin duyệt trước */}
+          {!isKt && (
           <div>
             <div className="text-xs text-[#8b95b7] mb-1">Độ khẩn</div>
             <div className="inline-flex rounded-lg border border-[#2d3249] bg-[#0b0d16] p-0.5">
@@ -800,6 +803,7 @@ export function ExpensesClient({
               </button>
             </div>
           </div>
+          )}
 
           <label className="block">
             <span className="text-xs text-[#8b95b7]">Ghi chú</span>
@@ -811,13 +815,18 @@ export function ExpensesClient({
               className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
             />
           </label>
+          {isKt && (
+            <div className="rounded-lg bg-violet-500/10 px-3 py-2 text-xs text-violet-300">
+              Lệnh chi do KT tạo sẽ chờ admin duyệt trước khi thanh toán.
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={creating}
               className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
             >
-              {creating ? "Đang tạo…" : "Gửi KT thanh toán"}
+              {creating ? "Đang tạo…" : isKt ? "Gửi admin duyệt" : "Gửi KT thanh toán"}
             </button>
             <button
               type="button"
