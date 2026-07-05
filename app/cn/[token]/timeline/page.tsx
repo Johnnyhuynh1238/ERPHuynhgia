@@ -77,12 +77,51 @@ export default async function CustomerTimelinePage({
 
   const visiblePhases = todayOnly ? phases.filter((p) => p.tasks.length > 0) : phases;
 
+  const acceptanceMilestones = await prisma.acceptanceMilestone.findMany({
+    where: { projectId: project.id },
+    orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
+    select: { id: true, seq: true, title: true, status: true, signedAt: true },
+  });
+
   return (
     <div className="owner-portal-page">
       <section className="owner-section">
         <div className="owner-section-title">TIẾN ĐỘ THI CÔNG</div>
         <div className="text-sm owner-muted">Theo dõi từng giai đoạn và các công việc đang mở cho chủ nhà.</div>
       </section>
+
+      {acceptanceMilestones.length > 0 ? (
+        <section className="owner-section">
+          <div className="owner-section-title">MỐC NGHIỆM THU</div>
+          <div className="text-sm owner-muted">Bấm vào mốc để xem và ký nghiệm thu.</div>
+          <div className="mt-3 space-y-2">
+            {acceptanceMilestones.map((m) => (
+              <Link key={m.id} href={`/cn/${params.token}/acceptance/${m.id}`} className="owner-card block">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs owner-muted">Mốc #{m.seq}</div>
+                    <div className="font-semibold text-white">{m.title}</div>
+                    {m.status === "signed" && m.signedAt ? (
+                      <div className="mt-1 text-xs text-emerald-300">
+                        Đã ký lúc {m.signedAt.toLocaleString("vi-VN")} · Xem biên bản →
+                      </div>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2 py-1 text-[11px] ${
+                      m.status === "signed"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                        : "border-orange-500/30 bg-orange-500/10 text-orange-200"
+                    }`}
+                  >
+                    {m.status === "signed" ? "Đã nghiệm thu" : "Chờ ký nghiệm thu"}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {todayOnly ? (
         <section className="owner-section flex items-center justify-between gap-3 border border-orange-500/30 bg-orange-500/10">
