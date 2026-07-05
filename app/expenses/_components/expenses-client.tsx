@@ -3,6 +3,7 @@
 import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { MoneyInput } from "@/components/money-input";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
@@ -607,12 +608,9 @@ export function ExpensesClient({
             </label>
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Số tiền (₫) *</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
+              <MoneyInput
                 value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                onChange={(raw) => setForm({ ...form, amount: raw })}
                 required
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
@@ -1213,11 +1211,9 @@ export function ExpensesClient({
             </div>
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Số tiền thực chi (₫) *</span>
-              <input
-                type="number"
-                min={0}
+              <MoneyInput
                 value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
+                onChange={setPayAmount}
                 required
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
@@ -1771,11 +1767,9 @@ function TransferDetails({
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
                     <span className="text-[11px] text-[#8b95b7]">Số tiền (₫) *</span>
-                    <input
-                      type="number"
-                      min={0}
+                    <MoneyInput
                       value={payAmount}
-                      onChange={(e) => setPayAmount(e.target.value)}
+                      onChange={setPayAmount}
                       className="mt-0.5 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1.5 text-xs text-[#f0f2ff]"
                     />
                   </label>

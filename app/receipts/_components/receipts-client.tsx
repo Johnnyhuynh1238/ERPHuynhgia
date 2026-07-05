@@ -3,6 +3,7 @@
 import { confirmDialog } from "@/components/confirm-dialog";
 import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Filter, Plus, Receipt as ReceiptIcon, Search, X } from "lucide-react";
+import { MoneyInput } from "@/components/money-input";
 import { toast } from "sonner";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
@@ -707,14 +708,15 @@ export function ReceiptsClient({
                   ...projects.map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` })),
                 ]}
               />
-              <FieldInput
-                label="Số tiền (₫) *"
-                type="number"
-                value={form.amount}
-                onChange={(v) => setForm({ ...form, amount: v })}
-                required
-                inputMode="numeric"
-              />
+              <label className="block">
+                <span className="text-xs text-[#8892b0]">Số tiền (₫) *</span>
+                <MoneyInput
+                  value={form.amount}
+                  onChange={(raw) => setForm({ ...form, amount: raw })}
+                  required
+                  className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+                />
+              </label>
               <FieldInput
                 label="Người/đơn vị nộp"
                 value={form.payer}
@@ -840,12 +842,9 @@ export function ReceiptsClient({
             </label>
             <label className="block">
               <span className="text-xs text-[#8892b0]">Số tiền đã thu (₫) *</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
+              <MoneyInput
                 value={recvAmount}
-                onChange={(e) => setRecvAmount(e.target.value)}
+                onChange={setRecvAmount}
                 required
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
