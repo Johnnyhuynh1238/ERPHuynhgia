@@ -103,7 +103,7 @@ export default async function CustomerTimelinePage({
                     <div className="font-semibold text-white">{m.title}</div>
                     {m.status === "signed" && m.signedAt ? (
                       <div className="mt-1 text-xs text-emerald-300">
-                        Đã ký lúc {m.signedAt.toLocaleString("vi-VN")} · Xem biên bản →
+                        Đã ký lúc {m.signedAt.toLocaleString("vi-VN")}
                       </div>
                     ) : null}
                   </div>

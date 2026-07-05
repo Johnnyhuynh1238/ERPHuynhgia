@@ -31,15 +31,9 @@ export default async function CustomerAcceptancePage({ params }: { params: { tok
       {milestone.status === "signed" ? (
         <section className="owner-section border border-emerald-500/30 bg-emerald-500/10">
           <div className="text-sm text-emerald-200">
-            Đã ký nghiệm thu lúc {milestone.signedAt?.toLocaleString("vi-VN")}
-            {milestone.signerName ? ` bởi ${milestone.signerName}` : ""}.
+            ✓ Đã ký nghiệm thu lúc {milestone.signedAt?.toLocaleString("vi-VN")}
+            {milestone.signerName ? ` bởi ${milestone.signerName}` : ""}. Cảm ơn quý chủ nhà.
           </div>
-          <Link
-            href={`/cn/${params.token}/acceptance/${milestone.id}/bien-ban`}
-            className="mt-3 inline-block rounded-xl bg-[#ff8a3d] px-4 py-2.5 text-sm font-bold text-black"
-          >
-            Xem biên bản nghiệm thu
-          </Link>
         </section>
       ) : (
         <AcceptanceSignForm

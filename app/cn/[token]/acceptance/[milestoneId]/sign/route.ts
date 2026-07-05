@@ -54,6 +54,6 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
   return NextResponse.json({
     message: "Đã ký nghiệm thu",
-    redirect: `/cn/${params.token}/acceptance/${milestone.id}/bien-ban`,
+    redirect: `/cn/${params.token}/timeline`,
   });
 }
