@@ -1,7 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+function fillWhite(canvas: HTMLCanvasElement | null) {
+  const ctx = canvas?.getContext("2d");
+  if (!canvas || !ctx) return;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
 
 export function AcceptanceSignForm({ action, defaultSignerName }: { action: string; defaultSignerName: string }) {
   const router = useRouter();
@@ -9,7 +16,11 @@ export function AcceptanceSignForm({ action, defaultSignerName }: { action: stri
   const [drawing, setDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [signerName, setSignerName] = useState(defaultSignerName);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState("Đồng ý nghiệm thu và tiếp tục thi công các hạng mục khác");
+
+  useEffect(() => {
+    fillWhite(canvasRef.current);
+  }, []);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -56,10 +67,7 @@ export function AcceptanceSignForm({ action, defaultSignerName }: { action: stri
   }
 
   function clearCanvas() {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    fillWhite(canvasRef.current);
     setHasDrawn(false);
   }
 
@@ -76,21 +84,11 @@ export function AcceptanceSignForm({ action, defaultSignerName }: { action: stri
     setError("");
     setSubmitting(true);
     try {
-      // Nền trắng để chữ ký in rõ trên biên bản
-      const out = document.createElement("canvas");
-      out.width = canvas.width;
-      out.height = canvas.height;
-      const octx = out.getContext("2d");
-      if (octx) {
-        octx.fillStyle = "#fff";
-        octx.fillRect(0, 0, out.width, out.height);
-        octx.drawImage(canvas, 0, 0);
-      }
       const r = await fetch(action, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          signatureUrl: out.toDataURL("image/png"),
+          signatureUrl: canvas.toDataURL("image/png"),
           signerName: signerName.trim(),
           note: note.trim(),
           confirmed: true,
