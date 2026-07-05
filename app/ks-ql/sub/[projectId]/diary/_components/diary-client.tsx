@@ -75,6 +75,19 @@ function fmtTimeVn(iso: string) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function addDaysYmd(ymd: string, delta: number) {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+// Nhập bù = chốt sau ngày nhật ký (so savedAt giờ VN với entryDate)
+function isBackfilled(entryDate: string, savedAt: string | null) {
+  if (!savedAt) return false;
+  const savedYmdVn = new Date(new Date(savedAt).getTime() + 7 * 3600_000).toISOString().slice(0, 10);
+  return savedYmdVn > entryDate;
+}
+
 function photoSrc(projectId: string, key: string) {
   return `/api/ks-ql/projects/${projectId}/diary/photos/file?key=${encodeURIComponent(key)}`;
 }
@@ -102,12 +115,13 @@ export function DiaryClient({
   const [uploadingSite, setUploadingSite] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [detailDate, setDetailDate] = useState<string | null>(null);
+  const [activeYmd, setActiveYmd] = useState(todayYmd);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const [r1, r2] = await Promise.all([
-        fetch(`/api/ks-ql/projects/${projectId}/diary?date=${todayYmd}`, { cache: "no-store" }),
+        fetch(`/api/ks-ql/projects/${projectId}/diary?date=${activeYmd}`, { cache: "no-store" }),
         fetch(`/api/ks-ql/projects/${projectId}/diary/list?take=14`, { cache: "no-store" }),
       ]);
       if (r1.ok) {
@@ -117,6 +131,10 @@ export function DiaryClient({
           setWorkerCount(d.diary.workerCount);
           setTasksDone(d.diary.tasksDone);
           setIssues(d.diary.issues || "");
+        } else {
+          setWorkerCount(0);
+          setTasksDone("");
+          setIssues("");
         }
       }
       if (r2.ok) {
@@ -126,7 +144,7 @@ export function DiaryClient({
     } finally {
       setLoading(false);
     }
-  }, [projectId, todayYmd]);
+  }, [projectId, activeYmd]);
 
   useEffect(() => {
     loadAll();
@@ -144,7 +162,7 @@ export function DiaryClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: todayYmd,
+          date: activeYmd,
           workerCount,
           tasksDone,
           issues,
@@ -155,7 +173,14 @@ export function DiaryClient({
         flash("err", j.message || "Lưu thất bại");
         return false;
       }
-      flash("ok", data?.diary?.savedAt ? "Đã cập nhật nhật ký" : "Đã chốt nhật ký hôm nay");
+      flash(
+        "ok",
+        data?.diary?.savedAt
+          ? "Đã cập nhật nhật ký"
+          : activeYmd === todayYmd
+            ? "Đã chốt nhật ký hôm nay"
+            : `Đã nhập bù nhật ký ${fmtDateVn(activeYmd)}`,
+      );
       await loadAll();
       setShowModal(false);
       return true;
@@ -180,7 +205,7 @@ export function DiaryClient({
       const fd = new FormData();
       for (const f of Array.from(files)) fd.append("files", f);
       const res = await fetch(
-        `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${todayYmd}`,
+        `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${activeYmd}`,
         { method: "POST", body: fd },
       );
       const j = await res.json().catch(() => ({}));
@@ -198,7 +223,7 @@ export function DiaryClient({
   const deletePhoto = async (kind: "task" | "site", key: string) => {
     if (!await confirmDialog("Xoá ảnh này?")) return;
     const res = await fetch(
-      `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${todayYmd}&key=${encodeURIComponent(key)}`,
+      `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${activeYmd}&key=${encodeURIComponent(key)}`,
       { method: "DELETE" },
     );
     const j = await res.json().catch(() => ({}));
@@ -218,6 +243,17 @@ export function DiaryClient({
   const canFinalize = useMemo(() => {
     return workerCount > 0 && tasksDone.trim().length > 0;
   }, [workerCount, tasksDone]);
+
+  // 3 ngày gần nhất chưa chốt (server cũng chặn quá 3 ngày)
+  const missingBackfillDays = useMemo(() => {
+    const saved = new Set(history.filter((h) => h.savedAt).map((h) => h.entryDate));
+    const days: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const day = addDaysYmd(todayYmd, -i);
+      if (!saved.has(day)) days.push(day);
+    }
+    return days.reverse();
+  }, [history, todayYmd]);
 
   if (loading && !data) {
     return (
@@ -244,12 +280,46 @@ export function DiaryClient({
 
       <TodayCard
         todayYmd={todayYmd}
-        diary={data?.diary ?? null}
-        onOpen={() => setShowModal(true)}
+        diary={activeYmd === todayYmd ? (data?.diary ?? null) : null}
+        onOpen={() => {
+          if (activeYmd !== todayYmd) {
+            setActiveYmd(todayYmd);
+            setData(null);
+          }
+          setShowModal(true);
+        }}
       />
 
+      {missingBackfillDays.length > 0 ? (
+        <div className="rounded-2xl border-2 border-[#f87171]/40 bg-[#1d1215] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#f8a5a5]">
+            <History className="h-4 w-4" />
+            Ngày quên chốt nhật ký — nhập bù ngay
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {missingBackfillDays.map((day) => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => {
+                  setActiveYmd(day);
+                  setData(null);
+                  setShowModal(true);
+                }}
+                className="rounded-xl border border-[#f87171]/50 bg-[#f87171]/10 px-3 py-2 text-sm font-semibold text-[#f8a5a5] active:scale-95"
+              >
+                Nhập bù {fmtDateVn(day)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {showModal ? (
-        <DiaryModal onClose={() => setShowModal(false)} title={`Nhật ký ${fmtDateVn(todayYmd)}`}>
+        <DiaryModal
+          onClose={() => setShowModal(false)}
+          title={`Nhật ký ${fmtDateVn(activeYmd)}${activeYmd !== todayYmd ? " (nhập bù)" : ""}`}
+        >
 
       {locked ? (
         <div className="flex items-center gap-2 rounded-xl border-2 border-[#4a8cf7]/40 bg-[#0f1a2e] px-4 py-3 text-sm text-[#a3c7f7]">
@@ -420,7 +490,7 @@ export function DiaryClient({
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-4 text-base font-bold text-black active:scale-[0.99] disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-            {finalized ? "Cập nhật nhật ký" : "Chốt nhật ký hôm nay"}
+            {finalized ? "Cập nhật nhật ký" : activeYmd === todayYmd ? "Chốt nhật ký hôm nay" : `Nhập bù ${fmtDateVn(activeYmd)}`}
           </button>
           {!canFinalize && (
             <p className="text-center text-xs text-[#fbbf24]">
@@ -453,6 +523,11 @@ export function DiaryClient({
                       {h.entryDate === todayYmd && (
                         <span className="rounded-full bg-[#ff8a3d]/20 px-2 py-0.5 text-[10px] font-semibold text-orange-300">
                           Hôm nay
+                        </span>
+                      )}
+                      {isBackfilled(h.entryDate, h.savedAt) && (
+                        <span className="rounded-full bg-[#f87171]/20 px-2 py-0.5 text-[10px] font-semibold text-[#f8a5a5]">
+                          Nhập bù
                         </span>
                       )}
                     </div>

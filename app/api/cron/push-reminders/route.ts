@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     tptc: { fired: 0, dedup: 0 },
     eod: { fired: 0, dedup: 0 },
     worker_attendance_pm: { fired: 0, dedup: 0 },
+    diary: { fired: 0, dedup: 0 },
   };
 
   const isSundayDefaultRest = isDefaultRestDay(today);
@@ -303,6 +304,51 @@ export async function POST(request: Request) {
         });
         if (r.dedup) results.worker_attendance_pm.dedup += 1;
         else results.worker_attendance_pm.fired += 1;
+      }
+    }
+  }
+
+  // 5) Nhật ký thi công KS QL (dự án sub-contract): hạn 19:00 VN = 12:00 UTC.
+  // Chủ Nhật công trường nghỉ → bỏ qua.
+  if (!isSundayDefaultRest) {
+    const deadline = new Date(today);
+    deadline.setUTCHours(12, 0, 0, 0);
+    const minutes = (deadline.getTime() - now.getTime()) / 60000;
+    const stage = stageForMinutes(minutes);
+    if (stage) {
+      const assignments = await prisma.projectMemberAssignment.findMany({
+        where: {
+          role: "pm_engineer",
+          project: { laborMode: "subcontract", status: { in: ["planning", "in_progress"] } },
+        },
+        select: { userId: true, projectId: true, project: { select: { name: true } } },
+      });
+      for (const a of assignments) {
+        const diary = await prisma.constructionDiary.findFirst({
+          where: { projectId: a.projectId, ksId: a.userId, entryDate: today, savedAt: { not: null } },
+          select: { id: true },
+        });
+        if (diary) continue;
+        const title =
+          stage === "overdue"
+            ? `⚠️ Đã 19:00 — chưa chốt nhật ký ${a.project.name}`
+            : `Còn ${stage === "r30" ? "30" : "15"} phút để chốt nhật ký thi công`;
+        const body =
+          stage === "overdue"
+            ? "Vào Nhật ký thi công chốt ngay. Quên hôm nay chỉ được nhập bù trong 3 ngày."
+            : `Dự án ${a.project.name} — hạn 19:00.`;
+        const r = await tryDedupAndSend({
+          userId: a.userId,
+          refType: "diary_reminder",
+          refId: `${a.projectId}_${refDateStr}`,
+          stage,
+          title,
+          body,
+          url: `/ks-ql/sub/${a.projectId}/diary`,
+          tag: `diary-${a.projectId}-${refDateStr}`,
+        });
+        if (r.dedup) results.diary.dedup += 1;
+        else results.diary.fired += 1;
       }
     }
   }

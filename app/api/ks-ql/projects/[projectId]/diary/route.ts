@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getWorkDateVn } from "@/lib/attendance";
+import { diaryDateError } from "@/lib/diary-date";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -162,6 +163,8 @@ export async function POST(
   }
 
   const entryDate = parseDateParam(typeof body.date === "string" ? body.date : null);
+  const dateErr = diaryDateError(entryDate);
+  if (dateErr) return NextResponse.json({ message: dateErr }, { status: 400 });
   const workerCount = Math.max(0, Math.min(500, Math.floor(Number(body.workerCount) || 0)));
   const tasksDone = String(body.tasksDone ?? "").slice(0, 4000).trim();
   const issuesRaw = body.issues == null ? null : String(body.issues).slice(0, 4000);

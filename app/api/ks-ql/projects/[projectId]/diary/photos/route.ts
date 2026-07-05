@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio, deleteObjectFromMinio } from "@/lib/minio";
 import { getWorkDateVn } from "@/lib/attendance";
+import { diaryDateError } from "@/lib/diary-date";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,8 @@ export async function POST(
     return NextResponse.json({ message: "kind phải là task|site" }, { status: 400 });
   }
   const entryDate = parseDate(url.searchParams.get("date"));
+  const dateErr = diaryDateError(entryDate);
+  if (dateErr) return NextResponse.json({ message: dateErr }, { status: 400 });
 
   let formData: FormData;
   try {
