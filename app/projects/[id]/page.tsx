@@ -98,11 +98,13 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
     canViewConstructionLog: role !== UserRole.accountant,
     canViewPayments: inAllowedSet([UserRole.admin, UserRole.accountant]),
     canViewMembers: inAllowedSet([UserRole.admin, UserRole.construction_manager]),
+    canViewFinance: isAdmin,
+    canViewAcceptance: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer]),
   };
 
   return (
     <div className="space-y-4">
-      <ProjectHubGrid projectId={project.id} caps={caps} />
+      <ProjectHubGrid projectId={project.id} caps={caps} laborMode={project.laborMode} />
       <ProjectInfoClient
       project={JSON.parse(
         JSON.stringify(
