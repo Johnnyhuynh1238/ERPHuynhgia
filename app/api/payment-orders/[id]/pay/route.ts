@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
+import { notifyPaymentOrderPaid } from "@/lib/notify-payment-order";
 
 export const runtime = "nodejs";
 
@@ -92,6 +93,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
   } catch (e: any) {
     return NextResponse.json({ message: e.message || "Lỗi ghi chi" }, { status: 400 });
   }
+
+  notifyPaymentOrderPaid({
+    orderId: order.id,
+    code: order.code,
+    supplierName: order.supplier.name,
+    paidAmount: Number(paidAmount),
+    actorUserId: user.id,
+    actorName: user.name || user.email || "KT",
+  }).catch((err) => console.error("[payment-order] notify paid failed", err));
 
   return NextResponse.json({ ok: true });
 }
