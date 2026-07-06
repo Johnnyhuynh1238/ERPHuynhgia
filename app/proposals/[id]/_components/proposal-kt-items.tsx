@@ -89,6 +89,9 @@ export function ProposalKtItems({
   const [loading, setLoading] = useState(true);
   const [openSeq, setOpenSeq] = useState<number | null>(null);
   const [closing, setClosing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRows, setEditRows] = useState<Array<{ name: string; qty: string; unit: string; task: string }>>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -158,6 +161,53 @@ export function ProposalKtItems({
     );
   }
 
+  const canEditItems =
+    (currentUserRole === "accountant" || currentUserRole === "admin") &&
+    !closedAt &&
+    orderStatus === "not_ordered";
+
+  const openEdit = () => {
+    setEditRows(
+      (items ?? []).map((it) => ({ name: it.name, qty: String(it.qty), unit: it.unit, task: it.task })),
+    );
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    const payload = editRows
+      .map((r) => ({ name: r.name.trim(), qty: Number(r.qty), unit: r.unit.trim(), task: r.task.trim() }))
+      .filter((r) => r.name || r.unit || r.qty > 0);
+    if (!payload.length) {
+      toast.error("Cần ít nhất 1 món");
+      return;
+    }
+    for (const r of payload) {
+      if (!r.name || !r.unit || !Number.isFinite(r.qty) || r.qty <= 0) {
+        toast.error("Mỗi món cần tên + ĐVT + số lượng > 0");
+        return;
+      }
+    }
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payload }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(j.message || "Không lưu được");
+        return;
+      }
+      toast.success(j.message || "Đã cập nhật nội dung đề xuất");
+      setEditOpen(false);
+      await reload();
+      onProposalUpdated?.();
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const canClose = !closedAt && orderStatus !== "not_ordered";
   const canReopen = !!closedAt && currentUserRole === "admin";
   const allDebted = summary.debt === summary.total && summary.total > 0;
@@ -201,6 +251,15 @@ export function ProposalKtItems({
           />
         </div>
 
+        {canEditItems && (
+          <button
+            type="button"
+            onClick={openEdit}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-xs font-semibold text-[#cfd4e8] hover:border-[#f97316]/50 hover:text-[#f0f2ff]"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Sửa nội dung đề xuất (tên · SL · ĐVT)
+          </button>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -213,6 +272,91 @@ export function ProposalKtItems({
           />
         ))}
       </div>
+
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4" onClick={() => setEditOpen(false)}>
+          <div
+            className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 sm:max-w-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-bold text-orange-300">Sửa nội dung đề xuất</div>
+              <button type="button" onClick={() => setEditOpen(false)} className="text-[#8892b0] hover:text-[#f0f2ff]">✕</button>
+            </div>
+            <div className="mb-2 text-[11px] text-[#8892b0]">
+              Chỉ sửa được khi chưa đặt hàng. KS chủ đề xuất sẽ nhận thông báo.
+            </div>
+            <div className="space-y-2">
+              {editRows.map((r, i) => (
+                <div key={i} className="rounded-xl border border-[#252840] bg-[#0f1220] p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 shrink-0 text-center text-[10px] font-bold text-[#5a6080]">{i + 1}</span>
+                    <input
+                      value={r.name}
+                      onChange={(e) => setEditRows((rows) => rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                      placeholder="Tên vật tư *"
+                      className="min-w-0 flex-1 rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-sm text-[#f0f2ff]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditRows((rows) => rows.filter((_, j) => j !== i))}
+                      className="shrink-0 rounded-lg border border-red-900/60 p-1.5 text-red-400 hover:bg-red-950/40"
+                      title="Xoá món"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="mt-1.5 flex gap-2 pl-7">
+                    <input
+                      value={r.qty}
+                      onChange={(e) => setEditRows((rows) => rows.map((x, j) => (j === i ? { ...x, qty: e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".") } : x)))}
+                      inputMode="decimal"
+                      placeholder="SL *"
+                      className="w-20 rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-sm text-[#f0f2ff]"
+                    />
+                    <input
+                      value={r.unit}
+                      onChange={(e) => setEditRows((rows) => rows.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))}
+                      placeholder="ĐVT *"
+                      className="w-24 rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-sm text-[#f0f2ff]"
+                    />
+                    <input
+                      value={r.task}
+                      onChange={(e) => setEditRows((rows) => rows.map((x, j) => (j === i ? { ...x, task: e.target.value } : x)))}
+                      placeholder="Dùng cho việc gì"
+                      className="min-w-0 flex-1 rounded-lg border border-[#2d3249] bg-[#13151f] px-2 py-1.5 text-sm text-[#f0f2ff]"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditRows((rows) => [...rows, { name: "", qty: "", unit: "", task: "" }])}
+              className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#8892b0] hover:text-[#f0f2ff]"
+            >
+              <Plus className="h-3.5 w-3.5" /> Thêm món
+            </button>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="flex-1 rounded-xl bg-orange-500 px-3 py-2.5 text-sm font-bold text-[#0b0d16] disabled:opacity-50"
+              >
+                {savingEdit ? "Đang lưu…" : "Lưu thay đổi"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                className="rounded-xl border border-[#2d3249] px-4 py-2.5 text-sm text-[#8b95b7]"
+              >
+                Huỷ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {closedAt ? (
         <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">

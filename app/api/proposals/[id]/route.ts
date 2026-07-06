@@ -4,7 +4,7 @@ import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { canViewProposal, isProposalStaffViewer } from "@/lib/proposal-access";
-import { notifyMaterialProposalNew } from "@/lib/notify-material-proposal";
+import { notifyMaterialProposalNew, notifyMaterialProposalUpdate } from "@/lib/notify-material-proposal";
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -53,7 +53,7 @@ const structuredItemSchema = z.object({
   name: z.string().trim().min(1).max(255),
   qty: z.number().positive(),
   unit: z.string().trim().min(1).max(50),
-  task: z.string().trim().min(1).max(500),
+  task: z.string().trim().max(500),
 });
 
 const patchSchema = z.object({
@@ -86,6 +86,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ksId: true,
       projectId: true,
       status: true,
+      orderStatus: true,
+      closedAt: true,
       project: { select: { id: true, name: true, code: true } },
     },
   });
@@ -95,6 +97,50 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const isOwnKs = proposal.ksId === user.id;
   const isAdmin = user.role === UserRole.admin;
+  const isKt = user.role === UserRole.accountant;
+
+  const items = parsed.data.items;
+  const description = items.map((it) => `${it.name} ${it.qty} ${it.unit} — ${it.task}`).join("; ");
+
+  // Nhánh KT/admin: sửa nội dung đề xuất trước khi đặt hàng (sai tên/SL/ĐVT của KS).
+  // Không reset trạng thái duyệt — chỉ cập nhật items + báo KS chủ đề xuất biết.
+  if ((isKt || isAdmin) && proposal.status !== "declined") {
+    if (proposal.closedAt) {
+      return NextResponse.json(
+        { error: "invalid_state", message: "Đề xuất đã đóng, không sửa được" },
+        { status: 409 },
+      );
+    }
+    if (proposal.orderStatus !== "not_ordered") {
+      return NextResponse.json(
+        { error: "invalid_state", message: "Đã đặt hàng — không sửa nội dung đề xuất được nữa" },
+        { status: 409 },
+      );
+    }
+
+    await prisma.materialProposal.update({
+      where: { id: proposal.id },
+      data: { description, parsedItems: items },
+    });
+
+    const actorName = user.name || user.email || (isKt ? "KT" : "Admin");
+    if (proposal.ksId !== user.id) {
+      await notifyMaterialProposalUpdate({
+        proposalId: proposal.id,
+        projectId: proposal.project.id,
+        projectName: proposal.project.name,
+        recipientId: proposal.ksId,
+        actorUserId: user.id,
+        actorName,
+        title: `${isKt ? "KT" : "Admin"} ${actorName} đã chỉnh đề xuất vật tư`,
+        body: `${proposal.project.code} — nội dung items được cập nhật trước khi đặt hàng.`,
+      });
+    }
+
+    return NextResponse.json({ ok: true, message: "Đã cập nhật nội dung đề xuất" });
+  }
+
+  // Nhánh KS chủ sở hữu: gửi lại đề xuất bị từ chối (reset về pending).
   if (!isOwnKs && !isAdmin) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
@@ -104,9 +150,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       { status: 409 },
     );
   }
-
-  const items = parsed.data.items;
-  const description = items.map((it) => `${it.name} ${it.qty} ${it.unit} — ${it.task}`).join("; ");
 
   await prisma.materialProposal.update({
     where: { id: proposal.id },
