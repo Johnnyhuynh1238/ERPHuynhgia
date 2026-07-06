@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Banknote,
+  BookOpenCheck,
   BookText,
   Calculator,
   ClipboardList,
@@ -25,6 +26,7 @@ type HubItem = {
   label: string;
   icon: LucideIcon;
   desc?: string;
+  badge?: number;
 };
 
 type HubGroup = {
@@ -55,10 +57,12 @@ export function ProjectHubGrid({
   projectId,
   caps,
   laborMode,
+  pendingDiaries = 0,
 }: {
   projectId: string;
   caps: Caps;
   laborMode: "self" | "subcontract";
+  pendingDiaries?: number;
 }) {
   const base = `/projects/${projectId}`;
   const isSelf = laborMode === "self";
@@ -100,6 +104,17 @@ export function ProjectHubGrid({
       : []),
     ...(caps.canViewConstructionLog
       ? [{ href: `${base}/construction-log`, label: "Nhật ký thi công", icon: BookText, desc: "Sự kiện công trường" } as HubItem]
+      : []),
+    ...(caps.isAdmin
+      ? [
+          {
+            href: `${base}/diary-approval`,
+            label: "Duyệt nhật ký",
+            icon: BookOpenCheck,
+            desc: "Nhật ký KS QL",
+            badge: pendingDiaries,
+          } as HubItem,
+        ]
       : []),
     { href: `${base}/documents`, label: "Hồ sơ", icon: FolderOpen, desc: "File · ảnh · hợp đồng" },
   ];
@@ -143,8 +158,13 @@ export function ProjectHubGrid({
                 <Link
                   key={it.href}
                   href={it.href}
-                  className="group flex flex-col items-center gap-1.5 rounded-2xl border border-[#252840] bg-[#13151f] p-3 text-center transition-all hover:-translate-y-0.5 hover:border-[#f97316]/60 hover:bg-[#1a1d2e]"
+                  className="group relative flex flex-col items-center gap-1.5 rounded-2xl border border-[#252840] bg-[#13151f] p-3 text-center transition-all hover:-translate-y-0.5 hover:border-[#f97316]/60 hover:bg-[#1a1d2e]"
                 >
+                  {it.badge ? (
+                    <span className="absolute right-1.5 top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {it.badge}
+                    </span>
+                  ) : null}
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#f97316]/15 text-[#fb923c] transition-colors group-hover:bg-[#f97316]/25">
                     <Icon className="h-5 w-5" />
                   </span>

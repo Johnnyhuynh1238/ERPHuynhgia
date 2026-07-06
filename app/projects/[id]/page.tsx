@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
 import { ProjectHubGrid } from "./_components/project-hub-grid";
-import { DiaryApprovalPanel } from "./_components/diary-approval-panel";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 
 function startOfTodayUtc() {
@@ -85,6 +84,13 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
     ? true
     : await canUserAccessProjectSubContracts(params.id, { id: user.id, role });
 
+  // Badge số nhật ký KS đã chốt chờ duyệt trên icon "Duyệt nhật ký"
+  const pendingDiaries = isAdmin
+    ? await prisma.constructionDiary.count({
+        where: { projectId: params.id, savedAt: { not: null }, approvedAt: null },
+      })
+    : 0;
+
   const inAllowedSet = (allowed: UserRole[]) => allowed.includes(role);
   const caps = {
     isAdmin,
@@ -104,7 +110,12 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
 
   return (
     <div className="space-y-4">
-      <ProjectHubGrid projectId={project.id} caps={caps} laborMode={project.laborMode} />
+      <ProjectHubGrid
+        projectId={project.id}
+        caps={caps}
+        laborMode={project.laborMode}
+        pendingDiaries={pendingDiaries}
+      />
       <ProjectInfoClient
       project={JSON.parse(
         JSON.stringify(
@@ -125,7 +136,6 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
       currentUserId={user.id}
       todaySiteRest={todaySiteRest ? JSON.parse(JSON.stringify(todaySiteRest)) : null}
     />
-      {isAdmin ? <DiaryApprovalPanel projectId={project.id} /> : null}
     </div>
   );
 }
