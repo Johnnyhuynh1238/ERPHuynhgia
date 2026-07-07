@@ -107,6 +107,25 @@ export function ExpensesClient({
   const [showFilters, setShowFilters] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // Deep-link từ notification: /expenses?status=...&id=... → set filter + highlight lệnh
+  const [filtersReady, setFiltersReady] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const s = sp.get("status");
+    const id = sp.get("id");
+    if (s && ["pending", "tptc_pending", "paid", "cancelled", "all"].includes(s)) {
+      setStatus(s);
+    } else if (id) {
+      // Có id nhưng không chỉ định status → xem "Tất cả" để lệnh không bị filter giấu
+      setStatus("all");
+    }
+    if (id) setHighlightId(id);
+    setFiltersReady(true);
+  }, []);
+
   const [balance, setBalance] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [pendingTotal, setPendingTotal] = useState<number>(0);
@@ -182,9 +201,18 @@ export function ExpensesClient({
   }, [status, projectFilter, categoryFilter, search]);
 
   useEffect(() => {
+    if (!filtersReady) return;
     load();
     loadBalance();
-  }, [load, loadBalance]);
+  }, [filtersReady, load, loadBalance]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    if (!rows.some((r) => r.id === highlightId)) return;
+    highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setHighlightId(null), 6000);
+    return () => clearTimeout(t);
+  }, [highlightId, loading, rows]);
 
   const totalAmount = useMemo(() => rows.reduce((s, r) => s + r.amount, 0), [rows]);
   const totalPaid = useMemo(() => rows.reduce((s, r) => s + (r.paidAmount || 0), 0), [rows]);
@@ -882,6 +910,7 @@ export function ExpensesClient({
             return (
               <div
                 key={r.id}
+                ref={r.id === highlightId ? highlightRef : undefined}
                 onClick={canQuickTransfer ? toggle : undefined}
                 role={canQuickTransfer ? "button" : undefined}
                 tabIndex={canQuickTransfer ? 0 : undefined}
@@ -898,7 +927,9 @@ export function ExpensesClient({
                 }
                 className={`rounded-2xl border bg-gradient-to-br from-[#13151f] to-[#0f111a] p-4 flex flex-col gap-3 ${cardBorder} ${
                   canQuickTransfer ? "cursor-pointer transition hover:border-orange-400/40 active:scale-[0.995]" : ""
-                } ${isExpanded ? "md:col-span-2 xl:col-span-3 ring-1 ring-orange-400/30" : ""}`}
+                } ${isExpanded ? "md:col-span-2 xl:col-span-3 ring-1 ring-orange-400/30" : ""} ${
+                  r.id === highlightId ? "ring-2 ring-orange-400/80 animate-pulse" : ""
+                }`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
