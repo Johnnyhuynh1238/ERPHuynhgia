@@ -753,6 +753,7 @@ model Project {
   cashTransactions          CashTransaction[]
   acceptanceMilestones      AcceptanceMilestone[]
   estimateGroups            EstimateGroup[]
+  estimateMaterialMaps      EstimateMaterialMap[]
 
   @@index([status])
   @@map("projects")
@@ -3307,6 +3308,9 @@ model MaterialPrice {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
+  estimateLines EstimateLine[]
+  estimateMaps  EstimateMaterialMap[]
+
   @@unique([name, unit])
   @@index([retiredAt])
   @@map("material_prices")
@@ -3977,6 +3981,9 @@ model EstimateLine {
   id         String             @id @default(uuid()) @db.Uuid
   itemId     String             @map("item_id") @db.Uuid
   normCode   String?            @map("norm_code") @db.VarChar(32) // null = công tác ngoài định mức (lump-sum/ME)
+  // Line vật tư mua thẳng NCC không qua định mức (thép bóc chi tiết từng loại D…):
+  // quantity theo đơn vị bán NCC, thành tiền VT = quantity × giá NCC.
+  materialPriceId String? @map("material_price_id") @db.Uuid
   name       String // tên công tác (theo Norm hoặc AI đặt)
   unit       String             @db.VarChar(20)
   formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
@@ -3988,10 +3995,33 @@ model EstimateLine {
   createdAt  DateTime           @default(now()) @map("created_at")
   updatedAt  DateTime           @updatedAt @map("updated_at")
 
-  item EstimateItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  norm Norm?        @relation(fields: [normCode], references: [code], onDelete: SetNull)
+  item          EstimateItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  norm          Norm?          @relation(fields: [normCode], references: [code], onDelete: SetNull)
+  materialPrice MaterialPrice? @relation(fields: [materialPriceId], references: [id], onDelete: SetNull)
 
   @@index([itemId, sortOrder])
   @@index([normCode])
+  @@index([materialPriceId])
   @@map("estimate_lines")
+}
+
+// Map vật tư định mức → hàng NCC cụ thể, PER DỰ ÁN (NCC theo vùng, giá theo thời điểm).
+// factor = số đơn vị định mức trong 1 đơn vị NCC (1 bao = 50 kg → 50; cùng đơn vị → 1).
+// Thành tiền VT = (tổng hao phí / factor) × giá NCC, giữ số lẻ không làm tròn.
+// AI worker tự map hàng giá cao nhất khi thiếu; admin đổi trên tab Hao phí VT.
+model EstimateMaterialMap {
+  id              String   @id @default(uuid()) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  srcName         String   @map("src_name") @db.VarChar(255) // tên vật tư trong định mức
+  srcUnit         String   @map("src_unit") @db.VarChar(20) // đơn vị định mức
+  materialPriceId String   @map("material_price_id") @db.Uuid
+  factor          Decimal  @default(1) @db.Decimal(12, 4)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materialPrice MaterialPrice @relation(fields: [materialPriceId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, srcName, srcUnit])
+  @@map("estimate_material_maps")
 }

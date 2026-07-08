@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { NormsClient } from "../../budget/norms/_components/norms-client";
 import { PricesClient } from "../../budget/prices/_components/prices-client";
+import { HaoPhiTab } from "./hao-phi-tab";
 import { KhoiLuongTab } from "./khoi-luong-tab";
 import { MoTaTab } from "./mo-ta-tab";
 
@@ -73,21 +74,12 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
 
       {tab === "mo-ta" && <MoTaTab projectId={projectId} />}
       {tab === "khoi-luong" && <KhoiLuongTab projectId={projectId} />}
-      {tab === "hp-vt" && <ComingSoon label="Hao phí vật tư" note="Đợt 4 — KL × định mức × đơn giá VT, tính tự động ra thành tiền." />}
+      {tab === "hp-vt" && <HaoPhiTab projectId={projectId} kind="vt" />}
       {tab === "don-gia" && <PricesClient projectId={projectId} canEdit initialTab="vt" />}
       {tab === "dinh-muc" && (
         <NormsClient projectId={projectId} projectName={projectName} projectCode={projectCode} canEdit />
       )}
-      {tab === "hp-nc" && <ComingSoon label="Hao phí nhân công + máy" note="Đợt 4 — KL × định mức NC/ca máy, tính tự động ra thành tiền." />}
-    </div>
-  );
-}
-
-function ComingSoon({ label, note }: { label: string; note: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[#252840] bg-[#13151f] p-10 text-center">
-      <p className="text-sm font-semibold text-zinc-300">{label}</p>
-      <p className="mt-1 text-xs text-zinc-500">{note}</p>
+      {tab === "hp-nc" && <HaoPhiTab projectId={projectId} kind="ncmm" />}
     </div>
   );
 }
