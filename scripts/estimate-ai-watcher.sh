@@ -67,18 +67,26 @@ payload=$(python3 -c 'import json,sys; print(json.dumps({"client": sys.argv[1], 
 result=$(curl -s -X POST "$VIEWER/send" -H 'Content-Type: application/json' -d "$payload")
 echo "[$(date '+%F %T')] send result: $result"
 
-# Chống race: session vừa respawn, Enter cuối bị nuốt khi TUI chưa init xong
-# → tin nhắn kẹt trong composer. Thời gian init không đoán được (5s có lần không đủ),
-# nên lặp: mỗi 5s kiểm busy — chưa bận thì gõ Enter tiếp, tối đa 12 lần (60s).
+# Chống race: gửi khi TUI chưa attach xong pty thì ký tự bị nuốt một phần (kẹt composer)
+# hoặc mất sạch (pane trống). Lặp mỗi 5s, tối đa 12 lần:
+#   - busy → worker đã chạy, xong
+#   - pane KHÔNG chứa tin nhắn → mất sạch → GỬI LẠI nguyên tin nhắn (session sống nên không còn race)
+#   - pane chứa tin nhắn mà chưa busy → kẹt composer → gõ Enter
 for i in $(seq 1 12); do
   sleep 5
-  busy_flag=$(curl -s "$VIEWER/capture?client=$CLIENT&lines=5" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("busy"))' 2>/dev/null || echo "")
+  cap=$(curl -s "$VIEWER/capture?client=$CLIENT&lines=40" 2>/dev/null || echo "")
+  busy_flag=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("busy"))' "$cap" 2>/dev/null || echo "")
   if [ "$busy_flag" = "True" ]; then
     echo "[$(date '+%F %T')] worker busy sau ${i} lần kiểm — OK"
     break
   fi
-  curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
-    -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
+  if python3 -c 'import json,sys; sys.exit(0 if "Hạng mục cần bóc" in (json.loads(sys.argv[1]).get("output") or "") else 1)' "$cap" 2>/dev/null; then
+    curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
+      -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
+  else
+    echo "[$(date '+%F %T')] pane trống — gửi lại tin nhắn (lần kiểm $i)"
+    curl -s -X POST "$VIEWER/send" -H 'Content-Type: application/json' -d "$payload" >/dev/null || true
+  fi
 done
 
 write_heartbeat
