@@ -15,7 +15,8 @@ SOP="/home/claudeuser/ERPHuynhgia/scripts/estimate-sop.md"
 
 # ── Heartbeat: đọc pane worker, suy trạng thái, upsert 1 row cho UI poll ──
 write_heartbeat() {
-  local capture busy_flag tail_txt state analyzing
+  # state + tail_txt cố ý KHÔNG local — phần tự hồi sinh phía dưới đọc lại
+  local capture busy_flag analyzing
   capture=$(curl -sf --max-time 5 "$VIEWER/capture?client=$CLIENT&lines=30" 2>/dev/null || echo "")
   analyzing=$("${PSQL[@]}" -c "SELECT count(*) FROM estimate_items WHERE status='analyzing'" || echo 0)
 
@@ -45,6 +46,19 @@ HSQL
 }
 
 write_heartbeat
+
+# ── Tự hồi sinh: worker chết giữa chừng (swap acc restart session, crash…) ──
+# Pane không còn tin nhắn giao việc + không busy + item treo analyzing >5' → re-queue.
+# Worker stateless nên bóc lại từ đầu an toàn (chỉ ghi đè line ai_draft).
+if [ "${state:-}" = "stuck" ]; then
+  if ! echo "${tail_txt:-}" | grep -q 'Hạng mục cần bóc'; then
+    requeued=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '5 minutes' RETURNING id" \
+      | grep -cE '^[0-9a-f-]{36}$' || true)
+    [ "${requeued:-0}" != "0" ] && echo "[$(date '+%F %T')] worker chết — re-queue $requeued item treo"
+  fi
+fi
+# Lưới an toàn cuối: analyzing quá 30' bất kể lý do → re-queue
+"${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '30 minutes'" >/dev/null || true
 
 # ── Spawn: worker đang bận (analyzing < 30 phút) → đợi lượt sau ──
 busy=$("${PSQL[@]}" -c "SELECT count(*) FROM estimate_items WHERE status='analyzing' AND updated_at > now() - interval '30 minutes'")
