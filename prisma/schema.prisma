@@ -752,6 +752,7 @@ model Project {
   receipts                  Receipt[]
   cashTransactions          CashTransaction[]
   acceptanceMilestones      AcceptanceMilestone[]
+  estimateGroups            EstimateGroup[]
 
   @@index([status])
   @@map("projects")
@@ -3266,7 +3267,8 @@ model Norm {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  budgetItems ProjectBudgetItem[]
+  budgetItems   ProjectBudgetItem[]
+  estimateLines EstimateLine[]
 
   @@index([category])
   @@index([retiredAt])
@@ -3910,4 +3912,86 @@ model AcceptanceMilestone {
   @@index([projectId, seq])
   @@index([projectId, status])
   @@map("acceptance_milestones")
+}
+
+// ──────────────────────────── Dự toán admin (Estimate): mô tả hạng mục → AI bóc KL ────────────────────────────
+
+enum EstimateItemStatus {
+  draft // admin đang nhập
+  requested // đã bấm "AI Phân tích", chờ session
+  analyzing // session Claude đang bóc (khoá nút)
+  waiting_answer // AI có câu hỏi, chờ admin trả lời
+  ai_done // AI bóc xong, chờ admin duyệt line
+  approved // admin duyệt toàn bộ line
+}
+
+enum EstimateLineStatus {
+  ai_draft // AI ghi, chưa duyệt
+  edited // admin đã sửa số
+  approved // admin duyệt
+}
+
+// Nhóm hạng mục (Phần thô / Hoàn thiện / ME…) — tab Mô tả
+model EstimateGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   EstimateItem[]
+
+  @@index([projectId, sortOrder])
+  @@map("estimate_groups")
+}
+
+// Hạng mục thi công (móng, cột + xây bao, đổ sàn…) — input chính admin nhập
+model EstimateItem {
+  id           String             @id @default(uuid()) @db.Uuid
+  groupId      String             @map("group_id") @db.Uuid
+  name         String
+  method       String?            @db.Text // biện pháp thi công (nhập tự do)
+  materialSpec String?            @map("material_spec") @db.Text // chủng loại vật tư sử dụng
+  dimensions   String?            @db.Text // kích thước — text AI đọc kèm bản vẽ
+  drawings     Json               @default("[]") @db.JsonB // [{url, name}] ảnh bản vẽ; tương lai thêm JSON app vẽ
+  status       EstimateItemStatus @default(draft)
+  // Q&A stateless: mỗi vòng AI hỏi/admin trả lời là 1 phần tử — session mới đọc lại đủ lịch sử
+  qaThread   Json      @default("[]") @map("qa_thread") @db.JsonB // [{q, a?, askedAt, answeredAt?}]
+  analyzedAt DateTime? @map("analyzed_at")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  group EstimateGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  lines EstimateLine[]
+
+  @@index([groupId, sortOrder])
+  @@index([status])
+  @@map("estimate_items")
+}
+
+// Công tác AI bóc ra từ hạng mục — tab Khối lượng. Hao phí VT/NC/MM = quantity × Norm items (tính runtime).
+model EstimateLine {
+  id         String             @id @default(uuid()) @db.Uuid
+  itemId     String             @map("item_id") @db.Uuid
+  normCode   String?            @map("norm_code") @db.VarChar(32) // null = công tác ngoài định mức (lump-sum/ME)
+  name       String // tên công tác (theo Norm hoặc AI đặt)
+  unit       String             @db.VarChar(20)
+  formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
+  quantity   Decimal            @db.Decimal(14, 3)
+  status     EstimateLineStatus @default(ai_draft)
+  aiQuestion String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này
+  note       String?            @db.Text
+  sortOrder  Int                @default(0) @map("sort_order")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  item EstimateItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  norm Norm?        @relation(fields: [normCode], references: [code], onDelete: SetNull)
+
+  @@index([itemId, sortOrder])
+  @@index([normCode])
+  @@map("estimate_lines")
 }

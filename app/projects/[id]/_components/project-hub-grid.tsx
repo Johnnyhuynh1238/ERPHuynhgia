@@ -15,6 +15,7 @@ import {
   Package,
   Pencil,
   ShieldCheck,
+  Sparkles,
   Sunset,
   TrendingUp,
   Users,
@@ -71,6 +72,9 @@ export function ProjectHubGrid({
     { href: `${base}/tasks`, label: "Tiến độ", icon: ListChecks, desc: "Mốc thi công" },
     ...(caps.canViewBudget
       ? [{ href: `${base}/budget`, label: "Dự toán", icon: Calculator, desc: "NC · VT · MM" } as HubItem]
+      : []),
+    ...(caps.isAdmin
+      ? [{ href: `${base}/estimate`, label: "Dự toán AI", icon: Sparkles, desc: "AI bóc khối lượng" } as HubItem]
       : []),
     ...(isSelf && caps.canViewWorkOrders
       ? [{ href: `${base}/work-orders`, label: "Giao việc", icon: ClipboardList, desc: "Phiếu hàng ngày" } as HubItem]
