@@ -148,18 +148,11 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-semibold text-orange-300">Tài chính dự án</h1>
-            <p className="mt-1 text-xs text-[#8892b0]">
-              {data.project.code} — {data.project.name}
-            </p>
-          </div>
-          <Link href="/finance" className="shrink-0 rounded-lg border border-[#252840] px-3 py-1.5 text-xs text-[#8892b0] hover:bg-[#22263a]">
-            ← Tài chính cty
-          </Link>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-orange-300">Tài chính dự án</h2>
+        <Link href="/finance" className="shrink-0 rounded-lg border border-[#252840] px-3 py-1.5 text-xs text-[#8892b0] hover:bg-[#22263a]">
+          Tài chính cty →
+        </Link>
       </div>
 
       {/* Doanh thu */}

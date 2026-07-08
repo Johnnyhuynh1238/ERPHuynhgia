@@ -20,12 +20,11 @@ export default async function ProjectAcceptancePage({ params }: { params: { id: 
 
   return (
       <div className="space-y-3">
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-          <h1 className="text-xl font-semibold text-orange-300">Nghiệm thu chủ nhà</h1>
-          <p className="mt-1 text-xs text-[#8892b0]">
-            {project.code} — {project.name} · Chủ nhà: {project.customerName}.{" "}
+        <div>
+          <h2 className="text-lg font-semibold text-orange-300">Nghiệm thu chủ nhà</h2>
+          <p className="mt-0.5 text-xs text-[#8892b0]">
             {canManage
-              ? "Tạo mốc nghiệm thu để chủ nhà ký trên cổng CN (tab Tiến độ). Mốc đã ký sinh biên bản, bấm vào để xem / tải."
+              ? "Tạo mốc nghiệm thu để chủ nhà ký trên cổng CN (tab Tiến độ). Mốc đã ký sinh biên bản, bấm BB để xem / tải."
               : "Xem trạng thái ký của chủ nhà và tải biên bản nghiệm thu (bấm BB)."}
           </p>
         </div>
