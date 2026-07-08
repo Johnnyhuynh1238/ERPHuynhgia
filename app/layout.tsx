@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { ConfirmHost } from "@/components/confirm-dialog";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import "./globals.css";
 import '@/src/styles/hg-design-system.css'
 
@@ -35,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="font-sans bg-black text-zinc-100">
+        <ImpersonationBanner />
         <div className="hg-page-enter">{children}</div>
         <Toaster richColors position="top-right" closeButton />
         <ConfirmHost />

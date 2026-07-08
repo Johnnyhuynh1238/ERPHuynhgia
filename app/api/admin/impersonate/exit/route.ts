@@ -8,6 +8,11 @@ import { IMPERSONATE_COOKIE, readImpersonationTarget } from "@/lib/impersonation
 export const dynamic = "force-dynamic";
 
 // Thoát đóng vai: xoá cookie + ghi audit, redirect về trang chủ.
+// GET để nút "Thoát vai" là link thường, hoạt động ở mọi trang.
+export async function GET(request: Request) {
+  return POST(request);
+}
+
 export async function POST(request: Request) {
   const admin = await getRealSessionUser();
   const targetId = readImpersonationTarget();
