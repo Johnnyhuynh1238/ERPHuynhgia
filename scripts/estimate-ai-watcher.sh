@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Cron mỗi phút: quét hạng mục dự toán chờ AI bóc (status=requested),
-# spawn session Claude Code mới qua viewer service (127.0.0.1:7683) với tin nhắn con trỏ.
+# Cron mỗi phút: (1) ghi heartbeat trạng thái worker vào DB cho UI hiển thị,
+# (2) quét hạng mục dự toán chờ AI bóc (status=requested) → spawn session Claude Code
+# mới qua viewer service (127.0.0.1:7683) với tin nhắn con trỏ.
 # Session stateless: kill session cũ trước mỗi lượt — toàn bộ trạng thái nằm trong DB.
 set -euo pipefail
 
@@ -12,8 +13,40 @@ CLIENT="ccw-estimate0001"
 VIEWER="http://127.0.0.1:7683"
 SOP="/home/claudeuser/ERPHuynhgia/scripts/estimate-sop.md"
 
-# Worker đang bận (có hạng mục analyzing chưa quá 30 phút) → đợi lượt sau.
-# Quá 30 phút coi như session chết — admin bấm Reset trên UI hoặc lượt sau tự gom lại.
+# ── Heartbeat: đọc pane worker, suy trạng thái, upsert 1 row cho UI poll ──
+write_heartbeat() {
+  local capture busy_flag tail_txt state analyzing
+  capture=$(curl -sf --max-time 5 "$VIEWER/capture?client=$CLIENT&lines=30" 2>/dev/null || echo "")
+  analyzing=$("${PSQL[@]}" -c "SELECT count(*) FROM estimate_items WHERE status='analyzing'" || echo 0)
+
+  if [ -z "$capture" ]; then
+    busy_flag="False"; tail_txt="(không nối được viewer service)"; state="viewer_down"
+  else
+    busy_flag=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("busy"))' "$capture" 2>/dev/null || echo "False")
+    tail_txt=$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]).get("output") or "")[-700:])' "$capture" 2>/dev/null || echo "")
+    if echo "$tail_txt" | grep -qiE 'usage limit|limit will reset|limit reached|rate.?limit|out of credit|quota'; then
+      state="quota"
+    elif [ "$busy_flag" = "True" ]; then
+      state="working"
+    elif [ "$analyzing" != "0" ]; then
+      # có item analyzing mà worker im — kẹt (composer/chết giữa chừng)
+      state="stuck"
+    else
+      state="idle"
+    fi
+  fi
+
+  docker exec -i erp_db_prod psql -U erp_user -d erp_huynhgia6_prod -q \
+    -v s="$state" -v b="$([ "$busy_flag" = "True" ] && echo true || echo false)" -v t="$tail_txt" <<'HSQL' || true
+INSERT INTO estimate_worker_status (id, state, busy, tail, updated_at)
+VALUES (1, :'s', :'b'::boolean, :'t', now())
+ON CONFLICT (id) DO UPDATE SET state=EXCLUDED.state, busy=EXCLUDED.busy, tail=EXCLUDED.tail, updated_at=now();
+HSQL
+}
+
+write_heartbeat
+
+# ── Spawn: worker đang bận (analyzing < 30 phút) → đợi lượt sau ──
 busy=$("${PSQL[@]}" -c "SELECT count(*) FROM estimate_items WHERE status='analyzing' AND updated_at > now() - interval '30 minutes'")
 [ "$busy" != "0" ] && exit 0
 
@@ -47,3 +80,5 @@ for i in $(seq 1 12); do
   curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
     -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
 done
+
+write_heartbeat

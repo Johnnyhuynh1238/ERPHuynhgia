@@ -4029,3 +4029,15 @@ model EstimateMaterialMap {
   @@unique([projectId, srcName, srcUnit])
   @@map("estimate_material_maps")
 }
+
+// Heartbeat worker AI bóc KL — watcher host ghi mỗi phút, UI poll để hiện tiến trình.
+// 1 row duy nhất (id=1). state: idle | working | stuck | quota | viewer_down
+model EstimateWorkerStatus {
+  id        Int      @id @default(1)
+  state     String   @db.VarChar(16)
+  busy      Boolean  @default(false)
+  tail      String?  @db.Text // vài dòng terminal cuối của worker
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("estimate_worker_status")
+}

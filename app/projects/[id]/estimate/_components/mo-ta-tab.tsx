@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
+import { WorkerStatusBanner } from "./worker-status-banner";
 
 type Drawing = { key: string; name: string; type: string };
 type Qa = { q: string; a?: string; askedAt: string; answeredAt?: string };
@@ -127,6 +128,7 @@ export function MoTaTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-3">
+      <WorkerStatusBanner />
       <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
         <table className="w-full min-w-[1060px] border-collapse text-left text-xs">
           <thead>

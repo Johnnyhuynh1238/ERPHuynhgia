@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
+import { WorkerStatusBanner } from "./worker-status-banner";
 
 type Qa = { q: string; a?: string; askedAt: string; answeredAt?: string };
 type LineStatus = "ai_draft" | "edited" | "approved";
@@ -97,8 +98,10 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
-      <table className="w-full min-w-[960px] border-collapse text-left text-xs">
+    <div className="space-y-3">
+      <WorkerStatusBanner />
+      <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+        <table className="w-full min-w-[960px] border-collapse text-left text-xs">
         <thead>
           <tr className="border-b border-[#252840] text-[11px] uppercase tracking-wide text-zinc-500">
             <th className="w-[9%] px-3 py-2.5 font-semibold">Mã ĐM</th>
@@ -119,7 +122,8 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }
