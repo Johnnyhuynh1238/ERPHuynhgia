@@ -48,13 +48,22 @@ HSQL
 write_heartbeat
 
 # ── Tự hồi sinh: worker chết giữa chừng (swap acc restart session, crash…) ──
-# Pane không còn tin nhắn giao việc + không busy + item treo analyzing >5' → re-queue.
-# Worker stateless nên bóc lại từ đầu an toàn (chỉ ghi đè line ai_draft).
-if [ "${state:-}" = "stuck" ]; then
-  if ! echo "${tail_txt:-}" | grep -q 'Hạng mục cần bóc'; then
-    requeued=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '5 minutes' RETURNING id" \
+# Detect chắc chắn: session hiện tại được TẠO SAU lần spawn của watcher (lệch >30s)
+# nghĩa là session cũ đã bị thay (swap-all/kill) → worker cũ chết chắc → re-queue.
+# (Không dò text pane — tin nhắn trôi khỏi màn hình khi worker chạy dài gây báo chết nhầm.)
+SPAWN_TS_FILE=/tmp/estimate-worker-spawn.ts
+if [ "${state:-}" = "stuck" ] && [ -f "$SPAWN_TS_FILE" ]; then
+  spawn_ts=$(cat "$SPAWN_TS_FILE" 2>/dev/null || echo 0)
+  sess_created=$(curl -s "$VIEWER/sessions" | python3 -c '
+import json,sys
+for s in json.load(sys.stdin).get("sessions", []):
+    if s["client_id"] == sys.argv[1]:
+        print(s["created"]); break
+' "$CLIENT" 2>/dev/null || echo "")
+  if [ -n "$sess_created" ] && [ "$sess_created" -gt $((spawn_ts + 30)) ] 2>/dev/null; then
+    requeued=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '2 minutes' RETURNING id" \
       | grep -cE '^[0-9a-f-]{36}$' || true)
-    [ "${requeued:-0}" != "0" ] && echo "[$(date '+%F %T')] worker chết — re-queue $requeued item treo"
+    [ "${requeued:-0}" != "0" ] && echo "[$(date '+%F %T')] session bị thay (created=$sess_created > spawn=$spawn_ts) — re-queue $requeued item treo"
   fi
 fi
 # Lưới an toàn cuối: analyzing quá 30' bất kể lý do → re-queue
@@ -80,6 +89,7 @@ msg="Bóc khối lượng dự toán ERP. Đọc file $SOP và làm đúng từn
 payload=$(python3 -c 'import json,sys; print(json.dumps({"client": sys.argv[1], "text": sys.argv[2]}))' "$CLIENT" "$msg")
 result=$(curl -s -X POST "$VIEWER/send" -H 'Content-Type: application/json' -d "$payload")
 echo "[$(date '+%F %T')] send result: $result"
+date +%s > /tmp/estimate-worker-spawn.ts
 
 # Chống race: gửi khi TUI chưa attach xong pty thì ký tự bị nuốt một phần (kẹt composer)
 # hoặc mất sạch (pane trống). Lặp mỗi 5s, tối đa 12 lần:
