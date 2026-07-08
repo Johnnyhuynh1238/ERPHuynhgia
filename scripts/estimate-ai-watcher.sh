@@ -61,20 +61,20 @@ for s in json.load(sys.stdin).get("sessions", []):
         print(s["created"]); break
 ' "$CLIENT" 2>/dev/null || echo "")
   if [ -n "$sess_created" ] && [ "$sess_created" -gt $((spawn_ts + 30)) ] 2>/dev/null; then
-    requeued=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '2 minutes' RETURNING id" \
+    requeued=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='requested', updated_at=now() WHERE status='analyzing' AND updated_at < now() - interval '2 minutes' RETURNING id" \
       | grep -cE '^[0-9a-f-]{36}$' || true)
     [ "${requeued:-0}" != "0" ] && echo "[$(date '+%F %T')] session bị thay (created=$sess_created > spawn=$spawn_ts) — re-queue $requeued item treo"
   fi
 fi
 # Lưới an toàn cuối: analyzing quá 30' bất kể lý do → re-queue
-"${PSQL[@]}" -c "UPDATE estimate_items SET status='requested' WHERE status='analyzing' AND updated_at < now() - interval '30 minutes'" >/dev/null || true
+"${PSQL[@]}" -c "UPDATE estimate_items SET status='requested', updated_at=now() WHERE status='analyzing' AND updated_at < now() - interval '30 minutes'" >/dev/null || true
 
 # ── Spawn: worker đang bận (analyzing < 30 phút) → đợi lượt sau ──
 busy=$("${PSQL[@]}" -c "SELECT count(*) FROM estimate_items WHERE status='analyzing' AND updated_at > now() - interval '30 minutes'")
 [ "$busy" != "0" ] && exit 0
 
 # psql -tA vẫn in command tag "UPDATE n" sau các dòng RETURNING — lọc lấy đúng uuid
-ids=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='analyzing' WHERE status='requested' RETURNING id" \
+ids=$("${PSQL[@]}" -c "UPDATE estimate_items SET status='analyzing', updated_at=now() WHERE status='requested' RETURNING id" \
   | grep -E '^[0-9a-f-]{36}$' | paste -sd, - || true)
 [ -z "$ids" ] && exit 0
 
