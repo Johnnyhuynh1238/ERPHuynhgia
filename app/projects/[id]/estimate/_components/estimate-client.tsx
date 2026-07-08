@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { NormsClient } from "../../budget/norms/_components/norms-client";
 import { PricesClient } from "../../budget/prices/_components/prices-client";
+import { MoTaTab } from "./mo-ta-tab";
 
 type TabKey = "mo-ta" | "khoi-luong" | "hp-vt" | "don-gia" | "dinh-muc" | "hp-nc";
 
@@ -69,7 +70,7 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
         ))}
       </div>
 
-      {tab === "mo-ta" && <ComingSoon label="Mô tả hạng mục" note="Đợt 2 — bảng nhóm/hạng mục: biện pháp thi công · chủng loại vật tư · kích thước + ảnh bản vẽ." />}
+      {tab === "mo-ta" && <MoTaTab projectId={projectId} />}
       {tab === "khoi-luong" && <ComingSoon label="Khối lượng" note="Đợt 3 — công tác AI bóc từ mô tả, kèm diễn giải công thức + nút AI Phân tích." />}
       {tab === "hp-vt" && <ComingSoon label="Hao phí vật tư" note="Đợt 4 — KL × định mức × đơn giá VT, tính tự động ra thành tiền." />}
       {tab === "don-gia" && <PricesClient projectId={projectId} canEdit initialTab="vt" />}
