@@ -1,6 +1,7 @@
 import { CommentTargetType, Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
+import { readImpersonationTarget } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import {
@@ -13,6 +14,36 @@ import {
 type AppRole = "admin" | "engineer" | "foreman" | "accountant" | "construction_manager";
 
 export async function getCurrentUser() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+
+  // Admin đóng vai user khác (cookie HMAC 60'): swap sang user đích.
+  // Chỉ admin thật mới được swap; user đích phải active và không phải admin.
+  if (session.user.role === "admin") {
+    const targetId = readImpersonationTarget();
+    if (targetId && targetId !== session.user.id) {
+      const target = await prisma.user.findUnique({
+        where: { id: targetId },
+        select: { id: true, email: true, fullName: true, role: true, isActive: true },
+      });
+      if (target && target.isActive && target.role !== "admin") {
+        return {
+          ...session.user,
+          id: target.id,
+          email: target.email,
+          name: target.fullName,
+          role: target.role,
+          impersonatedBy: { id: session.user.id, name: session.user.name ?? session.user.email ?? "admin" },
+        };
+      }
+    }
+  }
+
+  return session.user;
+}
+
+// User thật từ session, bỏ qua impersonation — dùng cho API bật/tắt đóng vai.
+export async function getRealSessionUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
   return session.user;

@@ -236,6 +236,17 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
     await loadUsers();
   }
 
+  async function handleImpersonate(user: UserItem) {
+    if (!await confirmDialog(`Đóng vai ${user.fullName} trong 60 phút? Thao tác sẽ đứng tên user này (có audit log).`)) return;
+    const res = await fetch(`/api/admin/users/${user.id}/impersonate`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error("Không đóng vai được", { description: data.message || "Vui lòng thử lại." });
+      return;
+    }
+    window.location.href = "/";
+  }
+
   async function handleResetPassword(user: UserItem) {
     if (!await confirmDialog(`Xác nhận reset password cho ${user.email}?`)) return;
 
@@ -376,6 +387,16 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                         >
                           Reset password
                         </Button>
+                        {user.role !== "admin" && user.isActive ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8"
+                            onClick={() => handleImpersonate(user)}
+                          >
+                            👁 Đóng vai
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
