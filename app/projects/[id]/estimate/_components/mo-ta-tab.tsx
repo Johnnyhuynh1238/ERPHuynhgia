@@ -3,6 +3,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  ClipboardList,
   ImagePlus,
   Loader2,
   MessageCircleQuestion,
@@ -12,6 +13,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { ESTIMATE_TEMPLATES } from "@/lib/estimate-templates";
+import { ItemFormModal } from "./item-form-modal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
@@ -30,6 +33,8 @@ type Item = {
   drawings: Drawing[];
   status: ItemStatus;
   qaThread: Qa[];
+  templateKey: string | null;
+  formData: Record<string, unknown>;
   sortOrder: number;
   lineCount: number;
 };
@@ -61,6 +66,7 @@ export function MoTaTab({ projectId }: { projectId: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // id đang gọi API
   const [lightbox, setLightbox] = useState<{ itemId: string; idx: number; drawing: Drawing } | null>(null);
+  const [formItem, setFormItem] = useState<Item | null>(null); // hạng mục đang mở form mẫu
 
   const reload = useCallback(async () => {
     try {
@@ -144,6 +150,7 @@ export function MoTaTab({ projectId }: { projectId: string }) {
                 busy={busy}
                 run={run}
                 openLightbox={(itemId, idx, drawing) => setLightbox({ itemId, idx, drawing })}
+                openForm={(item) => setFormItem(item)}
               />
             ))}
           </tbody>
@@ -155,6 +162,20 @@ export function MoTaTab({ projectId }: { projectId: string }) {
         label="+ Thêm nhóm"
         onAdd={(name) => run("group", () => api(`/api/projects/${projectId}/estimate/groups`, { method: "POST", body: JSON.stringify({ name }) }))}
       />
+
+      {formItem && formItem.templateKey && (
+        <ItemFormModal
+          itemId={formItem.id}
+          itemName={formItem.name}
+          templateKey={formItem.templateKey}
+          initialData={formItem.formData}
+          onClose={() => setFormItem(null)}
+          onSaved={() => {
+            setFormItem(null);
+            void reload();
+          }}
+        />
+      )}
 
       {lightbox && (
         <Lightbox
@@ -180,6 +201,7 @@ function GroupRows({
   busy,
   run,
   openLightbox,
+  openForm,
 }: {
   group: Group;
   first: boolean;
@@ -187,6 +209,7 @@ function GroupRows({
   busy: string | null;
   run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
   openLightbox: (itemId: string, idx: number, drawing: Drawing) => void;
+  openForm: (item: Item) => void;
 }) {
   return (
     <>
@@ -220,7 +243,7 @@ function GroupRows({
       </tr>
 
       {group.items.map((it, ii) => (
-        <ItemRow key={it.id} item={it} first={ii === 0} last={ii === group.items.length - 1} busy={busy} run={run} openLightbox={openLightbox} />
+        <ItemRow key={it.id} item={it} first={ii === 0} last={ii === group.items.length - 1} busy={busy} run={run} openLightbox={openLightbox} openForm={openForm} />
       ))}
 
       <tr>
@@ -229,7 +252,10 @@ function GroupRows({
             placeholder="Tên hạng mục (VD: Móng, Cột + xây bao…)"
             label="+ Hạng mục"
             subtle
-            onAdd={(name) => run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))}
+            withTemplate
+            onAdd={(name, templateKey) =>
+              run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name, templateKey }) }))
+            }
           />
         </td>
       </tr>
@@ -244,6 +270,7 @@ function ItemRow({
   busy,
   run,
   openLightbox,
+  openForm,
 }: {
   item: Item;
   first: boolean;
@@ -251,6 +278,7 @@ function ItemRow({
   busy: string | null;
   run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
   openLightbox: (itemId: string, idx: number, drawing: Drawing) => void;
+  openForm: (item: Item) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const meta = STATUS_META[item.status];
@@ -278,6 +306,14 @@ function ItemRow({
           <EditableText value={item.name} className="font-semibold text-zinc-100" onSave={patch("name")} />
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+            {item.templateKey && (
+              <button
+                onClick={() => openForm(item)}
+                className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400 hover:bg-sky-500/25"
+              >
+                <ClipboardList className="h-3 w-3" /> Form
+              </button>
+            )}
             {item.lineCount > 0 && <span className="text-[10px] text-zinc-500">{item.lineCount} công tác</span>}
             <span className="hidden items-center gap-0.5 group-hover:flex">
               {!first && <IconBtn title="Lên" onClick={() => run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ move: "up" }) }))}><ArrowUp className="h-3 w-3" /></IconBtn>}
@@ -410,14 +446,17 @@ function AddInline({
   placeholder,
   label,
   subtle = false,
+  withTemplate = false,
 }: {
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string, templateKey?: string) => Promise<void>;
   placeholder: string;
   label: string;
   subtle?: boolean;
+  withTemplate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [templateKey, setTemplateKey] = useState("");
 
   if (!open) {
     return (
@@ -439,11 +478,32 @@ function AddInline({
     if (!v) return;
     setName("");
     setOpen(false);
-    await onAdd(v);
+    await onAdd(v, templateKey || undefined);
+  };
+
+  const pickTemplate = (key: string) => {
+    setTemplateKey(key);
+    // chọn mẫu mà chưa gõ tên → điền luôn tên mẫu cho nhanh
+    const tpl = ESTIMATE_TEMPLATES.find((t) => t.key === key);
+    if (tpl && !name.trim()) setName(tpl.name);
   };
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {withTemplate && (
+        <select
+          value={templateKey}
+          onChange={(e) => pickTemplate(e.target.value)}
+          className="rounded-md border border-[#374151] bg-[#0d0f17] px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-[#f97316]/60"
+        >
+          <option value="">Mẫu: tự do</option>
+          {ESTIMATE_TEMPLATES.map((t) => (
+            <option key={t.key} value={t.key}>
+              Mẫu: {t.name}
+            </option>
+          ))}
+        </select>
+      )}
       <input
         autoFocus
         value={name}

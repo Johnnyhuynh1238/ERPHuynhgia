@@ -34,6 +34,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         drawings: it.drawings,
         status: it.status,
         qaThread: it.qaThread,
+        templateKey: it.templateKey,
+        formData: it.formData,
         sortOrder: it.sortOrder,
         lineCount: it._count.lines,
       })),

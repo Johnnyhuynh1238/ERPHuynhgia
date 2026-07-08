@@ -3960,6 +3960,10 @@ model EstimateItem {
   materialSpec String?            @map("material_spec") @db.Text // chủng loại vật tư sử dụng
   dimensions   String?            @db.Text // kích thước — text AI đọc kèm bản vẽ
   drawings     Json               @default("[]") @db.JsonB // [{url, name}] ảnh bản vẽ; tương lai thêm JSON app vẽ
+  // Form mẫu chuẩn (lib/estimate-templates.ts): templateKey chọn mẫu, formData là câu trả lời;
+  // lưu form → renderFormText() sinh text vào 3 cột method/materialSpec/dimensions cho AI đọc.
+  templateKey String? @map("template_key") @db.VarChar(32)
+  formData    Json    @default("{}") @map("form_data") @db.JsonB
   status       EstimateItemStatus @default(draft)
   // Q&A stateless: mỗi vòng AI hỏi/admin trả lời là 1 phần tử — session mới đọc lại đủ lịch sử
   qaThread   Json      @default("[]") @map("qa_thread") @db.JsonB // [{q, a?, askedAt, answeredAt?}]
