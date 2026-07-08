@@ -34,8 +34,16 @@ payload=$(python3 -c 'import json,sys; print(json.dumps({"client": sys.argv[1], 
 result=$(curl -s -X POST "$VIEWER/send" -H 'Content-Type: application/json' -d "$payload")
 echo "[$(date '+%F %T')] send result: $result"
 
-# Chống race: session vừa respawn, Enter cuối có thể bị nuốt khi TUI chưa init xong
-# → tin nhắn kẹt trong composer. Gửi Enter bù sau 5s — composer rỗng thì Enter vô hại.
-sleep 5
-curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
-  -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
+# Chống race: session vừa respawn, Enter cuối bị nuốt khi TUI chưa init xong
+# → tin nhắn kẹt trong composer. Thời gian init không đoán được (5s có lần không đủ),
+# nên lặp: mỗi 5s kiểm busy — chưa bận thì gõ Enter tiếp, tối đa 12 lần (60s).
+for i in $(seq 1 12); do
+  sleep 5
+  busy_flag=$(curl -s "$VIEWER/capture?client=$CLIENT&lines=5" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("busy"))' 2>/dev/null || echo "")
+  if [ "$busy_flag" = "True" ]; then
+    echo "[$(date '+%F %T')] worker busy sau ${i} lần kiểm — OK"
+    break
+  fi
+  curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
+    -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
+done
