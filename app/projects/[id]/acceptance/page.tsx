@@ -2,7 +2,6 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-import { ProtectedLayout } from "@/components/protected-layout";
 import { AcceptanceManageClient } from "./_components/acceptance-manage-client";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +19,6 @@ export default async function ProjectAcceptancePage({ params }: { params: { id: 
   const canManage = user.role === "admin";
 
   return (
-    <ProtectedLayout>
       <div className="space-y-3">
         <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
           <h1 className="text-xl font-semibold text-orange-300">Nghiệm thu chủ nhà</h1>
@@ -33,6 +31,5 @@ export default async function ProjectAcceptancePage({ params }: { params: { id: 
         </div>
         <AcceptanceManageClient projectId={project.id} canManage={canManage} />
       </div>
-    </ProtectedLayout>
   );
 }

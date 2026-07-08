@@ -358,7 +358,7 @@ function Lightbox({
   if (!photo) return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
       onClick={onClose}
     >
       <button
