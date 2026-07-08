@@ -296,6 +296,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
   };
 
   const cardAnchorMap: Record<string, string> = {
+    admin_money_approvals: "/expenses?status=tptc_pending",
     admin_missing_morning: "#missing-morning-list",
     cm_missing_morning: "#missing-morning-list",
     admin_missing_evening: "#missing-evening-list",

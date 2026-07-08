@@ -115,6 +115,9 @@ export async function GET() {
       subPendingRequests,
       subDuePayments7,
       contractsWithoutEvaluation,
+      ktExpensePending,
+      ktReceiptPending,
+      poPending,
     ] = await Promise.all([
       prisma.project.count({ where: { ...projectAccess, status: "in_progress" } }),
       prisma.task.count({
@@ -214,6 +217,15 @@ export async function GET() {
           },
         },
       }),
+      user.role === UserRole.admin
+        ? prisma.expense.count({ where: { status: "tptc_pending", creator: { role: UserRole.accountant } } })
+        : Promise.resolve(0),
+      user.role === UserRole.admin
+        ? prisma.receipt.count({ where: { status: "awaiting_approval" } })
+        : Promise.resolve(0),
+      user.role === UserRole.admin
+        ? prisma.supplierPaymentOrder.count({ where: { status: "pending" } })
+        : Promise.resolve(0),
     ]);
 
     const reportProjectIds = reportProjectsRaw.map((project) => project.id);
@@ -357,6 +369,12 @@ export async function GET() {
       user.role === UserRole.admin
         ? [
             ...commonCards,
+            {
+              key: "admin_money_approvals",
+              label: "Lệnh tiền chờ anh duyệt (KT gửi)",
+              value: ktExpensePending + ktReceiptPending + poPending,
+              tone: ktExpensePending + ktReceiptPending + poPending > 0 ? ("danger" as const) : ("good" as const),
+            },
             {
               key: "admin_payment_due",
               label: "Đợt thanh toán 7 ngày tới",

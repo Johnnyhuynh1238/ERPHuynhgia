@@ -137,13 +137,18 @@ const SECTIONS: MenuSection[] = [
   },
 ];
 
-function MenuCard({ item }: { item: MenuItem }) {
+function MenuCard({ item, badge }: { item: MenuItem; badge?: number }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
-      className="group flex flex-col items-start gap-2 rounded-2xl border border-[#252840] bg-[#13151f] p-4 transition-all hover:-translate-y-0.5 hover:border-[#f97316]/60 hover:bg-[#1a1d2e] hover:shadow-[0_8px_24px_-12px_rgba(249,115,22,0.5)]"
+      className="group relative flex flex-col items-start gap-2 rounded-2xl border border-[#252840] bg-[#13151f] p-4 transition-all hover:-translate-y-0.5 hover:border-[#f97316]/60 hover:bg-[#1a1d2e] hover:shadow-[0_8px_24px_-12px_rgba(249,115,22,0.5)]"
     >
+      {badge ? (
+        <span className="absolute right-2 top-2 grid h-5 min-w-[20px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {badge}
+        </span>
+      ) : null}
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f97316]/15 text-[#fb923c] transition-colors group-hover:bg-[#f97316]/25">
         <Icon className="h-5 w-5" />
       </div>
@@ -155,7 +160,7 @@ function MenuCard({ item }: { item: MenuItem }) {
   );
 }
 
-function SectionBlock({ section }: { section: MenuSection }) {
+function SectionBlock({ section, badges = {} }: { section: MenuSection; badges?: Record<string, number> }) {
   const SectionIcon = section.icon;
   return (
     <section className="space-y-3">
@@ -170,14 +175,14 @@ function SectionBlock({ section }: { section: MenuSection }) {
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {section.items.map((item) => (
-          <MenuCard key={item.href} item={item} />
+          <MenuCard key={item.href} item={item} badge={badges[item.href]} />
         ))}
       </div>
     </section>
   );
 }
 
-export function AdminMenuClient() {
+export function AdminMenuClient({ badges = {} }: { badges?: Record<string, number> }) {
   const total = SECTIONS.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
@@ -200,13 +205,13 @@ export function AdminMenuClient() {
         <h2 className="text-sm font-bold uppercase tracking-wide text-[#f0f2ff]">Truy cập nhanh</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {QUICK.map((item) => (
-            <MenuCard key={item.href} item={item} />
+            <MenuCard key={item.href} item={item} badge={badges[item.href]} />
           ))}
         </div>
       </section>
 
       {SECTIONS.map((section) => (
-        <SectionBlock key={section.title} section={section} />
+        <SectionBlock key={section.title} section={section} badges={badges} />
       ))}
     </div>
   );
