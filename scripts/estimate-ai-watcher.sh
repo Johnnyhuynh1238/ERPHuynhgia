@@ -33,3 +33,9 @@ msg="Bóc khối lượng dự toán ERP. Đọc file $SOP và làm đúng từn
 payload=$(python3 -c 'import json,sys; print(json.dumps({"client": sys.argv[1], "text": sys.argv[2]}))' "$CLIENT" "$msg")
 result=$(curl -s -X POST "$VIEWER/send" -H 'Content-Type: application/json' -d "$payload")
 echo "[$(date '+%F %T')] send result: $result"
+
+# Chống race: session vừa respawn, Enter cuối có thể bị nuốt khi TUI chưa init xong
+# → tin nhắn kẹt trong composer. Gửi Enter bù sau 5s — composer rỗng thì Enter vô hại.
+sleep 5
+curl -s -X POST "$VIEWER/send_keys" -H 'Content-Type: application/json' \
+  -d "{\"client\":\"$CLIENT\",\"keys\":[\"Enter\"]}" >/dev/null || true
