@@ -252,7 +252,7 @@ function PivotTable({ title, groupCol, groups }: { title: string; groupCol: stri
   const total = groups.reduce((s, g) => s + g.amount, 0);
 
   return (
-    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
+    <div className="-mx-4 overflow-x-auto border-y border-[#252840] bg-[#13151f] sm:mx-0 sm:rounded-2xl sm:border-x">
       <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
         <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
         <span className="text-[11px] font-semibold tabular-nums text-zinc-400">Tổng: {fmt(total, 0)} ₫</span>
@@ -375,8 +375,8 @@ function ResourceTable({
     });
 
   return (
-    <div className="border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
-      <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
+    <div className="-mx-4 border-y border-[#252840] bg-[#13151f] sm:mx-0 sm:rounded-2xl sm:border-x">
+      <div className="sticky top-14 z-20 flex items-center justify-between border-b border-[#252840] bg-[#13151f] px-3 py-2.5 md:static">
         <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
         {missingPrice > 0 && (
           <span className="text-[10px] font-semibold text-amber-400">⚠ {missingPrice} dòng thiếu đơn giá — bổ sung ở tab Đơn giá</span>

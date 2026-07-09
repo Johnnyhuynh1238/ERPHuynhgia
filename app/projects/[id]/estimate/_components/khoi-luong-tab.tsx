@@ -143,13 +143,13 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
         </table>
       </div>
 
-      {/* Mobile: mỗi công tác 1 dòng gọn, không cuộn ngang, bấm mở popup chi tiết */}
-      <div className="space-y-3 md:hidden">
+      {/* Mobile: danh sách phẳng tràn mép, header nhóm dính — không card */}
+      <div className="-mx-4 md:hidden">
         {visibleGroups.map((g) => (
-          <div key={g.id} className="overflow-hidden border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
+          <div key={g.id}>
             <button
               onClick={() => toggleCollapse(g.id)}
-              className="flex w-full items-center gap-1.5 border-b border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left text-[13px] font-bold text-[#fb923c]"
+              className="sticky top-14 z-20 flex w-full items-center gap-1.5 border-y border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left text-[13px] font-bold text-[#fb923c]"
             >
               {collapsed.has(g.id) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               {g.name}
