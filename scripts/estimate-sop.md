@@ -111,6 +111,16 @@ Với mỗi vật tư chưa map, nếu bảng giá có hàng NCC tương ứng (
 - Insert: `INSERT INTO estimate_material_maps (id, project_id, src_name, src_unit, material_price_id, factor, created_at, updated_at) VALUES (gen_random_uuid(), '<projectId>', $t$Xi măng PCB30$t$, 'kg', '<mpId>', 50, now(), now()) ON CONFLICT (project_id, src_name, src_unit) DO NOTHING;` (DO NOTHING — không ghi đè lựa chọn admin đã chỉnh)
 - Vật tư phụ không có hàng NCC (nước, dây buộc, đinh, gỗ ván…) → bỏ qua, hệ thống dùng giá generic sẵn có.
 
+### 4d. Cân bằng đào – đắp (đất tôn nền, hố móng)
+
+Đất đào từ hố móng có thể tận dụng để đắp tôn nền. **So khối lượng đào vs đắp** rồi bóc đúng công tác:
+
+1. Tính `KL_đào` (đào móng/hố — CB.1210 thủ công / CB.1220 máy) và `KL_đắp` cần (tôn nền, cao độ × diện tích).
+2. **Phần đắp bằng đất tận dụng** = `min(KL_đào khả dụng, KL_đắp)` → line `CB.1240` (Đắp đất tận dụng — chỉ NC+máy, không vật tư).
+3. **Thiếu** (`KL_đắp > KL_đào`): phần thiếu `= KL_đắp − KL_đào` → line `CB.1230` (Đắp cát đầm chặt — có vật tư cát mua). Đây là **mua thêm**.
+4. **Dư** (`KL_đào > KL_đắp`): phần dư `= KL_đào − KL_đắp` → line `CB.1250` (Vận chuyển đất thải đi đổ — khoán /m³). Đây là **chở đi**.
+5. Formula ghi rõ phép trừ: `đắp 76.4 − đào tận dụng 13.7 = 62.7 m³ mua cát`. Không được đắp toàn bộ bằng tận dụng khi đào không đủ.
+
 ## 5. Ghi kết quả
 
 Mỗi lần bóc lại: xoá line nháp cũ của item đó trước (giữ line admin đã sửa/duyệt):
