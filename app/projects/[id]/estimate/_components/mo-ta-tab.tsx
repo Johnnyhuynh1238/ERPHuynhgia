@@ -235,27 +235,29 @@ function ItemRow({
   const isBusy = busy === item.id;
   const [showDoc, setShowDoc] = useState(false);
 
-  // Thông tin riêng — ô text tự do từng dòng
+  // Thông tin riêng — mỗi dòng sửa qua popup; bên ngoài chỉ hiện text phẳng
   const [fields, setFields] = useState<Field[]>(item.fields ?? []);
   useEffect(() => { setFields(item.fields ?? []); }, [item.fields]);
-  const fieldsDirty = JSON.stringify(fields) !== JSON.stringify(item.fields ?? []);
+  const [editing, setEditing] = useState<number | "new" | null>(null); // dòng đang mở popup
   const missing = fields.filter((f) => !f.value.trim()).length;
 
   const patchName = (value: string) =>
     run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: value }) }));
 
-  const setFieldValue = (i: number, value: string) =>
-    setFields((prev) => prev.map((f, k) => (k === i ? { ...f, value } : f)));
-  const setFieldLabel = (i: number, label: string) =>
-    setFields((prev) => prev.map((f, k) => (k === i ? { ...f, label } : f)));
-  const addField = () => setFields((prev) => [...prev, { label: "", value: "" }]);
-  const removeField = (i: number) => setFields((prev) => prev.filter((_, k) => k !== i));
-
-  const saveFields = () =>
-    run(item.id, async () => {
-      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ fields }) });
-      toast.success("Đã lưu thông tin riêng");
-    });
+  // Lưu ngay khi popup bấm Lưu — bên ngoài luôn là text đã lưu
+  const persistFields = (next: Field[]) => {
+    setFields(next);
+    return run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ fields: next }) }));
+  };
+  const saveField = (label: string, value: string) => {
+    const next = editing === "new" ? [...fields, { label, value }] : fields.map((f, k) => (k === editing ? { label, value } : f));
+    void persistFields(next);
+    setEditing(null);
+  };
+  const deleteField = () => {
+    if (typeof editing === "number") void persistFields(fields.filter((_, k) => k !== editing));
+    setEditing(null);
+  };
 
   return (
     <>
@@ -289,7 +291,7 @@ function ItemRow({
           </div>
         </td>
         <td className="px-3 py-2">
-          {/* Thông tin riêng — mỗi dòng 1 ô text tự do */}
+          {/* Thông tin riêng — hiện text phẳng, bấm dòng để mở popup sửa */}
           {fields.length > 0 && (
             <div className="mb-1.5 flex items-center gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Thông tin riêng</span>
@@ -302,64 +304,30 @@ function ItemRow({
               )}
             </div>
           )}
-          <div className="divide-y divide-[#252840] border-y border-[#252840]">
-            {fields.map((f, i) => {
-              const empty = !f.value.trim();
-              return (
-                <div key={i} className="group/f flex items-center gap-2 py-2 hover:bg-[#171a28]">
-                  <span
-                    title={empty ? "Chưa điền" : "Đã điền"}
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${empty ? "bg-rose-500" : "bg-emerald-500"}`}
-                  />
-                  <input
-                    value={f.label}
-                    onChange={(e) => setFieldLabel(i, e.target.value)}
-                    placeholder="Tên dòng…"
-                    className="w-48 shrink-0 border-none bg-transparent px-0 text-[12px] font-semibold text-zinc-400 outline-none placeholder:text-zinc-600"
-                  />
-                  <input
-                    value={f.value}
-                    onChange={(e) => setFieldValue(i, e.target.value)}
-                    placeholder="nhập nội dung…"
-                    className="min-w-0 flex-1 border-none bg-transparent px-0 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
-                  />
-                  <button
-                    onClick={() => removeField(i)}
-                    title="Xoá dòng"
-                    className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-rose-400 group-hover/f:opacity-100"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={addField}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
-            >
-              <Plus className="h-3 w-3" /> Thêm dòng
-            </button>
-            {fieldsDirty && (
-              <>
+          {fields.length > 0 && (
+            <div className="space-y-1">
+              {fields.map((f, i) => (
                 <button
-                  onClick={saveFields}
-                  disabled={isBusy}
-                  className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                  key={i}
+                  onClick={() => setEditing(i)}
+                  className="block w-full rounded-md px-1.5 py-1 text-left text-sm leading-relaxed hover:bg-[#171a28]"
                 >
-                  <Save className="h-3 w-3" /> Lưu
+                  {f.label && <span className="font-semibold text-[#fb923c]">{f.label}: </span>}
+                  {f.value.trim() ? (
+                    <span className="whitespace-pre-wrap text-zinc-200">{f.value}</span>
+                  ) : (
+                    <span className="italic text-rose-400/80">chưa nhập</span>
+                  )}
                 </button>
-                <button
-                  onClick={() => setFields(item.fields ?? [])}
-                  className="rounded-md p-1 text-zinc-500 hover:text-zinc-300"
-                  title="Hoàn tác"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setEditing("new")}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+          >
+            <Plus className="h-3 w-3" /> Thêm dòng mô tả
+          </button>
         </td>
         <td className="px-3 py-2 text-right">
           {item.status === "requested" || item.status === "analyzing" ? (
@@ -376,10 +344,6 @@ function ItemRow({
             <button
               disabled={isBusy}
               onClick={() => run(item.id, async () => {
-                // Lưu thông tin riêng đang gõ trước — tránh reload wipe mất
-                if (fieldsDirty) {
-                  await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ fields }) });
-                }
                 await api(`/api/estimate/items/${item.id}/request-analysis`, { method: "POST" });
                 toast.success("Đã lưu & đưa vào hàng chờ AI bóc khối lượng");
               })}
@@ -394,7 +358,100 @@ function ItemRow({
       {showDoc && (
         <DocModal item={item} isBusy={isBusy} run={run} onClose={() => setShowDoc(false)} labels={fields.map((f) => f.label).filter(Boolean)} />
       )}
+      {editing !== null && (
+        <FieldModal
+          initial={editing === "new" ? { label: "", value: "" } : fields[editing]}
+          isNew={editing === "new"}
+          onSave={saveField}
+          onDelete={deleteField}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
+  );
+}
+
+// Popup thêm/sửa 1 dòng mô tả — căn giữa màn hình hiện tại, không khuất
+function FieldModal({
+  initial,
+  isNew,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  initial: Field;
+  isNew: boolean;
+  onSave: (label: string, value: string) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(initial.label);
+  const [value, setValue] = useState(initial.value);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const canSave = !!label.trim() || !!value.trim();
+  const submit = () => { if (canSave) onSave(label.trim(), value.trim()); };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+          <span className="text-sm font-bold text-zinc-100">{isNew ? "Thêm dòng mô tả" : "Sửa dòng mô tả"}</span>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3 p-4">
+          <div>
+            <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Tiêu đề</p>
+            <input
+              autoFocus
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="VD: Mác bê tông, Loại thép, Cao độ…"
+              className="w-full rounded-lg border border-[#252840] bg-[#0d0f17] px-3 py-2 text-sm font-semibold text-[#fb923c] outline-none focus:border-[#f97316]/60 placeholder:font-normal placeholder:text-zinc-600"
+            />
+          </div>
+          <div>
+            <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Nội dung</p>
+            <textarea
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
+              rows={5}
+              placeholder="Nhập nội dung mô tả…"
+              className="w-full resize-y rounded-lg border border-[#252840] bg-[#0d0f17] px-3 py-2 text-sm leading-relaxed text-zinc-100 outline-none focus:border-[#f97316]/60"
+            />
+            <p className="mt-1 text-[10px] text-zinc-600">Ctrl+Enter để lưu nhanh</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 border-t border-[#252840] px-4 py-3">
+          {!isNew && (
+            <button
+              onClick={onDelete}
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Xoá
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={onClose} className="rounded-md border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-zinc-800">Huỷ</button>
+            <button
+              onClick={submit}
+              disabled={!canSave}
+              className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-4 py-1.5 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" /> Lưu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

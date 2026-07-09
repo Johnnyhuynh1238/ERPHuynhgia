@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CheckCheck, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
@@ -48,6 +48,7 @@ const fmtQty = (n: number) =>
 
 export function KhoiLuongTab({ projectId }: { projectId: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null); // popup chi tiết công tác (mobile)
 
   const reload = useCallback(async () => {
     try {
@@ -99,10 +100,20 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
     );
   }
 
+  const detailLine = detailId
+    ? groups.flatMap((g) => g.items).flatMap((it) => it.lines).find((l) => l.id === detailId) ?? null
+    : null;
+
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => it.lines.length > 0 || it.status === "analyzing" || it.status === "waiting_answer") }))
+    .filter((g) => g.items.length > 0);
+
   return (
     <div className="space-y-3">
       <WorkerStatusBanner />
-      <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+
+      {/* PC: bảng đầy đủ, sửa tại chỗ */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f] md:block">
         <table className="w-full min-w-[960px] border-collapse text-left text-xs">
         <thead>
           <tr className="border-b border-[#252840] text-[11px] uppercase tracking-wide text-zinc-500">
@@ -116,16 +127,62 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
           </tr>
         </thead>
         <tbody>
-          {groups.map((g) => {
-            const items = g.items.filter((it) => it.lines.length > 0 || it.status === "analyzing" || it.status === "waiting_answer");
-            if (items.length === 0) return null;
-            return (
-              <GroupSection key={g.id} group={g} items={items} run={run} />
-            );
-          })}
+          {visibleGroups.map((g) => (
+            <GroupSection key={g.id} group={g} items={g.items} run={run} />
+          ))}
         </tbody>
         </table>
       </div>
+
+      {/* Mobile: mỗi công tác 1 dòng gọn, không cuộn ngang, bấm mở popup chi tiết */}
+      <div className="space-y-3 md:hidden">
+        {visibleGroups.map((g) => (
+          <div key={g.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f]">
+            <div className="border-b border-[#252840] bg-[#1a1d2e] px-3 py-2 text-[13px] font-bold text-[#fb923c]">{g.name}</div>
+            {g.items.map((it) => (
+              <div key={it.id} className="border-b border-[#252840]">
+                {it.qaThread.map((qa, qi) => (
+                  <div key={`q${qi}`} className="border-b border-[#1c1f30] bg-[#191322]/60 px-3 py-1.5">
+                    <AnswerBox
+                      question={qa.q}
+                      answer={qa.a ?? null}
+                      onSave={(a) => run(() => api(`/api/estimate/items/${it.id}/answer`, { method: "POST", body: JSON.stringify({ index: qi, answer: a }) }))}
+                    />
+                  </div>
+                ))}
+                <div className="bg-[#161927] px-3 py-2">
+                  <ItemActions item={it} run={run} />
+                </div>
+                {it.lines.map((l) => {
+                  const meta = LINE_STATUS[l.status];
+                  const needAnswer = !!l.aiQuestion && !l.aiAnswer;
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => setDetailId(l.id)}
+                      className="flex w-full items-center gap-2 border-t border-[#1c1f30] px-3 py-2.5 pl-5 text-left active:bg-[#171a28]"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-zinc-200">{l.name}</span>
+                        <span className="mt-0.5 block truncate text-[10px] text-zinc-500">
+                          {l.normCode || "—"} · {fmtQty(l.quantity)} {l.unit}
+                          {l.fixRequest && l.status !== "approved" ? " · có YC sửa" : ""}
+                        </span>
+                      </span>
+                      {needAnswer && <MessageCircleQuestion className="h-4 w-4 shrink-0 text-rose-400" />}
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {detailLine && (
+        <LineDetailModal line={detailLine} run={run} onClose={() => setDetailId(null)} />
+      )}
     </div>
   );
 }
@@ -144,16 +201,6 @@ function GroupSection({ group, items, run }: { group: Group; items: Item[]; run:
 }
 
 function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
-  const allApproved = item.lines.length > 0 && item.lines.every((l) => l.status === "approved");
-  const someApproved = item.lines.some((l) => l.status === "approved");
-  const isProcessing = item.status === "requested" || item.status === "analyzing";
-  // Công tác chưa duyệt + có yêu cầu sửa = phần AI sẽ sửa lại
-  const fixCount = item.lines.filter((l) => l.fixRequest && l.status !== "approved").length;
-  // Câu hỏi còn treo (chung + theo công tác), và có gì đã trả lời / cần gửi lại AI
-  const openCount = item.qaThread.filter((q) => !q.a).length + item.lines.filter((l) => l.aiQuestion && !l.aiAnswer).length;
-  const answeredReady = item.qaThread.some((q) => q.a) || item.lines.some((l) => l.aiAnswer);
-  const actionable = fixCount > 0 || answeredReady;
-
   return (
     <>
       {/* Câu hỏi chung của hạng mục — nằm TRÊN hàng tên hạng mục */}
@@ -171,59 +218,76 @@ function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknow
 
       <tr className="border-b border-[#1c1f30] bg-[#161927]">
         <td colSpan={7} className="px-3 py-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="pl-2 text-xs font-semibold text-zinc-200">{item.name}</span>
-            {isProcessing && (
-              <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">
-                <Loader2 className="h-2.5 w-2.5 animate-spin" /> AI đang xử lý…
-              </span>
-            )}
-            {openCount > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-400">
-                <MessageCircleQuestion className="h-3 w-3" /> {openCount} câu hỏi chờ trả lời
-              </span>
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              {actionable && !isProcessing && (
-                <button
-                  onClick={() => run(async () => {
-                    await api(`/api/estimate/items/${item.id}/request-analysis`, { method: "POST" });
-                    toast.success("Đã gửi AI xử lý (câu trả lời + yêu cầu sửa)");
-                  })}
-                  className="inline-flex items-center gap-1 rounded-lg bg-[#f97316]/15 px-2.5 py-1 text-[11px] font-bold text-[#fb923c] hover:bg-[#f97316]/25"
-                >
-                  <Sparkles className="h-3 w-3" /> Gửi AI xử lý{fixCount > 0 ? ` (sửa ${fixCount})` : ""}
-                </button>
-              )}
-              {item.lines.length > 0 && !allApproved && (
-                <button
-                  onClick={() => run(() => api(`/api/estimate/items/${item.id}/approve-lines`, { method: "POST" }))}
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25"
-                >
-                  <CheckCheck className="h-3 w-3" /> Duyệt cả hạng mục
-                </button>
-              )}
-              {allApproved && (
-                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                  <CheckCheck className="h-3.5 w-3.5" /> Đã duyệt hết
-                </span>
-              )}
-              {someApproved && (
-                <button
-                  onClick={() => run(() => api(`/api/estimate/items/${item.id}/approve-lines`, { method: "DELETE" }))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-[11px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-rose-400"
-                >
-                  <RotateCcw className="h-3 w-3" /> Bỏ duyệt hạng mục
-                </button>
-              )}
-            </div>
-          </div>
+          <ItemActions item={item} run={run} />
         </td>
       </tr>
       {item.lines.map((l) => (
         <LineRow key={l.id} line={l} run={run} />
       ))}
     </>
+  );
+}
+
+// Tên hạng mục + badge + nút hành động (Gửi AI xử lý / Duyệt / Bỏ duyệt). Dùng chung PC + mobile.
+function ItemActions({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+  const allApproved = item.lines.length > 0 && item.lines.every((l) => l.status === "approved");
+  const someApproved = item.lines.some((l) => l.status === "approved");
+  const isProcessing = item.status === "requested" || item.status === "analyzing";
+  // Công tác chưa duyệt + có yêu cầu sửa = phần AI sẽ sửa lại
+  const fixCount = item.lines.filter((l) => l.fixRequest && l.status !== "approved").length;
+  // Câu hỏi còn treo (chung + theo công tác), và có gì đã trả lời / cần gửi lại AI
+  const openCount = item.qaThread.filter((q) => !q.a).length + item.lines.filter((l) => l.aiQuestion && !l.aiAnswer).length;
+  const answeredReady = item.qaThread.some((q) => q.a) || item.lines.some((l) => l.aiAnswer);
+  const actionable = fixCount > 0 || answeredReady;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="pl-2 text-xs font-semibold text-zinc-200">{item.name}</span>
+      {isProcessing && (
+        <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">
+          <Loader2 className="h-2.5 w-2.5 animate-spin" /> AI đang xử lý…
+        </span>
+      )}
+      {openCount > 0 && (
+        <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-400">
+          <MessageCircleQuestion className="h-3 w-3" /> {openCount} câu hỏi chờ trả lời
+        </span>
+      )}
+      <div className="ml-auto flex items-center gap-2">
+        {actionable && !isProcessing && (
+          <button
+            onClick={() => run(async () => {
+              await api(`/api/estimate/items/${item.id}/request-analysis`, { method: "POST" });
+              toast.success("Đã gửi AI xử lý (câu trả lời + yêu cầu sửa)");
+            })}
+            className="inline-flex items-center gap-1 rounded-lg bg-[#f97316]/15 px-2.5 py-1 text-[11px] font-bold text-[#fb923c] hover:bg-[#f97316]/25"
+          >
+            <Sparkles className="h-3 w-3" /> Gửi AI xử lý{fixCount > 0 ? ` (sửa ${fixCount})` : ""}
+          </button>
+        )}
+        {item.lines.length > 0 && !allApproved && (
+          <button
+            onClick={() => run(() => api(`/api/estimate/items/${item.id}/approve-lines`, { method: "POST" }))}
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25"
+          >
+            <CheckCheck className="h-3 w-3" /> Duyệt cả hạng mục
+          </button>
+        )}
+        {allApproved && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+            <CheckCheck className="h-3.5 w-3.5" /> Đã duyệt hết
+          </span>
+        )}
+        {someApproved && (
+          <button
+            onClick={() => run(() => api(`/api/estimate/items/${item.id}/approve-lines`, { method: "DELETE" }))}
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-[11px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-rose-400"
+          >
+            <RotateCcw className="h-3 w-3" /> Bỏ duyệt hạng mục
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -365,6 +429,140 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
         )
       )}
     </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+// Popup chi tiết 1 công tác (mobile) — căn giữa màn hình, cuộn trong popup, sửa tại chỗ + hành động
+function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; onClose: () => void }) {
+  const meta = LINE_STATUS[line.status];
+  const [fixDraft, setFixDraft] = useState(line.fixRequest ?? "");
+  const patch = (field: string) => (value: string) =>
+    run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#252840] bg-[#13151f] px-4 py-3">
+          <span className="text-sm font-bold text-zinc-100">Chi tiết công tác</span>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+            <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <Field label="Công tác">
+            <EditableText value={line.name} className="text-sm text-zinc-200" onSave={patch("name")} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Mã ĐM">
+              <EditableText value={line.normCode ?? ""} placeholder="—" className="font-mono text-xs text-zinc-300" onSave={patch("normCode")} />
+              {line.normName && <p className="mt-0.5 text-[10px] leading-tight text-zinc-600">{line.normName}</p>}
+            </Field>
+            <Field label="Khối lượng">
+              <div className="flex items-center gap-1">
+                <EditableText
+                  value={fmtQty(line.quantity)}
+                  className="font-semibold tabular-nums text-zinc-100"
+                  onSave={(v) => patch("quantity")(v.replace(/\./g, "").replace(",", "."))}
+                />
+                <span className="text-xs text-zinc-500">{line.unit}</span>
+              </div>
+            </Field>
+          </div>
+          <Field label="Diễn giải">
+            <EditableText value={line.formula ?? ""} multiline placeholder="Diễn giải công thức…" className="font-mono text-xs" onSave={patch("formula")} />
+            {line.note && <p className="mt-0.5 text-[10px] text-amber-500/80">{line.note}</p>}
+          </Field>
+
+          {line.aiQuestion && (
+            <Field label="Câu hỏi AI">
+              <AnswerBox
+                question={line.aiQuestion}
+                answer={line.aiAnswer}
+                onSave={(a) => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ aiAnswer: a }) }))}
+              />
+            </Field>
+          )}
+
+          {line.status !== "approved" && (
+            <div>
+              <p className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wide text-[#fb923c]">
+                <Wrench className="h-3 w-3" /> Yêu cầu AI sửa
+              </p>
+              <textarea
+                value={fixDraft}
+                onChange={(e) => setFixDraft(e.target.value)}
+                placeholder="VD: khối lượng thiếu phần giằng móng, tính thêm; hoặc mã ĐM sai đổi sang BT.1120…"
+                rows={2}
+                className="w-full rounded-md border border-[#f97316]/40 bg-[#0d0f17] px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-[#f97316]/70"
+              />
+              <div className="mt-1.5 flex gap-1.5">
+                <button
+                  onClick={() => void run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ fixRequest: fixDraft.trim() }) }))}
+                  disabled={fixDraft.trim() === (line.fixRequest ?? "")}
+                  className="rounded-md bg-[#f97316] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                >
+                  Lưu YC sửa
+                </button>
+                {line.fixRequest && (
+                  <button
+                    onClick={() => { setFixDraft(""); void run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ fixRequest: "" }) })); }}
+                    className="rounded-md border border-zinc-700 px-3 py-1 text-[11px] font-semibold text-zinc-400 hover:bg-zinc-800"
+                  >
+                    Bỏ YC
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex items-center gap-2 border-t border-[#252840] bg-[#13151f] px-4 py-3">
+          {line.status !== "approved" ? (
+            <button
+              onClick={() => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ action: "approve" }) }))}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/25"
+            >
+              <Check className="h-4 w-4" /> Duyệt công tác
+            </button>
+          ) : (
+            <button
+              onClick={() => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ action: "unapprove" }) }))}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-zinc-800"
+            >
+              <RotateCcw className="h-4 w-4" /> Bỏ duyệt
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              const ok = await confirmDialog({ message: `Xoá công tác "${line.name}"?` });
+              if (ok) { await run(() => api(`/api/estimate/lines/${line.id}`, { method: "DELETE" })); onClose(); }
+            }}
+            className="flex items-center justify-center gap-1 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
+          >
+            <Trash2 className="h-4 w-4" /> Xoá
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
