@@ -4,6 +4,8 @@ import {
   ArrowDown,
   ArrowUp,
   BookMarked,
+  ChevronDown,
+  ChevronRight,
   FileText,
   Loader2,
   Plus,
@@ -59,6 +61,14 @@ async function api(url: string, init?: RequestInit) {
 export function MoTaTab({ projectId }: { projectId: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // id đang gọi API
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // nhóm đang gập
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const reload = useCallback(async () => {
     try {
@@ -142,6 +152,8 @@ export function MoTaTab({ projectId }: { projectId: string }) {
                 last={gi === groups.length - 1}
                 busy={busy}
                 run={run}
+                collapsed={collapsed.has(g.id)}
+                onToggle={() => toggleCollapse(g.id)}
               />
             ))}
           </tbody>
@@ -151,8 +163,11 @@ export function MoTaTab({ projectId }: { projectId: string }) {
       {/* Mobile: mỗi nhóm 1 khối, mỗi hạng mục 1 card — không cuộn ngang */}
       <div className="space-y-3 md:hidden">
         {groups.map((g, gi) => (
-          <div key={g.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f]">
+          <div key={g.id} className="overflow-hidden border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
             <div className="flex items-center gap-2 border-b border-[#252840] bg-[#1a1d2e] px-3 py-2">
+              <button onClick={() => toggleCollapse(g.id)} title={collapsed.has(g.id) ? "Xổ nhóm" : "Gập nhóm"} className="shrink-0 text-zinc-400 hover:text-[#fb923c]">
+                {collapsed.has(g.id) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
               <EditableText
                 value={g.name}
                 className="text-[13px] font-bold text-[#fb923c]"
@@ -174,17 +189,19 @@ export function MoTaTab({ projectId }: { projectId: string }) {
                 </IconBtn>
               </div>
             </div>
-            {g.items.map((it, ii) => (
+            {!collapsed.has(g.id) && g.items.map((it, ii) => (
               <ItemRow key={it.id} item={it} first={ii === 0} last={ii === g.items.length - 1} busy={busy} run={run} mode="card" />
             ))}
-            <div className="border-t border-[#1c1f30] px-3 py-2">
-              <AddInline
-                placeholder="Tên hạng mục…"
-                label="+ Hạng mục"
-                subtle
-                onAdd={(name) => run(g.id, () => api(`/api/estimate/groups/${g.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))}
-              />
-            </div>
+            {!collapsed.has(g.id) && (
+              <div className="border-t border-[#1c1f30] px-3 py-2">
+                <AddInline
+                  placeholder="Tên hạng mục…"
+                  label="+ Hạng mục"
+                  subtle
+                  onAdd={(name) => run(g.id, () => api(`/api/estimate/groups/${g.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -204,18 +221,25 @@ function GroupRows({
   last,
   busy,
   run,
+  collapsed,
+  onToggle,
 }: {
   group: Group;
   first: boolean;
   last: boolean;
   busy: string | null;
   run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   return (
     <>
       <tr className="border-y border-[#252840] bg-[#1a1d2e]">
         <td colSpan={3} className="px-3 py-2">
           <div className="flex items-center gap-2">
+            <button onClick={onToggle} title={collapsed ? "Xổ nhóm" : "Gập nhóm"} className="shrink-0 text-zinc-400 hover:text-[#fb923c]">
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
             <EditableText
               value={group.name}
               className="text-[13px] font-bold text-[#fb923c]"
@@ -242,22 +266,24 @@ function GroupRows({
         </td>
       </tr>
 
-      {group.items.map((it, ii) => (
+      {!collapsed && group.items.map((it, ii) => (
         <ItemRow key={it.id} item={it} first={ii === 0} last={ii === group.items.length - 1} busy={busy} run={run} />
       ))}
 
-      <tr>
-        <td colSpan={3} className="px-3 py-1.5">
-          <AddInline
-            placeholder="Tên hạng mục (VD: Móng, Cột + xây bao…)"
-            label="+ Hạng mục"
-            subtle
-            onAdd={(name) =>
-              run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))
-            }
-          />
-        </td>
-      </tr>
+      {!collapsed && (
+        <tr>
+          <td colSpan={3} className="px-3 py-1.5">
+            <AddInline
+              placeholder="Tên hạng mục (VD: Móng, Cột + xây bao…)"
+              label="+ Hạng mục"
+              subtle
+              onAdd={(name) =>
+                run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))
+              }
+            />
+          </td>
+        </tr>
+      )}
     </>
   );
 }

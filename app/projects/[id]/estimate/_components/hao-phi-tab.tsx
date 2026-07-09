@@ -252,7 +252,7 @@ function PivotTable({ title, groupCol, groups }: { title: string; groupCol: stri
   const total = groups.reduce((s, g) => s + g.amount, 0);
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
       <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
         <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
         <span className="text-[11px] font-semibold tabular-nums text-zinc-400">Tổng: {fmt(total, 0)} ₫</span>
@@ -375,7 +375,7 @@ function ResourceTable({
     });
 
   return (
-    <div className="rounded-2xl border border-[#252840] bg-[#13151f]">
+    <div className="border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
       <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
         <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
         {missingPrice > 0 && (

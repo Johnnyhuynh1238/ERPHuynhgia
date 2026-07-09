@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronRight, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -50,6 +50,14 @@ const fmtQty = (n: number) =>
 export function KhoiLuongTab({ projectId }: { projectId: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null); // popup chi tiết công tác (mobile)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // nhóm đang gập
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const reload = useCallback(async () => {
     try {
@@ -129,7 +137,7 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
         </thead>
         <tbody>
           {visibleGroups.map((g) => (
-            <GroupSection key={g.id} group={g} items={g.items} run={run} />
+            <GroupSection key={g.id} group={g} items={g.items} run={run} collapsed={collapsed.has(g.id)} onToggle={() => toggleCollapse(g.id)} />
           ))}
         </tbody>
         </table>
@@ -138,9 +146,16 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
       {/* Mobile: mỗi công tác 1 dòng gọn, không cuộn ngang, bấm mở popup chi tiết */}
       <div className="space-y-3 md:hidden">
         {visibleGroups.map((g) => (
-          <div key={g.id} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f]">
-            <div className="border-b border-[#252840] bg-[#1a1d2e] px-3 py-2 text-[13px] font-bold text-[#fb923c]">{g.name}</div>
-            {g.items.map((it) => (
+          <div key={g.id} className="overflow-hidden border-y border-[#252840] bg-[#13151f] sm:rounded-2xl sm:border-x">
+            <button
+              onClick={() => toggleCollapse(g.id)}
+              className="flex w-full items-center gap-1.5 border-b border-[#252840] bg-[#1a1d2e] px-3 py-2 text-left text-[13px] font-bold text-[#fb923c]"
+            >
+              {collapsed.has(g.id) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {g.name}
+              <span className="text-[10px] font-normal text-zinc-600">{g.items.length} hạng mục</span>
+            </button>
+            {!collapsed.has(g.id) && g.items.map((it) => (
               <div key={it.id} className="border-b border-[#252840]">
                 {it.qaThread.map((qa, qi) => (
                   <div key={`q${qi}`} className="border-b border-[#1c1f30] bg-[#191322]/60 px-3 py-1.5">
@@ -188,13 +203,19 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
   );
 }
 
-function GroupSection({ group, items, run }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+function GroupSection({ group, items, run, collapsed, onToggle }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed: boolean; onToggle: () => void }) {
   return (
     <>
       <tr className="border-y border-[#252840] bg-[#1a1d2e]">
-        <td colSpan={7} className="px-3 py-2 text-[13px] font-bold text-[#fb923c]">{group.name}</td>
+        <td colSpan={7} className="px-3 py-2">
+          <button onClick={onToggle} className="flex items-center gap-1.5 text-[13px] font-bold text-[#fb923c]">
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {group.name}
+            <span className="text-[10px] font-normal text-zinc-600">{items.length} hạng mục</span>
+          </button>
+        </td>
       </tr>
-      {items.map((it) => (
+      {!collapsed && items.map((it) => (
         <ItemSection key={it.id} item={it} run={run} />
       ))}
     </>
