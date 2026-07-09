@@ -99,7 +99,9 @@ WHERE m.id IS NULL;
 
 Với mỗi vật tư chưa map, nếu bảng giá có hàng NCC tương ứng (xi măng ↔ các loại xi măng, cát vàng ↔ cát bê tông, đá dăm ↔ đá 1x2/0x4, gạch ↔ gạch tuynel…):
 
-- **Bê tông: dùng BÊ TÔNG THƯƠNG PHẨM mua theo m³** — norm BT đã set `material_items` = "Bê tông thương phẩm M<mác>" (KHÔNG còn cấp phối xi-cát-đá-nước). Map thẳng tới hàng NCC cùng tên "Bê tông thương phẩm M100/M250" (`factor=1`, đơn vị m³). **KHÔNG bung cấp phối, KHÔNG thêm nước.**
+- **Bê tông: MẶC ĐỊNH tính CẤP PHỐI định mức** (xi măng + cát + đá theo norm) — map các vật tư này tới hàng NCC (xi măng, cát, đá) như bình thường. **KHÔNG tự chuyển sang thương phẩm.**
+  - **CHỈ KHI** mô tả (method/fields) ghi rõ **"bê tông thương phẩm"** (BT tươi mua sẵn) → mới dùng bê tông thương phẩm: thay vật tư cấp phối bằng 1 vật tư "Bê tông thương phẩm M<mác>" (m³, hao hụt ~1.5%), map tới hàng NCC cùng tên đã có trong bảng giá. Không note thương phẩm = cấp phối.
+  - **Không thêm "Nước"** vào bê tông (đã bỏ khỏi định mức).
 - **Gỗ ván / cây chống / giàn giáo / máy / dụng cụ thi công: KHÔNG bóc line vật tư** — đã nằm trong hao phí NC + máy. Norm cốp pha `material_items` chỉ còn **Đinh các loại** (đúng); chỉ map norm cốp pha là đủ, đừng thêm gỗ ván.
 - **KHÔNG thêm "Nước" vào bất kỳ công tác nào** — đã loại khỏi mọi định mức.
 - Chọn hàng **GIÁ CAO NHẤT** trong nhóm phù hợp.
