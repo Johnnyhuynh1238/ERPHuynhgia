@@ -156,7 +156,7 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
               <span className="text-[10px] font-normal text-zinc-600">{g.items.length} hạng mục</span>
             </button>
             {!collapsed.has(g.id) && g.items.map((it, ii) => (
-              <div key={it.id} className={`border-b border-[#252840] ${ii % 2 === 1 ? "bg-[#171a28]" : "bg-[#13151f]"}`}>
+              <div key={it.id} className={`border-b border-[#252840] ${ii % 2 === 1 ? "bg-[#1c2338]" : "bg-[#12141d]"}`}>
                 {it.qaThread.map((qa, qi) => (
                   <div key={`q${qi}`} className="border-b border-[#1c1f30] bg-[#191322]/60 px-3 py-1.5">
                     <AnswerBox
