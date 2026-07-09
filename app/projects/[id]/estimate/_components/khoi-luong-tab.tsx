@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, Loader2, MessageCircleQuestion, Sparkles, Trash2, Wrench, X } from "lucide-react";
+import { Check, CheckCheck, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
@@ -145,6 +145,7 @@ function GroupSection({ group, items, run }: { group: Group; items: Item[]; run:
 
 function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
   const allApproved = item.lines.length > 0 && item.lines.every((l) => l.status === "approved");
+  const someApproved = item.lines.some((l) => l.status === "approved");
   const isProcessing = item.status === "requested" || item.status === "analyzing";
   // Công tác chưa duyệt + có yêu cầu sửa = phần AI sẽ sửa lại
   const fixCount = item.lines.filter((l) => l.fixRequest && l.status !== "approved").length;
@@ -206,6 +207,14 @@ function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknow
                 <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
                   <CheckCheck className="h-3.5 w-3.5" /> Đã duyệt hết
                 </span>
+              )}
+              {someApproved && (
+                <button
+                  onClick={() => run(() => api(`/api/estimate/items/${item.id}/approve-lines`, { method: "DELETE" }))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-[11px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-rose-400"
+                >
+                  <RotateCcw className="h-3 w-3" /> Bỏ duyệt hạng mục
+                </button>
               )}
             </div>
           </div>

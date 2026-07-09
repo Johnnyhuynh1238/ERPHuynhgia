@@ -21,3 +21,18 @@ export async function POST(_req: Request, { params }: { params: { itemId: string
   ]);
   return NextResponse.json({ ok: true });
 }
+
+// DELETE: bỏ duyệt toàn bộ line của hạng mục (approved → edited), hạng mục về ai_done
+export async function DELETE(_req: Request, { params }: { params: { itemId: string } }) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
+  const item = await prisma.estimateItem.findUnique({ where: { id: params.itemId }, select: { id: true } });
+  if (!item) return NextResponse.json({ message: "Không tìm thấy hạng mục" }, { status: 404 });
+
+  await prisma.$transaction([
+    prisma.estimateLine.updateMany({ where: { itemId: item.id, status: "approved" }, data: { status: "edited" } }),
+    prisma.estimateItem.update({ where: { id: item.id }, data: { status: "ai_done" } }),
+  ]);
+  return NextResponse.json({ ok: true });
+}
