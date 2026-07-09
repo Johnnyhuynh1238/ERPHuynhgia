@@ -302,32 +302,37 @@ function ItemRow({
               )}
             </div>
           )}
-          <div className="space-y-1">
-            {fields.map((f, i) => (
-              <div key={i} className="group/f flex items-center gap-1.5">
-                <input
-                  value={f.label}
-                  onChange={(e) => setFieldLabel(i, e.target.value)}
-                  placeholder="Tên dòng…"
-                  className="w-40 shrink-0 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[11px] font-semibold text-zinc-400 outline-none hover:border-[#252840] focus:border-[#f97316]/40 focus:bg-[#0d0f17]"
-                />
-                <input
-                  value={f.value}
-                  onChange={(e) => setFieldValue(i, e.target.value)}
-                  placeholder="nhập…"
-                  className={`min-w-0 flex-1 rounded-md border px-1.5 py-1 text-xs text-zinc-100 outline-none focus:border-[#f97316]/50 focus:bg-[#0d0f17] ${
-                    f.value.trim() ? "border-transparent bg-transparent hover:border-[#252840]" : "border-rose-500/40 bg-rose-500/5"
-                  }`}
-                />
-                <button
-                  onClick={() => removeField(i)}
-                  title="Xoá dòng"
-                  className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-rose-400 group-hover/f:opacity-100"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
+          <div className="divide-y divide-[#252840] border-y border-[#252840]">
+            {fields.map((f, i) => {
+              const empty = !f.value.trim();
+              return (
+                <div key={i} className="group/f flex items-center gap-2 py-2 hover:bg-[#171a28]">
+                  <span
+                    title={empty ? "Chưa điền" : "Đã điền"}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${empty ? "bg-rose-500" : "bg-emerald-500"}`}
+                  />
+                  <input
+                    value={f.label}
+                    onChange={(e) => setFieldLabel(i, e.target.value)}
+                    placeholder="Tên dòng…"
+                    className="w-48 shrink-0 border-none bg-transparent px-0 text-[12px] font-semibold text-zinc-400 outline-none placeholder:text-zinc-600"
+                  />
+                  <input
+                    value={f.value}
+                    onChange={(e) => setFieldValue(i, e.target.value)}
+                    placeholder="nhập nội dung…"
+                    className="min-w-0 flex-1 border-none bg-transparent px-0 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                  />
+                  <button
+                    onClick={() => removeField(i)}
+                    title="Xoá dòng"
+                    className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-rose-400 group-hover/f:opacity-100"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <button
