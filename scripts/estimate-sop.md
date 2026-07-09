@@ -9,6 +9,18 @@ Bạn là worker session bóc khối lượng cho ERP Huỳnh Gia. Tin nhắn sp
 3. **Không đụng line admin đã sửa/duyệt**: chỉ xoá + ghi đè line có `status='ai_draft'`.
 4. Đơn vị của line phải khớp đơn vị của định mức nếu map `norm_code`.
 
+## 0b. Hai chế độ — kiểm tra TRƯỚC KHI làm
+
+Với mỗi item, chạy trước:
+
+```sql
+SELECT id, name, status, fix_request FROM estimate_lines
+WHERE item_id = '<itemId>' AND fix_request IS NOT NULL AND status <> 'approved';
+```
+
+- **Có dòng trả về → CHẾ ĐỘ SỬA** (mục 5b): admin đã bóc rồi, chỉ muốn sửa đúng các công tác đó theo yêu cầu. **KHÔNG bóc lại cả hạng mục, KHÔNG xoá line khác.**
+- **Không dòng nào → CHẾ ĐỘ BÓC MỚI** (mục 2–5 như thường).
+
 ## 1. Truy cập DB
 
 ```bash
@@ -28,7 +40,7 @@ JOIN projects p ON p.id = g.project_id
 WHERE i.id IN ('<id1>', '<id2>');
 ```
 
-- `method` = biện pháp thi công, `material_spec` = chủng loại vật tư, `dimensions` = kích thước — cả 3 là text tự do admin nhập.
+- `method` = **mô tả hạng mục** (text tự do admin nhập: gồm biện pháp thi công + chủng loại vật tư + kích thước/cao độ/số lượng, gộp chung 1 ô). Đây là nguồn chính. `material_spec`/`dimensions` là cột cũ, có thể rỗng — đọc kèm nếu có giá trị.
 - `qa_thread` = lịch sử hỏi–đáp các vòng trước: `[{q, a?, askedAt, answeredAt?}]`. **Đọc kỹ các câu đã trả lời (`a` có giá trị) — đó là thông tin bổ sung, không hỏi lại.**
 
 ## 3. Tải bản vẽ (nếu có)
@@ -104,6 +116,36 @@ VALUES (gen_random_uuid(), '<itemId>', 'BT.1110', $t$Bê tông móng đá 1x2 M2
 ```
 
 `sort_order` tăng dần theo trình tự thi công.
+
+## 5b. CHẾ ĐỘ SỬA (khi có `fix_request`)
+
+Admin đã xem khối lượng và ghi yêu cầu sửa vào từng công tác. Chỉ đụng đúng các công tác đó.
+
+```sql
+SELECT id, norm_code, name, unit, formula, quantity, status, fix_request
+FROM estimate_lines
+WHERE item_id = '<itemId>' AND fix_request IS NOT NULL AND status <> 'approved'
+ORDER BY sort_order;
+```
+
+Với **mỗi** dòng:
+
+1. Đọc `fix_request` = yêu cầu của admin (VD "thiếu giằng móng, tính thêm", "mã ĐM sai đổi BT.1120", "khối lượng sai, đào sâu 1.5m").
+2. Sửa đúng theo yêu cầu: cập nhật `quantity`/`formula`/`norm_code`/`name`/`unit`/`note` của **chính dòng đó** (UPDATE theo `id`). Nếu yêu cầu là "thêm 1 công tác mới" thì INSERT thêm line (`status='ai_draft'`), và vẫn xử lý xong dòng gốc.
+3. Sửa xong: **clear `fix_request` và set lại `status='ai_draft'`** để admin duyệt lại, ghi `note` tóm tắt đã sửa gì.
+
+```sql
+UPDATE estimate_lines
+SET quantity = 4.2, formula = $t$...$t$, status = 'ai_draft', fix_request = NULL,
+    note = $t$Đã thêm giằng móng theo yêu cầu$t$, updated_at = now()
+WHERE id = '<lineId>';
+```
+
+- **KHÔNG** chạy `DELETE ... WHERE status='ai_draft'` ở chế độ này — sẽ xoá công tác admin chưa yêu cầu sửa.
+- **KHÔNG** đụng line `status='approved'` hay line `fix_request IS NULL`.
+- Thiếu thông tin để sửa → ghi câu hỏi (mục 6), để nguyên `fix_request` dòng đó chờ vòng sau.
+- Sau khi map lại `norm_code` mới, chạy lại mục 4c để map vật tư định mức phát sinh.
+- Xong hết → chốt status item (mục 7) + báo Telegram (mục 8) với nội dung "đã sửa N công tác".
 
 ## 6. Khi cần hỏi admin
 

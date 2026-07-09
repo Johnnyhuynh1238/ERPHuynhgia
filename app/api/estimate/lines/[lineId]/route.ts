@@ -35,6 +35,16 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
     return NextResponse.json({ ok: true });
   }
 
+  // Yêu cầu AI sửa: chỉ ghi/xoá fix_request, KHÔNG đổi status (đây không phải sửa tay).
+  // Line đã duyệt vẫn cho gỡ yêu cầu; muốn AI sửa thì bỏ duyệt trước — worker sẽ bỏ qua line approved.
+  if ("fixRequest" in body) {
+    await prisma.estimateLine.update({
+      where: { id: line.id },
+      data: { fixRequest: String(body.fixRequest ?? "").trim() || null },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   const data: Record<string, unknown> = {};
   if ("name" in body) {
     const v = String(body.name ?? "").trim();

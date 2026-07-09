@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteObjectFromMinio } from "@/lib/minio";
 import { requireAdmin, type EstimateDrawing } from "@/lib/estimate";
-import { getTemplate, renderFormText } from "@/lib/estimate-templates";
 
 export const runtime = "nodejs";
 
 // PATCH: sửa nội dung hạng mục.
 // body {name?, method?, materialSpec?, dimensions?} | {move: "up"|"down"}
-// | {formData: {...}} — lưu form mẫu: ghi formData + render text vào 3 cột
+// method = ô Mô tả duy nhất trên tab; materialSpec/dimensions là cột cũ (vẫn nhận nếu có).
 export async function PATCH(req: Request, { params }: { params: { itemId: string } }) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -30,23 +29,6 @@ export async function PATCH(req: Request, { params }: { params: { itemId: string
         prisma.estimateItem.update({ where: { id: neighbor.id }, data: { sortOrder: item.sortOrder } }),
       ]);
     }
-    return NextResponse.json({ ok: true });
-  }
-
-  if (body.formData && typeof body.formData === "object") {
-    if (!item.templateKey || !getTemplate(item.templateKey)) {
-      return NextResponse.json({ message: "Hạng mục không có form mẫu" }, { status: 400 });
-    }
-    const text = renderFormText(item.templateKey, body.formData as Record<string, unknown>);
-    await prisma.estimateItem.update({
-      where: { id: item.id },
-      data: {
-        formData: body.formData,
-        method: text?.method || null,
-        materialSpec: text?.materialSpec || null,
-        dimensions: text?.dimensions || null,
-      },
-    });
     return NextResponse.json({ ok: true });
   }
 

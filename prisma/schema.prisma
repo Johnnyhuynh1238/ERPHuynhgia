@@ -3994,6 +3994,7 @@ model EstimateLine {
   quantity   Decimal            @db.Decimal(14, 3)
   status     EstimateLineStatus @default(ai_draft)
   aiQuestion String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này
+  fixRequest String?            @map("fix_request") @db.Text // admin yêu cầu AI sửa lại công tác này (clear sau khi AI sửa xong)
   note       String?            @db.Text
   sortOrder  Int                @default(0) @map("sort_order")
   createdAt  DateTime           @default(now()) @map("created_at")

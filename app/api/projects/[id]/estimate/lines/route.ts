@@ -44,6 +44,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           quantity: Number(l.quantity),
           status: l.status,
           aiQuestion: l.aiQuestion,
+          fixRequest: l.fixRequest,
           note: l.note,
         })),
       })),

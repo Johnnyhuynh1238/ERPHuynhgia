@@ -3,8 +3,6 @@
 import {
   ArrowDown,
   ArrowUp,
-  ClipboardList,
-  ImagePlus,
   Loader2,
   MessageCircleQuestion,
   Plus,
@@ -13,14 +11,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { ESTIMATE_TEMPLATES, getTemplate, type EstimateFormField } from "@/lib/estimate-templates";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
 import { WorkerStatusBanner } from "./worker-status-banner";
 
-type Drawing = { key: string; name: string; type: string };
 type Qa = { q: string; a?: string; askedAt: string; answeredAt?: string };
 type ItemStatus = "draft" | "requested" | "analyzing" | "waiting_answer" | "ai_done" | "approved";
 
@@ -28,14 +24,8 @@ type Item = {
   id: string;
   name: string;
   method: string | null;
-  materialSpec: string | null;
-  dimensions: string | null;
-  drawings: Drawing[];
   status: ItemStatus;
   qaThread: Qa[];
-  templateKey: string | null;
-  formData: Record<string, unknown>;
-  sortOrder: number;
   lineCount: number;
 };
 
@@ -65,7 +55,6 @@ async function api(url: string, init?: RequestInit) {
 export function MoTaTab({ projectId }: { projectId: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // id đang gọi API
-  const [lightbox, setLightbox] = useState<{ itemId: string; idx: number; drawing: Drawing } | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -130,14 +119,12 @@ export function MoTaTab({ projectId }: { projectId: string }) {
     <div className="space-y-3">
       <WorkerStatusBanner />
       <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
-        <table className="w-full min-w-[1060px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[640px] border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-[#252840] text-[11px] uppercase tracking-wide text-zinc-500">
-              <th className="w-[18%] px-3 py-2.5 font-semibold">Hạng mục</th>
-              <th className="w-[22%] px-3 py-2.5 font-semibold">Biện pháp thi công</th>
-              <th className="w-[22%] px-3 py-2.5 font-semibold">Chủng loại vật tư</th>
-              <th className="w-[24%] px-3 py-2.5 font-semibold">Kích thước · Bản vẽ</th>
-              <th className="w-[14%] px-3 py-2.5 text-right font-semibold">AI</th>
+              <th className="w-[26%] px-3 py-2.5 font-semibold">Hạng mục</th>
+              <th className="w-[56%] px-3 py-2.5 font-semibold">Mô tả</th>
+              <th className="w-[18%] px-3 py-2.5 text-right font-semibold">AI</th>
             </tr>
           </thead>
           <tbody>
@@ -149,7 +136,6 @@ export function MoTaTab({ projectId }: { projectId: string }) {
                 last={gi === groups.length - 1}
                 busy={busy}
                 run={run}
-                openLightbox={(itemId, idx, drawing) => setLightbox({ itemId, idx, drawing })}
               />
             ))}
           </tbody>
@@ -161,20 +147,6 @@ export function MoTaTab({ projectId }: { projectId: string }) {
         label="+ Thêm nhóm"
         onAdd={(name) => run("group", () => api(`/api/projects/${projectId}/estimate/groups`, { method: "POST", body: JSON.stringify({ name }) }))}
       />
-
-      {lightbox && (
-        <Lightbox
-          drawing={lightbox.drawing}
-          url={`/api/estimate/items/${lightbox.itemId}/drawings/${lightbox.idx}`}
-          onClose={() => setLightbox(null)}
-          onDelete={async () => {
-            const ok = await confirmDialog({ message: `Xoá bản vẽ "${lightbox.drawing.name}"?` });
-            if (!ok) return;
-            setLightbox(null);
-            await run(lightbox.itemId, () => api(`/api/estimate/items/${lightbox.itemId}/drawings/${lightbox.idx}`, { method: "DELETE" }));
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -185,19 +157,17 @@ function GroupRows({
   last,
   busy,
   run,
-  openLightbox,
 }: {
   group: Group;
   first: boolean;
   last: boolean;
   busy: string | null;
   run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
-  openLightbox: (itemId: string, idx: number, drawing: Drawing) => void;
 }) {
   return (
     <>
       <tr className="border-y border-[#252840] bg-[#1a1d2e]">
-        <td colSpan={5} className="px-3 py-2">
+        <td colSpan={3} className="px-3 py-2">
           <div className="flex items-center gap-2">
             <EditableText
               value={group.name}
@@ -226,18 +196,17 @@ function GroupRows({
       </tr>
 
       {group.items.map((it, ii) => (
-        <ItemRow key={it.id} item={it} first={ii === 0} last={ii === group.items.length - 1} busy={busy} run={run} openLightbox={openLightbox} />
+        <ItemRow key={it.id} item={it} first={ii === 0} last={ii === group.items.length - 1} busy={busy} run={run} />
       ))}
 
       <tr>
-        <td colSpan={5} className="px-3 py-1.5">
+        <td colSpan={3} className="px-3 py-1.5">
           <AddInline
             placeholder="Tên hạng mục (VD: Móng, Cột + xây bao…)"
             label="+ Hạng mục"
             subtle
-            withTemplate
-            onAdd={(name, templateKey) =>
-              run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name, templateKey }) }))
+            onAdd={(name) =>
+              run(group.id, () => api(`/api/estimate/groups/${group.id}/items`, { method: "POST", body: JSON.stringify({ name }) }))
             }
           />
         </td>
@@ -252,60 +221,19 @@ function ItemRow({
   last,
   busy,
   run,
-  openLightbox,
 }: {
   item: Item;
   first: boolean;
   last: boolean;
   busy: string | null;
   run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
-  openLightbox: (itemId: string, idx: number, drawing: Drawing) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const meta = STATUS_META[item.status];
   const isBusy = busy === item.id;
   const openQuestions = item.qaThread.filter((qa) => !qa.a);
-  const template = getTemplate(item.templateKey);
-
-  // Form inline tự lưu: state cục bộ + debounce PATCH, không reload bảng để giữ focus
-  const [form, setForm] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {};
-    for (const [k, v] of Object.entries(item.formData ?? {})) init[k] = v == null ? "" : String(v);
-    return init;
-  });
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const setField = (key: string, value: string) => {
-    setForm((prev) => {
-      const next = { ...prev, [key]: value };
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        void api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ formData: next }) }).catch(
-          (e) => toast.error((e as Error).message),
-        );
-      }, 800);
-      return next;
-    });
-  };
-
-  const formSection = (col: "method" | "materialSpec" | "dimensions") => {
-    const section = template?.sections.find((s) => s.col === col);
-    if (!section) return null;
-    return <InlineFormSection fields={section.fields} form={form} setField={setField} />;
-  };
 
   const patch = (field: string) => (value: string) =>
     run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }));
-
-  const upload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    await run(item.id, async () => {
-      for (const f of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", f);
-        await api(`/api/estimate/items/${item.id}/drawings`, { method: "POST", body: fd });
-      }
-    });
-  };
 
   return (
     <>
@@ -314,11 +242,6 @@ function ItemRow({
           <EditableText value={item.name} className="font-semibold text-zinc-100" onSave={patch("name")} />
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
-            {template && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-500">
-                <ClipboardList className="h-3 w-3" /> {template.name}
-              </span>
-            )}
             {item.lineCount > 0 && <span className="text-[10px] text-zinc-500">{item.lineCount} công tác</span>}
             <span className="hidden items-center gap-0.5 group-hover:flex">
               {!first && <IconBtn title="Lên" onClick={() => run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ move: "up" }) }))}><ArrowUp className="h-3 w-3" /></IconBtn>}
@@ -337,44 +260,12 @@ function ItemRow({
           </div>
         </td>
         <td className="px-3 py-2">
-          {template ? formSection("method") : (
-            <EditableText value={item.method ?? ""} multiline placeholder="Biện pháp thi công…" onSave={patch("method")} />
-          )}
-        </td>
-        <td className="px-3 py-2">
-          {template ? formSection("materialSpec") : (
-            <EditableText value={item.materialSpec ?? ""} multiline placeholder="Chủng loại vật tư…" onSave={patch("materialSpec")} />
-          )}
-        </td>
-        <td className="px-3 py-2">
-          {template ? formSection("dimensions") : (
-            <EditableText value={item.dimensions ?? ""} multiline placeholder="Kích thước, cao độ, số lượng…" onSave={patch("dimensions")} />
-          )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {item.drawings.map((d, idx) => (
-              <button
-                key={d.key}
-                onClick={() => openLightbox(item.id, idx, d)}
-                title={d.name}
-                className="overflow-hidden rounded-md border border-[#252840] hover:border-[#f97316]/60"
-              >
-                {d.type === "application/pdf" ? (
-                  <span className="grid h-10 w-10 place-items-center bg-[#1a1d2e] text-[9px] font-bold text-rose-400">PDF</span>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/api/estimate/items/${item.id}/drawings/${idx}`} alt={d.name} className="h-10 w-10 object-cover" />
-                )}
-              </button>
-            ))}
-            <button
-              onClick={() => fileRef.current?.click()}
-              title="Thêm ảnh bản vẽ / PDF"
-              className="grid h-10 w-10 place-items-center rounded-md border border-dashed border-[#374151] text-zinc-500 hover:border-[#f97316]/60 hover:text-[#fb923c]"
-            >
-              <ImagePlus className="h-4 w-4" />
-            </button>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />
-          </div>
+          <EditableText
+            value={item.method ?? ""}
+            multiline
+            placeholder="Mô tả hạng mục: biện pháp thi công, chủng loại vật tư, kích thước / cao độ / số lượng…"
+            onSave={patch("method")}
+          />
         </td>
         <td className="px-3 py-2 text-right">
           {item.status === "requested" || item.status === "analyzing" ? (
@@ -405,7 +296,7 @@ function ItemRow({
 
       {item.qaThread.length > 0 && (
         <tr className="border-b border-[#1c1f30] bg-[#191322]/60">
-          <td colSpan={5} className="px-3 py-2">
+          <td colSpan={3} className="px-3 py-2">
             <div className="space-y-2 pl-4">
               {item.qaThread.map((qa, qi) => (
                 <QaRow key={qi} qa={qa} onAnswer={(answer) => run(item.id, () => api(`/api/estimate/items/${item.id}/answer`, { method: "POST", body: JSON.stringify({ index: qi, answer }) }))} />
@@ -452,103 +343,19 @@ function QaRow({ qa, onAnswer }: { qa: Qa; onAnswer: (answer: string) => Promise
   );
 }
 
-const inlineInputCls =
-  "w-full rounded-md border border-[#2b2f4a] bg-[#0d0f17] px-1.5 py-1 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#f97316]/60";
-
-// Form mẫu hiển thị thẳng trong ô bảng: mỗi field 1 hàng label + control, tự lưu
-function InlineFormSection({
-  fields,
-  form,
-  setField,
-}: {
-  fields: EstimateFormField[];
-  form: Record<string, string>;
-  setField: (key: string, value: string) => void;
-}) {
-  return (
-    <div className="min-w-[210px] space-y-1">
-      {fields.map((f) => {
-        if (f.type === "heading") {
-          return (
-            <p key={f.key} className="mt-1.5 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-[#fb923c]/80">
-              {f.label}
-              <span className="h-px flex-1 bg-[#252840]" />
-            </p>
-          );
-        }
-        if (f.type === "textarea") {
-          return (
-            <div key={f.key}>
-              <span className="mb-0.5 block text-[10px] text-zinc-500">{f.label}</span>
-              <textarea
-                value={form[f.key] ?? ""}
-                onChange={(e) => setField(f.key, e.target.value)}
-                placeholder={f.placeholder}
-                rows={2}
-                className={`${inlineInputCls} resize-y`}
-              />
-            </div>
-          );
-        }
-        return (
-          <div key={f.key} className="flex items-center gap-1.5">
-            <span className="w-[44%] shrink-0 truncate text-[10px] leading-tight text-zinc-500" title={f.label}>
-              {f.label}
-            </span>
-            {f.type === "select" ? (
-              <select
-                value={form[f.key] ?? ""}
-                onChange={(e) => setField(f.key, e.target.value)}
-                className={`${inlineInputCls} appearance-none ${form[f.key] ? "" : "text-zinc-600"}`}
-              >
-                <option value="">—</option>
-                {f.options.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="relative flex-1">
-                <input
-                  type={f.type === "number" ? "number" : "text"}
-                  inputMode={f.type === "number" ? "decimal" : undefined}
-                  step="any"
-                  value={form[f.key] ?? ""}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  placeholder={f.placeholder ?? "—"}
-                  className={`${inlineInputCls} ${f.unit ? "pr-8" : ""}`}
-                />
-                {f.unit && (
-                  <span className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-[9px] font-semibold text-zinc-600">
-                    {f.unit}
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function AddInline({
   onAdd,
   placeholder,
   label,
   subtle = false,
-  withTemplate = false,
 }: {
-  onAdd: (name: string, templateKey?: string) => Promise<void>;
+  onAdd: (name: string) => Promise<void>;
   placeholder: string;
   label: string;
   subtle?: boolean;
-  withTemplate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [templateKey, setTemplateKey] = useState("");
 
   if (!open) {
     return (
@@ -570,32 +377,11 @@ function AddInline({
     if (!v) return;
     setName("");
     setOpen(false);
-    await onAdd(v, templateKey || undefined);
-  };
-
-  const pickTemplate = (key: string) => {
-    setTemplateKey(key);
-    // chọn mẫu mà chưa gõ tên → điền luôn tên mẫu cho nhanh
-    const tpl = ESTIMATE_TEMPLATES.find((t) => t.key === key);
-    if (tpl && !name.trim()) setName(tpl.name);
+    await onAdd(v);
   };
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      {withTemplate && (
-        <select
-          value={templateKey}
-          onChange={(e) => pickTemplate(e.target.value)}
-          className="rounded-md border border-[#374151] bg-[#0d0f17] px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-[#f97316]/60"
-        >
-          <option value="">Mẫu: tự do</option>
-          {ESTIMATE_TEMPLATES.map((t) => (
-            <option key={t.key} value={t.key}>
-              Mẫu: {t.name}
-            </option>
-          ))}
-        </select>
-      )}
       <input
         autoFocus
         value={name}
@@ -622,35 +408,5 @@ function IconBtn({ children, onClick, title, danger = false }: { children: React
     >
       {children}
     </button>
-  );
-}
-
-function Lightbox({ drawing, url, onClose, onDelete }: { drawing: Drawing; url: string; onClose: () => void; onDelete: () => Promise<void> }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] max-w-4xl overflow-auto rounded-2xl border border-[#252840] bg-[#13151f] p-3" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="truncate text-xs font-semibold text-zinc-300">{drawing.name}</p>
-          <div className="flex shrink-0 gap-1.5">
-            <button onClick={() => void onDelete()} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/15">
-              <Trash2 className="h-3 w-3" /> Xoá
-            </button>
-            <button onClick={onClose} className="rounded-md border border-zinc-700 p-1 text-zinc-400 hover:bg-zinc-800"><X className="h-4 w-4" /></button>
-          </div>
-        </div>
-        {drawing.type === "application/pdf" ? (
-          <iframe src={url} title={drawing.name} className="h-[75vh] w-[80vw] max-w-3xl rounded-lg bg-white" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={drawing.name} className="max-h-[78vh] w-auto rounded-lg" />
-        )}
-      </div>
-    </div>
   );
 }
