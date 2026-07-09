@@ -4043,3 +4043,15 @@ model EstimateWorkerStatus {
 
   @@map("estimate_worker_status")
 }
+
+// Mẫu mô tả chung theo hạng mục (global, dùng lại mọi dự án). Key = tên hạng mục.
+// Tạo hạng mục trùng tên → copy `method` này vào EstimateItem.method; sửa trong dự án lưu riêng, hoặc lưu ngược lại global.
+model EstimateItemDefault {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique // tên hạng mục chuẩn, VD "Móng", "Cột"
+  method    String?  @db.Text // mô tả mặc định (biện pháp/chủng loại/kích thước gộp 1 mô tả)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("estimate_item_defaults")
+}

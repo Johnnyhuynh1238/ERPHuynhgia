@@ -3,9 +3,11 @@
 import {
   ArrowDown,
   ArrowUp,
+  BookMarked,
   Loader2,
   Plus,
   RotateCcw,
+  Save,
   Sparkles,
   Trash2,
   X,
@@ -227,9 +229,36 @@ function ItemRow({
 }) {
   const meta = STATUS_META[item.status];
   const isBusy = busy === item.id;
+  const [method, setMethod] = useState(item.method ?? "");
+  useEffect(() => { setMethod(item.method ?? ""); }, [item.method]);
+  const dirty = method !== (item.method ?? "");
 
   const patch = (field: string) => (value: string) =>
     run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }));
+
+  const saveProject = () =>
+    run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) }));
+
+  const saveGlobal = () =>
+    run(item.id, async () => {
+      await api(`/api/estimate/defaults`, { method: "PUT", body: JSON.stringify({ name: item.name, method }) });
+      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) });
+      toast.success(`Đã lưu mẫu chung "${item.name}"`);
+    });
+
+  const pullGlobal = async () => {
+    try {
+      const r = await api(`/api/estimate/defaults?name=${encodeURIComponent(item.name)}`);
+      if (!r.default || r.default.method == null || r.default.method === "") {
+        toast.error(`Chưa có mẫu chung cho "${item.name}"`);
+        return;
+      }
+      setMethod(r.default.method);
+      toast.success("Đã lấy mẫu chung — bấm Lưu dự án để áp");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   return (
     <>
@@ -239,6 +268,13 @@ function ItemRow({
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
             {item.lineCount > 0 && <span className="text-[10px] text-zinc-500">{item.lineCount} công tác</span>}
+            <button
+              onClick={() => void pullGlobal()}
+              title="Lấy mô tả từ mẫu chung của hạng mục này"
+              className="inline-flex items-center gap-1 rounded-md bg-[#312152]/60 px-1.5 py-0.5 text-[10px] font-semibold text-[#c4b5fd] hover:bg-[#3b2a63]"
+            >
+              <BookMarked className="h-3 w-3" /> Mẫu chung
+            </button>
             <span className="hidden items-center gap-0.5 group-hover:flex">
               {!first && <IconBtn title="Lên" onClick={() => run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ move: "up" }) }))}><ArrowUp className="h-3 w-3" /></IconBtn>}
               {!last && <IconBtn title="Xuống" onClick={() => run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ move: "down" }) }))}><ArrowDown className="h-3 w-3" /></IconBtn>}
@@ -256,12 +292,39 @@ function ItemRow({
           </div>
         </td>
         <td className="px-3 py-2">
-          <EditableText
-            value={item.method ?? ""}
-            multiline
-            placeholder="Mô tả hạng mục: biện pháp thi công, chủng loại vật tư, kích thước / cao độ / số lượng…"
-            onSave={patch("method")}
+          <textarea
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+            rows={Math.max(2, method.split("\n").length)}
+            placeholder="Mô tả hạng mục: biện pháp thi công, chủng loại vật tư, kích thước / cao độ / số lượng… (phần cố định lấy từ Mẫu chung, chỉ nhập cái khác)"
+            className="w-full resize-y rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs leading-relaxed text-zinc-200 outline-none hover:border-[#252840] focus:border-[#f97316]/50 focus:bg-[#0d0f17]"
           />
+          {dirty && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={saveProject}
+                disabled={isBusy}
+                className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+              >
+                <Save className="h-3 w-3" /> Lưu dự án
+              </button>
+              <button
+                onClick={saveGlobal}
+                disabled={isBusy}
+                title="Lưu vào mẫu chung để dùng lại cho dự án khác"
+                className="inline-flex items-center gap-1 rounded-md border border-[#6d5bb0]/60 px-2.5 py-1 text-[11px] font-bold text-[#c4b5fd] hover:bg-[#312152]/60 disabled:opacity-50"
+              >
+                <BookMarked className="h-3 w-3" /> Lưu mẫu chung
+              </button>
+              <button
+                onClick={() => setMethod(item.method ?? "")}
+                className="rounded-md p-1 text-zinc-500 hover:text-zinc-300"
+                title="Hoàn tác"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </td>
         <td className="px-3 py-2 text-right">
           {item.status === "requested" || item.status === "analyzing" ? (
