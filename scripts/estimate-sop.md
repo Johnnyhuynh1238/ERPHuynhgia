@@ -99,8 +99,10 @@ WHERE m.id IS NULL;
 
 Với mỗi vật tư chưa map, nếu bảng giá có hàng NCC tương ứng (xi măng ↔ các loại xi măng, cát vàng ↔ cát bê tông, đá dăm ↔ đá 1x2/0x4, gạch ↔ gạch tuynel…):
 
-- **Bê tông: MẶC ĐỊNH tính CẤP PHỐI định mức** (xi măng + cát + đá theo norm) — map các vật tư này tới hàng NCC (xi măng, cát, đá) như bình thường. **KHÔNG tự chuyển sang thương phẩm.**
-  - **CHỈ KHI** mô tả (method/fields) ghi rõ **"bê tông thương phẩm"** (BT tươi mua sẵn) → mới dùng bê tông thương phẩm: thay vật tư cấp phối bằng 1 vật tư "Bê tông thương phẩm M<mác>" (m³, hao hụt ~1.5%), map tới hàng NCC cùng tên đã có trong bảng giá. Không note thương phẩm = cấp phối.
+- **Bê tông: MẶC ĐỊNH tính CẤP PHỐI định mức** (map norm `BT.xxxx` — vật tư xi măng + cát + đá tự bung, map tới hàng NCC như bình thường). **KHÔNG tự chuyển sang thương phẩm.** Không note thương phẩm = cấp phối.
+  - **CHỈ KHI** mô tả (method/fields) ghi rõ **"bê tông thương phẩm"** (BT tươi mua sẵn) → bóc theo **2 line** (giống thép mua thẳng), **KHÔNG map norm BT cấp phối**:
+    1. **Line vật tư mua thẳng**: `norm_code=NULL`, `material_price_id` = hàng NCC "Bê tông thương phẩm M<mác>" (đã có trong bảng giá), `unit='m³'`, `quantity` = KL bê tông × 1.015 (hao hụt), formula ghi rõ.
+    2. **Line công đổ**: `norm_code='BT.1950'` (Đổ + đầm BT thương phẩm — chỉ NC+máy, không vật tư), `quantity` = KL bê tông. Nếu bơm thì thêm line `BT.1900` (ca bơm).
   - **Không thêm "Nước"** vào bê tông (đã bỏ khỏi định mức).
 - **Gỗ ván / cây chống / giàn giáo / máy / dụng cụ thi công: KHÔNG bóc line vật tư** — đã nằm trong hao phí NC + máy. Norm cốp pha `material_items` chỉ còn **Đinh các loại** (đúng); chỉ map norm cốp pha là đủ, đừng thêm gỗ ván.
 - **KHÔNG thêm "Nước" vào bất kỳ công tác nào** — đã loại khỏi mọi định mức.

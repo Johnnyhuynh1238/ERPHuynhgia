@@ -117,6 +117,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       amount: Math.round(qty * price),
       direct: true,
       lineName: l.name,
+      lineId: l.id,
+      materialPriceId: l.materialPriceId!,
       contributions: [
         {
           itemId: l.id,

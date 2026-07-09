@@ -36,6 +36,8 @@ type ResourceRow = {
   ncc?: NccInfo | null; // hàng NCC đã map (vật tư định mức)
   direct?: boolean; // line vật tư mua thẳng NCC (thép bóc chi tiết)
   lineName?: string;
+  lineId?: string; // direct: id estimate_line để đổi hàng NCC
+  materialPriceId?: string; // direct: hàng NCC hiện tại
 };
 
 type NccPrice = { id: string; name: string; unit: string; price: number; source: string | null };
@@ -270,6 +272,13 @@ function ResourceTable({
                           <>chưa chọn NCC — chọn ▾</>
                         )}
                       </button>
+                    ) : projectId && r.direct ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMapping(r); }}
+                        className="block pl-[18px] text-left text-[10px] text-zinc-500 hover:text-[#fb923c]"
+                      >
+                        <span className="text-zinc-600">{r.lineName}</span> — NCC: <span className="text-[#fb923c]">{getName(r)}</span> đổi ▾
+                      </button>
                     ) : (
                       <p className="pl-[18px] text-[10px] text-zinc-600">
                         {r.direct ? r.lineName : `${r.contributions.length} công tác đóng góp`}
@@ -348,7 +357,7 @@ function MapNccModal({
 }) {
   const [prices, setPrices] = useState<NccPrice[]>([]);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string>(row.ncc?.materialPriceId ?? "");
+  const [selected, setSelected] = useState<string>(row.direct ? (row.materialPriceId ?? "") : (row.ncc?.materialPriceId ?? ""));
   const [factor, setFactor] = useState(String(row.ncc?.factor ?? 1));
   const [saving, setSaving] = useState(false);
 
@@ -361,16 +370,18 @@ function MapNccModal({
 
   const save = async (materialPriceId: string | null) => {
     setSaving(true);
-    const r = await fetch(`/api/projects/${projectId}/estimate/material-map`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        srcName: row.name,
-        srcUnit: row.unit,
-        materialPriceId,
-        factor: Number(factor) || 1,
-      }),
-    });
+    // Direct (mua thẳng): đổi hàng NCC thẳng trên estimate_line. Định mức: lưu qua material-map.
+    const r = row.direct && row.lineId
+      ? await fetch(`/api/estimate/lines/${row.lineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ materialPriceId }),
+        })
+      : await fetch(`/api/projects/${projectId}/estimate/material-map`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ srcName: row.name, srcUnit: row.unit, materialPriceId, factor: Number(factor) || 1 }),
+        });
     setSaving(false);
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
@@ -390,7 +401,11 @@ function MapNccModal({
       <div className="w-full max-w-md rounded-2xl border border-[#252840] bg-[#13151f] p-4" onClick={(e) => e.stopPropagation()}>
         <h4 className="text-sm font-bold text-zinc-100">Chọn hàng NCC</h4>
         <p className="mt-0.5 text-xs text-zinc-500">
-          Cho vật tư định mức: <b className="text-zinc-300">{row.name}</b> ({row.unit}) — cần {fmt(row.total)} {row.unit}
+          {row.direct ? (
+            <>Vật tư mua thẳng: <b className="text-zinc-300">{row.lineName}</b> — {fmt(row.total)} {row.unit}. Đổi hàng NCC (đơn giá lấy theo hàng chọn).</>
+          ) : (
+            <>Cho vật tư định mức: <b className="text-zinc-300">{row.name}</b> ({row.unit}) — cần {fmt(row.total)} {row.unit}</>
+          )}
         </p>
 
         <input
@@ -422,7 +437,7 @@ function MapNccModal({
           {filtered.length === 0 && <p className="py-4 text-center text-xs text-zinc-600">Không tìm thấy</p>}
         </div>
 
-        {sel && !sameUnit && (
+        {sel && !sameUnit && !row.direct && (
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-xs text-zinc-300">
             <span>1 {sel.unit} =</span>
             <input

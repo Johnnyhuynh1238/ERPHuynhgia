@@ -77,6 +77,18 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
       data.normCode = null;
     }
   }
+  // Đổi hàng NCC cho line vật tư mua thẳng (thép, BT thương phẩm…): đồng bộ đơn vị theo hàng NCC
+  if ("materialPriceId" in body) {
+    const mpId = String(body.materialPriceId ?? "").trim();
+    if (mpId) {
+      const mp = await prisma.materialPrice.findUnique({ where: { id: mpId }, select: { id: true, unit: true } });
+      if (!mp) return NextResponse.json({ message: "Không tìm thấy hàng NCC" }, { status: 400 });
+      data.materialPriceId = mp.id;
+      data.unit = mp.unit;
+    } else {
+      data.materialPriceId = null;
+    }
+  }
   if (Object.keys(data).length === 0) return NextResponse.json({ message: "Không có gì để sửa" }, { status: 400 });
 
   data.status = "edited";
