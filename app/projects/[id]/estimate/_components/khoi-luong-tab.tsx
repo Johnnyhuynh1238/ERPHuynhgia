@@ -359,41 +359,93 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
   );
 }
 
-// Câu hỏi của AI + ô trả lời (dùng cho câu hỏi chung của hạng mục và câu hỏi theo công tác)
+// Câu hỏi của AI + ô trả lời. Câu hỏi thường dài → bấm mở modal giữa màn, ô trả lời to.
 function AnswerBox({ question, answer, onSave }: { question: string; answer: string | null; onSave: (a: string) => Promise<void> | void }) {
-  const [draft, setDraft] = useState(answer ?? "");
-  const [editing, setEditing] = useState(!answer);
-
-  if (answer && !editing) {
-    return (
-      <div className="flex items-start gap-1.5 text-[11px]">
-        <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
-        <span className="text-zinc-400">{question}</span>
-        <span className="flex-1 font-semibold text-emerald-400">→ {answer}</span>
-        <button onClick={() => { setDraft(answer); setEditing(true); }} className="shrink-0 text-zinc-500 hover:text-emerald-400">sửa</button>
-      </div>
-    );
-  }
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
-      <span className="flex shrink-0 items-center gap-1 pt-1.5 text-[11px] font-semibold text-rose-400">
-        <MessageCircleQuestion className="h-3.5 w-3.5" /> {question}
-      </span>
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) { void onSave(draft.trim()); setEditing(false); } }}
-        placeholder="Trả lời cho AI…"
-        className="w-full flex-1 rounded-md border border-rose-500/40 bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-rose-500/70"
-      />
-      <button
-        onClick={() => { if (draft.trim()) { void onSave(draft.trim()); setEditing(false); } }}
-        disabled={!draft.trim()}
-        className="shrink-0 rounded-md bg-rose-500/90 px-3 py-1 text-[11px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
-      >
-        Gửi
-      </button>
+    <>
+      {/* Hàng tóm tắt trong bảng */}
+      {answer ? (
+        <div className="flex items-start gap-1.5 text-[11px]">
+          <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+          <span className="min-w-0 flex-1 text-zinc-400">
+            {question} <span className="font-semibold text-emerald-400">→ {answer}</span>
+          </span>
+          <button onClick={() => setOpen(true)} className="shrink-0 text-zinc-500 hover:text-emerald-400">sửa</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex w-full items-start gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1.5 text-left text-[11px] text-rose-300 hover:bg-rose-500/10"
+        >
+          <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+          <span className="min-w-0 flex-1 line-clamp-2">{question}</span>
+          <span className="shrink-0 rounded bg-rose-500/90 px-2 py-0.5 text-[10px] font-bold text-white">Trả lời</span>
+        </button>
+      )}
+      {open && (
+        <AnswerModal
+          question={question}
+          answer={answer}
+          onClose={() => setOpen(false)}
+          onSave={async (a) => { await onSave(a); setOpen(false); }}
+        />
+      )}
+    </>
+  );
+}
+
+// Modal giữa màn — câu hỏi đầy đủ + ô trả lời to
+function AnswerModal({ question, answer, onClose, onSave }: { question: string; answer: string | null; onClose: () => void; onSave: (a: string) => Promise<void> | void }) {
+  const [draft, setDraft] = useState(answer ?? "");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = () => { if (draft.trim()) void onSave(draft.trim()); };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <MessageCircleQuestion className="h-4 w-4 text-rose-400" />
+            <span className="text-sm font-bold text-zinc-100">Trả lời AI</span>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-4">
+          <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-sm leading-relaxed text-rose-200">
+            {question}
+          </div>
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
+            rows={7}
+            placeholder="Nhập câu trả lời cho AI…"
+            className="w-full resize-y rounded-lg border border-[#252840] bg-[#0d0f17] px-3 py-2 text-sm leading-relaxed text-zinc-100 outline-none focus:border-rose-500/60"
+          />
+          <p className="mt-1 text-[10px] text-zinc-600">Ctrl+Enter để gửi nhanh</p>
+        </div>
+        <div className="flex items-center justify-end gap-1.5 border-t border-[#252840] px-4 py-3">
+          <button onClick={onClose} className="rounded-md border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-zinc-800">Huỷ</button>
+          <button
+            onClick={submit}
+            disabled={!draft.trim()}
+            className="rounded-md bg-rose-500/90 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+          >
+            Gửi
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
