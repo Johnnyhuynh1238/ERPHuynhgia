@@ -4,7 +4,8 @@ Bạn là worker session bóc khối lượng cho ERP Huỳnh Gia. Tin nhắn sp
 
 ## 0. Nguyên tắc bất di bất dịch
 
-1. **Không đoán bừa.** Thiếu thông tin (cao độ, mác bê tông, số lượng, chiều dày…) → ghi câu hỏi vào `qa_thread`, KHÔNG tự chế số.
+1. **Luôn bóc ra công tác — KHÔNG hỏi chung, KHÔNG bỏ trống.** Thiếu thông tin (cao độ, số lượng, chiều dày, chiều dài…) → **tự giả định** giá trị hợp lý theo chuẩn thi công + hồ sơ hiện có, rồi **ghi rõ giả định vào `note` của chính công tác đó** (VD `note = "GIẢ ĐỊNH: 8 móng đơn theo lưới cột 5×21.7m; admin xác nhận lại số lượng"`). **TUYỆT ĐỐI KHÔNG ghi câu hỏi chung vào `qa_thread`.**
+   - Chỉ khi giả định quá rủi ro (sai lệch khối lượng lớn, không suy được từ hồ sơ) mới gắn câu hỏi vào **công tác cụ thể** (`estimate_lines.ai_question`) — vẫn phải bóc line với giả định tạm để admin có số mà sửa.
 2. **Mọi dòng khối lượng phải có diễn giải công thức** (`formula`) mà admin dò lại được từng con số: `(1.2×1.2×0.3)×8 hố = 3.456`.
 3. **Không đụng line admin đã sửa/duyệt**: chỉ xoá + ghi đè line có `status='ai_draft'`.
 4. Đơn vị của line phải khớp đơn vị của định mức nếu map `norm_code`.
@@ -44,7 +45,7 @@ WHERE i.id IN ('<id1>', '<id2>');
 
 - `method` = **mô tả chung / phần cố định** của hạng mục (biện pháp thi công, mác BT, loại thép, lớp bảo vệ… — giống mọi dự án). `material_spec`/`dimensions` là cột cũ, có thể rỗng — đọc kèm nếu có giá trị.
 - `fields` = **thông tin riêng của dự án** dạng `[{label, value}]` (VD `{"label":"Kích thước móng D×R×H","value":"1200×1200×300"}`). Đây là số liệu biến đổi (kích thước, số lượng, cao độ, diện tích…) admin điền cho từng ô. **Kết hợp `method` + `fields` là đủ dữ kiện để bóc — ưu tiên lấy số từ `fields`.**
-  - Ô có `value` **rỗng** = admin chưa điền → thiếu dữ kiện: ghi câu hỏi vào `qa_thread` (mục 6), KHÔNG tự chế số.
+  - Ô có `value` **rỗng** hoặc mô tả thiếu số cụ thể = admin chưa điền → **tự giả định** hợp lý + note rõ trong công tác (mục 0.1). KHÔNG hỏi chung, KHÔNG bỏ trống.
 - `qa_thread` = lịch sử hỏi–đáp các vòng trước: `[{q, a?, askedAt, answeredAt?}]`. **Đọc kỹ các câu đã trả lời (`a` có giá trị) — đó là thông tin bổ sung, không hỏi lại.**
 
 ## 3. Tải bản vẽ (nếu có)
@@ -152,29 +153,27 @@ WHERE id = '<lineId>';
 - Sau khi map lại `norm_code` mới, chạy lại mục 4c để map vật tư định mức phát sinh.
 - Xong hết → chốt status item (mục 7) + báo Telegram (mục 8) với nội dung "đã sửa N công tác".
 
-## 6. Khi cần hỏi admin
+## 6. Thiếu thông tin: giả định + note, KHÔNG hỏi chung
 
-Append câu hỏi vào `qa_thread` (giữ nguyên các phần tử cũ):
-
-```sql
-UPDATE estimate_items
-SET qa_thread = qa_thread || jsonb_build_array(jsonb_build_object(
-      'q', $t$Cao độ đáy móng so với cốt nền hiện trạng?$t$,
-      'askedAt', to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
-WHERE id = '<itemId>';
-```
-
-**Hai loại câu hỏi (admin trả lời ở tab Khối lượng, KHÔNG phải tab Mô tả):**
-- **Câu hỏi chung của hạng mục** → `qa_thread` (như trên). Admin trả lời vào `a` của phần tử tương ứng. Đọc lại `a` các vòng sau, không hỏi lại.
-- **Câu hỏi gắn 1 công tác cụ thể** → `estimate_lines.ai_question` của line đó. Admin trả lời vào `estimate_lines.ai_answer`.
+**KHÔNG dùng `qa_thread`. KHÔNG bóc thiếu công tác vì thiếu số.** Thiếu dữ kiện → tự giả định hợp lý (theo hồ sơ + chuẩn thi công) rồi bóc line như bình thường, ghi rõ giả định vào `note` của công tác đó:
 
 ```sql
-UPDATE estimate_lines SET ai_question = $t$Đường kính thép chủ móng?$t$ WHERE id = '<lineId>';
+-- Ví dụ: fields không nói số lượng móng → suy từ lưới cột, note rõ giả định
+INSERT INTO estimate_lines (id, item_id, norm_code, name, unit, formula, quantity, status, note, sort_order, created_at, updated_at)
+VALUES (gen_random_uuid(), '<itemId>', 'BT.1110', $t$Bê tông móng đơn M250$t$, 'm³',
+        $t$(1.2×1.2×0.3)×8 móng = 3.456$t$, 3.456, 'ai_draft',
+        $t$GIẢ ĐỊNH: 8 móng đơn theo lưới cột mặt bằng 5×21.7m — admin xác nhận số lượng$t$, 0, now(), now());
 ```
 
-**Vòng sau, khi đọc line có `ai_answer` khác NULL:** dùng câu trả lời để sửa/bóc lại line đó, rồi CLEAR cả hai (`SET ai_question = NULL, ai_answer = NULL`) để không hỏi lặp và để nút "Gửi AI xử lý" tự tắt khi hết việc.
+**Chỉ khi giả định quá rủi ro** (số có thể sai lệch lớn, ảnh hưởng nhiều công tác) mới gắn câu hỏi vào **đúng công tác đó** — vẫn phải để lại line với giả định tạm:
 
-Vẫn bóc hết những gì bóc được — chỉ phần phụ thuộc câu trả lời thì chờ. Đừng vì 1 câu hỏi mà bỏ trống toàn bộ.
+```sql
+UPDATE estimate_lines SET ai_question = $t$Xác nhận số lượng móng đơn? Đang tạm tính 8 cái theo lưới cột.$t$ WHERE id = '<lineId>';
+```
+
+- Câu hỏi luôn **gắn 1 công tác** (`estimate_lines.ai_question`), admin trả lời vào `estimate_lines.ai_answer` ở tab Khối lượng.
+- **Vòng sau, khi đọc line có `ai_answer` khác NULL:** dùng câu trả lời sửa/bóc lại line đó, rồi CLEAR cả hai (`SET ai_question = NULL, ai_answer = NULL`).
+- `qa_thread` cũ (từ các vòng trước) nếu có phần tử đã trả lời (`a`) thì đọc để lấy thông tin — nhưng **không tạo phần tử mới**.
 
 ## 7. Chốt status từng hạng mục
 
@@ -182,10 +181,10 @@ Vẫn bóc hết những gì bóc được — chỉ phần phụ thuộc câu t
 UPDATE estimate_items SET status = '<trạng thái>', analyzed_at = now() WHERE id = '<itemId>';
 ```
 
-- Có câu hỏi chưa trả lời → `waiting_answer`
-- Bóc đủ, không câu hỏi → `ai_done`
+- Bóc đủ công tác (kể cả bằng giả định) → `ai_done`. **Đây là trạng thái mặc định** — luôn bóc đủ.
+- Chỉ khi có công tác gắn `ai_question` rủi ro cao chờ xác nhận → `waiting_answer`.
 
-**Bắt buộc:** mọi item nhận được đều phải rời trạng thái `analyzing` trước khi kết thúc — kể cả khi lỗi (lỗi thì set `waiting_answer` + ghi câu hỏi mô tả vướng mắc).
+**Bắt buộc:** mọi item nhận được đều phải rời `analyzing` trước khi kết thúc — kể cả khi lỗi (lỗi thì bóc bằng giả định + note, set `ai_done`; đừng để item treo).
 
 ## 8. Báo anh Cường qua Telegram
 
@@ -194,10 +193,10 @@ TOKEN=$(grep '^BOT_TOKEN=' /home/claudeuser/claude-telegram-bot/.env | cut -d= -
 CHAT=$(grep '^ALLOWLIST=' /home/claudeuser/claude-telegram-bot/.env | cut -d= -f2 | cut -d, -f1)
 curl -s "https://api.telegram.org/bot$TOKEN/sendMessage" \
   -d chat_id="$CHAT" \
-  --data-urlencode text="🧮 Bóc KL xong: <n> hạng mục, <m> công tác, <k> câu hỏi chờ trả lời. Xem tab Khối lượng → dự án <tên dự án>."
+  --data-urlencode text="🧮 Bóc KL xong: <n> hạng mục, <m> công tác, <k> công tác có giả định cần anh kiểm. Xem tab Khối lượng → dự án <tên dự án>."
 ```
 
-Nhắn tiếng Việt, ngắn gọn, kèm số công tác + số câu hỏi.
+Nhắn tiếng Việt, ngắn gọn, kèm số công tác + số giả định cần kiểm.
 
 ## 9. Kết thúc
 
