@@ -137,7 +137,7 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
         </thead>
         <tbody>
           {visibleGroups.map((g) => (
-            <GroupSection key={g.id} group={g} items={g.items} run={run} collapsed={collapsed.has(g.id)} onToggle={() => toggleCollapse(g.id)} />
+            <GroupSection key={g.id} group={g} items={g.items} run={run} collapsedSet={collapsed} toggle={toggleCollapse} />
           ))}
         </tbody>
         </table>
@@ -155,8 +155,8 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
               {g.name}
               <span className="text-[10px] font-normal text-zinc-600">{g.items.length} hạng mục</span>
             </button>
-            {!collapsed.has(g.id) && g.items.map((it) => (
-              <div key={it.id} className="border-b border-[#252840]">
+            {!collapsed.has(g.id) && g.items.map((it, ii) => (
+              <div key={it.id} className={`border-b border-[#252840] ${ii % 2 === 1 ? "bg-[#171a28]" : "bg-[#13151f]"}`}>
                 {it.qaThread.map((qa, qi) => (
                   <div key={`q${qi}`} className="border-b border-[#1c1f30] bg-[#191322]/60 px-3 py-1.5">
                     <AnswerBox
@@ -166,10 +166,10 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
                     />
                   </div>
                 ))}
-                <div className="bg-[#161927] px-3 py-2">
-                  <ItemActions item={it} run={run} />
+                <div className="border-b border-[#252840] bg-black/25 px-3 py-2">
+                  <ItemActions item={it} run={run} collapsed={collapsed.has(it.id)} onToggle={() => toggleCollapse(it.id)} />
                 </div>
-                {it.lines.map((l) => {
+                {!collapsed.has(it.id) && it.lines.map((l) => {
                   const meta = LINE_STATUS[l.status];
                   const needAnswer = !!l.aiQuestion && !l.aiAnswer;
                   return (
@@ -203,12 +203,13 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
   );
 }
 
-function GroupSection({ group, items, run, collapsed, onToggle }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed: boolean; onToggle: () => void }) {
+function GroupSection({ group, items, run, collapsedSet, toggle }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void>; collapsedSet: Set<string>; toggle: (id: string) => void }) {
+  const collapsed = collapsedSet.has(group.id);
   return (
     <>
       <tr className="border-y border-[#252840] bg-[#1a1d2e]">
         <td colSpan={7} className="px-3 py-2">
-          <button onClick={onToggle} className="flex items-center gap-1.5 text-[13px] font-bold text-[#fb923c]">
+          <button onClick={() => toggle(group.id)} className="flex items-center gap-1.5 text-[13px] font-bold text-[#fb923c]">
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             {group.name}
             <span className="text-[10px] font-normal text-zinc-600">{items.length} hạng mục</span>
@@ -216,13 +217,13 @@ function GroupSection({ group, items, run, collapsed, onToggle }: { group: Group
         </td>
       </tr>
       {!collapsed && items.map((it) => (
-        <ItemSection key={it.id} item={it} run={run} />
+        <ItemSection key={it.id} item={it} run={run} collapsed={collapsedSet.has(it.id)} onToggle={() => toggle(it.id)} />
       ))}
     </>
   );
 }
 
-function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+function ItemSection({ item, run, collapsed, onToggle }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed: boolean; onToggle: () => void }) {
   return (
     <>
       {/* Câu hỏi chung của hạng mục — nằm TRÊN hàng tên hạng mục */}
@@ -240,10 +241,10 @@ function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknow
 
       <tr className="border-b border-[#1c1f30] bg-[#161927]">
         <td colSpan={7} className="px-3 py-1.5">
-          <ItemActions item={item} run={run} />
+          <ItemActions item={item} run={run} collapsed={collapsed} onToggle={onToggle} />
         </td>
       </tr>
-      {item.lines.map((l) => (
+      {!collapsed && item.lines.map((l) => (
         <LineRow key={l.id} line={l} run={run} />
       ))}
     </>
@@ -251,7 +252,7 @@ function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknow
 }
 
 // Tên hạng mục + badge + nút hành động (Gửi AI xử lý / Duyệt / Bỏ duyệt). Dùng chung PC + mobile.
-function ItemActions({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+function ItemActions({ item, run, collapsed, onToggle }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed?: boolean; onToggle?: () => void }) {
   const allApproved = item.lines.length > 0 && item.lines.every((l) => l.status === "approved");
   const someApproved = item.lines.some((l) => l.status === "approved");
   const isProcessing = item.status === "requested" || item.status === "analyzing";
@@ -264,7 +265,13 @@ function ItemActions({ item, run }: { item: Item; run: (fn: () => Promise<unknow
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="pl-2 text-xs font-semibold text-zinc-200">{item.name}</span>
+      {onToggle && (
+        <button onClick={onToggle} title={collapsed ? "Xổ hạng mục" : "Gập hạng mục"} className="shrink-0 text-zinc-400 hover:text-[#fb923c]">
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      )}
+      <span className="text-xs font-semibold text-zinc-200">{item.name}</span>
+      {item.lines.length > 0 && <span className="text-[10px] text-zinc-500">{item.lines.length} công tác</span>}
       {isProcessing && (
         <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">
           <Loader2 className="h-2.5 w-2.5 animate-spin" /> AI đang xử lý…
