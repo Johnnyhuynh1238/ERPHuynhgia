@@ -32,13 +32,20 @@ export async function PATCH(req: Request, { params }: { params: { itemId: string
     return NextResponse.json({ ok: true });
   }
 
-  const data: Record<string, string | null> = {};
+  const data: Record<string, unknown> = {};
   for (const field of ["name", "method", "materialSpec", "dimensions"] as const) {
     if (field in body) {
       const v = String(body[field] ?? "").trim();
       if (field === "name" && !v) return NextResponse.json({ message: "Tên hạng mục không được rỗng" }, { status: 400 });
       data[field] = v || null;
     }
+  }
+  // fields: thông tin riêng [{label, value}] — chỉ giữ dòng có nhãn
+  if (Array.isArray(body.fields)) {
+    data.fields = (body.fields as unknown[])
+      .map((f) => (f && typeof f === "object" ? f as { label?: unknown; value?: unknown } : { label: "", value: "" }))
+      .map((f) => ({ label: String(f.label ?? "").trim(), value: String(f.value ?? "").trim() }))
+      .filter((f) => f.label);
   }
   if (Object.keys(data).length === 0) return NextResponse.json({ message: "Không có gì để sửa" }, { status: 400 });
 

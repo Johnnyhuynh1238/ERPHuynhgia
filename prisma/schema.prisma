@@ -3967,6 +3967,7 @@ model EstimateItem {
   status       EstimateItemStatus @default(draft)
   // Q&A stateless: mỗi vòng AI hỏi/admin trả lời là 1 phần tử — session mới đọc lại đủ lịch sử
   qaThread   Json      @default("[]") @map("qa_thread") @db.JsonB // [{q, a?, askedAt, answeredAt?}]
+  fields     Json      @default("[]") @db.JsonB // thông tin riêng: [{label, value}] — ô text tự do từng dòng
   analyzedAt DateTime? @map("analyzed_at")
   sortOrder  Int       @default(0) @map("sort_order")
   createdAt  DateTime  @default(now()) @map("created_at")
@@ -4050,6 +4051,7 @@ model EstimateItemDefault {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique // tên hạng mục chuẩn, VD "Móng", "Cột"
   method    String?  @db.Text // mô tả mặc định (biện pháp/chủng loại/kích thước gộp 1 mô tả)
+  fields    Json     @default("[]") @db.JsonB // template trường riêng: ["Loại móng","Số lượng móng",…] mảng nhãn dòng
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

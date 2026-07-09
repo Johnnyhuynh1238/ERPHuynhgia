@@ -20,10 +20,12 @@ export async function POST(req: Request, { params }: { params: { groupId: string
     where: { groupId: group.id },
     _max: { sortOrder: true },
   });
-  // Trùng tên mẫu chung → copy mô tả mặc định vào dự án
-  const def = await prisma.estimateItemDefault.findUnique({ where: { name }, select: { method: true } });
+  // Trùng tên mẫu chung → copy mô tả + trường riêng mặc định vào dự án
+  const def = await prisma.estimateItemDefault.findUnique({ where: { name }, select: { method: true, fields: true } });
+  const labels = Array.isArray(def?.fields) ? (def!.fields as unknown[]).map((f) => String(f ?? "").trim()).filter(Boolean) : [];
+  const fields = labels.map((label) => ({ label, value: "" }));
   const item = await prisma.estimateItem.create({
-    data: { groupId: group.id, name, method: def?.method ?? null, sortOrder: (max._max.sortOrder ?? -1) + 1 },
+    data: { groupId: group.id, name, method: def?.method ?? null, fields, sortOrder: (max._max.sortOrder ?? -1) + 1 },
   });
   return NextResponse.json({ id: item.id });
 }

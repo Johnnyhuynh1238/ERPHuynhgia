@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   BookMarked,
+  FileText,
   Loader2,
   Plus,
   RotateCcw,
@@ -20,10 +21,13 @@ import { WorkerStatusBanner } from "./worker-status-banner";
 
 type ItemStatus = "draft" | "requested" | "analyzing" | "waiting_answer" | "ai_done" | "approved";
 
+type Field = { label: string; value: string };
+
 type Item = {
   id: string;
   name: string;
   method: string | null;
+  fields: Field[];
   status: ItemStatus;
   lineCount: number;
 };
@@ -229,51 +233,44 @@ function ItemRow({
 }) {
   const meta = STATUS_META[item.status];
   const isBusy = busy === item.id;
-  const [method, setMethod] = useState(item.method ?? "");
-  useEffect(() => { setMethod(item.method ?? ""); }, [item.method]);
-  const dirty = method !== (item.method ?? "");
+  const [showDoc, setShowDoc] = useState(false);
 
-  const patch = (field: string) => (value: string) =>
-    run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }));
+  // Thông tin riêng — ô text tự do từng dòng
+  const [fields, setFields] = useState<Field[]>(item.fields ?? []);
+  useEffect(() => { setFields(item.fields ?? []); }, [item.fields]);
+  const fieldsDirty = JSON.stringify(fields) !== JSON.stringify(item.fields ?? []);
+  const missing = fields.filter((f) => !f.value.trim()).length;
 
-  const saveProject = () =>
-    run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) }));
+  const patchName = (value: string) =>
+    run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: value }) }));
 
-  const saveGlobal = () =>
+  const setFieldValue = (i: number, value: string) =>
+    setFields((prev) => prev.map((f, k) => (k === i ? { ...f, value } : f)));
+  const setFieldLabel = (i: number, label: string) =>
+    setFields((prev) => prev.map((f, k) => (k === i ? { ...f, label } : f)));
+  const addField = () => setFields((prev) => [...prev, { label: "", value: "" }]);
+  const removeField = (i: number) => setFields((prev) => prev.filter((_, k) => k !== i));
+
+  const saveFields = () =>
     run(item.id, async () => {
-      await api(`/api/estimate/defaults`, { method: "PUT", body: JSON.stringify({ name: item.name, method }) });
-      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) });
-      toast.success(`Đã lưu mẫu chung "${item.name}"`);
+      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ fields }) });
+      toast.success("Đã lưu thông tin riêng");
     });
-
-  const pullGlobal = async () => {
-    try {
-      const r = await api(`/api/estimate/defaults?name=${encodeURIComponent(item.name)}`);
-      if (!r.default || r.default.method == null || r.default.method === "") {
-        toast.error(`Chưa có mẫu chung cho "${item.name}"`);
-        return;
-      }
-      setMethod(r.default.method);
-      toast.success("Đã lấy mẫu chung — bấm Lưu dự án để áp");
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  };
 
   return (
     <>
       <tr className="group border-b border-[#1c1f30] align-top transition-colors hover:bg-[#171a28]">
         <td className="px-3 py-2">
-          <EditableText value={item.name} className="font-semibold text-zinc-100" onSave={patch("name")} />
+          <EditableText value={item.name} className="font-semibold text-zinc-100" onSave={patchName} />
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
             {item.lineCount > 0 && <span className="text-[10px] text-zinc-500">{item.lineCount} công tác</span>}
             <button
-              onClick={() => void pullGlobal()}
-              title="Lấy mô tả từ mẫu chung của hạng mục này"
+              onClick={() => setShowDoc(true)}
+              title="Xem / sửa mô tả chung (phần cố định)"
               className="inline-flex items-center gap-1 rounded-md bg-[#312152]/60 px-1.5 py-0.5 text-[10px] font-semibold text-[#c4b5fd] hover:bg-[#3b2a63]"
             >
-              <BookMarked className="h-3 w-3" /> Mẫu chung
+              <FileText className="h-3 w-3" /> Mô tả chung
             </button>
             <span className="hidden items-center gap-0.5 group-hover:flex">
               {!first && <IconBtn title="Lên" onClick={() => run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ move: "up" }) }))}><ArrowUp className="h-3 w-3" /></IconBtn>}
@@ -292,39 +289,72 @@ function ItemRow({
           </div>
         </td>
         <td className="px-3 py-2">
-          <textarea
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            rows={Math.max(2, method.split("\n").length)}
-            placeholder="Mô tả hạng mục: biện pháp thi công, chủng loại vật tư, kích thước / cao độ / số lượng… (phần cố định lấy từ Mẫu chung, chỉ nhập cái khác)"
-            className="w-full resize-y rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs leading-relaxed text-zinc-200 outline-none hover:border-[#252840] focus:border-[#f97316]/50 focus:bg-[#0d0f17]"
-          />
-          {dirty && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={saveProject}
-                disabled={isBusy}
-                className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
-              >
-                <Save className="h-3 w-3" /> Lưu dự án
-              </button>
-              <button
-                onClick={saveGlobal}
-                disabled={isBusy}
-                title="Lưu vào mẫu chung để dùng lại cho dự án khác"
-                className="inline-flex items-center gap-1 rounded-md border border-[#6d5bb0]/60 px-2.5 py-1 text-[11px] font-bold text-[#c4b5fd] hover:bg-[#312152]/60 disabled:opacity-50"
-              >
-                <BookMarked className="h-3 w-3" /> Lưu mẫu chung
-              </button>
-              <button
-                onClick={() => setMethod(item.method ?? "")}
-                className="rounded-md p-1 text-zinc-500 hover:text-zinc-300"
-                title="Hoàn tác"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {/* Thông tin riêng — mỗi dòng 1 ô text tự do */}
+          {fields.length > 0 && (
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Thông tin riêng</span>
+              {missing > 0 ? (
+                <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold text-rose-400">
+                  còn {missing}/{fields.length} ô chưa điền
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">đủ thông tin</span>
+              )}
             </div>
           )}
+          <div className="space-y-1">
+            {fields.map((f, i) => (
+              <div key={i} className="group/f flex items-center gap-1.5">
+                <input
+                  value={f.label}
+                  onChange={(e) => setFieldLabel(i, e.target.value)}
+                  placeholder="Tên dòng…"
+                  className="w-40 shrink-0 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[11px] font-semibold text-zinc-400 outline-none hover:border-[#252840] focus:border-[#f97316]/40 focus:bg-[#0d0f17]"
+                />
+                <input
+                  value={f.value}
+                  onChange={(e) => setFieldValue(i, e.target.value)}
+                  placeholder="nhập…"
+                  className={`min-w-0 flex-1 rounded-md border px-1.5 py-1 text-xs text-zinc-100 outline-none focus:border-[#f97316]/50 focus:bg-[#0d0f17] ${
+                    f.value.trim() ? "border-transparent bg-transparent hover:border-[#252840]" : "border-rose-500/40 bg-rose-500/5"
+                  }`}
+                />
+                <button
+                  onClick={() => removeField(i)}
+                  title="Xoá dòng"
+                  className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-rose-400 group-hover/f:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={addField}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+            >
+              <Plus className="h-3 w-3" /> Thêm dòng
+            </button>
+            {fieldsDirty && (
+              <>
+                <button
+                  onClick={saveFields}
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                >
+                  <Save className="h-3 w-3" /> Lưu
+                </button>
+                <button
+                  onClick={() => setFields(item.fields ?? [])}
+                  className="rounded-md p-1 text-zinc-500 hover:text-zinc-300"
+                  title="Hoàn tác"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         </td>
         <td className="px-3 py-2 text-right">
           {item.status === "requested" || item.status === "analyzing" ? (
@@ -352,7 +382,124 @@ function ItemRow({
           )}
         </td>
       </tr>
+      {showDoc && (
+        <DocModal item={item} isBusy={isBusy} run={run} onClose={() => setShowDoc(false)} labels={fields.map((f) => f.label).filter(Boolean)} />
+      )}
     </>
+  );
+}
+
+// Modal giữa màn — mô tả chung (phần cố định) của hạng mục
+function DocModal({
+  item,
+  isBusy,
+  run,
+  onClose,
+  labels,
+}: {
+  item: Item;
+  isBusy: boolean;
+  run: (id: string, fn: () => Promise<unknown>, silent?: boolean) => Promise<void>;
+  onClose: () => void;
+  labels: string[];
+}) {
+  const [method, setMethod] = useState(item.method ?? "");
+  const dirty = method !== (item.method ?? "");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const saveProject = () =>
+    run(item.id, async () => {
+      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) });
+      toast.success("Đã lưu mô tả cho dự án");
+      onClose();
+    });
+
+  // Lưu mẫu chung: method + template trường riêng (nhãn hiện có)
+  const saveGlobal = () =>
+    run(item.id, async () => {
+      await api(`/api/estimate/defaults`, { method: "PUT", body: JSON.stringify({ name: item.name, method, fields: labels }) });
+      await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ method }) });
+      toast.success(`Đã lưu mẫu chung "${item.name}"`);
+      onClose();
+    });
+
+  const pullGlobal = async () => {
+    try {
+      const r = await api(`/api/estimate/defaults?name=${encodeURIComponent(item.name)}`);
+      if (!r.default || r.default.method == null || r.default.method === "") {
+        toast.error(`Chưa có mẫu chung cho "${item.name}"`);
+        return;
+      }
+      setMethod(r.default.method);
+      toast.success("Đã lấy mẫu chung — bấm Lưu dự án để áp");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  return (
+    <tr>
+      <td colSpan={3} className="p-0">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#c4b5fd]" />
+                <span className="text-sm font-bold text-zinc-100">Mô tả chung — {item.name}</span>
+              </div>
+              <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="mb-2 text-[11px] text-zinc-500">
+                Phần cố định (biện pháp, mác BT, loại thép…) — giống mọi dự án. AI đọc phần này + thông tin riêng để bóc khối lượng.
+              </p>
+              <textarea
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                rows={12}
+                placeholder="Mô tả cố định của hạng mục…"
+                className="w-full resize-y rounded-lg border border-[#252840] bg-[#0d0f17] px-3 py-2 text-xs leading-relaxed text-zinc-200 outline-none focus:border-[#f97316]/50"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-[#252840] px-4 py-3">
+              <button
+                onClick={() => void pullGlobal()}
+                className="inline-flex items-center gap-1 rounded-md bg-[#312152]/60 px-2.5 py-1.5 text-[11px] font-semibold text-[#c4b5fd] hover:bg-[#3b2a63]"
+              >
+                <BookMarked className="h-3.5 w-3.5" /> Lấy từ mẫu chung
+              </button>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button
+                  onClick={saveGlobal}
+                  disabled={isBusy}
+                  title="Lưu vào mẫu chung để dùng lại cho dự án khác"
+                  className="inline-flex items-center gap-1 rounded-md border border-[#6d5bb0]/60 px-2.5 py-1.5 text-[11px] font-bold text-[#c4b5fd] hover:bg-[#312152]/60 disabled:opacity-50"
+                >
+                  <BookMarked className="h-3.5 w-3.5" /> Lưu mẫu chung
+                </button>
+                <button
+                  onClick={saveProject}
+                  disabled={isBusy || !dirty}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                >
+                  <Save className="h-3.5 w-3.5" /> Lưu dự án
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
   );
 }
 

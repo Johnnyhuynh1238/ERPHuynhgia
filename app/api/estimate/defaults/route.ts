@@ -12,10 +12,10 @@ export async function GET(req: Request) {
   const name = new URL(req.url).searchParams.get("name")?.trim();
   if (name) {
     const d = await prisma.estimateItemDefault.findUnique({ where: { name } });
-    return NextResponse.json({ default: d ? { name: d.name, method: d.method } : null });
+    return NextResponse.json({ default: d ? { name: d.name, method: d.method, fields: d.fields } : null });
   }
   const list = await prisma.estimateItemDefault.findMany({ orderBy: { name: "asc" } });
-  return NextResponse.json({ defaults: list.map((d) => ({ name: d.name, method: d.method })) });
+  return NextResponse.json({ defaults: list.map((d) => ({ name: d.name, method: d.method, fields: d.fields })) });
 }
 
 // PUT: lưu mẫu chung cho 1 hạng mục (upsert theo name). body {name, method}
@@ -27,11 +27,16 @@ export async function PUT(req: Request) {
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ message: "Thiếu tên hạng mục" }, { status: 400 });
   const method = String(body.method ?? "").trim() || null;
+  // fields (tuỳ chọn): mảng nhãn dòng ["Loại móng", …]
+  const hasFields = Array.isArray(body.fields);
+  const fields = hasFields
+    ? (body.fields as unknown[]).map((f) => String(f ?? "").trim()).filter(Boolean)
+    : undefined;
 
   const d = await prisma.estimateItemDefault.upsert({
     where: { name },
-    create: { name, method },
-    update: { method },
+    create: { name, method, fields: fields ?? [] },
+    update: { method, ...(fields ? { fields } : {}) },
   });
-  return NextResponse.json({ default: { name: d.name, method: d.method } });
+  return NextResponse.json({ default: { name: d.name, method: d.method, fields: d.fields } });
 }

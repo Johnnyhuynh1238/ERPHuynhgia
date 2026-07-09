@@ -14,14 +14,16 @@ export async function POST(_req: Request, { params }: { params: { itemId: string
 
   const item = await prisma.estimateItem.findUnique({
     where: { id: params.itemId },
-    select: { id: true, status: true, name: true, method: true, materialSpec: true, dimensions: true },
+    select: { id: true, status: true, name: true, method: true, materialSpec: true, dimensions: true, fields: true },
   });
   if (!item) return NextResponse.json({ message: "Không tìm thấy hạng mục" }, { status: 404 });
   if (!REQUESTABLE.has(item.status)) {
     return NextResponse.json({ message: "Hạng mục đang được AI xử lý" }, { status: 409 });
   }
-  if (!item.dimensions && !item.method && !item.materialSpec) {
-    return NextResponse.json({ message: "Nhập mô tả (biện pháp / vật tư / kích thước) trước khi yêu cầu bóc" }, { status: 400 });
+  const hasFieldValue = Array.isArray(item.fields)
+    && (item.fields as { value?: unknown }[]).some((f) => String(f?.value ?? "").trim());
+  if (!item.dimensions && !item.method && !item.materialSpec && !hasFieldValue) {
+    return NextResponse.json({ message: "Nhập mô tả hoặc thông tin riêng trước khi yêu cầu bóc" }, { status: 400 });
   }
 
   await prisma.estimateItem.update({ where: { id: item.id }, data: { status: "requested" } });

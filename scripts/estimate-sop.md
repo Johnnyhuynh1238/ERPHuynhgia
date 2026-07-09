@@ -34,7 +34,7 @@ Text tiếng Việt trong SQL: dùng dollar-quoting `$txt$...$txt$` để khỏi
 ## 2. Đọc dữ liệu hạng mục
 
 ```sql
-SELECT i.id, i.name, i.method, i.material_spec, i.dimensions, i.qa_thread,
+SELECT i.id, i.name, i.method, i.fields, i.material_spec, i.dimensions, i.qa_thread,
        g.name AS group_name, g.project_id, p.name AS project_name, p.area_m2
 FROM estimate_items i
 JOIN estimate_groups g ON g.id = i.group_id
@@ -42,7 +42,9 @@ JOIN projects p ON p.id = g.project_id
 WHERE i.id IN ('<id1>', '<id2>');
 ```
 
-- `method` = **mô tả hạng mục** (text tự do admin nhập: gồm biện pháp thi công + chủng loại vật tư + kích thước/cao độ/số lượng, gộp chung 1 ô). Đây là nguồn chính. `material_spec`/`dimensions` là cột cũ, có thể rỗng — đọc kèm nếu có giá trị.
+- `method` = **mô tả chung / phần cố định** của hạng mục (biện pháp thi công, mác BT, loại thép, lớp bảo vệ… — giống mọi dự án). `material_spec`/`dimensions` là cột cũ, có thể rỗng — đọc kèm nếu có giá trị.
+- `fields` = **thông tin riêng của dự án** dạng `[{label, value}]` (VD `{"label":"Kích thước móng D×R×H","value":"1200×1200×300"}`). Đây là số liệu biến đổi (kích thước, số lượng, cao độ, diện tích…) admin điền cho từng ô. **Kết hợp `method` + `fields` là đủ dữ kiện để bóc — ưu tiên lấy số từ `fields`.**
+  - Ô có `value` **rỗng** = admin chưa điền → thiếu dữ kiện: ghi câu hỏi vào `qa_thread` (mục 6), KHÔNG tự chế số.
 - `qa_thread` = lịch sử hỏi–đáp các vòng trước: `[{q, a?, askedAt, answeredAt?}]`. **Đọc kỹ các câu đã trả lời (`a` có giá trị) — đó là thông tin bổ sung, không hỏi lại.**
 
 ## 3. Tải bản vẽ (nếu có)

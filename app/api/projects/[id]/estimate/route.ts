@@ -29,6 +29,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         id: it.id,
         name: it.name,
         method: it.method,
+        fields: it.fields,
         materialSpec: it.materialSpec,
         dimensions: it.dimensions,
         drawings: it.drawings,
