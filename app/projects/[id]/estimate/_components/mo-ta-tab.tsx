@@ -371,8 +371,12 @@ function ItemRow({
             <button
               disabled={isBusy}
               onClick={() => run(item.id, async () => {
+                // Lưu thông tin riêng đang gõ trước — tránh reload wipe mất
+                if (fieldsDirty) {
+                  await api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ fields }) });
+                }
                 await api(`/api/estimate/items/${item.id}/request-analysis`, { method: "POST" });
-                toast.success("Đã đưa vào hàng chờ AI bóc khối lượng");
+                toast.success("Đã lưu & đưa vào hàng chờ AI bóc khối lượng");
               })}
               className="inline-flex items-center gap-1 rounded-lg bg-[#f97316]/15 px-2.5 py-1.5 text-[11px] font-bold text-[#fb923c] hover:bg-[#f97316]/25 disabled:opacity-50"
             >
