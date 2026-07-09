@@ -3993,7 +3993,8 @@ model EstimateLine {
   formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
   quantity   Decimal            @db.Decimal(14, 3)
   status     EstimateLineStatus @default(ai_draft)
-  aiQuestion String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này
+  aiQuestion String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này (AI hỏi)
+  aiAnswer   String?            @map("ai_answer") @db.Text // admin trả lời câu hỏi của công tác này (worker đọc rồi clear)
   fixRequest String?            @map("fix_request") @db.Text // admin yêu cầu AI sửa lại công tác này (clear sau khi AI sửa xong)
   note       String?            @db.Text
   sortOrder  Int                @default(0) @map("sort_order")

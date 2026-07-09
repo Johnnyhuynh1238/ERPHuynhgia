@@ -4,7 +4,6 @@ import {
   ArrowDown,
   ArrowUp,
   Loader2,
-  MessageCircleQuestion,
   Plus,
   RotateCcw,
   Sparkles,
@@ -17,7 +16,6 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
 import { WorkerStatusBanner } from "./worker-status-banner";
 
-type Qa = { q: string; a?: string; askedAt: string; answeredAt?: string };
 type ItemStatus = "draft" | "requested" | "analyzing" | "waiting_answer" | "ai_done" | "approved";
 
 type Item = {
@@ -25,7 +23,6 @@ type Item = {
   name: string;
   method: string | null;
   status: ItemStatus;
-  qaThread: Qa[];
   lineCount: number;
 };
 
@@ -230,7 +227,6 @@ function ItemRow({
 }) {
   const meta = STATUS_META[item.status];
   const isBusy = busy === item.id;
-  const openQuestions = item.qaThread.filter((qa) => !qa.a);
 
   const patch = (field: string) => (value: string) =>
     run(item.id, () => api(`/api/estimate/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }));
@@ -293,53 +289,7 @@ function ItemRow({
           )}
         </td>
       </tr>
-
-      {item.qaThread.length > 0 && (
-        <tr className="border-b border-[#1c1f30] bg-[#191322]/60">
-          <td colSpan={3} className="px-3 py-2">
-            <div className="space-y-2 pl-4">
-              {item.qaThread.map((qa, qi) => (
-                <QaRow key={qi} qa={qa} onAnswer={(answer) => run(item.id, () => api(`/api/estimate/items/${item.id}/answer`, { method: "POST", body: JSON.stringify({ index: qi, answer }) }))} />
-              ))}
-              {openQuestions.length > 0 && (
-                <p className="text-[10px] text-zinc-500">Trả lời xong bấm lại <b className="text-[#fb923c]">AI Phân tích</b> để AI bóc tiếp với thông tin mới.</p>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
     </>
-  );
-}
-
-function QaRow({ qa, onAnswer }: { qa: Qa; onAnswer: (answer: string) => Promise<void> }) {
-  const [draft, setDraft] = useState(qa.a ?? "");
-  return (
-    <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-start sm:gap-2">
-      <span className="flex shrink-0 items-center gap-1 font-semibold text-rose-400">
-        <MessageCircleQuestion className="h-3.5 w-3.5" /> AI hỏi:
-      </span>
-      <span className="text-zinc-300">{qa.q}</span>
-      {qa.a ? (
-        <span className="text-emerald-400 sm:ml-2">→ {qa.a}</span>
-      ) : (
-        <span className="flex flex-1 gap-1 sm:ml-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) void onAnswer(draft.trim()); }}
-            placeholder="Trả lời…"
-            className="w-full max-w-sm rounded-md border border-[#374151] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/60"
-          />
-          <button
-            onClick={() => draft.trim() && void onAnswer(draft.trim())}
-            className="shrink-0 rounded-md bg-[#f97316]/15 px-2 py-1 text-[11px] font-bold text-[#fb923c] hover:bg-[#f97316]/25"
-          >
-            Gửi
-          </button>
-        </span>
-      )}
-    </div>
   );
 }
 

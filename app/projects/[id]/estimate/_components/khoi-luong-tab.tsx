@@ -20,6 +20,7 @@ type Line = {
   quantity: number;
   status: LineStatus;
   aiQuestion: string | null;
+  aiAnswer: string | null;
   fixRequest: string | null;
   note: string | null;
 };
@@ -143,14 +144,30 @@ function GroupSection({ group, items, run }: { group: Group; items: Item[]; run:
 }
 
 function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void> }) {
-  const openQuestions = item.qaThread.filter((qa) => !qa.a);
   const allApproved = item.lines.length > 0 && item.lines.every((l) => l.status === "approved");
   const isProcessing = item.status === "requested" || item.status === "analyzing";
-  // Công tác chưa duyệt + có yêu cầu sửa = phần AI sẽ sửa lại khi bấm "Yêu cầu AI sửa"
+  // Công tác chưa duyệt + có yêu cầu sửa = phần AI sẽ sửa lại
   const fixCount = item.lines.filter((l) => l.fixRequest && l.status !== "approved").length;
+  // Câu hỏi còn treo (chung + theo công tác), và có gì đã trả lời / cần gửi lại AI
+  const openCount = item.qaThread.filter((q) => !q.a).length + item.lines.filter((l) => l.aiQuestion && !l.aiAnswer).length;
+  const answeredReady = item.qaThread.some((q) => q.a) || item.lines.some((l) => l.aiAnswer);
+  const actionable = fixCount > 0 || answeredReady;
 
   return (
     <>
+      {/* Câu hỏi chung của hạng mục — nằm TRÊN hàng tên hạng mục */}
+      {item.qaThread.map((qa, qi) => (
+        <tr key={`q${qi}`} className="border-b border-[#1c1f30] bg-[#191322]/60">
+          <td colSpan={7} className="px-3 py-1.5">
+            <AnswerBox
+              question={qa.q}
+              answer={qa.a ?? null}
+              onSave={(a) => run(() => api(`/api/estimate/items/${item.id}/answer`, { method: "POST", body: JSON.stringify({ index: qi, answer: a }) }))}
+            />
+          </td>
+        </tr>
+      ))}
+
       <tr className="border-b border-[#1c1f30] bg-[#161927]">
         <td colSpan={7} className="px-3 py-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -160,21 +177,21 @@ function ItemSection({ item, run }: { item: Item; run: (fn: () => Promise<unknow
                 <Loader2 className="h-2.5 w-2.5 animate-spin" /> AI đang xử lý…
               </span>
             )}
-            {openQuestions.length > 0 && (
+            {openCount > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-400">
-                <MessageCircleQuestion className="h-3 w-3" /> {openQuestions.length} câu hỏi — trả lời ở tab Mô tả
+                <MessageCircleQuestion className="h-3 w-3" /> {openCount} câu hỏi chờ trả lời
               </span>
             )}
             <div className="ml-auto flex items-center gap-2">
-              {fixCount > 0 && !isProcessing && (
+              {actionable && !isProcessing && (
                 <button
                   onClick={() => run(async () => {
                     await api(`/api/estimate/items/${item.id}/request-analysis`, { method: "POST" });
-                    toast.success(`Đã gửi AI sửa ${fixCount} công tác`);
+                    toast.success("Đã gửi AI xử lý (câu trả lời + yêu cầu sửa)");
                   })}
                   className="inline-flex items-center gap-1 rounded-lg bg-[#f97316]/15 px-2.5 py-1 text-[11px] font-bold text-[#fb923c] hover:bg-[#f97316]/25"
                 >
-                  <Sparkles className="h-3 w-3" /> Yêu cầu AI sửa ({fixCount})
+                  <Sparkles className="h-3 w-3" /> Gửi AI xử lý{fixCount > 0 ? ` (sửa ${fixCount})` : ""}
                 </button>
               )}
               {item.lines.length > 0 && !allApproved && (
@@ -283,9 +300,11 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
       {line.aiQuestion && (
         <tr className="border-b border-[#1c1f30] bg-[#191322]/60">
           <td colSpan={7} className="px-3 py-1.5 pl-6">
-            <span className="flex items-center gap-1.5 text-[11px] text-rose-400">
-              <MessageCircleQuestion className="h-3.5 w-3.5 shrink-0" /> {line.aiQuestion}
-            </span>
+            <AnswerBox
+              question={line.aiQuestion}
+              answer={line.aiAnswer}
+              onSave={(a) => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ aiAnswer: a }) }))}
+            />
           </td>
         </tr>
       )}
@@ -337,5 +356,44 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
         )
       )}
     </>
+  );
+}
+
+// Câu hỏi của AI + ô trả lời (dùng cho câu hỏi chung của hạng mục và câu hỏi theo công tác)
+function AnswerBox({ question, answer, onSave }: { question: string; answer: string | null; onSave: (a: string) => Promise<void> | void }) {
+  const [draft, setDraft] = useState(answer ?? "");
+  const [editing, setEditing] = useState(!answer);
+
+  if (answer && !editing) {
+    return (
+      <div className="flex items-start gap-1.5 text-[11px]">
+        <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+        <span className="text-zinc-400">{question}</span>
+        <span className="flex-1 font-semibold text-emerald-400">→ {answer}</span>
+        <button onClick={() => { setDraft(answer); setEditing(true); }} className="shrink-0 text-zinc-500 hover:text-emerald-400">sửa</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
+      <span className="flex shrink-0 items-center gap-1 pt-1.5 text-[11px] font-semibold text-rose-400">
+        <MessageCircleQuestion className="h-3.5 w-3.5" /> {question}
+      </span>
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) { void onSave(draft.trim()); setEditing(false); } }}
+        placeholder="Trả lời cho AI…"
+        className="w-full flex-1 rounded-md border border-rose-500/40 bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-rose-500/70"
+      />
+      <button
+        onClick={() => { if (draft.trim()) { void onSave(draft.trim()); setEditing(false); } }}
+        disabled={!draft.trim()}
+        className="shrink-0 rounded-md bg-rose-500/90 px-3 py-1 text-[11px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+      >
+        Gửi
+      </button>
+    </div>
   );
 }

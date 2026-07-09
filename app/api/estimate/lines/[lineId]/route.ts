@@ -45,6 +45,15 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
     return NextResponse.json({ ok: true });
   }
 
+  // Trả lời câu hỏi của công tác: chỉ ghi ai_answer, KHÔNG đổi status. Worker đọc rồi clear.
+  if ("aiAnswer" in body) {
+    await prisma.estimateLine.update({
+      where: { id: line.id },
+      data: { aiAnswer: String(body.aiAnswer ?? "").trim() || null },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   const data: Record<string, unknown> = {};
   if ("name" in body) {
     const v = String(body.name ?? "").trim();

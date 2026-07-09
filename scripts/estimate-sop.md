@@ -14,12 +14,14 @@ Bạn là worker session bóc khối lượng cho ERP Huỳnh Gia. Tin nhắn sp
 Với mỗi item, chạy trước:
 
 ```sql
-SELECT id, name, status, fix_request FROM estimate_lines
-WHERE item_id = '<itemId>' AND fix_request IS NOT NULL AND status <> 'approved';
+SELECT id, name, status, fix_request, ai_answer FROM estimate_lines
+WHERE item_id = '<itemId>' AND (fix_request IS NOT NULL OR ai_answer IS NOT NULL) AND status <> 'approved';
+-- + câu trả lời chung của hạng mục:
+SELECT qa_thread FROM estimate_items WHERE id = '<itemId>';
 ```
 
-- **Có dòng trả về → CHẾ ĐỘ SỬA** (mục 5b): admin đã bóc rồi, chỉ muốn sửa đúng các công tác đó theo yêu cầu. **KHÔNG bóc lại cả hạng mục, KHÔNG xoá line khác.**
-- **Không dòng nào → CHẾ ĐỘ BÓC MỚI** (mục 2–5 như thường).
+- **Có dòng `fix_request`/`ai_answer`, HOẶC `qa_thread` có phần tử mới được trả lời (`a`) mà các line liên quan còn `ai_draft` → CHẾ ĐỘ SỬA** (mục 5b): admin đã bóc rồi, chỉ sửa/bóc lại đúng công tác liên quan theo yêu cầu + câu trả lời. **KHÔNG bóc lại cả hạng mục, KHÔNG xoá line khác.** Xử lý xong CLEAR `fix_request`/`ai_question`/`ai_answer` các dòng đã giải quyết.
+- **Item chưa có line nào (bóc lần đầu) → CHẾ ĐỘ BÓC MỚI** (mục 2–5 như thường).
 
 ## 1. Truy cập DB
 
@@ -117,33 +119,34 @@ VALUES (gen_random_uuid(), '<itemId>', 'BT.1110', $t$Bê tông móng đá 1x2 M2
 
 `sort_order` tăng dần theo trình tự thi công.
 
-## 5b. CHẾ ĐỘ SỬA (khi có `fix_request`)
+## 5b. CHẾ ĐỘ SỬA (khi có `fix_request` hoặc `ai_answer`)
 
-Admin đã xem khối lượng và ghi yêu cầu sửa vào từng công tác. Chỉ đụng đúng các công tác đó.
+Admin đã xem khối lượng và (a) ghi yêu cầu sửa `fix_request`, hoặc (b) trả lời câu hỏi của công tác vào `ai_answer` / câu hỏi chung vào `qa_thread.a`. Chỉ đụng đúng các công tác liên quan.
 
 ```sql
-SELECT id, norm_code, name, unit, formula, quantity, status, fix_request
+SELECT id, norm_code, name, unit, formula, quantity, status, fix_request, ai_question, ai_answer
 FROM estimate_lines
-WHERE item_id = '<itemId>' AND fix_request IS NOT NULL AND status <> 'approved'
+WHERE item_id = '<itemId>' AND (fix_request IS NOT NULL OR ai_answer IS NOT NULL) AND status <> 'approved'
 ORDER BY sort_order;
 ```
 
 Với **mỗi** dòng:
 
-1. Đọc `fix_request` = yêu cầu của admin (VD "thiếu giằng móng, tính thêm", "mã ĐM sai đổi BT.1120", "khối lượng sai, đào sâu 1.5m").
-2. Sửa đúng theo yêu cầu: cập nhật `quantity`/`formula`/`norm_code`/`name`/`unit`/`note` của **chính dòng đó** (UPDATE theo `id`). Nếu yêu cầu là "thêm 1 công tác mới" thì INSERT thêm line (`status='ai_draft'`), và vẫn xử lý xong dòng gốc.
-3. Sửa xong: **clear `fix_request` và set lại `status='ai_draft'`** để admin duyệt lại, ghi `note` tóm tắt đã sửa gì.
+1. Đọc `fix_request` (yêu cầu sửa) và/hoặc `ai_answer` (câu trả lời cho `ai_question` của dòng) + các câu trả lời chung trong `qa_thread`.
+2. Sửa đúng theo yêu cầu/câu trả lời: cập nhật `quantity`/`formula`/`norm_code`/`name`/`unit`/`note` của **chính dòng đó** (UPDATE theo `id`). Nếu cần "thêm 1 công tác mới" thì INSERT thêm line (`status='ai_draft'`).
+3. Sửa xong: **clear `fix_request`, `ai_question`, `ai_answer` (= NULL)** và set lại `status='ai_draft'` để admin duyệt lại, ghi `note` tóm tắt đã sửa gì.
 
 ```sql
 UPDATE estimate_lines
-SET quantity = 4.2, formula = $t$...$t$, status = 'ai_draft', fix_request = NULL,
+SET quantity = 4.2, formula = $t$...$t$, status = 'ai_draft',
+    fix_request = NULL, ai_question = NULL, ai_answer = NULL,
     note = $t$Đã thêm giằng móng theo yêu cầu$t$, updated_at = now()
 WHERE id = '<lineId>';
 ```
 
 - **KHÔNG** chạy `DELETE ... WHERE status='ai_draft'` ở chế độ này — sẽ xoá công tác admin chưa yêu cầu sửa.
-- **KHÔNG** đụng line `status='approved'` hay line `fix_request IS NULL`.
-- Thiếu thông tin để sửa → ghi câu hỏi (mục 6), để nguyên `fix_request` dòng đó chờ vòng sau.
+- **KHÔNG** đụng line `status='approved'` hay line không có `fix_request`/`ai_answer`.
+- Thiếu thông tin để sửa → ghi câu hỏi (mục 6), để nguyên `fix_request`/`ai_question` dòng đó chờ vòng sau.
 - Sau khi map lại `norm_code` mới, chạy lại mục 4c để map vật tư định mức phát sinh.
 - Xong hết → chốt status item (mục 7) + báo Telegram (mục 8) với nội dung "đã sửa N công tác".
 
@@ -159,7 +162,15 @@ SET qa_thread = qa_thread || jsonb_build_array(jsonb_build_object(
 WHERE id = '<itemId>';
 ```
 
-Câu hỏi gắn với 1 công tác cụ thể thì ghi thêm vào `estimate_lines.ai_question` của line đó.
+**Hai loại câu hỏi (admin trả lời ở tab Khối lượng, KHÔNG phải tab Mô tả):**
+- **Câu hỏi chung của hạng mục** → `qa_thread` (như trên). Admin trả lời vào `a` của phần tử tương ứng. Đọc lại `a` các vòng sau, không hỏi lại.
+- **Câu hỏi gắn 1 công tác cụ thể** → `estimate_lines.ai_question` của line đó. Admin trả lời vào `estimate_lines.ai_answer`.
+
+```sql
+UPDATE estimate_lines SET ai_question = $t$Đường kính thép chủ móng?$t$ WHERE id = '<lineId>';
+```
+
+**Vòng sau, khi đọc line có `ai_answer` khác NULL:** dùng câu trả lời để sửa/bóc lại line đó, rồi CLEAR cả hai (`SET ai_question = NULL, ai_answer = NULL`) để không hỏi lặp và để nút "Gửi AI xử lý" tự tắt khi hết việc.
 
 Vẫn bóc hết những gì bóc được — chỉ phần phụ thuộc câu trả lời thì chờ. Đừng vì 1 câu hỏi mà bỏ trống toàn bộ.
 
