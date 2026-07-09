@@ -3989,6 +3989,9 @@ model EstimateLine {
   // Line vật tư mua thẳng NCC không qua định mức (thép bóc chi tiết từng loại D…):
   // quantity theo đơn vị bán NCC, thành tiền VT = quantity × giá NCC.
   materialPriceId String? @map("material_price_id") @db.Uuid
+  // Line trọn gói (cửa nhôm/nhựa… mua 1 lần, ngoài định mức, không map NCC):
+  // nhập giá thẳng trên tab Hao phí, thành tiền VT = quantity × directUnitPrice.
+  directUnitPrice BigInt? @map("direct_unit_price")
   name       String // tên công tác (theo Norm hoặc AI đặt)
   unit       String             @db.VarChar(20)
   formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46

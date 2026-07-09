@@ -36,10 +36,26 @@ type ResourceRow = {
   contributions: Contrib[];
   ncc?: NccInfo | null; // hàng NCC đã map (vật tư định mức)
   direct?: boolean; // line vật tư mua thẳng NCC (thép bóc chi tiết)
+  lump?: boolean; // line trọn gói (cửa nhôm/nhựa…) — nhập giá thẳng, không map NCC
   lineName?: string;
   lineIds?: string[]; // direct: các estimate_line gộp cùng hàng NCC (đổi giá áp cả nhóm)
   materialPriceId?: string; // direct: hàng NCC hiện tại
 };
+
+// PATCH giá trọn gói lên chính estimate_line
+async function saveDirectPrice(lineId: string, price: number | null): Promise<boolean> {
+  const r = await fetch(`/api/estimate/lines/${lineId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ directUnitPrice: price }),
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    toast.error(j.message || "Lỗi lưu giá");
+    return false;
+  }
+  return true;
+}
 
 type NccPrice = { id: string; name: string; unit: string; price: number; source: string | null };
 
@@ -398,10 +414,13 @@ function ResourceTable({
                 {r.direct && (
                   <span className="shrink-0 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-bold text-violet-400">MUA THẲNG</span>
                 )}
+                {r.lump && (
+                  <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-bold text-amber-400">TRỌN GÓI</span>
+                )}
               </span>
               <span className="mt-0.5 block truncate text-[10px] text-zinc-500">
                 {r.ncc ? `${fmt(r.ncc.qty, 2)} ${r.ncc.unit}` : `${fmt(r.total)} ${getUnit(r)}`}
-                {projectId && !r.direct && !r.ncc ? " · chưa chọn NCC" : ""}
+                {r.lump ? (r.price == null ? " · chưa nhập giá" : "") : projectId && !r.direct && !r.ncc ? " · chưa chọn NCC" : ""}
               </span>
             </span>
             <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums text-zinc-100">
@@ -443,8 +462,13 @@ function ResourceTable({
                       {r.direct && (
                         <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">MUA THẲNG</span>
                       )}
+                      {r.lump && (
+                        <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">TRỌN GÓI</span>
+                      )}
                     </span>
-                    {projectId && !r.direct ? (
+                    {r.lump ? (
+                      <p className="pl-[18px] text-[10px] text-zinc-600">{r.lineName} · nhập giá thẳng</p>
+                    ) : projectId && !r.direct ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); setMapping(r); }}
                         className="pl-[18px] text-left text-[10px] text-zinc-500 hover:text-[#fb923c]"
@@ -479,8 +503,10 @@ function ResourceTable({
                       fmt(r.total)
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-zinc-300">
-                    {r.ncc ? fmt(r.ncc.price, 0) : r.price != null ? fmt(r.price, 0) : <span className="text-amber-500">—</span>}
+                  <td className="px-3 py-2 text-right tabular-nums text-zinc-300" onClick={(e) => r.lump && e.stopPropagation()}>
+                    {r.lump ? (
+                      <LumpPriceInput lineId={r.lineIds![0]} value={r.price} onSaved={onMapChanged} />
+                    ) : r.ncc ? fmt(r.ncc.price, 0) : r.price != null ? fmt(r.price, 0) : <span className="text-amber-500">—</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-100">
                     {r.amount != null ? fmt(r.amount, 0) : <span className="text-amber-500">thiếu giá</span>}
@@ -523,6 +549,10 @@ function ResourceTable({
             setMapping(detail);
             setDetail(null);
           }}
+          onSaved={() => {
+            setDetail(null);
+            onMapChanged?.();
+          }}
         />
       )}
 
@@ -541,6 +571,50 @@ function ResourceTable({
   );
 }
 
+// Ô nhập giá trọn gói (line ngoài định mức) — gõ số, blur/Enter lưu directUnitPrice
+function LumpPriceInput({
+  lineId,
+  value,
+  onSaved,
+  big = false,
+}: {
+  lineId: string;
+  value: number | null;
+  onSaved?: () => void;
+  big?: boolean;
+}) {
+  const [v, setV] = useState(value != null ? String(value) : "");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setV(value != null ? String(value) : ""); }, [value]);
+
+  const commit = async () => {
+    const raw = v.trim();
+    const num = raw === "" ? null : Math.round(Number(raw));
+    if (num !== null && (!Number.isFinite(num) || num < 0)) { toast.error("Đơn giá không hợp lệ"); return; }
+    if (num === (value ?? null)) return;
+    setSaving(true);
+    const ok = await saveDirectPrice(lineId, num);
+    setSaving(false);
+    if (ok) { toast.success("Đã lưu giá"); onSaved?.(); }
+  };
+
+  return (
+    <input
+      type="number"
+      min={0}
+      inputMode="numeric"
+      value={v}
+      disabled={saving}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+      placeholder="Nhập giá"
+      className={`rounded-md border border-[#f97316]/50 bg-[#0d0f17] px-2 py-1 text-right tabular-nums text-zinc-100 outline-none focus:border-[#f97316] disabled:opacity-50 ${big ? "w-full text-sm" : "w-24 text-xs"}`}
+    />
+  );
+}
+
 // Popup chi tiết 1 vật tư (mobile) — căn giữa màn hình, cuộn trong popup nên không khuất
 function MaterialDetailModal({
   row,
@@ -549,6 +623,7 @@ function MaterialDetailModal({
   getUnit,
   onClose,
   onMap,
+  onSaved,
 }: {
   row: ResourceRow;
   canMap: boolean;
@@ -556,6 +631,7 @@ function MaterialDetailModal({
   getUnit: (r: ResourceRow) => string;
   onClose: () => void;
   onMap: () => void;
+  onSaved?: () => void;
 }) {
   const unit = row.ncc ? row.ncc.unit : getUnit(row);
   const qty = row.ncc ? row.ncc.qty : row.total;
@@ -571,6 +647,9 @@ function MaterialDetailModal({
             {getName(row)}
             {row.direct && (
               <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">MUA THẲNG</span>
+            )}
+            {row.lump && (
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">TRỌN GÓI</span>
             )}
           </h4>
           <button onClick={onClose} className="shrink-0 rounded-lg border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800">
@@ -596,7 +675,14 @@ function MaterialDetailModal({
           </div>
         </div>
 
-        {canMap && (
+        {row.lump ? (
+          <div className="mt-2 rounded-lg border border-[#f97316]/40 bg-[#f97316]/5 p-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Nhập đơn giá trọn gói (₫/{getUnit(row)})</p>
+            <div className="mt-1.5">
+              <LumpPriceInput lineId={row.lineIds![0]} value={row.price} big onSaved={onSaved} />
+            </div>
+          </div>
+        ) : canMap && (
           <button
             onClick={onMap}
             className="mt-2 w-full rounded-lg border border-[#374151] bg-[#0d0f17] px-3 py-2 text-left text-xs text-zinc-300 hover:border-[#f97316]/60"

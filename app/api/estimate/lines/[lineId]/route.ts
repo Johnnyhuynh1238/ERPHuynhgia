@@ -89,6 +89,17 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
       data.materialPriceId = null;
     }
   }
+  // Giá trọn gói nhập thẳng trên tab Hao phí (cửa nhôm/nhựa… ngoài định mức)
+  if ("directUnitPrice" in body) {
+    const raw = body.directUnitPrice;
+    if (raw === null || raw === "") {
+      data.directUnitPrice = null;
+    } else {
+      const p = Math.round(Number(raw));
+      if (!Number.isFinite(p) || p < 0) return NextResponse.json({ message: "Đơn giá không hợp lệ" }, { status: 400 });
+      data.directUnitPrice = p;
+    }
+  }
   if (Object.keys(data).length === 0) return NextResponse.json({ message: "Không có gì để sửa" }, { status: 400 });
 
   data.status = "edited";

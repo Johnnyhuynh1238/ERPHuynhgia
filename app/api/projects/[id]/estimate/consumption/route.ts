@@ -23,6 +23,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         quantity: true,
         normCode: true,
         materialPriceId: true,
+        directUnitPrice: true,
         status: true,
         item: { select: { name: true, group: { select: { name: true } } } },
         materialPrice: { select: { name: true, unit: true, price: true } },
@@ -135,14 +136,37 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const directMaterials = Array.from(directMap.values());
   const directAmount = directMaterials.reduce((s, d) => s + (d.amount ?? 0), 0);
 
-  const materialAmount = result.totals.materialAmount + deltaAmount + directAmount;
+  // Line trọn gói: công tác ngoài định mức (normCode null) chưa map NCC (materialPriceId null).
+  // Nhập giá thẳng trên tab Hao phí (directUnitPrice). Mỗi line = 1 dòng riêng, không gộp.
+  type LumpRow = {
+    name: string; unit: string; total: number; price: number | null; amount: number | null;
+    lump: true; lineName: string; lineIds: string[];
+    contributions: Array<{ itemId: string; itemName: string; componentName: string; stage: string; quantity: number; qtyPerUnit: number; k: number; contrib: number }>;
+  };
+  const lumpLines = lines.filter((l) => !l.normCode && !l.materialPriceId);
+  let lumpAmount = 0;
+  let lumpMissing = 0;
+  const lumpMaterials: LumpRow[] = lumpLines.map((l) => {
+    const qty = Number(l.quantity);
+    const price = l.directUnitPrice != null ? Number(l.directUnitPrice) : null;
+    const amount = price != null ? Math.round(qty * price) : null;
+    if (amount != null) lumpAmount += amount;
+    else lumpMissing++;
+    return {
+      name: l.name, unit: l.unit, total: qty, price, amount,
+      lump: true, lineName: l.name, lineIds: [l.id],
+      contributions: [{ itemId: l.id, itemName: l.name, componentName: l.item.name, stage: l.item.group.name, quantity: qty, qtyPerUnit: 1, k: 1, contrib: qty }],
+    };
+  });
+
+  const materialAmount = result.totals.materialAmount + deltaAmount + directAmount + lumpAmount;
   return NextResponse.json({
     ...result,
-    materials: [...materials, ...directMaterials],
+    materials: [...materials, ...directMaterials, ...lumpMaterials],
     totals: {
       ...result.totals,
       materialAmount,
-      materialsMissingPrice: result.totals.materialsMissingPrice - fixedMissing,
+      materialsMissingPrice: result.totals.materialsMissingPrice - fixedMissing + lumpMissing,
       grandTotal: materialAmount + result.totals.laborAmount + result.totals.machineAmount,
     },
     lineCount: lines.length,
