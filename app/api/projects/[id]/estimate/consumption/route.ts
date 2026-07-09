@@ -106,33 +106,33 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   });
 
   // Line vật tư mua thẳng NCC — cộng vào danh sách vật tư
-  const directMaterials = directLines.map((l) => {
+  // Gộp vật tư mua thẳng theo hàng NCC (materialPriceId): nhiều công tác cùng 1 vật tư → 1 dòng tổng
+  type DirectRow = {
+    name: string; unit: string; total: number; price: number; amount: number;
+    direct: true; lineName: string; lineIds: string[]; materialPriceId: string;
+    contributions: Array<{ itemId: string; itemName: string; componentName: string; stage: string; quantity: number; qtyPerUnit: number; k: number; contrib: number }>;
+  };
+  const directMap = new Map<string, DirectRow>();
+  for (const l of directLines) {
     const qty = Number(l.quantity);
     const price = Number(l.materialPrice!.price);
-    return {
-      name: l.materialPrice!.name,
-      unit: l.materialPrice!.unit,
-      total: qty,
-      price,
-      amount: Math.round(qty * price),
-      direct: true,
-      lineName: l.name,
-      lineId: l.id,
-      materialPriceId: l.materialPriceId!,
-      contributions: [
-        {
-          itemId: l.id,
-          itemName: l.name,
-          componentName: l.item.name,
-          stage: l.item.group.name,
-          quantity: qty,
-          qtyPerUnit: 1,
-          k: 1,
-          contrib: qty,
-        },
-      ],
-    };
-  });
+    const key = l.materialPriceId!;
+    const contrib = { itemId: l.id, itemName: l.name, componentName: l.item.name, stage: l.item.group.name, quantity: qty, qtyPerUnit: 1, k: 1, contrib: qty };
+    const ex = directMap.get(key);
+    if (ex) {
+      ex.total += qty;
+      ex.amount += Math.round(qty * price);
+      ex.lineIds.push(l.id);
+      ex.contributions.push(contrib);
+    } else {
+      directMap.set(key, {
+        name: l.materialPrice!.name, unit: l.materialPrice!.unit, total: qty, price,
+        amount: Math.round(qty * price), direct: true, lineName: l.name,
+        lineIds: [l.id], materialPriceId: key, contributions: [contrib],
+      });
+    }
+  }
+  const directMaterials = Array.from(directMap.values());
   const directAmount = directMaterials.reduce((s, d) => s + (d.amount ?? 0), 0);
 
   const materialAmount = result.totals.materialAmount + deltaAmount + directAmount;

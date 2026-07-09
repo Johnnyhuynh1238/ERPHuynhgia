@@ -36,7 +36,7 @@ type ResourceRow = {
   ncc?: NccInfo | null; // hàng NCC đã map (vật tư định mức)
   direct?: boolean; // line vật tư mua thẳng NCC (thép bóc chi tiết)
   lineName?: string;
-  lineId?: string; // direct: id estimate_line để đổi hàng NCC
+  lineIds?: string[]; // direct: các estimate_line gộp cùng hàng NCC (đổi giá áp cả nhóm)
   materialPriceId?: string; // direct: hàng NCC hiện tại
 };
 
@@ -277,7 +277,7 @@ function ResourceTable({
                         onClick={(e) => { e.stopPropagation(); setMapping(r); }}
                         className="block pl-[18px] text-left text-[10px] text-zinc-500 hover:text-[#fb923c]"
                       >
-                        <span className="text-zinc-600">{r.lineName}</span> — NCC: <span className="text-[#fb923c]">{getName(r)}</span> đổi ▾
+                        <span className="text-zinc-600">{r.contributions.length > 1 ? `${r.contributions.length} công tác` : r.lineName}</span> — NCC: <span className="text-[#fb923c]">{getName(r)}</span> đổi ▾
                       </button>
                     ) : (
                       <p className="pl-[18px] text-[10px] text-zinc-600">
@@ -370,21 +370,27 @@ function MapNccModal({
 
   const save = async (materialPriceId: string | null) => {
     setSaving(true);
-    // Direct (mua thẳng): đổi hàng NCC thẳng trên estimate_line. Định mức: lưu qua material-map.
-    const r = row.direct && row.lineId
-      ? await fetch(`/api/estimate/lines/${row.lineId}`, {
+    // Direct (mua thẳng): đổi hàng NCC thẳng trên các estimate_line gộp. Định mức: lưu qua material-map.
+    let r: Response | null = null;
+    if (row.direct && row.lineIds?.length) {
+      for (const lineId of row.lineIds) {
+        r = await fetch(`/api/estimate/lines/${lineId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ materialPriceId }),
-        })
-      : await fetch(`/api/projects/${projectId}/estimate/material-map`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ srcName: row.name, srcUnit: row.unit, materialPriceId, factor: Number(factor) || 1 }),
         });
+        if (!r.ok) break;
+      }
+    } else {
+      r = await fetch(`/api/projects/${projectId}/estimate/material-map`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ srcName: row.name, srcUnit: row.unit, materialPriceId, factor: Number(factor) || 1 }),
+      });
+    }
     setSaving(false);
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
+    if (!r || !r.ok) {
+      const j = r ? await r.json().catch(() => ({})) : {};
       toast.error(j.message || "Lỗi lưu");
       return;
     }
@@ -402,7 +408,7 @@ function MapNccModal({
         <h4 className="text-sm font-bold text-zinc-100">Chọn hàng NCC</h4>
         <p className="mt-0.5 text-xs text-zinc-500">
           {row.direct ? (
-            <>Vật tư mua thẳng: <b className="text-zinc-300">{row.lineName}</b> — {fmt(row.total)} {row.unit}. Đổi hàng NCC (đơn giá lấy theo hàng chọn).</>
+            <>Vật tư mua thẳng: <b className="text-zinc-300">{row.name}</b> — {fmt(row.total)} {row.unit} ({row.lineIds?.length ?? 1} công tác). Đổi hàng NCC áp cho cả nhóm (đơn giá theo hàng chọn).</>
           ) : (
             <>Cho vật tư định mức: <b className="text-zinc-300">{row.name}</b> ({row.unit}) — cần {fmt(row.total)} {row.unit}</>
           )}
