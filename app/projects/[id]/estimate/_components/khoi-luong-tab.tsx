@@ -2,6 +2,7 @@
 
 import { Check, CheckCheck, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { EditableText } from "./editable-text";
@@ -454,7 +455,7 @@ function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => P
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#252840] bg-[#13151f] px-4 py-3">
@@ -562,7 +563,8 @@ function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => P
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -615,7 +617,7 @@ function AnswerModal({ question, answer, onClose, onSave }: { question: string; 
 
   const submit = () => { if (draft.trim()) void onSave(draft.trim()); };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div className="w-full max-w-xl rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
@@ -653,6 +655,7 @@ function AnswerModal({ question, answer, onClose, onSave }: { question: string; 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -2,6 +2,7 @@
 
 import { AlertTriangle, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 type Contrib = {
@@ -559,7 +560,7 @@ function MaterialDetailModal({
   const unit = row.ncc ? row.ncc.unit : getUnit(row);
   const qty = row.ncc ? row.ncc.qty : row.total;
   const price = row.ncc ? row.ncc.price : row.price;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] p-4"
@@ -625,7 +626,8 @@ function MaterialDetailModal({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -688,7 +690,7 @@ function MapNccModal({
   const sel = prices.find((p) => p.id === selected);
   const sameUnit = sel && sel.unit === row.unit;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-[#252840] bg-[#13151f] p-4" onClick={(e) => e.stopPropagation()}>
         <h4 className="text-sm font-bold text-zinc-100">Chọn hàng NCC</h4>
@@ -769,6 +771,7 @@ function MapNccModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
