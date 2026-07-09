@@ -107,17 +107,7 @@ export function HaoPhiTab({ projectId, kind }: { projectId: string; kind: "vt" |
       )}
 
       {kind === "vt" ? (
-        <ResourceTable
-          title="Hao phí vật tư"
-          rows={data.materials}
-          cols={{ name: "Vật tư", qty: "Tổng KL", priceUnit: "Đơn giá" }}
-          missingPrice={data.totals.materialsMissingPrice}
-          projectId={projectId}
-          onMapChanged={reload}
-          getKey={(r) => `${r.name}__${r.unit}${r.direct ? `__${r.lineName}` : ""}`}
-          getName={(r) => r.name ?? ""}
-          getUnit={(r) => r.unit ?? ""}
-        />
+        <MaterialViews data={data} projectId={projectId} onMapChanged={reload} />
       ) : (
         <>
           <ResourceTable
@@ -160,6 +150,165 @@ export function HaoPhiTab({ projectId, kind }: { projectId: string; kind: "vt" |
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// Giá 1 đơn vị định mức của vật tư (ưu tiên NCC đã map, fallback đơn giá thô)
+const unitCost = (r: ResourceRow) => (r.amount != null && r.total > 0 ? r.amount / r.total : (r.price ?? 0));
+
+type PivotMat = { name: string; unit: string; qty: number; amount: number; noPrice: boolean };
+type PivotGroup = { key: string; stage: string; label: string; amount: number; noPrice: boolean; mats: Map<string, PivotMat> };
+
+// Gom vật tư theo hạng mục (component) hoặc theo công tác (item)
+function pivot(rows: ResourceRow[], by: "component" | "item"): PivotGroup[] {
+  const groups = new Map<string, PivotGroup>();
+  for (const r of rows) {
+    const uc = unitCost(r);
+    const noPrice = r.amount == null && r.price == null;
+    const unit = r.unit ?? "";
+    const matName = r.name ?? "";
+    for (const c of r.contributions) {
+      const gkey = by === "component" ? `${c.stage}|${c.componentName}` : `${c.stage}|${c.componentName}|${c.itemName}`;
+      const label = by === "component" ? c.componentName : c.itemName;
+      let g = groups.get(gkey);
+      if (!g) {
+        g = { key: gkey, stage: c.stage, label, amount: 0, noPrice: false, mats: new Map() };
+        groups.set(gkey, g);
+      }
+      const tien = c.contrib * uc;
+      g.amount += tien;
+      if (noPrice) g.noPrice = true;
+      const mkey = `${matName}__${unit}`;
+      let m = g.mats.get(mkey);
+      if (!m) {
+        m = { name: matName, unit, qty: 0, amount: 0, noPrice: false };
+        g.mats.set(mkey, m);
+      }
+      m.qty += c.contrib;
+      m.amount += tien;
+      if (noPrice) m.noPrice = true;
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => b.amount - a.amount);
+}
+
+function MaterialViews({ data, projectId, onMapChanged }: { data: Consumption; projectId: string; onMapChanged: () => void }) {
+  const [view, setView] = useState<"material" | "component" | "item">("material");
+  const modes = [
+    { id: "material" as const, label: "Theo vật tư" },
+    { id: "component" as const, label: "Theo hạng mục" },
+    { id: "item" as const, label: "Theo công tác" },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="inline-flex rounded-xl border border-[#252840] bg-[#13151f] p-0.5 text-xs">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setView(m.id)}
+            className={`rounded-lg px-3 py-1.5 font-semibold transition-colors ${
+              view === m.id ? "bg-[#f97316] text-white" : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "material" ? (
+        <ResourceTable
+          title="Hao phí vật tư"
+          rows={data.materials}
+          cols={{ name: "Vật tư", qty: "Tổng KL", priceUnit: "Đơn giá" }}
+          missingPrice={data.totals.materialsMissingPrice}
+          projectId={projectId}
+          onMapChanged={onMapChanged}
+          getKey={(r) => `${r.name}__${r.unit}${r.direct ? `__${r.lineName}` : ""}`}
+          getName={(r) => r.name ?? ""}
+          getUnit={(r) => r.unit ?? ""}
+        />
+      ) : (
+        <PivotTable
+          title={view === "component" ? "Hao phí vật tư theo hạng mục" : "Hao phí vật tư theo công tác"}
+          groupCol={view === "component" ? "Hạng mục" : "Công tác"}
+          groups={pivot(data.materials, view)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PivotTable({ title, groupCol, groups }: { title: string; groupCol: string; groups: PivotGroup[] }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (k: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  const total = groups.reduce((s, g) => s + g.amount, 0);
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+      <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
+        <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
+        <span className="text-[11px] font-semibold tabular-nums text-zinc-400">Tổng: {fmt(total, 0)} ₫</span>
+      </div>
+      <table className="w-full min-w-[560px] border-collapse text-left text-xs">
+        <thead>
+          <tr className="border-b border-[#252840] text-[11px] uppercase tracking-wide text-zinc-500">
+            <th className="w-[64%] px-3 py-2 font-semibold">{groupCol}</th>
+            <th className="w-[12%] px-3 py-2 text-right font-semibold">Số VT</th>
+            <th className="w-[24%] px-3 py-2 text-right font-semibold">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.length === 0 && (
+            <tr>
+              <td colSpan={3} className="px-3 py-6 text-center text-zinc-600">Không có dòng nào</td>
+            </tr>
+          )}
+          {groups.map((g) => {
+            const isOpen = open.has(g.key);
+            const mats = Array.from(g.mats.values()).sort((a, b) => b.amount - a.amount);
+            return (
+              <Fragment key={g.key}>
+                <tr onClick={() => toggle(g.key)} className="cursor-pointer border-b border-[#1c1f30] transition-colors hover:bg-[#171a28]">
+                  <td className="px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-zinc-200">
+                      {isOpen ? <ChevronDown className="h-3 w-3 text-zinc-500" /> : <ChevronRight className="h-3 w-3 text-zinc-500" />}
+                      <span className="text-zinc-600">[{g.stage}]</span> {g.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{g.mats.size}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-100">
+                    {fmt(g.amount, 0)}
+                    {g.noPrice && <span className="ml-1 text-amber-500">⚠</span>}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr className="border-b border-[#1c1f30] bg-[#0f1220]/60">
+                    <td colSpan={3} className="px-3 py-2">
+                      <div className="space-y-1 pl-[18px] text-[11px]">
+                        {mats.map((m) => (
+                          <div key={`${m.name}__${m.unit}`} className="flex items-center justify-between gap-2 text-zinc-400">
+                            <span className="truncate text-zinc-300">{m.name}</span>
+                            <span className="shrink-0 font-mono tabular-nums">
+                              {fmt(m.qty)} {m.unit} = <span className="text-zinc-200">{m.noPrice ? <span className="text-amber-500">thiếu giá</span> : `${fmt(m.amount, 0)} ₫`}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
