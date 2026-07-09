@@ -364,6 +364,7 @@ function ResourceTable({
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [mapping, setMapping] = useState<ResourceRow | null>(null);
+  const [detail, setDetail] = useState<ResourceRow | null>(null); // popup chi tiết (mobile)
   const toggle = (k: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -373,13 +374,45 @@ function ResourceTable({
     });
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+    <div className="rounded-2xl border border-[#252840] bg-[#13151f]">
       <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2.5">
         <h3 className="text-[13px] font-bold text-[#fb923c]">{title}</h3>
         {missingPrice > 0 && (
           <span className="text-[10px] font-semibold text-amber-400">⚠ {missingPrice} dòng thiếu đơn giá — bổ sung ở tab Đơn giá</span>
         )}
       </div>
+
+      {/* Mobile: mỗi vật tư 1 dòng gọn, bấm mở popup chi tiết. Không cuộn ngang. */}
+      <div className="divide-y divide-[#1c1f30] md:hidden">
+        {rows.length === 0 && <p className="px-3 py-6 text-center text-xs text-zinc-600">Không có dòng nào</p>}
+        {rows.map((r) => (
+          <button
+            key={getKey(r)}
+            onClick={() => setDetail(r)}
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left active:bg-[#171a28]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span className="truncate text-[13px] text-zinc-200">{getName(r)}</span>
+                {r.direct && (
+                  <span className="shrink-0 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-bold text-violet-400">MUA THẲNG</span>
+                )}
+              </span>
+              <span className="mt-0.5 block truncate text-[10px] text-zinc-500">
+                {r.ncc ? `${fmt(r.ncc.qty, 2)} ${r.ncc.unit}` : `${fmt(r.total)} ${getUnit(r)}`}
+                {projectId && !r.direct && !r.ncc ? " · chưa chọn NCC" : ""}
+              </span>
+            </span>
+            <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums text-zinc-100">
+              {r.amount != null ? `${fmt(r.amount, 0)} ₫` : <span className="text-[11px] text-amber-500">thiếu giá</span>}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+          </button>
+        ))}
+      </div>
+
+      {/* PC: giữ nguyên bảng đầy đủ */}
+      <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[720px] border-collapse text-left text-xs">
         <thead>
           <tr className="border-b border-[#252840] text-[11px] uppercase tracking-wide text-zinc-500">
@@ -476,6 +509,21 @@ function ResourceTable({
           })}
         </tbody>
       </table>
+      </div>
+
+      {detail && (
+        <MaterialDetailModal
+          row={detail}
+          canMap={!!projectId}
+          getName={getName}
+          getUnit={getUnit}
+          onClose={() => setDetail(null)}
+          onMap={() => {
+            setMapping(detail);
+            setDetail(null);
+          }}
+        />
+      )}
 
       {mapping && projectId && (
         <MapNccModal
@@ -488,6 +536,95 @@ function ResourceTable({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// Popup chi tiết 1 vật tư (mobile) — căn giữa màn hình, cuộn trong popup nên không khuất
+function MaterialDetailModal({
+  row,
+  canMap,
+  getName,
+  getUnit,
+  onClose,
+  onMap,
+}: {
+  row: ResourceRow;
+  canMap: boolean;
+  getName: (r: ResourceRow) => string;
+  getUnit: (r: ResourceRow) => string;
+  onClose: () => void;
+  onMap: () => void;
+}) {
+  const unit = row.ncc ? row.ncc.unit : getUnit(row);
+  const qty = row.ncc ? row.ncc.qty : row.total;
+  const price = row.ncc ? row.ncc.price : row.price;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#252840] bg-[#13151f] p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="flex items-center gap-1.5 text-sm font-bold text-zinc-100">
+            {getName(row)}
+            {row.direct && (
+              <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">MUA THẲNG</span>
+            )}
+          </h4>
+          <button onClick={onClose} className="shrink-0 rounded-lg border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800">
+            Đóng
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-lg border border-[#252840] bg-[#0f1220] p-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Khối lượng</p>
+            <p className="mt-0.5 font-semibold tabular-nums text-zinc-100">{fmt(qty, 2)} {unit}</p>
+            {row.ncc && <p className="text-[10px] text-zinc-600">= {fmt(row.total)} {getUnit(row)}</p>}
+          </div>
+          <div className="rounded-lg border border-[#252840] bg-[#0f1220] p-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Đơn giá</p>
+            <p className="mt-0.5 font-semibold tabular-nums text-zinc-100">{price != null ? `${fmt(price, 0)} ₫` : <span className="text-amber-500">—</span>}</p>
+          </div>
+          <div className="col-span-2 rounded-lg border border-[#f97316]/40 bg-[#f97316]/10 p-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Thành tiền</p>
+            <p className="mt-0.5 text-base font-bold tabular-nums text-[#fb923c]">
+              {row.amount != null ? `${fmt(row.amount, 0)} ₫` : <span className="text-amber-500">thiếu giá</span>}
+            </p>
+          </div>
+        </div>
+
+        {canMap && (
+          <button
+            onClick={onMap}
+            className="mt-2 w-full rounded-lg border border-[#374151] bg-[#0d0f17] px-3 py-2 text-left text-xs text-zinc-300 hover:border-[#f97316]/60"
+          >
+            {row.ncc ? (
+              <>NCC: <span className="text-[#fb923c]">{row.ncc.name}</span> · {fmt(row.ncc.qty, 2)} {row.ncc.unit} — <span className="text-[#fb923c]">đổi ▾</span></>
+            ) : row.direct ? (
+              <>NCC: <span className="text-[#fb923c]">{getName(row)}</span> — <span className="text-[#fb923c]">đổi ▾</span></>
+            ) : (
+              <span className="text-[#fb923c]">Chưa chọn NCC — chọn ▾</span>
+            )}
+          </button>
+        )}
+
+        <p className="mt-3 text-[11px] font-semibold text-zinc-400">{row.contributions.length} công tác đóng góp</p>
+        <div className="mt-1 space-y-1 text-[11px]">
+          {row.contributions.map((c, i) => (
+            <div key={i} className="flex items-center justify-between gap-2 border-b border-[#1c1f30] pb-1 text-zinc-400">
+              <span className="min-w-0 truncate">
+                <span className="text-zinc-600">[{c.stage}]</span> <span className="text-zinc-500">{c.componentName} /</span> {c.itemName}
+              </span>
+              <span className="shrink-0 font-mono tabular-nums">
+                {fmt(c.quantity)} × {fmt(c.qtyPerUnit, 4)}
+                {c.k !== 1 ? ` × ${fmt(c.k, 2)}` : ""} = <span className="text-zinc-200">{fmt(c.contrib)}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
