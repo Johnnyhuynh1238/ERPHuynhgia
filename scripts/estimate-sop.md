@@ -99,6 +99,9 @@ WHERE m.id IS NULL;
 
 Với mỗi vật tư chưa map, nếu bảng giá có hàng NCC tương ứng (xi măng ↔ các loại xi măng, cát vàng ↔ cát bê tông, đá dăm ↔ đá 1x2/0x4, gạch ↔ gạch tuynel…):
 
+- **Bê tông: dùng BÊ TÔNG THƯƠNG PHẨM mua theo m³** — norm BT đã set `material_items` = "Bê tông thương phẩm M<mác>" (KHÔNG còn cấp phối xi-cát-đá-nước). Map thẳng tới hàng NCC cùng tên "Bê tông thương phẩm M100/M250" (`factor=1`, đơn vị m³). **KHÔNG bung cấp phối, KHÔNG thêm nước.**
+- **Cốp pha / máy / dụng cụ thi công (gỗ ván, cây chống, giàn giáo…): KHÔNG bóc line vật tư.** Chi phí này đã nằm trong hao phí NC + máy của định mức (norm cốp pha `material_items` để rỗng là đúng). Chỉ map norm cốp pha là đủ.
+- **KHÔNG thêm "Nước" vào bất kỳ công tác nào** — đã loại khỏi mọi định mức.
 - Chọn hàng **GIÁ CAO NHẤT** trong nhóm phù hợp.
 - `factor` = số đơn vị định mức trong 1 đơn vị NCC: xi măng kg → bao = 50; cát/đá m³ → m³ (khối) = 1; gạch viên → viên = 1.
 - Insert: `INSERT INTO estimate_material_maps (id, project_id, src_name, src_unit, material_price_id, factor, created_at, updated_at) VALUES (gen_random_uuid(), '<projectId>', $t$Xi măng PCB30$t$, 'kg', '<mpId>', 50, now(), now()) ON CONFLICT (project_id, src_name, src_unit) DO NOTHING;` (DO NOTHING — không ghi đè lựa chọn admin đã chỉnh)
