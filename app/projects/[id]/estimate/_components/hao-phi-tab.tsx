@@ -734,6 +734,7 @@ function MapNccModal({
   const [selected, setSelected] = useState<string>(row.direct ? (row.materialPriceId ?? "") : (row.ncc?.materialPriceId ?? ""));
   const [factor, setFactor] = useState(String(row.ncc?.factor ?? 1));
   const [saving, setSaving] = useState(false);
+  const [quickPrice, setQuickPrice] = useState(row.ncc == null && row.price != null ? String(row.price) : "");
 
   useEffect(() => {
     void (async () => {
@@ -771,6 +772,27 @@ function MapNccModal({
     onSaved();
   };
 
+  // Nhập giá thẳng: lưu đơn giá vào catalog (tab Đơn giá) + áp luôn cho vật tư định mức này
+  const saveQuickPrice = async () => {
+    const raw = quickPrice.trim();
+    const num = Math.round(Number(raw));
+    if (!raw || !Number.isFinite(num) || num < 0) { toast.error("Đơn giá không hợp lệ"); return; }
+    setSaving(true);
+    const r = await fetch(`/api/projects/${projectId}/estimate/material-map`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ srcName: row.name, srcUnit: row.unit, newPrice: num }),
+    });
+    setSaving(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      toast.error(j.message || "Lỗi lưu giá");
+      return;
+    }
+    toast.success("Đã lưu đơn giá vào catalog");
+    onSaved();
+  };
+
   const q = search.trim().toLowerCase();
   const filtered = q ? prices.filter((p) => p.name.toLowerCase().includes(q)) : prices;
   const sel = prices.find((p) => p.id === selected);
@@ -788,11 +810,38 @@ function MapNccModal({
           )}
         </p>
 
+        {!row.lump && (
+          <div className="mt-3 rounded-lg border border-[#f97316]/40 bg-[#f97316]/5 p-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Nhập giá thẳng (₫/{row.unit})</p>
+            <p className="text-[10px] text-zinc-500">Lưu vào tab Đơn giá + áp luôn, khỏi qua tab Đơn giá tạo tay.</p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={quickPrice}
+                onChange={(e) => setQuickPrice(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveQuickPrice(); } }}
+                placeholder="Đơn giá"
+                className="min-w-0 flex-1 rounded-md border border-[#f97316]/50 bg-[#0d0f17] px-2 py-1.5 text-right tabular-nums text-zinc-100 outline-none focus:border-[#f97316]"
+              />
+              <button
+                onClick={() => void saveQuickPrice()}
+                disabled={saving || !quickPrice.trim()}
+                className="shrink-0 rounded-md bg-[#f97316] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+              >
+                Lưu giá
+              </button>
+            </div>
+          </div>
+        )}
+
+        <p className="mt-3 text-[10px] uppercase tracking-wide text-zinc-500">{row.direct ? "Đổi hàng NCC" : "Hoặc chọn hàng NCC có sẵn"}</p>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm vật tư NCC…"
-          className="mt-3 w-full rounded-lg border border-[#374151] bg-[#0d0f17] px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60"
+          className="mt-1.5 w-full rounded-lg border border-[#374151] bg-[#0d0f17] px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60"
         />
 
         <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">

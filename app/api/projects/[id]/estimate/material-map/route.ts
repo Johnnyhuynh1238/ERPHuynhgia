@@ -15,6 +15,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const srcUnit = String(body.srcUnit || "").trim();
   if (!srcName || !srcUnit) return NextResponse.json({ message: "Thiếu vật tư nguồn" }, { status: 400 });
 
+  // Nhập giá thẳng: tạo/cập nhật đơn giá trong catalog (name=srcName, unit=srcUnit) → tự áp cho
+  // vật tư định mức trùng tên, đồng thời hiện luôn ở tab Đơn giá. Không cần qua tab Đơn giá tạo tay.
+  if (body.newPrice !== undefined && body.newPrice !== null && body.newPrice !== "") {
+    const price = Math.round(Number(body.newPrice));
+    if (!Number.isFinite(price) || price < 0) {
+      return NextResponse.json({ message: "Đơn giá không hợp lệ" }, { status: 400 });
+    }
+    const mp = await prisma.materialPrice.upsert({
+      where: { name_unit: { name: srcName, unit: srcUnit } },
+      create: { name: srcName, unit: srcUnit, price: BigInt(price), source: "Nhập nhanh (Hao phí)" },
+      update: { price: BigInt(price), retiredAt: null },
+    });
+    // Gỡ map NCC cũ (nếu có) để dùng đúng giá vừa nhập theo tên định mức
+    await prisma.estimateMaterialMap.deleteMany({ where: { projectId: params.id, srcName, srcUnit } });
+    return NextResponse.json({ ok: true, materialPriceId: mp.id });
+  }
+
   if (!body.materialPriceId) {
     await prisma.estimateMaterialMap.deleteMany({
       where: { projectId: params.id, srcName, srcUnit },
