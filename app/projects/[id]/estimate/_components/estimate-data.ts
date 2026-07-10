@@ -21,6 +21,7 @@ export type CongTac = {
   quantity: number;
   status: string;
   note: string | null;
+  fixRequest: string | null;
   vtChildren: Vt[];
 };
 
