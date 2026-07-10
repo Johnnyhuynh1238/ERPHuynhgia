@@ -1,0 +1,184 @@
+/* ============================================================
+   Dự toán — Design system Huỳnh Gia (brief v4)
+   Ngà (sáng) / Mahogany (tối). IBM Plex. Phẳng, kẻ mảnh, mono số.
+   Mọi thứ scope trong .estdoc để không đụng app shell.
+   ============================================================ */
+
+.estdoc {
+  --bg: #f5efe1;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.12);
+  --line2: rgba(46, 20, 10, 0.18);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --field: rgba(46, 20, 10, 0.04);
+
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  /* full-bleed nền ngà, nội dung canh giữa tối đa 680px */
+  padding-top: clamp(14px, 4.5vw, 28px);
+  padding-bottom: 44px;
+  padding-left: max(clamp(14px, 5vw, 32px), calc((100% - 680px) / 2));
+  padding-right: max(clamp(14px, 5vw, 32px), calc((100% - 680px) / 2));
+}
+.estdoc[data-theme="dark"] {
+  --bg: #431a0b;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.42);
+  --line: rgba(247, 242, 228, 0.14);
+  --line2: rgba(247, 242, 228, 0.22);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --field: rgba(247, 242, 228, 0.06);
+}
+
+.estdoc .num,
+.estdoc .amt,
+.estdoc .tot,
+.estdoc .calc {
+  font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---- topbar ---- */
+.est-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 18px; }
+.est-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.est-mark { width: 32px; height: 32px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 14px; letter-spacing: -0.02em; flex: 0 0 auto; }
+.est-brand b { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; display: block; }
+.est-brand span { font-size: 10.5px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.est-acts { display: flex; gap: 10px; align-items: center; flex: 0 0 auto; }
+.est-lnk { font-size: 12.5px; font-weight: 500; color: var(--mut); cursor: pointer; background: none; border: none; font-family: inherit; padding: 4px 2px; }
+.est-lnk:hover { color: var(--text); }
+.est-lnk.pri { color: var(--orange); font-weight: 600; }
+.est-toggle { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 14px; display: grid; place-items: center; line-height: 1; }
+.est-toggle:hover { border-color: var(--text); }
+
+/* ---- header ---- */
+.est-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.est-h1 { font-size: clamp(20px, 5.5vw, 26px); font-weight: 600; letter-spacing: -0.022em; margin: 7px 0 6px; line-height: 1.12; }
+.est-meta { font-size: 12.5px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.est-meta .d { color: var(--line2); }
+
+/* ---- tabs ---- */
+.est-tabs { display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid var(--line2); }
+.est-tab { appearance: none; background: none; border: none; font-family: inherit; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--mut); padding: 9px 12px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.est-tab:hover { color: var(--text); }
+.est-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+/* ---- summary (VT tổng / overview) ---- */
+.est-sum { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line2); }
+.est-sum .k { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mut); font-weight: 500; }
+.est-sum .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: clamp(26px, 8vw, 38px); font-weight: 600; letter-spacing: -0.03em; color: var(--orange); line-height: 1; margin-top: 6px; }
+.est-sum .v .u { font-size: 0.42em; color: var(--mut2); font-weight: 500; margin-left: 6px; }
+.est-sum .note { font-size: 12px; color: var(--mut); margin-top: 7px; }
+
+/* ---- phase / nhóm ---- */
+.est-phase { margin-top: 26px; }
+.est-phase-h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1.5px solid var(--text); }
+.est-phase-h .tgl { appearance: none; background: none; border: none; cursor: pointer; color: var(--mut); font-size: 12px; padding: 0; display: flex; align-items: center; }
+.est-phase-h .idx { font-family: var(--font-plex-mono), monospace; font-size: 11px; color: var(--gold); font-weight: 600; flex: 0 0 auto; }
+.est-phase-h .nm { font-size: 12.5px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; flex: 1; min-width: 0; color: var(--text); text-align: left; background: none; border: none; font-family: inherit; cursor: pointer; padding: 0; }
+.est-phase-h .tot { font-size: 13px; font-weight: 600; color: var(--mut); flex: 0 0 auto; }
+.est-phase-h .x { color: var(--mut2); cursor: pointer; background: none; border: none; display: grid; place-items: center; padding: 2px; }
+.est-phase-h .x:hover { color: var(--orange); }
+
+/* ---- hạng mục (nhóm phụ trong phase) ---- */
+.est-itemhdr { display: flex; align-items: center; gap: 8px; padding: 12px 0 4px; }
+.est-itemhdr .nm { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--terra); }
+
+/* ---- line item (list row, không cuộn ngang) ---- */
+.est-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); width: 100%; text-align: left; background: none; border-left: none; border-right: none; border-top: none; font-family: inherit; color: inherit; cursor: pointer; }
+.est-row .body { flex: 1; min-width: 0; }
+.est-row .name { font-size: 14.5px; font-weight: 500; letter-spacing: -0.01em; word-break: break-word; }
+.est-row .calc { font-size: 12px; color: var(--mut); margin-top: 3px; }
+.est-row .calc .code { color: var(--terra); }
+.est-row .amt { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; padding-top: 1px; flex: 0 0 auto; }
+.est-row .amt .u { font-size: 0.66em; color: var(--mut2); font-weight: 500; margin-left: 2px; }
+.est-row .chev { color: var(--mut2); flex: 0 0 auto; padding-top: 2px; }
+
+.est-flag { color: var(--orange); flex: 0 0 auto; padding-top: 3px; }
+
+.est-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; margin-top: 6px; }
+.est-tag::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+.est-tag.warn { color: var(--orange); }
+.est-tag.warn::before { background: var(--orange); }
+.est-tag.ok { color: var(--ok); }
+.est-tag.ok::before { background: var(--ok); }
+
+/* ---- subtotal ---- */
+.est-subt { display: flex; justify-content: space-between; align-items: center; padding: 11px 0 0; margin-top: 2px; border-top: 1.5px solid var(--gold); }
+.est-subt .k { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--terra); }
+.est-subt .v { font-size: 14px; font-weight: 600; }
+
+/* ---- grand total ---- */
+.est-grand { margin-top: 30px; padding-top: 18px; border-top: 3px solid var(--orange); }
+.est-grand .gw { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.est-grand .k { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); font-weight: 600; }
+.est-grand .n { font-size: 12px; color: var(--mut); margin-top: 6px; }
+.est-grand .v { font-size: clamp(28px, 9vw, 42px); font-weight: 600; letter-spacing: -0.03em; color: var(--text); line-height: 1; }
+.est-grand .v .u { font-size: 0.42em; color: var(--orange); margin-left: 6px; font-weight: 600; }
+
+.est-foot { text-align: center; font-size: 11px; color: var(--mut2); letter-spacing: 0.05em; padding: 26px 0 6px; }
+
+/* ---- inline edit (EditableText rebrand) ---- */
+.est-ed { min-height: 20px; cursor: text; white-space: pre-wrap; border-radius: 4px; padding: 1px 3px; margin: 0 -3px; line-height: 1.45; word-break: break-word; }
+.est-ed:hover { background: var(--field); }
+.est-ed.empty { color: var(--mut2); }
+.est-ed-input { width: 100%; resize: none; overflow: hidden; border-radius: 4px; border: 1px solid var(--orange); background: var(--bg); padding: 1px 4px; line-height: 1.45; color: var(--text); outline: none; font-family: inherit; font-size: inherit; }
+.est-ed-num, .est-ed-num .est-ed, .est-ed-num .est-ed-input { font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---- add row ---- */
+.est-add { display: flex; align-items: center; gap: 8px; padding: 10px 0; }
+.est-add input { min-width: 0; flex: 1; border: none; border-bottom: 1px solid var(--line2); background: none; padding: 4px 2px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; }
+.est-add input:focus { border-bottom-color: var(--orange); }
+.est-add input.w-unit { flex: 0 0 64px; }
+.est-add .go { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 6px; border: none; background: var(--orange); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.est-add .go:disabled { opacity: 0.4; }
+
+.est-iconbtn { background: none; border: none; cursor: pointer; color: var(--mut2); display: grid; place-items: center; padding: 3px; flex: 0 0 auto; }
+.est-iconbtn:hover { color: var(--orange); }
+
+.est-empty { padding: 30px 4px; text-align: center; color: var(--mut); font-size: 13px; }
+
+/* ---- view switch (VT tab) ---- */
+.est-views { display: flex; gap: 2px; margin: 14px 0 6px; }
+.est-views button { appearance: none; background: none; border: none; border-bottom: 2px solid transparent; font-family: inherit; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--mut); padding: 6px 10px; }
+.est-views button.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+/* ---- popup bottom-sheet ---- */
+.est-ov { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; background: rgba(30, 12, 4, 0.5); }
+@media (min-width: 640px) { .est-ov { align-items: center; } }
+.est-sheet { font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif; background: var(--bg); color: var(--text); width: 100%; max-height: 92vh; overflow-y: auto; border-radius: 16px 16px 0 0; border-top: 3px solid var(--orange); }
+@media (min-width: 640px) { .est-sheet { max-width: 34rem; border-radius: 14px; border-top: 3px solid var(--orange); } }
+.est-sheet .num, .est-sheet .amt { font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; }
+.est-sheet-h { position: sticky; top: 0; background: var(--bg); display: flex; align-items: flex-start; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.est-sheet-h .eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--terra); font-weight: 600; }
+.est-sheet-h .ttl { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2px; }
+.est-sheet-h .sub { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--mut); }
+.est-sheet-body { padding: 16px 18px 22px; }
+.est-sec { margin-top: 18px; }
+.est-sec:first-child { margin-top: 0; }
+.est-sec h4 { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
+.est-sec.fix h4 { color: var(--orange); }
+.est-box { border: 1px solid var(--line2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.est-box.fixon { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 7%, transparent); }
+.est-hint { font-size: 11px; color: var(--mut2); margin-top: 6px; }
+
+/* vật tư rows trong sheet */
+.est-vt { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.est-vt:last-child { border-bottom: none; }
+.est-vt .vname { flex: 1; min-width: 0; font-size: 13.5px; word-break: break-word; }
+.est-vt .vqty { flex: 0 0 auto; font-size: 12.5px; color: var(--mut); text-align: right; }
+.est-vt .vamt { flex: 0 0 auto; font-size: 13.5px; font-weight: 600; text-align: right; white-space: nowrap; }

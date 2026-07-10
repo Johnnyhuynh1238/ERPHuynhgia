@@ -1,17 +1,22 @@
 "use client";
 
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KhoanTab } from "./khoan-tab";
 import { KhoiLuongTab } from "./khoi-luong-tab";
 import { VatTuTab } from "./vat-tu-tab";
+import "./estimate.css";
+
+const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 type TabKey = "khoi-luong" | "vat-tu" | "khoan";
 
-const TABS: { key: TabKey; label: string; short: string }[] = [
-  { key: "khoi-luong", label: "Khối lượng", short: "KL" },
-  { key: "vat-tu", label: "Vật tư", short: "VT" },
-  { key: "khoan", label: "Khoán", short: "Khoán" },
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "khoi-luong", label: "Khối lượng" },
+  { key: "vat-tu", label: "Vật tư" },
+  { key: "khoan", label: "Khoán" },
 ];
 
 type Props = {
@@ -24,6 +29,20 @@ type Props = {
 export function EstimateClient({ projectId, projectCode, projectName, initialTab }: Props) {
   const valid = TABS.some((t) => t.key === initialTab);
   const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "khoi-luong");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  // Nhớ chế độ sáng/tối riêng cho màn dự toán
+  useEffect(() => {
+    const saved = localStorage.getItem("estimate-theme");
+    if (saved === "dark" || saved === "light") setTheme(saved);
+  }, []);
+  const toggleTheme = () => {
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      localStorage.setItem("estimate-theme", next);
+      return next;
+    });
+  };
 
   const selectTab = (key: TabKey) => {
     setTab(key);
@@ -31,44 +50,48 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
   };
 
   return (
-    <div className="-mx-4 space-y-3 py-3 md:mx-auto md:max-w-6xl md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 md:px-0">
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/projects/${projectId}`}
-            className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
-          >
+    <div className={`estdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="est-top">
+        <div className="est-brand">
+          <div className="est-mark">H6</div>
+          <div>
+            <b>HUỲNH GIA</b>
+            <span>Dự toán</span>
+          </div>
+        </div>
+        <div className="est-acts">
+          <Link href={`/projects/${projectId}`} className="est-lnk">
             ← Dự án
           </Link>
-          <div>
-            <h1 className="text-base font-bold text-zinc-100">Dự toán</h1>
-            <p className="text-xs text-zinc-500">
-              {projectCode} · {projectName}
-            </p>
-          </div>
+          <button className="est-toggle" onClick={toggleTheme} aria-label="Đổi giao diện sáng/tối">
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
         </div>
       </div>
 
-      <div className="mx-3 flex gap-1 overflow-x-auto rounded-xl border border-[#252840] bg-[#13151f] p-1 md:mx-0">
+      <div className="est-eyebrow">Dự toán · {projectCode}</div>
+      <h1 className="est-h1">{projectName}</h1>
+      <div className="est-meta">
+        <span>Kiểm soát vật tư từ dự toán</span>
+        <span className="d">·</span>
+        <span>Giá mua dự kiến</span>
+      </div>
+
+      <div className="est-tabs">
         {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => selectTab(t.key)}
-            className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-              tab === t.key
-                ? "bg-[#f97316]/20 text-[#fb923c]"
-                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            }`}
-          >
-            <span className="hidden sm:inline">{t.label}</span>
-            <span className="sm:hidden">{t.short}</span>
+          <button key={t.key} className={`est-tab ${tab === t.key ? "active" : ""}`} onClick={() => selectTab(t.key)}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {tab === "khoi-luong" && <KhoiLuongTab projectId={projectId} />}
-      {tab === "vat-tu" && <VatTuTab projectId={projectId} />}
-      {tab === "khoan" && <KhoanTab projectId={projectId} />}
+      <div style={{ marginTop: 4 }}>
+        {tab === "khoi-luong" && <KhoiLuongTab projectId={projectId} />}
+        {tab === "vat-tu" && <VatTuTab projectId={projectId} />}
+        {tab === "khoan" && <KhoanTab projectId={projectId} />}
+      </div>
+
+      <div className="est-foot">Đúng — Đẹp — Bền · Huỳnh Gia ERP</div>
     </div>
   );
 }

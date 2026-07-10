@@ -1,34 +1,27 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EditableText } from "./editable-text";
 import { api, type EstimateData, fmtQty, fmtVnd, type Vt } from "./estimate-data";
 
-type FlatVt = {
-  vt: Vt;
-  groupName: string;
-  itemId: string;
-  itemName: string;
-  congTacId: string;
-  congTacName: string;
-};
+type FlatVt = { vt: Vt; groupName: string; itemId: string; itemName: string; congTacName: string };
 
 type ViewKey = "tong" | "hang-muc" | "chi-tiet";
 const VIEWS: { key: ViewKey; label: string }[] = [
   { key: "tong", label: "Tổng hợp" },
   { key: "hang-muc", label: "Theo hạng mục" },
-  { key: "chi-tiet", label: "Chi tiết công tác" },
+  { key: "chi-tiet", label: "Chi tiết" },
 ];
 
 // Ô giá sửa tại chỗ
-function PriceCell({ value, onSave }: { value: number | null; onSave: (n: number | null) => Promise<void> }) {
+function Price({ value, onSave }: { value: number | null; onSave: (n: number | null) => Promise<void> }) {
   return (
     <EditableText
       value={value == null ? "" : String(value)}
-      className="text-right"
-      placeholder="nhập giá"
+      className="est-ed-num"
+      placeholder="giá?"
       onSave={async (v) => {
         const t = v.replace(/[^\d]/g, "");
         if (t === "") return onSave(null);
@@ -40,6 +33,34 @@ function PriceCell({ value, onSave }: { value: number | null; onSave: (n: number
         await onSave(n);
       }}
     />
+  );
+}
+
+// 1 dòng vật tư: tên + (KL ĐVT × giá) + thành tiền
+function VtRow({ name, unit, qty, price, extra, onSavePrice }: { name: string; unit: string; qty: number; price: number | null; extra?: ReactNode; onSavePrice: (n: number | null) => Promise<void> }) {
+  return (
+    <div className="est-row" style={{ cursor: "default" }}>
+      <div className="body">
+        <div className="name">{name}</div>
+        <div className="calc num">
+          {fmtQty(qty)} {unit} ×{" "}
+          <span className="est-ed-num" style={{ display: "inline-block", minWidth: 52 }}>
+            <Price value={price} onSave={onSavePrice} />
+          </span>
+          {extra}
+        </div>
+      </div>
+      <div className="amt num">
+        {price != null ? (
+          <>
+            {fmtVnd(Math.round(qty * price))}
+            <span className="u">đ</span>
+          </>
+        ) : (
+          <span style={{ color: "var(--mut2)" }}>—</span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -67,24 +88,19 @@ export function VatTuTab({ projectId }: { projectId: string }) {
       toast.error((e as Error).message);
     }
   };
-  const patchVt = (id: string, body: Record<string, unknown>) =>
-    api(`/api/estimate/lines/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  const patchVt = (id: string, body: Record<string, unknown>) => api(`/api/estimate/lines/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
   const flat = useMemo<FlatVt[]>(() => {
     if (!data) return [];
     const out: FlatVt[] = [];
-    for (const g of data.groups)
-      for (const it of g.items)
-        for (const ct of it.lines)
-          for (const vt of ct.vtChildren)
-            out.push({ vt, groupName: g.name, itemId: it.id, itemName: it.name, congTacId: ct.id, congTacName: ct.name });
+    for (const g of data.groups) for (const it of g.items) for (const ct of it.lines) for (const vt of ct.vtChildren) out.push({ vt, groupName: g.name, itemId: it.id, itemName: it.name, congTacName: ct.name });
     return out;
   }, [data]);
 
   if (data === null) {
     return (
-      <div className="grid place-items-center rounded-2xl border border-[#252840] bg-[#13151f] p-16">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+      <div className="est-empty">
+        <Loader2 className="mx-auto h-5 w-5 animate-spin" />
       </div>
     );
   }
@@ -92,27 +108,27 @@ export function VatTuTab({ projectId }: { projectId: string }) {
   const grand = flat.reduce((s, f) => s + f.vt.quantity * (f.vt.directUnitPrice ?? 0), 0);
 
   return (
-    <div className="w-full space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-1">
-        <div className="flex gap-1 rounded-lg border border-[#252840] bg-[#13151f] p-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v.key}
-              onClick={() => setView(v.key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${view === v.key ? "bg-[#f97316]/20 text-[#fb923c]" : "text-zinc-400 hover:text-zinc-200"}`}
-            >
-              {v.label}
-            </button>
-          ))}
+    <div>
+      <div className="est-sum">
+        <div className="k">Tổng dự kiến mua</div>
+        <div className="v">
+          {fmtVnd(Math.round(grand))}
+          <span className="u">đ</span>
         </div>
-        <div className="text-xs text-zinc-400">
-          Tổng dự kiến mua: <b className="text-emerald-400">{fmtVnd(Math.round(grand))}đ</b>
-        </div>
+        <div className="note">Bảng hao phí vật tư · giá mua dự kiến cho kế toán</div>
+      </div>
+
+      <div className="est-views">
+        {VIEWS.map((v) => (
+          <button key={v.key} className={view === v.key ? "active" : ""} onClick={() => setView(v.key)}>
+            {v.label}
+          </button>
+        ))}
       </div>
 
       {flat.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#252840] bg-[#13151f] p-8 text-center text-sm text-zinc-500">
-          Chưa có vật tư. Qua tab <b className="text-zinc-300">Khối lượng</b> gắn vật tư vào công tác.
+        <div className="est-empty">
+          Chưa có vật tư. Qua tab <b>Khối lượng</b> gắn vật tư vào công tác.
         </div>
       ) : view === "tong" ? (
         <TongView flat={flat} run={run} patchVt={patchVt} />
@@ -125,30 +141,22 @@ export function VatTuTab({ projectId }: { projectId: string }) {
   );
 }
 
-type ViewProps = {
-  flat: FlatVt[];
-  run: (fn: () => Promise<unknown>) => Promise<void>;
-  patchVt: (id: string, body: Record<string, unknown>) => Promise<unknown>;
-};
+type ViewProps = { flat: FlatVt[]; run: (fn: () => Promise<unknown>) => Promise<void>; patchVt: (id: string, body: Record<string, unknown>) => Promise<unknown> };
 
-// View Tổng hợp: gộp theo tên+đơn vị, giá sửa 1 lần áp cho mọi dòng cùng vật tư
+// Tổng hợp: gộp theo tên+đơn vị, sửa giá 1 lần áp hết dòng cùng tên
 function TongView({ flat, run, patchVt }: ViewProps) {
   const rows = useMemo(() => {
-    const m = new Map<
-      string,
-      { name: string; unit: string; qty: number; price: number | null; multiPrice: boolean; ids: string[]; refs: { name: string; qty: number }[] }
-    >();
+    const m = new Map<string, { name: string; unit: string; qty: number; price: number | null; multi: boolean; ids: string[]; refs: string[] }>();
     for (const f of flat) {
       const key = `${f.vt.name.toLowerCase()}|${f.vt.unit.toLowerCase()}`;
       const cur = m.get(key);
       const price = f.vt.directUnitPrice;
-      if (!cur) {
-        m.set(key, { name: f.vt.name, unit: f.vt.unit, qty: f.vt.quantity, price, multiPrice: false, ids: [f.vt.id], refs: [{ name: f.congTacName, qty: f.vt.quantity }] });
-      } else {
+      if (!cur) m.set(key, { name: f.vt.name, unit: f.vt.unit, qty: f.vt.quantity, price, multi: false, ids: [f.vt.id], refs: [f.congTacName] });
+      else {
         cur.qty += f.vt.quantity;
         cur.ids.push(f.vt.id);
-        cur.refs.push({ name: f.congTacName, qty: f.vt.quantity });
-        if (price != null && cur.price != null && price !== cur.price) cur.multiPrice = true;
+        cur.refs.push(f.congTacName);
+        if (price != null && cur.price != null && price !== cur.price) cur.multi = true;
         if (cur.price == null) cur.price = price;
       }
     }
@@ -156,56 +164,23 @@ function TongView({ flat, run, patchVt }: ViewProps) {
   }, [flat]);
 
   return (
-    <div className="border-y border-[#252840] bg-[#13151f]">
-      <table className="w-full table-fixed text-xs">
-        <thead>
-          <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
-            <th className="px-3 py-2 font-medium">Vật tư</th>
-            <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
-            <th className="w-14 px-1 py-2 text-right font-medium">KL</th>
-            <th className="w-20 px-1 py-2 text-right font-medium">Giá mua</th>
-            <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
-            <th className="hidden px-3 py-2 font-medium md:table-cell">Dùng cho</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.name + r.unit} className="border-b border-[#1c1f2e] align-top">
-              <td className="break-words px-3 py-2 font-medium text-zinc-100">
-                {r.name}
-                <span className="text-zinc-600 md:hidden">
-                  {" "}· dùng: {r.refs.map((x) => x.name).join(", ")}
-                </span>
-              </td>
-              <td className="break-words px-1 py-2 text-zinc-400">{r.unit}</td>
-              <td className="px-1 py-2 text-right text-zinc-200">{fmtQty(r.qty)}</td>
-              <td className="px-1 py-2 text-right text-zinc-200">
-                <PriceCell
-                  value={r.multiPrice ? null : r.price}
-                  onSave={(n) => run(async () => { for (const id of r.ids) await patchVt(id, { directUnitPrice: n }); })}
-                />
-                {r.multiPrice && <div className="text-[10px] text-amber-400">nhiều giá</div>}
-              </td>
-              <td className="hidden px-2 py-2 text-right text-emerald-400 md:table-cell">
-                {r.price != null && !r.multiPrice ? fmtVnd(Math.round(r.qty * r.price)) : "—"}
-              </td>
-              <td className="hidden px-3 py-2 text-xs text-zinc-500 md:table-cell">
-                {r.refs.map((x, i) => (
-                  <span key={i}>
-                    {i > 0 && ", "}
-                    {x.name} <span className="text-zinc-600">({fmtQty(x.qty)})</span>
-                  </span>
-                ))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      {rows.map((r) => (
+        <VtRow
+          key={r.name + r.unit}
+          name={r.name}
+          unit={r.unit}
+          qty={r.qty}
+          price={r.multi ? null : r.price}
+          extra={<span style={{ color: "var(--mut2)" }}> · {r.refs.join(", ")}</span>}
+          onSavePrice={(n) => run(async () => { for (const id of r.ids) await patchVt(id, { directUnitPrice: n }); })}
+        />
+      ))}
     </div>
   );
 }
 
-// View theo hạng mục: nhóm VT theo hạng mục, subtotal mỗi hạng mục
+// Theo hạng mục: nhóm + subtotal
 function HangMucView({ flat, run, patchVt }: ViewProps) {
   const groups = useMemo(() => {
     const m = new Map<string, { name: string; items: FlatVt[] }>();
@@ -218,74 +193,44 @@ function HangMucView({ flat, run, patchVt }: ViewProps) {
   }, [flat]);
 
   return (
-    <div className="space-y-3">
+    <div>
       {groups.map((g, gi) => {
         const sub = g.items.reduce((s, f) => s + f.vt.quantity * (f.vt.directUnitPrice ?? 0), 0);
         return (
-          <div key={gi} className="border-y border-[#252840] bg-[#13151f]">
-            <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
-              <span className="text-sm font-bold text-zinc-100">{g.name}</span>
-              <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
+          <section className="est-phase" key={gi}>
+            <div className="est-phase-h">
+              <span className="nm" style={{ cursor: "default" }}>{g.name}</span>
+              <span className="tot">{fmtVnd(Math.round(sub))}</span>
             </div>
-            <div>
-              <table className="w-full table-fixed text-xs">
-                <tbody>
-                  {g.items.map((f) => (
-                    <tr key={f.vt.id} className="border-b border-[#1c1f2e] align-top">
-                      <td className="break-words px-3 py-1.5 text-zinc-100">{f.vt.name}</td>
-                      <td className="w-9 break-words px-1 py-1.5 text-zinc-400">{f.vt.unit}</td>
-                      <td className="w-14 px-1 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
-                      <td className="w-20 px-1 py-1.5 text-right text-zinc-200">
-                        <PriceCell value={f.vt.directUnitPrice} onSave={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))} />
-                      </td>
-                      <td className="hidden w-28 px-3 py-1.5 text-right text-emerald-400 md:table-cell">
-                        {f.vt.directUnitPrice != null ? fmtVnd(Math.round(f.vt.quantity * f.vt.directUnitPrice)) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {g.items.map((f) => (
+              <VtRow key={f.vt.id} name={f.vt.name} unit={f.vt.unit} qty={f.vt.quantity} price={f.vt.directUnitPrice} onSavePrice={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))} />
+            ))}
+            <div className="est-subt">
+              <span className="k">Cộng {g.name}</span>
+              <span className="v num">{fmtVnd(Math.round(sub))} đ</span>
             </div>
-          </div>
+          </section>
         );
       })}
     </div>
   );
 }
 
-// View chi tiết: mỗi dòng VT theo công tác (phẳng)
+// Chi tiết: từng dòng theo công tác
 function ChiTietView({ flat, run, patchVt }: ViewProps) {
   return (
-    <div className="border-y border-[#252840] bg-[#13151f]">
-      <table className="w-full table-fixed text-xs">
-        <thead>
-          <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
-            <th className="px-3 py-2 font-medium">Vật tư / Công tác</th>
-            <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
-            <th className="w-14 px-1 py-2 text-right font-medium">KL</th>
-            <th className="w-20 px-1 py-2 text-right font-medium">Giá mua</th>
-            <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flat.map((f) => (
-            <tr key={f.vt.id} className="border-b border-[#1c1f2e] align-top">
-              <td className="break-words px-3 py-1.5">
-                <div className="text-zinc-100">{f.vt.name}</div>
-                <div className="text-[11px] text-zinc-600">{f.congTacName} · {f.itemName}</div>
-              </td>
-              <td className="break-words px-1 py-1.5 text-zinc-400">{f.vt.unit}</td>
-              <td className="px-1 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
-              <td className="px-1 py-1.5 text-right text-zinc-200">
-                <PriceCell value={f.vt.directUnitPrice} onSave={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))} />
-              </td>
-              <td className="hidden px-2 py-1.5 text-right text-emerald-400 md:table-cell">
-                {f.vt.directUnitPrice != null ? fmtVnd(Math.round(f.vt.quantity * f.vt.directUnitPrice)) : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      {flat.map((f) => (
+        <VtRow
+          key={f.vt.id}
+          name={f.vt.name}
+          unit={f.vt.unit}
+          qty={f.vt.quantity}
+          price={f.vt.directUnitPrice}
+          extra={<span style={{ color: "var(--mut2)" }}> · {f.congTacName}</span>}
+          onSavePrice={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))}
+        />
+      ))}
     </div>
   );
 }

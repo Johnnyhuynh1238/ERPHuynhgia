@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectBackLink } from "./_components/project-back-link";
+import { HideOnEstimate } from "./_components/hide-on-estimate";
 
 type ProjectLayoutProps = {
   children: React.ReactNode;
@@ -65,20 +66,21 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   return (
     <ProtectedLayout>
       <div className="space-y-4">
-        <ProjectBackLink projectId={project.id} projectName={project.name} />
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs text-[#8892b0]">{project.code}</div>
-              <h1 className="text-xl font-bold text-[#f0f2ff]">{project.name}</h1>
-              <div className="text-sm text-[#8892b0]">Chủ nhà: {project.customerName}</div>
+        <HideOnEstimate>
+          <ProjectBackLink projectId={project.id} projectName={project.name} />
+          <div className="mt-4 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-[#8892b0]">{project.code}</div>
+                <h1 className="text-xl font-bold text-[#f0f2ff]">{project.name}</h1>
+                <div className="text-sm text-[#8892b0]">Chủ nhà: {project.customerName}</div>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
+                {statusLabel[project.status]}
+              </span>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
-              {statusLabel[project.status]}
-            </span>
           </div>
-
-        </div>
+        </HideOnEstimate>
 
         {children}
       </div>

@@ -12,11 +12,11 @@ const GROUPS: { key: "nc" | "khac"; label: string }[] = [
   { key: "khac", label: "Khoán khác" },
 ];
 
-function NumCell({ value, onSave, placeholder }: { value: number | null; onSave: (n: number | null) => Promise<void>; placeholder: string }) {
+function Num({ value, onSave, placeholder }: { value: number | null; onSave: (n: number | null) => Promise<void>; placeholder: string }) {
   return (
     <EditableText
       value={value == null ? "" : String(value)}
-      className="text-right"
+      className="est-ed-num"
       placeholder={placeholder}
       onSave={async (v) => {
         const t = v.replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
@@ -32,7 +32,6 @@ function NumCell({ value, onSave, placeholder }: { value: number | null; onSave:
   );
 }
 
-// Thêm dòng khoán: tên + đơn vị
 function AddKhoan({ onAdd }: { onAdd: (name: string, unit: string) => Promise<void> }) {
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
@@ -49,26 +48,10 @@ function AddKhoan({ onAdd }: { onAdd: (name: string, unit: string) => Promise<vo
     }
   };
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && void submit()}
-        placeholder="+ tên khoán (VD: NC phần MEP)"
-        className="min-w-0 flex-1 rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
-      />
-      <input
-        value={unit}
-        onChange={(e) => setUnit(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && void submit()}
-        placeholder="ĐVT"
-        className="w-16 shrink-0 rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
-      />
-      <button
-        onClick={() => void submit()}
-        disabled={busy}
-        className="grid h-6 w-6 place-items-center rounded-md bg-[#f97316]/20 text-[#fb923c] hover:bg-[#f97316]/30 disabled:opacity-40"
-      >
+    <div className="est-add">
+      <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void submit()} placeholder="+ nội dung khoán" />
+      <input className="w-unit" value={unit} onChange={(e) => setUnit(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void submit()} placeholder="ĐVT" />
+      <button className="go" onClick={() => void submit()} disabled={busy} aria-label="Thêm">
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
       </button>
     </div>
@@ -99,13 +82,12 @@ export function KhoanTab({ projectId }: { projectId: string }) {
       toast.error((e as Error).message);
     }
   };
-  const patch = (id: string, body: Record<string, unknown>) =>
-    run(() => api(`/api/estimate/lines/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
+  const patch = (id: string, body: Record<string, unknown>) => run(() => api(`/api/estimate/lines/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
 
   if (rows === null) {
     return (
-      <div className="grid place-items-center p-16">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+      <div className="est-empty">
+        <Loader2 className="mx-auto h-5 w-5 animate-spin" />
       </div>
     );
   }
@@ -113,84 +95,72 @@ export function KhoanTab({ projectId }: { projectId: string }) {
   const grand = rows.reduce((s, r) => s + r.quantity * (r.directUnitPrice ?? 0), 0);
 
   return (
-    <div className="w-full space-y-3">
-      <div className="flex justify-end px-3 pt-1 text-xs text-zinc-400">
-        Tổng khoán: <b className="ml-1 text-emerald-400">{fmtVnd(Math.round(grand))}đ</b>
+    <div>
+      <div className="est-sum">
+        <div className="k">Tổng khoán</div>
+        <div className="v">
+          {fmtVnd(Math.round(grand))}
+          <span className="u">đ</span>
+        </div>
+        <div className="note">Khoán nhân công + các loại khoán khác</div>
       </div>
 
       {GROUPS.map((grp) => {
         const list = rows.filter((r) => (r.khoanGroup === "nc" ? "nc" : "khac") === grp.key);
         const sub = list.reduce((s, r) => s + r.quantity * (r.directUnitPrice ?? 0), 0);
         return (
-          <div key={grp.key} className="border-y border-[#252840] bg-[#13151f]">
-            <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
-              <span className="text-sm font-bold text-zinc-100">{grp.label}</span>
-              <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
+          <section className="est-phase" key={grp.key}>
+            <div className="est-phase-h">
+              <span className="nm" style={{ cursor: "default" }}>{grp.label}</span>
+              <span className="tot">{sub > 0 ? fmtVnd(Math.round(sub)) : ""}</span>
             </div>
-            {list.length > 0 && (
-              <div>
-                <table className="w-full table-fixed text-xs">
-                  <thead>
-                    <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
-                      <th className="px-3 py-2 font-medium">Nội dung khoán</th>
-                      <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
-                      <th className="w-12 px-1 py-2 text-right font-medium">KL</th>
-                      <th className="w-20 px-1 py-2 text-right font-medium">Đơn giá</th>
-                      <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
-                      <th className="w-7" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((r) => (
-                      <tr key={r.id} className="border-b border-[#1c1f2e] align-top">
-                        <td className="break-words px-3 py-1.5 text-zinc-100">
-                          <EditableText value={r.name} onSave={(v) => patch(r.id, { name: v })} />
-                          <div className="text-[11px] text-zinc-500">
-                            <EditableText value={r.note ?? ""} placeholder="+ ghi chú" onSave={(v) => patch(r.id, { note: v })} />
-                          </div>
-                        </td>
-                        <td className="break-words px-1 py-1.5 text-zinc-400">
-                          <EditableText value={r.unit} onSave={(v) => patch(r.id, { unit: v })} />
-                        </td>
-                        <td className="px-1 py-1.5 text-right text-zinc-200">
-                          <NumCell value={r.quantity} placeholder="—" onSave={(n) => patch(r.id, { quantity: n ?? 0 })} />
-                        </td>
-                        <td className="px-1 py-1.5 text-right text-zinc-200">
-                          <NumCell value={r.directUnitPrice} placeholder="nhập giá" onSave={(n) => patch(r.id, { directUnitPrice: n })} />
-                        </td>
-                        <td className="hidden px-2 py-1.5 text-right text-emerald-400 md:table-cell">
-                          {r.directUnitPrice != null ? fmtVnd(Math.round(r.quantity * r.directUnitPrice)) : "—"}
-                        </td>
-                        <td className="px-0.5 py-1.5 text-right">
-                          <button
-                            onClick={async () => {
-                              if (await confirmDialog({ title: "Xoá khoán?", message: r.name, confirmText: "Xoá" }))
-                                void run(() => api(`/api/estimate/lines/${r.id}`, { method: "DELETE" }));
-                            }}
-                            className="text-zinc-600 hover:text-rose-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+            {list.map((r) => (
+              <div className="est-row" key={r.id} style={{ cursor: "default" }}>
+                <div className="body">
+                  <div className="name">
+                    <EditableText value={r.name} onSave={(v) => patch(r.id, { name: v })} />
+                  </div>
+                  <div className="calc num">
+                    <span className="est-ed-num" style={{ display: "inline-block", minWidth: 30 }}>
+                      <Num value={r.quantity} placeholder="—" onSave={(n) => patch(r.id, { quantity: n ?? 0 })} />
+                    </span>{" "}
+                    <EditableText value={r.unit} onSave={(v) => patch(r.id, { unit: v })} className="inline" /> ×{" "}
+                    <span className="est-ed-num" style={{ display: "inline-block", minWidth: 52 }}>
+                      <Num value={r.directUnitPrice} placeholder="giá?" onSave={(n) => patch(r.id, { directUnitPrice: n })} />
+                    </span>
+                  </div>
+                </div>
+                <div className="amt num">
+                  {r.directUnitPrice != null ? (
+                    <>
+                      {fmtVnd(Math.round(r.quantity * r.directUnitPrice))}
+                      <span className="u">đ</span>
+                    </>
+                  ) : (
+                    <span style={{ color: "var(--mut2)" }}>—</span>
+                  )}
+                </div>
+                <button
+                  className="est-iconbtn"
+                  onClick={async () => {
+                    if (await confirmDialog({ title: "Xoá khoán?", message: r.name, confirmText: "Xoá" })) void run(() => api(`/api/estimate/lines/${r.id}`, { method: "DELETE" }));
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+
+            <AddKhoan onAdd={(name, unit) => run(() => api(`/api/projects/${projectId}/estimate/lines`, { method: "POST", body: JSON.stringify({ kind: "khoan", khoanGroup: grp.key, name, unit, quantity: 1 }) }))} />
+
+            {sub > 0 && (
+              <div className="est-subt">
+                <span className="k">Cộng {grp.label.toLowerCase()}</span>
+                <span className="v num">{fmtVnd(Math.round(sub))} đ</span>
               </div>
             )}
-            <div className="p-3">
-              <AddKhoan
-                onAdd={(name, unit) =>
-                  run(() =>
-                    api(`/api/projects/${projectId}/estimate/lines`, {
-                      method: "POST",
-                      body: JSON.stringify({ kind: "khoan", khoanGroup: grp.key, name, unit, quantity: 1 }),
-                    }),
-                  )
-                }
-              />
-            </div>
-          </div>
+          </section>
         );
       })}
     </div>
