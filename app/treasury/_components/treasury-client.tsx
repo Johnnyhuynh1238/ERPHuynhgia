@@ -114,6 +114,12 @@ export function TreasuryClient({
 
   const [selectedTxn, setSelectedTxn] = useState<Txn | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [catValue, setCatValue] = useState<string>("");
+  const [catSaving, setCatSaving] = useState(false);
+
+  useEffect(() => {
+    setCatValue(selectedTxn?.category?.id ?? "");
+  }, [selectedTxn]);
 
   useEffect(() => {
     if (!lightboxUrl) return;
@@ -230,6 +236,30 @@ export function TreasuryClient({
     setTrAmount("");
     setTrNote("");
     await load();
+  }
+
+  async function saveCategory() {
+    if (!selectedTxn) return;
+    if (!catValue) {
+      toast.error("Chọn danh mục");
+      return;
+    }
+    setCatSaving(true);
+    const res = await fetch(`/api/treasury/transactions/${selectedTxn.id}/category`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoryId: catValue }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setCatSaving(false);
+    if (!res.ok) {
+      toast.error(json.message || "Lưu danh mục thất bại");
+      return;
+    }
+    const newCat = (json.category as CategoryOption) ?? null;
+    setRows((prev) => prev.map((r) => (r.id === selectedTxn.id ? { ...r, category: newCat } : r)));
+    setSelectedTxn((prev) => (prev ? { ...prev, category: newCat } : prev));
+    toast.success("Đã cập nhật danh mục");
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -587,11 +617,41 @@ export function TreasuryClient({
                   </span>
                 </div>
               )}
-              {selectedTxn.category && (
-                <div className="flex justify-between gap-3">
+              {selectedTxn.refType === "expense" ? (
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-[#8b95b7]">Danh mục</span>
-                  <span className="text-[#f0f2ff]">{selectedTxn.category.name}</span>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={catValue}
+                      onChange={(e) => setCatValue(e.target.value)}
+                      className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1 text-sm text-[#f0f2ff]"
+                    >
+                      <option value="">— Chọn danh mục —</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {catValue !== (selectedTxn.category?.id ?? "") && (
+                      <button
+                        type="button"
+                        onClick={saveCategory}
+                        disabled={catSaving}
+                        className="rounded-lg bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        {catSaving ? "..." : "Lưu"}
+                      </button>
+                    )}
+                  </div>
                 </div>
+              ) : (
+                selectedTxn.category && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[#8b95b7]">Danh mục</span>
+                    <span className="text-[#f0f2ff]">{selectedTxn.category.name}</span>
+                  </div>
+                )
               )}
               {selectedTxn.refId && (
                 <div className="flex justify-between gap-3">
