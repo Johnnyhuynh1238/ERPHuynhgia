@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, ChevronDown, ChevronRight, Loader2, MessageCircleQuestion, RotateCcw, Sparkles, Trash2, Wrench, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronRight, Loader2, MessageCircleQuestion, Plus, RotateCcw, Search, Sparkles, Trash2, Wrench, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -336,13 +336,7 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
     <>
       <tr className="group border-b border-[#1c1f30] align-top transition-colors hover:bg-[#171a28]">
         <td className="px-3 py-2">
-          <EditableText
-            value={line.normCode ?? ""}
-            placeholder="—"
-            className="font-mono text-[11px] text-zinc-400"
-            onSave={patch("normCode")}
-          />
-          {line.normName && <p className="mt-0.5 line-clamp-2 pl-0 text-[10px] leading-tight text-zinc-600">{line.normName}</p>}
+          <NormModeControl line={line} run={run} />
         </td>
         <td className="px-3 py-2">
           <EditableText value={line.name} className="text-zinc-200" onSave={patch("name")} />
@@ -500,22 +494,19 @@ function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => P
           <Field label="Công tác">
             <EditableText value={line.name} className="text-sm text-zinc-200" onSave={patch("name")} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Mã ĐM">
-              <EditableText value={line.normCode ?? ""} placeholder="—" className="font-mono text-xs text-zinc-300" onSave={patch("normCode")} />
-              {line.normName && <p className="mt-0.5 text-[10px] leading-tight text-zinc-600">{line.normName}</p>}
-            </Field>
-            <Field label="Khối lượng">
-              <div className="flex items-center gap-1">
-                <EditableText
-                  value={fmtQty(line.quantity)}
-                  className="font-semibold tabular-nums text-zinc-100"
-                  onSave={(v) => patch("quantity")(v.replace(/\./g, "").replace(",", "."))}
-                />
-                <span className="text-xs text-zinc-500">{line.unit}</span>
-              </div>
-            </Field>
-          </div>
+          <Field label="Kiểu công tác">
+            <NormModeControl line={line} run={run} />
+          </Field>
+          <Field label="Khối lượng">
+            <div className="flex items-center gap-1">
+              <EditableText
+                value={fmtQty(line.quantity)}
+                className="font-semibold tabular-nums text-zinc-100"
+                onSave={(v) => patch("quantity")(v.replace(/\./g, "").replace(",", "."))}
+              />
+              <span className="text-xs text-zinc-500">{line.unit}</span>
+            </div>
+          </Field>
           <Field label="Diễn giải">
             <EditableText value={line.formula ?? ""} multiline placeholder="Diễn giải công thức…" className="font-mono text-xs" onSave={patch("formula")} />
             {line.note && <p className="mt-0.5 text-[10px] text-amber-500/80">{line.note}</p>}
@@ -685,5 +676,295 @@ function AnswerModal({ question, answer, onClose, onSave }: { question: string; 
       </div>
     </div>,
     document.body,
+  );
+}
+
+// ── Toggle Định mức ↔ Trọn gói + chọn/tạo định mức ──────────────────────────
+const NORM_CATEGORIES = ["be_tong", "cot_thep", "cop_pha", "xay", "to_trat", "op_lat", "son", "tran", "chong_tham", "cua", "mep", "khac"] as const;
+const NORM_CAT_LABELS: Record<string, string> = {
+  be_tong: "Bê tông", cot_thep: "Cốt thép", cop_pha: "Cốp pha", xay: "Xây", to_trat: "Tô trát",
+  op_lat: "Ốp lát", son: "Sơn", tran: "Trần", chong_tham: "Chống thấm", cua: "Cửa", mep: "M&E", khac: "Khác",
+};
+const inputCls = "min-w-0 rounded-md border border-[#2b2f45] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60";
+
+function NormModeControl({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+  const [assignOpen, setAssignOpen] = useState(false);
+  const isLump = !line.normCode;
+  const toLump = () => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: "" }) }));
+
+  return (
+    <div>
+      <div className="mb-1 inline-flex overflow-hidden rounded-md border border-[#2b2f45] text-[10px] font-bold">
+        <button
+          onClick={() => { if (isLump) setAssignOpen(true); }}
+          className={`px-2 py-0.5 ${!isLump ? "bg-sky-500/20 text-sky-300" : "text-zinc-500 hover:text-zinc-300"}`}
+        >
+          Định mức
+        </button>
+        <button
+          onClick={() => { if (!isLump) void toLump(); }}
+          className={`border-l border-[#2b2f45] px-2 py-0.5 ${isLump ? "bg-[#f97316]/20 text-[#fb923c]" : "text-zinc-500 hover:text-zinc-300"}`}
+        >
+          Trọn gói
+        </button>
+      </div>
+      {isLump ? (
+        <p className="text-[10px] leading-tight text-amber-500/80">Nhập đơn giá ở tab Hao phí</p>
+      ) : (
+        <>
+          <button
+            onClick={() => setAssignOpen(true)}
+            title="Đổi / chọn định mức"
+            className="block font-mono text-[11px] text-zinc-300 hover:text-[#fb923c]"
+          >
+            {line.normCode}
+          </button>
+          {line.normName && <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-zinc-600">{line.normName}</p>}
+        </>
+      )}
+      {assignOpen && <NormAssignModal line={line} run={run} onClose={() => setAssignOpen(false)} />}
+    </div>
+  );
+}
+
+type MatRow = { name: string; unit: string; qty: string };
+type LabRow = { grade: string; qty: string };
+type MacRow = { name: string; qty: string };
+type NormHit = { code: string; name: string; unit: string; category: string | null };
+
+function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; onClose: () => void }) {
+  const [tab, setTab] = useState<"pick" | "create">("pick");
+
+  // pick
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<NormHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    if (tab !== "pick") return;
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api(`/api/norms?q=${encodeURIComponent(q.trim())}`);
+        if (!cancelled) setHits((r.norms as NormHit[]).slice(0, 40));
+      } catch { /* ignore */ }
+      if (!cancelled) setSearching(false);
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [q, tab]);
+
+  const assign = (code: string) =>
+    run(async () => {
+      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: code }) });
+      toast.success(`Đã gán mã ${code}`);
+      onClose();
+    });
+
+  // create
+  const [code, setCode] = useState("");
+  const [name, setName] = useState(line.name);
+  const [unit, setUnit] = useState(line.unit);
+  const [category, setCategory] = useState<string>("khac");
+  const [mats, setMats] = useState<MatRow[]>([{ name: "", unit: "", qty: "" }]);
+  const [labs, setLabs] = useState<LabRow[]>([{ grade: "", qty: "" }]);
+  const [macs, setMacs] = useState<MacRow[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const num = (s: string) => Number(s.replace(",", ".").trim());
+
+  const saveCreate = async () => {
+    const c = code.trim().toUpperCase();
+    if (!/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/.test(c)) { toast.error("Mã ĐM sai định dạng (VD: MT.1110)"); return; }
+    if (!name.trim() || !unit.trim()) { toast.error("Thiếu tên hoặc đơn vị"); return; }
+    const materialItems = mats.filter((m) => m.name.trim() && m.unit.trim() && num(m.qty) > 0).map((m) => ({ name: m.name.trim(), unit: m.unit.trim(), qtyPerUnit: num(m.qty) }));
+    const laborItems = labs.filter((l) => l.grade.trim() && num(l.qty) > 0).map((l) => ({ grade: l.grade.trim(), qtyPerUnit: num(l.qty) }));
+    const machineItems = macs.filter((m) => m.name.trim() && num(m.qty) > 0).map((m) => ({ name: m.name.trim(), qtyPerUnit: num(m.qty) }));
+    if (materialItems.length + laborItems.length + machineItems.length === 0) {
+      toast.error("Nhập ít nhất 1 dòng hao phí (VT / NC / MM)");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api(`/api/norms`, {
+        method: "POST",
+        body: JSON.stringify({ code: c, name: name.trim(), unit: unit.trim(), category, materialItems, laborItems, machineItems }),
+      });
+    } catch (e) {
+      setSaving(false);
+      toast.error((e as Error).message);
+      return;
+    }
+    setSaving(false);
+    await run(async () => {
+      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: c }) });
+      toast.success(`Đã tạo & gán định mức ${c}`);
+      onClose();
+    });
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const tabCls = (active: boolean) =>
+    `flex-1 px-3 py-2 text-xs font-bold ${active ? "border-b-2 border-[#f97316] text-[#fb923c]" : "text-zinc-500 hover:text-zinc-300"}`;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+          <span className="text-sm font-bold text-zinc-100">Định mức cho: <span className="text-zinc-400">{line.name}</span></span>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex border-b border-[#252840]">
+          <button onClick={() => setTab("pick")} className={tabCls(tab === "pick")}>Chọn có sẵn</button>
+          <button onClick={() => setTab("create")} className={tabCls(tab === "create")}>＋ Tạo mới</button>
+        </div>
+
+        {tab === "pick" ? (
+          <div className="flex min-h-0 flex-col p-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Tìm mã / tên định mức…"
+                className="w-full rounded-lg border border-[#2b2f45] bg-[#0d0f17] py-2 pl-8 pr-2 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60"
+              />
+            </div>
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+              {searching && hits.length === 0 ? (
+                <div className="grid place-items-center py-8"><Loader2 className="h-4 w-4 animate-spin text-zinc-600" /></div>
+              ) : hits.length === 0 ? (
+                <p className="py-8 text-center text-xs text-zinc-600">Không có định mức khớp. Qua tab <b className="text-[#fb923c]">＋ Tạo mới</b>.</p>
+              ) : (
+                <ul className="divide-y divide-[#1c1f30]">
+                  {hits.map((h) => (
+                    <li key={h.code}>
+                      <button onClick={() => void assign(h.code)} className="flex w-full items-start gap-2 px-1 py-2 text-left hover:bg-[#171a28]">
+                        <span className="shrink-0 font-mono text-[11px] text-[#fb923c]">{h.code}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs text-zinc-200">{h.name}</span>
+                          <span className="text-[10px] text-zinc-500">{h.unit}{h.category ? ` · ${NORM_CAT_LABELS[h.category] ?? h.category}` : ""}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Mã định mức *</p>
+                <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="VD: MT.1110" className={`w-full font-mono ${inputCls}`} />
+              </div>
+              <div className="col-span-2">
+                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Tên công tác *</p>
+                <input value={name} onChange={(e) => setName(e.target.value)} className={`w-full ${inputCls}`} />
+              </div>
+              <div>
+                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Đơn vị *</p>
+                <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m², md, kg…" className={`w-full ${inputCls}`} />
+              </div>
+              <div>
+                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Nhóm</p>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} className={`w-full ${inputCls}`}>
+                  {NORM_CATEGORIES.map((c) => <option key={c} value={c}>{NORM_CAT_LABELS[c]}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <NormItemSection
+              title="Vật tư (VT)" accent="text-emerald-400"
+              rows={mats}
+              onAdd={() => setMats((r) => [...r, { name: "", unit: "", qty: "" }])}
+              onRemove={(i) => setMats((r) => r.filter((_, k) => k !== i))}
+              render={(m, i) => (
+                <>
+                  <input value={m.name} onChange={(e) => setMats((r) => r.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="Tên vật tư" className={`flex-1 ${inputCls}`} />
+                  <input value={m.unit} onChange={(e) => setMats((r) => r.map((x, k) => (k === i ? { ...x, unit: e.target.value } : x)))} placeholder="ĐV" className={`w-12 ${inputCls}`} />
+                  <input value={m.qty} inputMode="decimal" onChange={(e) => setMats((r) => r.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} placeholder="ĐM/đv" className={`w-16 text-right ${inputCls}`} />
+                </>
+              )}
+            />
+            <NormItemSection
+              title="Nhân công (NC)" accent="text-sky-400"
+              rows={labs}
+              onAdd={() => setLabs((r) => [...r, { grade: "", qty: "" }])}
+              onRemove={(i) => setLabs((r) => r.filter((_, k) => k !== i))}
+              render={(l, i) => (
+                <>
+                  <input value={l.grade} onChange={(e) => setLabs((r) => r.map((x, k) => (k === i ? { ...x, grade: e.target.value } : x)))} placeholder="Bậc thợ (VD: Thợ chính)" className={`flex-1 ${inputCls}`} />
+                  <input value={l.qty} inputMode="decimal" onChange={(e) => setLabs((r) => r.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} placeholder="công/đv" className={`w-16 text-right ${inputCls}`} />
+                </>
+              )}
+            />
+            <NormItemSection
+              title="Máy thi công (MM)" accent="text-amber-400"
+              rows={macs}
+              onAdd={() => setMacs((r) => [...r, { name: "", qty: "" }])}
+              onRemove={(i) => setMacs((r) => r.filter((_, k) => k !== i))}
+              render={(m, i) => (
+                <>
+                  <input value={m.name} onChange={(e) => setMacs((r) => r.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="Loại máy" className={`flex-1 ${inputCls}`} />
+                  <input value={m.qty} inputMode="decimal" onChange={(e) => setMacs((r) => r.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} placeholder="ca/đv" className={`w-16 text-right ${inputCls}`} />
+                </>
+              )}
+            />
+            <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">ĐM/đv = hao phí cho 1 {unit || "đơn vị"} công tác. Giá VT/NC/MM lấy từ tab Đơn giá theo tên + đơn vị (khớp thì bóc ra tiền).</p>
+          </div>
+        )}
+
+        {tab === "create" && (
+          <div className="flex items-center justify-end gap-1.5 border-t border-[#252840] px-4 py-3">
+            <button onClick={onClose} className="rounded-md border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-zinc-800">Huỷ</button>
+            <button
+              onClick={() => void saveCreate()}
+              disabled={saving}
+              className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-4 py-1.5 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+            >
+              {saving && <Loader2 className="h-3 w-3 animate-spin" />} Tạo & gán
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function NormItemSection<T>({ title, accent, rows, onAdd, onRemove, render }: {
+  title: string; accent: string; rows: T[];
+  onAdd: () => void; onRemove: (i: number) => void; render: (row: T, i: number) => ReactNode;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex items-center justify-between">
+        <p className={`text-[10px] font-bold uppercase tracking-wide ${accent}`}>{title}</p>
+        <button onClick={onAdd} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-zinc-400 hover:text-[#fb923c]">
+          <Plus className="h-3 w-3" /> Thêm
+        </button>
+      </div>
+      <div className="space-y-1">
+        {rows.length === 0 && <p className="text-[10px] text-zinc-600">—</p>}
+        {rows.map((row, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            {render(row, i)}
+            <button onClick={() => onRemove(i)} className="shrink-0 rounded p-1 text-zinc-600 hover:bg-rose-500/15 hover:text-rose-400">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

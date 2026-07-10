@@ -10,12 +10,32 @@ const NORM_CATEGORIES = [
   "op_lat", "son", "tran", "chong_tham", "cua", "mep", "khac",
 ] as const;
 
+const materialItemSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  unit: z.string().trim().min(1).max(20),
+  qtyPerUnit: z.coerce.number().positive(),
+});
+const laborItemSchema = z.object({
+  grade: z.string().trim().min(1).max(64),
+  qtyPerUnit: z.coerce.number().positive(),
+});
+const machineItemSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  qtyPerUnit: z.coerce.number().positive(),
+});
+
 const createSchema = z.object({
   code: z.string().trim().regex(/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/, "Mã ĐM: 2-4 chữ + dấu chấm + 2-8 ký tự (VD: BT.1140)").max(32),
   name: z.string().trim().min(1, "Tên ĐM bắt buộc").max(255),
   unit: z.string().trim().min(1, "Đơn vị bắt buộc").max(20),
   category: z.enum(NORM_CATEGORIES).optional().nullable(),
   source: z.string().trim().max(255).optional().nullable(),
+  materialItems: z.array(materialItemSchema).max(50).optional(),
+  laborItems: z.array(laborItemSchema).max(50).optional(),
+  machineItems: z.array(machineItemSchema).max(50).optional(),
+  kMaterial: z.coerce.number().min(0).max(10).optional(),
+  kLabor: z.coerce.number().min(0).max(10).optional(),
+  kMachine: z.coerce.number().min(0).max(10).optional(),
 });
 
 type NormSerialized = {
@@ -132,6 +152,12 @@ export async function POST(request: Request) {
       unit: body.unit,
       category: body.category ?? null,
       source: body.source?.trim() ? body.source.trim() : null,
+      materialItems: body.materialItems ?? [],
+      laborItems: body.laborItems ?? [],
+      machineItems: body.machineItems ?? [],
+      ...(body.kMaterial !== undefined ? { kMaterial: new Prisma.Decimal(body.kMaterial) } : {}),
+      ...(body.kLabor !== undefined ? { kLabor: new Prisma.Decimal(body.kLabor) } : {}),
+      ...(body.kMachine !== undefined ? { kMachine: new Prisma.Decimal(body.kMachine) } : {}),
     },
   });
 
