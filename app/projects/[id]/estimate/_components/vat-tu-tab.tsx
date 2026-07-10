@@ -92,8 +92,8 @@ export function VatTuTab({ projectId }: { projectId: string }) {
   const grand = flat.reduce((s, f) => s + f.vt.quantity * (f.vt.directUnitPrice ?? 0), 0);
 
   return (
-    <div className="space-y-3 px-3 sm:px-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="w-full space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-1">
         <div className="flex gap-1 rounded-lg border border-[#252840] bg-[#13151f] p-1">
           {VIEWS.map((v) => (
             <button
@@ -156,7 +156,7 @@ function TongView({ flat, run, patchVt }: ViewProps) {
   }, [flat]);
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f]">
       <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b border-[#252840] text-left text-xs text-zinc-500">
@@ -217,7 +217,7 @@ function HangMucView({ flat, run, patchVt }: ViewProps) {
       {groups.map((g, gi) => {
         const sub = g.items.reduce((s, f) => s + f.vt.quantity * (f.vt.directUnitPrice ?? 0), 0);
         return (
-          <div key={gi} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f]">
+          <div key={gi} className="border-y border-[#252840] bg-[#13151f]">
             <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
               <span className="text-sm font-bold text-zinc-100">{g.name}</span>
               <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
@@ -251,7 +251,7 @@ function HangMucView({ flat, run, patchVt }: ViewProps) {
 // View chi tiết: mỗi dòng VT theo công tác (phẳng)
 function ChiTietView({ flat, run, patchVt }: ViewProps) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#252840] bg-[#13151f]">
+    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f]">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-[#252840] text-left text-xs text-zinc-500">

@@ -104,7 +104,7 @@ export function KhoanTab({ projectId }: { projectId: string }) {
 
   if (rows === null) {
     return (
-      <div className="grid place-items-center rounded-2xl border border-[#252840] bg-[#13151f] p-16">
+      <div className="grid place-items-center p-16">
         <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
       </div>
     );
@@ -113,8 +113,8 @@ export function KhoanTab({ projectId }: { projectId: string }) {
   const grand = rows.reduce((s, r) => s + r.quantity * (r.directUnitPrice ?? 0), 0);
 
   return (
-    <div className="space-y-3 px-3 sm:px-0">
-      <div className="flex justify-end text-xs text-zinc-400">
+    <div className="w-full space-y-3">
+      <div className="flex justify-end px-3 pt-1 text-xs text-zinc-400">
         Tổng khoán: <b className="ml-1 text-emerald-400">{fmtVnd(Math.round(grand))}đ</b>
       </div>
 
@@ -122,7 +122,7 @@ export function KhoanTab({ projectId }: { projectId: string }) {
         const list = rows.filter((r) => (r.khoanGroup === "nc" ? "nc" : "khac") === grp.key);
         const sub = list.reduce((s, r) => s + r.quantity * (r.directUnitPrice ?? 0), 0);
         return (
-          <div key={grp.key} className="overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f]">
+          <div key={grp.key} className="border-y border-[#252840] bg-[#13151f]">
             <div className="flex items-center justify-between border-b border-[#252840] px-3 py-2">
               <span className="text-sm font-bold text-zinc-100">{grp.label}</span>
               <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
