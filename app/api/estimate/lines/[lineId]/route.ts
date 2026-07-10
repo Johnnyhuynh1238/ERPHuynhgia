@@ -104,6 +104,10 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
       data.directUnitPrice = p;
     }
   }
+  // Nhóm khoán (nc | khac) — dòng khoán
+  if ("khoanGroup" in body) {
+    data.khoanGroup = body.khoanGroup === "nc" ? "nc" : "khac";
+  }
   // Đơn vị (đổi khi chuyển sang thép: cây / kg)
   if ("unit" in body) {
     const u = String(body.unit ?? "").trim();

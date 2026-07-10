@@ -2,21 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { NormsClient } from "../../budget/norms/_components/norms-client";
-import { PricesClient } from "../../budget/prices/_components/prices-client";
-import { HaoPhiTab } from "./hao-phi-tab";
+import { KhoanTab } from "./khoan-tab";
 import { KhoiLuongTab } from "./khoi-luong-tab";
-import { MoTaTab } from "./mo-ta-tab";
+import { VatTuTab } from "./vat-tu-tab";
 
-type TabKey = "mo-ta" | "khoi-luong" | "hp-vt" | "don-gia" | "dinh-muc" | "hp-nc";
+type TabKey = "khoi-luong" | "vat-tu" | "khoan";
 
 const TABS: { key: TabKey; label: string; short: string }[] = [
-  { key: "mo-ta", label: "Mô tả", short: "Mô tả" },
   { key: "khoi-luong", label: "Khối lượng", short: "KL" },
-  { key: "hp-vt", label: "Hao phí vật tư", short: "HP VT" },
-  { key: "don-gia", label: "Đơn giá", short: "Đơn giá" },
-  { key: "dinh-muc", label: "Định mức", short: "ĐM" },
-  { key: "hp-nc", label: "Hao phí NC + máy", short: "HP NC" },
+  { key: "vat-tu", label: "Vật tư", short: "VT" },
+  { key: "khoan", label: "Khoán", short: "Khoán" },
 ];
 
 type Props = {
@@ -28,11 +23,10 @@ type Props = {
 
 export function EstimateClient({ projectId, projectCode, projectName, initialTab }: Props) {
   const valid = TABS.some((t) => t.key === initialTab);
-  const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "mo-ta");
+  const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "khoi-luong");
 
   const selectTab = (key: TabKey) => {
     setTab(key);
-    // Giữ tab trong URL để reload/share không mất vị trí, không trigger navigation
     window.history.replaceState(null, "", `/projects/${projectId}/estimate?tab=${key}`);
   };
 
@@ -47,7 +41,7 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
             ← Dự án
           </Link>
           <div>
-            <h1 className="text-base font-bold text-zinc-100">Dự toán AI</h1>
+            <h1 className="text-base font-bold text-zinc-100">Dự toán</h1>
             <p className="text-xs text-zinc-500">
               {projectCode} · {projectName}
             </p>
@@ -72,14 +66,9 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
         ))}
       </div>
 
-      {tab === "mo-ta" && <MoTaTab projectId={projectId} />}
       {tab === "khoi-luong" && <KhoiLuongTab projectId={projectId} />}
-      {tab === "hp-vt" && <HaoPhiTab projectId={projectId} kind="vt" />}
-      {tab === "don-gia" && <PricesClient projectId={projectId} canEdit initialTab="vt" />}
-      {tab === "dinh-muc" && (
-        <NormsClient projectId={projectId} projectName={projectName} projectCode={projectCode} canEdit />
-      )}
-      {tab === "hp-nc" && <HaoPhiTab projectId={projectId} kind="ncmm" />}
+      {tab === "vat-tu" && <VatTuTab projectId={projectId} />}
+      {tab === "khoan" && <KhoanTab projectId={projectId} />}
     </div>
   );
 }

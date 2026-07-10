@@ -3986,6 +3986,13 @@ model EstimateItem {
 model EstimateLine {
   id         String             @id @default(uuid()) @db.Uuid
   itemId     String             @map("item_id") @db.Uuid
+  // Phân loại dòng (màn Dự toán rút gọn, không auto):
+  //   kl    = công tác khối lượng (bóc tay)
+  //   vt    = vật tư con của 1 công tác (parentLineId trỏ về công tác), giá mua dự kiến = directUnitPrice
+  //   khoan = dòng khoán (khoanGroup = nc | khac), đơn giá = directUnitPrice
+  section     String  @default("kl") @db.VarChar(8)
+  parentLineId String? @map("parent_line_id") @db.Uuid // VT con → công tác kl
+  khoanGroup   String? @map("khoan_group") @db.VarChar(8) // nc | khac (chỉ dòng khoán)
   normCode   String?            @map("norm_code") @db.VarChar(32) // null = công tác ngoài định mức (lump-sum/ME)
   // Line vật tư mua thẳng NCC không qua định mức (thép bóc chi tiết từng loại D…):
   // quantity theo đơn vị bán NCC, thành tiền VT = quantity × giá NCC.
@@ -4016,11 +4023,15 @@ model EstimateLine {
   norm          Norm?          @relation(fields: [normCode], references: [code], onDelete: SetNull)
   materialPrice MaterialPrice? @relation("LineMaterial", fields: [materialPriceId], references: [id], onDelete: SetNull)
   steelPrice    MaterialPrice? @relation("LineSteel", fields: [steelPriceId], references: [id], onDelete: SetNull)
+  parentLine    EstimateLine?  @relation("LineVT", fields: [parentLineId], references: [id], onDelete: Cascade)
+  vtChildren    EstimateLine[] @relation("LineVT")
 
   @@index([itemId, sortOrder])
   @@index([normCode])
   @@index([materialPriceId])
   @@index([steelPriceId])
+  @@index([parentLineId])
+  @@index([section])
   @@map("estimate_lines")
 }
 

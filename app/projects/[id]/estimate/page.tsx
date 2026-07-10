@@ -3,10 +3,10 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { EstimateClient } from "./_components/estimate-client";
 
-export const metadata = { title: "Dự toán AI" };
+export const metadata = { title: "Dự toán" };
 
-// Màn dự toán admin: 6 tab (Mô tả / Khối lượng / Hao phí VT / Đơn giá / Định mức / Hao phí NC+MM).
-// Chỉ admin — đây là công cụ bóc khối lượng nội bộ, khác màn /budget của TPTC.
+// Màn dự toán admin: 3 tab (Khối lượng / Vật tư / Khoán) — bóc tay, không auto.
+// Chỉ admin — công cụ kiểm soát vật tư + áp giá mua dự kiến, khác màn /budget của TPTC.
 export default async function ProjectEstimatePage({
   params,
   searchParams,
