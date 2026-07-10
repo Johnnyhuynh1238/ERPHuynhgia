@@ -685,6 +685,10 @@ const NORM_CAT_LABELS: Record<string, string> = {
   be_tong: "Bê tông", cot_thep: "Cốt thép", cop_pha: "Cốp pha", xay: "Xây", to_trat: "Tô trát",
   op_lat: "Ốp lát", son: "Sơn", tran: "Trần", chong_tham: "Chống thấm", cua: "Cửa", mep: "M&E", khac: "Khác",
 };
+const CAT_PREFIX_HINT: Record<string, string> = {
+  be_tong: "BT", cot_thep: "TH", cop_pha: "CP", xay: "XY", to_trat: "TR",
+  op_lat: "OL", son: "SN", tran: "TC", chong_tham: "TM", cua: "CK", mep: "ME", khac: "CB",
+};
 const inputCls = "min-w-0 rounded-md border border-[#2b2f45] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60";
 
 function NormModeControl({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void> }) {
@@ -761,7 +765,6 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
     });
 
   // create
-  const [code, setCode] = useState("");
   const [name, setName] = useState(line.name);
   const [unit, setUnit] = useState(line.unit);
   const [category, setCategory] = useState<string>("khac");
@@ -773,8 +776,6 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
   const num = (s: string) => Number(s.replace(",", ".").trim());
 
   const saveCreate = async () => {
-    const c = code.trim().toUpperCase();
-    if (!/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/.test(c)) { toast.error("Mã ĐM sai định dạng (VD: MT.1110)"); return; }
     if (!name.trim() || !unit.trim()) { toast.error("Thiếu tên hoặc đơn vị"); return; }
     const materialItems = mats.filter((m) => m.name.trim() && m.unit.trim() && num(m.qty) > 0).map((m) => ({ name: m.name.trim(), unit: m.unit.trim(), qtyPerUnit: num(m.qty) }));
     const laborItems = labs.filter((l) => l.grade.trim() && num(l.qty) > 0).map((l) => ({ grade: l.grade.trim(), qtyPerUnit: num(l.qty) }));
@@ -784,11 +785,13 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
       return;
     }
     setSaving(true);
+    let newCode: string;
     try {
-      await api(`/api/norms`, {
+      const res = await api(`/api/norms`, {
         method: "POST",
-        body: JSON.stringify({ code: c, name: name.trim(), unit: unit.trim(), category, materialItems, laborItems, machineItems }),
+        body: JSON.stringify({ name: name.trim(), unit: unit.trim(), category, materialItems, laborItems, machineItems }),
       });
+      newCode = res.norm.code as string;
     } catch (e) {
       setSaving(false);
       toast.error((e as Error).message);
@@ -796,8 +799,8 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
     }
     setSaving(false);
     await run(async () => {
-      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: c }) });
-      toast.success(`Đã tạo & gán định mức ${c}`);
+      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: newCode }) });
+      toast.success(`Đã tạo & gán định mức ${newCode}`);
       onClose();
     });
   };
@@ -864,10 +867,6 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="grid grid-cols-2 gap-2">
               <div className="col-span-2">
-                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Mã định mức *</p>
-                <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="VD: MT.1110" className={`w-full font-mono ${inputCls}`} />
-              </div>
-              <div className="col-span-2">
                 <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Tên công tác *</p>
                 <input value={name} onChange={(e) => setName(e.target.value)} className={`w-full ${inputCls}`} />
               </div>
@@ -881,6 +880,7 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
                   {NORM_CATEGORIES.map((c) => <option key={c} value={c}>{NORM_CAT_LABELS[c]}</option>)}
                 </select>
               </div>
+              <p className="col-span-2 text-[10px] text-zinc-600">Mã định mức ERP tự sinh theo nhóm (VD: {CAT_PREFIX_HINT[category] ?? "CB"}.xxxx).</p>
             </div>
 
             <NormItemSection

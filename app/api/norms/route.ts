@@ -24,8 +24,26 @@ const machineItemSchema = z.object({
   qtyPerUnit: z.coerce.number().positive(),
 });
 
+// Prefix mã tự sinh theo nhóm (khớp prefix đang dùng trong catalog)
+const CAT_PREFIX: Record<string, string> = {
+  be_tong: "BT", cot_thep: "TH", cop_pha: "CP", xay: "XY", to_trat: "TR",
+  op_lat: "OL", son: "SN", tran: "TC", chong_tham: "TM", cua: "CK", mep: "ME", khac: "CB",
+};
+
+// ERP tự sinh mã kế tiếp cho nhóm: <PREFIX>.<max+10>, bắt đầu 1110
+async function nextNormCode(category: string | null): Promise<string> {
+  const prefix = CAT_PREFIX[category ?? "khac"] ?? "CB";
+  const rows = await prisma.norm.findMany({ where: { code: { startsWith: `${prefix}.` } }, select: { code: true } });
+  let max = 1100;
+  for (const r of rows) {
+    const suffix = r.code.slice(prefix.length + 1);
+    if (/^\d+$/.test(suffix)) { const n = parseInt(suffix, 10); if (n > max) max = n; }
+  }
+  return `${prefix}.${max + 10}`;
+}
+
 const createSchema = z.object({
-  code: z.string().trim().regex(/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/, "Mã ĐM: 2-4 chữ + dấu chấm + 2-8 ký tự (VD: BT.1140)").max(32),
+  code: z.string().trim().regex(/^[A-Z]{2,4}\.[A-Z0-9]{2,8}$/, "Mã ĐM: 2-4 chữ + dấu chấm + 2-8 ký tự (VD: BT.1140)").max(32).optional(),
   name: z.string().trim().min(1, "Tên ĐM bắt buộc").max(255),
   unit: z.string().trim().min(1, "Đơn vị bắt buộc").max(20),
   category: z.enum(NORM_CATEGORIES).optional().nullable(),
@@ -140,14 +158,17 @@ export async function POST(request: Request) {
   }
   const body = parsed.data;
 
-  const exists = await prisma.norm.findUnique({ where: { code: body.code } });
+  // Mã: dùng mã client gửi (nếu có) hoặc ERP tự sinh theo nhóm
+  const code = body.code ?? (await nextNormCode(body.category ?? null));
+
+  const exists = await prisma.norm.findUnique({ where: { code } });
   if (exists) {
-    return NextResponse.json({ message: `Mã ĐM "${body.code}" đã tồn tại` }, { status: 409 });
+    return NextResponse.json({ message: `Mã ĐM "${code}" đã tồn tại` }, { status: 409 });
   }
 
   const norm = await prisma.norm.create({
     data: {
-      code: body.code,
+      code,
       name: body.name,
       unit: body.unit,
       category: body.category ?? null,
