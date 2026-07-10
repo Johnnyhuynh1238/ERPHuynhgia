@@ -58,7 +58,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     }),
   ]);
 
-  const normLines = lines.filter((l) => !l.materialPriceId);
+  // Chỉ line có mã định mức mới đi bóc tách. Line không mã + không NCC = trọn gói (lumpLines).
+  const normLines = lines.filter((l) => l.normCode && !l.materialPriceId);
   const directLines = lines.filter((l) => l.materialPriceId && l.materialPrice);
 
   const result = aggregateConsumption({
