@@ -31,8 +31,8 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-3 px-0 py-3 sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
+    <div className="-mx-4 space-y-3 py-3 md:mx-auto md:max-w-6xl md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 md:px-0">
         <div className="flex items-center gap-2">
           <Link
             href={`/projects/${projectId}`}
@@ -49,7 +49,7 @@ export function EstimateClient({ projectId, projectCode, projectName, initialTab
         </div>
       </div>
 
-      <div className="mx-3 flex gap-1 overflow-x-auto rounded-xl border border-[#252840] bg-[#13151f] p-1 sm:mx-0">
+      <div className="mx-3 flex gap-1 overflow-x-auto rounded-xl border border-[#252840] bg-[#13151f] p-1 md:mx-0">
         {TABS.map((t) => (
           <button
             key={t.key}

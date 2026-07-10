@@ -172,16 +172,16 @@ function ItemBlock({ item, projectId, run }: { item: Item; projectId: string; ru
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-xs">
+      <div>
+        <table className="w-full table-fixed text-xs">
           <thead>
             <tr className="text-left text-[11px] text-zinc-500">
-              <th className="py-1 pl-3 pr-2 font-medium">Công tác / Vật tư</th>
-              <th className="w-20 px-2 py-1 text-right font-medium">KL</th>
-              <th className="w-14 px-2 py-1 font-medium">ĐVT</th>
-              <th className="w-24 px-2 py-1 text-right font-medium">Giá mua</th>
-              <th className="w-24 px-2 py-1 text-right font-medium">Thành tiền</th>
-              <th className="w-8" />
+              <th className="py-1 pl-3 pr-1 font-medium">Công tác / Vật tư</th>
+              <th className="w-12 px-1 py-1 text-right font-medium">KL</th>
+              <th className="w-9 px-1 py-1 font-medium">ĐVT</th>
+              <th className="w-16 px-1 py-1 text-right font-medium">Giá</th>
+              <th className="hidden w-24 px-2 py-1 text-right font-medium md:table-cell">Thành tiền</th>
+              <th className="w-7" />
             </tr>
           </thead>
           <tbody>
@@ -224,18 +224,18 @@ function CongTacRows({
   return (
     <>
       <tr className="border-t border-[#1c1f2e] bg-[#13151f]">
-        <td className="py-1 pl-3 pr-2 font-medium text-zinc-100">
+        <td className="break-words py-1 pl-3 pr-1 font-medium text-zinc-100">
           <EditableText value={line.name} onSave={(v) => patchLine(line.id, { name: v })} />
         </td>
-        <td className="px-2 py-1 text-right text-zinc-300">
+        <td className="px-1 py-1 text-right text-zinc-300">
           <NumCell value={line.quantity} onSave={(n) => patchLine(line.id, { quantity: n ?? 0 })} />
         </td>
-        <td className="px-2 py-1 text-zinc-400">
+        <td className="break-words px-1 py-1 text-zinc-400">
           <EditableText value={line.unit} onSave={(v) => patchLine(line.id, { unit: v })} />
         </td>
-        <td className="px-2 py-1" />
-        <td className="px-2 py-1 text-right text-emerald-400">{total > 0 ? fmtVnd(Math.round(total)) : ""}</td>
-        <td className="px-1 py-1 text-right">
+        <td className="px-1 py-1" />
+        <td className="hidden px-2 py-1 text-right text-emerald-400 md:table-cell">{total > 0 ? fmtVnd(Math.round(total)) : ""}</td>
+        <td className="px-0.5 py-1 text-right">
           <button
             onClick={async () => {
               if (await confirmDialog({ title: "Xoá công tác?", message: `${line.name} + vật tư`, confirmText: "Xoá" })) void delLine(line.id);
@@ -249,23 +249,22 @@ function CongTacRows({
 
       {line.vtChildren.map((vt) => (
         <tr key={vt.id} className="border-t border-[#1c1f2e]">
-          <td className="py-0.5 pl-7 pr-2 text-zinc-300">
-            <span className="mr-1 text-zinc-600">•</span>
-            <EditableText value={vt.name} onSave={(v) => patchVt(vt, { name: v })} className="inline" />
+          <td className="break-words py-0.5 pl-6 pr-1 text-zinc-300">
+            <EditableText value={vt.name} onSave={(v) => patchVt(vt, { name: v })} />
           </td>
-          <td className="px-2 py-0.5 text-right text-zinc-300">
+          <td className="px-1 py-0.5 text-right text-zinc-300">
             <NumCell value={vt.quantity} onSave={(n) => patchVt(vt, { quantity: n ?? 0 })} />
           </td>
-          <td className="px-2 py-0.5 text-zinc-400">
+          <td className="break-words px-1 py-0.5 text-zinc-400">
             <EditableText value={vt.unit} onSave={(v) => patchVt(vt, { unit: v })} />
           </td>
-          <td className="px-2 py-0.5 text-right text-zinc-200">
+          <td className="px-1 py-0.5 text-right text-zinc-200">
             <NumCell value={vt.directUnitPrice} onSave={(n) => patchVt(vt, { directUnitPrice: n })} />
           </td>
-          <td className="px-2 py-0.5 text-right text-zinc-400">
+          <td className="hidden px-2 py-0.5 text-right text-zinc-400 md:table-cell">
             {vt.directUnitPrice != null ? fmtVnd(Math.round(vt.quantity * vt.directUnitPrice)) : "—"}
           </td>
-          <td className="px-1 py-0.5 text-right">
+          <td className="px-0.5 py-0.5 text-right">
             <button
               onClick={async () => {
                 if (await confirmDialog({ title: "Xoá vật tư?", message: vt.name, confirmText: "Xoá" })) void delLine(vt.id);
@@ -279,7 +278,7 @@ function CongTacRows({
       ))}
 
       <tr className="border-t border-[#1c1f2e]">
-        <td colSpan={6} className="py-1 pl-7 pr-3">
+        <td colSpan={6} className="py-1 pl-6 pr-3">
           <AddInline
             placeholder="+ vật tư"
             onAdd={(name) => run(() => api(`/api/projects/${projectId}/estimate/lines`, { method: "POST", body: JSON.stringify({ kind: "vt", parentLineId: line.id, name, unit: line.unit || "cái", quantity: 0 }) }))}

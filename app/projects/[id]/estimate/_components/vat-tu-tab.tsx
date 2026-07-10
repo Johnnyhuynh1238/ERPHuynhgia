@@ -156,35 +156,40 @@ function TongView({ flat, run, patchVt }: ViewProps) {
   }, [flat]);
 
   return (
-    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f]">
-      <table className="w-full min-w-[720px] text-sm">
+    <div className="border-y border-[#252840] bg-[#13151f]">
+      <table className="w-full table-fixed text-xs">
         <thead>
-          <tr className="border-b border-[#252840] text-left text-xs text-zinc-500">
+          <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
             <th className="px-3 py-2 font-medium">Vật tư</th>
-            <th className="w-16 px-2 py-2 font-medium">ĐVT</th>
-            <th className="w-28 px-2 py-2 text-right font-medium">Tổng KL</th>
-            <th className="w-32 px-2 py-2 text-right font-medium">Giá mua</th>
-            <th className="w-32 px-2 py-2 text-right font-medium">Thành tiền</th>
-            <th className="px-3 py-2 font-medium">Dùng cho</th>
+            <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
+            <th className="w-14 px-1 py-2 text-right font-medium">KL</th>
+            <th className="w-20 px-1 py-2 text-right font-medium">Giá mua</th>
+            <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
+            <th className="hidden px-3 py-2 font-medium md:table-cell">Dùng cho</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.name + r.unit} className="border-b border-[#1c1f2e] align-top">
-              <td className="px-3 py-2 font-medium text-zinc-100">{r.name}</td>
-              <td className="px-2 py-2 text-zinc-400">{r.unit}</td>
-              <td className="px-2 py-2 text-right text-zinc-200">{fmtQty(r.qty)}</td>
-              <td className="px-2 py-2 text-right text-zinc-200">
+              <td className="break-words px-3 py-2 font-medium text-zinc-100">
+                {r.name}
+                <span className="text-zinc-600 md:hidden">
+                  {" "}· dùng: {r.refs.map((x) => x.name).join(", ")}
+                </span>
+              </td>
+              <td className="break-words px-1 py-2 text-zinc-400">{r.unit}</td>
+              <td className="px-1 py-2 text-right text-zinc-200">{fmtQty(r.qty)}</td>
+              <td className="px-1 py-2 text-right text-zinc-200">
                 <PriceCell
                   value={r.multiPrice ? null : r.price}
                   onSave={(n) => run(async () => { for (const id of r.ids) await patchVt(id, { directUnitPrice: n }); })}
                 />
                 {r.multiPrice && <div className="text-[10px] text-amber-400">nhiều giá</div>}
               </td>
-              <td className="px-2 py-2 text-right text-emerald-400">
+              <td className="hidden px-2 py-2 text-right text-emerald-400 md:table-cell">
                 {r.price != null && !r.multiPrice ? fmtVnd(Math.round(r.qty * r.price)) : "—"}
               </td>
-              <td className="px-3 py-2 text-xs text-zinc-500">
+              <td className="hidden px-3 py-2 text-xs text-zinc-500 md:table-cell">
                 {r.refs.map((x, i) => (
                   <span key={i}>
                     {i > 0 && ", "}
@@ -222,18 +227,18 @@ function HangMucView({ flat, run, patchVt }: ViewProps) {
               <span className="text-sm font-bold text-zinc-100">{g.name}</span>
               <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+            <div>
+              <table className="w-full table-fixed text-xs">
                 <tbody>
                   {g.items.map((f) => (
-                    <tr key={f.vt.id} className="border-b border-[#1c1f2e]">
-                      <td className="px-3 py-1.5 text-zinc-100">{f.vt.name}</td>
-                      <td className="w-16 px-2 py-1.5 text-zinc-400">{f.vt.unit}</td>
-                      <td className="w-24 px-2 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
-                      <td className="w-28 px-2 py-1.5 text-right text-zinc-200">
+                    <tr key={f.vt.id} className="border-b border-[#1c1f2e] align-top">
+                      <td className="break-words px-3 py-1.5 text-zinc-100">{f.vt.name}</td>
+                      <td className="w-9 break-words px-1 py-1.5 text-zinc-400">{f.vt.unit}</td>
+                      <td className="w-14 px-1 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
+                      <td className="w-20 px-1 py-1.5 text-right text-zinc-200">
                         <PriceCell value={f.vt.directUnitPrice} onSave={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))} />
                       </td>
-                      <td className="w-28 px-3 py-1.5 text-right text-emerald-400">
+                      <td className="hidden w-28 px-3 py-1.5 text-right text-emerald-400 md:table-cell">
                         {f.vt.directUnitPrice != null ? fmtVnd(Math.round(f.vt.quantity * f.vt.directUnitPrice)) : "—"}
                       </td>
                     </tr>
@@ -251,32 +256,30 @@ function HangMucView({ flat, run, patchVt }: ViewProps) {
 // View chi tiết: mỗi dòng VT theo công tác (phẳng)
 function ChiTietView({ flat, run, patchVt }: ViewProps) {
   return (
-    <div className="overflow-x-auto border-y border-[#252840] bg-[#13151f]">
-      <table className="w-full min-w-[760px] text-sm">
+    <div className="border-y border-[#252840] bg-[#13151f]">
+      <table className="w-full table-fixed text-xs">
         <thead>
-          <tr className="border-b border-[#252840] text-left text-xs text-zinc-500">
-            <th className="px-3 py-2 font-medium">Công tác</th>
-            <th className="px-3 py-2 font-medium">Vật tư</th>
-            <th className="w-16 px-2 py-2 font-medium">ĐVT</th>
-            <th className="w-24 px-2 py-2 text-right font-medium">KL</th>
-            <th className="w-28 px-2 py-2 text-right font-medium">Giá mua</th>
-            <th className="w-28 px-2 py-2 text-right font-medium">Thành tiền</th>
+          <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
+            <th className="px-3 py-2 font-medium">Vật tư / Công tác</th>
+            <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
+            <th className="w-14 px-1 py-2 text-right font-medium">KL</th>
+            <th className="w-20 px-1 py-2 text-right font-medium">Giá mua</th>
+            <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
           </tr>
         </thead>
         <tbody>
           {flat.map((f) => (
-            <tr key={f.vt.id} className="border-b border-[#1c1f2e]">
-              <td className="px-3 py-1.5 text-xs text-zinc-400">
-                <div className="text-zinc-200">{f.congTacName}</div>
-                <div className="text-zinc-600">{f.groupName} · {f.itemName}</div>
+            <tr key={f.vt.id} className="border-b border-[#1c1f2e] align-top">
+              <td className="break-words px-3 py-1.5">
+                <div className="text-zinc-100">{f.vt.name}</div>
+                <div className="text-[11px] text-zinc-600">{f.congTacName} · {f.itemName}</div>
               </td>
-              <td className="px-3 py-1.5 text-zinc-100">{f.vt.name}</td>
-              <td className="px-2 py-1.5 text-zinc-400">{f.vt.unit}</td>
-              <td className="px-2 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
-              <td className="px-2 py-1.5 text-right text-zinc-200">
+              <td className="break-words px-1 py-1.5 text-zinc-400">{f.vt.unit}</td>
+              <td className="px-1 py-1.5 text-right text-zinc-200">{fmtQty(f.vt.quantity)}</td>
+              <td className="px-1 py-1.5 text-right text-zinc-200">
                 <PriceCell value={f.vt.directUnitPrice} onSave={(n) => run(() => patchVt(f.vt.id, { directUnitPrice: n }))} />
               </td>
-              <td className="px-2 py-1.5 text-right text-emerald-400">
+              <td className="hidden px-2 py-1.5 text-right text-emerald-400 md:table-cell">
                 {f.vt.directUnitPrice != null ? fmtVnd(Math.round(f.vt.quantity * f.vt.directUnitPrice)) : "—"}
               </td>
             </tr>

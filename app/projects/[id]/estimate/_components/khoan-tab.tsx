@@ -55,14 +55,14 @@ function AddKhoan({ onAdd }: { onAdd: (name: string, unit: string) => Promise<vo
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && void submit()}
         placeholder="+ tên khoán (VD: NC phần MEP)"
-        className="w-64 max-w-full rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
+        className="min-w-0 flex-1 rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
       />
       <input
         value={unit}
         onChange={(e) => setUnit(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && void submit()}
-        placeholder="ĐVT (m²)"
-        className="w-24 rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
+        placeholder="ĐVT"
+        className="w-16 shrink-0 rounded-md border border-[#252840] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-200 outline-none focus:border-[#f97316]/50"
       />
       <button
         onClick={() => void submit()}
@@ -128,42 +128,40 @@ export function KhoanTab({ projectId }: { projectId: string }) {
               <span className="text-xs text-zinc-400">{fmtVnd(Math.round(sub))}đ</span>
             </div>
             {list.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+              <div>
+                <table className="w-full table-fixed text-xs">
                   <thead>
-                    <tr className="border-b border-[#252840] text-left text-xs text-zinc-500">
+                    <tr className="border-b border-[#252840] text-left text-[11px] text-zinc-500">
                       <th className="px-3 py-2 font-medium">Nội dung khoán</th>
-                      <th className="w-16 px-2 py-2 font-medium">ĐVT</th>
-                      <th className="w-24 px-2 py-2 text-right font-medium">KL</th>
-                      <th className="w-32 px-2 py-2 text-right font-medium">Đơn giá</th>
-                      <th className="w-32 px-2 py-2 text-right font-medium">Thành tiền</th>
-                      <th className="w-8" />
+                      <th className="w-9 px-1 py-2 font-medium">ĐVT</th>
+                      <th className="w-12 px-1 py-2 text-right font-medium">KL</th>
+                      <th className="w-20 px-1 py-2 text-right font-medium">Đơn giá</th>
+                      <th className="hidden w-28 px-2 py-2 text-right font-medium md:table-cell">Thành tiền</th>
+                      <th className="w-7" />
                     </tr>
                   </thead>
                   <tbody>
                     {list.map((r) => (
-                      <tr key={r.id} className="border-b border-[#1c1f2e]">
-                        <td className="px-3 py-1.5 text-zinc-100">
+                      <tr key={r.id} className="border-b border-[#1c1f2e] align-top">
+                        <td className="break-words px-3 py-1.5 text-zinc-100">
                           <EditableText value={r.name} onSave={(v) => patch(r.id, { name: v })} />
-                          {r.note != null && (
-                            <div className="text-xs text-zinc-500">
-                              <EditableText value={r.note} placeholder="+ ghi chú" onSave={(v) => patch(r.id, { note: v })} />
-                            </div>
-                          )}
+                          <div className="text-[11px] text-zinc-500">
+                            <EditableText value={r.note ?? ""} placeholder="+ ghi chú" onSave={(v) => patch(r.id, { note: v })} />
+                          </div>
                         </td>
-                        <td className="px-2 py-1.5 text-zinc-400">
+                        <td className="break-words px-1 py-1.5 text-zinc-400">
                           <EditableText value={r.unit} onSave={(v) => patch(r.id, { unit: v })} />
                         </td>
-                        <td className="px-2 py-1.5 text-right text-zinc-200">
+                        <td className="px-1 py-1.5 text-right text-zinc-200">
                           <NumCell value={r.quantity} placeholder="—" onSave={(n) => patch(r.id, { quantity: n ?? 0 })} />
                         </td>
-                        <td className="px-2 py-1.5 text-right text-zinc-200">
+                        <td className="px-1 py-1.5 text-right text-zinc-200">
                           <NumCell value={r.directUnitPrice} placeholder="nhập giá" onSave={(n) => patch(r.id, { directUnitPrice: n })} />
                         </td>
-                        <td className="px-2 py-1.5 text-right text-emerald-400">
+                        <td className="hidden px-2 py-1.5 text-right text-emerald-400 md:table-cell">
                           {r.directUnitPrice != null ? fmtVnd(Math.round(r.quantity * r.directUnitPrice)) : "—"}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="px-0.5 py-1.5 text-right">
                           <button
                             onClick={async () => {
                               if (await confirmDialog({ title: "Xoá khoán?", message: r.name, confirmText: "Xoá" }))
