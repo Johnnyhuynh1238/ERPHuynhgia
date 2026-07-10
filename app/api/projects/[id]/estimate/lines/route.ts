@@ -18,7 +18,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         include: {
           lines: {
             orderBy: { sortOrder: "asc" },
-            include: { norm: { select: { name: true, unit: true } } },
+            include: {
+              norm: { select: { name: true, unit: true } },
+              steelPrice: { select: { id: true, name: true, unit: true } },
+            },
           },
         },
       },
@@ -47,6 +50,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           aiAnswer: l.aiAnswer,
           fixRequest: l.fixRequest,
           note: l.note,
+          steelDia: l.steelDia,
+          steelBarLen: l.steelBarLen != null ? Number(l.steelBarLen) : null,
+          steelPriceId: l.steelPriceId,
+          steelPriceName: l.steelPrice?.name ?? null,
+          steelPriceUnit: l.steelPrice?.unit ?? null,
         })),
       })),
     })),

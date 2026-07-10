@@ -75,6 +75,10 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
       data.normCode = code;
     } else {
       data.normCode = null;
+      // Trọn gói không thể là line thép
+      data.steelDia = null;
+      data.steelBarLen = null;
+      data.steelPriceId = null;
     }
   }
   // Đổi hàng NCC cho line vật tư mua thẳng (thép, BT thương phẩm…): đồng bộ đơn vị theo hàng NCC
@@ -98,6 +102,47 @@ export async function PATCH(req: Request, { params }: { params: { lineId: string
       const p = Math.round(Number(raw));
       if (!Number.isFinite(p) || p < 0) return NextResponse.json({ message: "Đơn giá không hợp lệ" }, { status: 400 });
       data.directUnitPrice = p;
+    }
+  }
+  // Đơn vị (đổi khi chuyển sang thép: cây / kg)
+  if ("unit" in body) {
+    const u = String(body.unit ?? "").trim();
+    if (u) data.unit = u;
+  }
+  // Cốt thép: Ø + chiều dài cây + hàng NCC thép. steelDia != null = line thép.
+  if ("steelDia" in body) {
+    const raw = body.steelDia;
+    if (raw === null || raw === "") {
+      data.steelDia = null;
+      data.steelBarLen = null;
+      data.steelPriceId = null;
+    } else {
+      const d = parseInt(String(raw), 10);
+      if (!Number.isFinite(d) || d <= 0) return NextResponse.json({ message: "Đường kính thép không hợp lệ" }, { status: 400 });
+      data.steelDia = d;
+      // Line thép đi qua định mức (NC + máy) + mua thép riêng → không phải mua thẳng/trọn gói
+      data.materialPriceId = null;
+      data.directUnitPrice = null;
+    }
+  }
+  if ("steelBarLen" in body) {
+    const raw = body.steelBarLen;
+    if (raw === null || raw === "") {
+      data.steelBarLen = null;
+    } else {
+      const b = Number(raw);
+      if (!Number.isFinite(b) || b <= 0) return NextResponse.json({ message: "Chiều dài cây thép không hợp lệ" }, { status: 400 });
+      data.steelBarLen = b;
+    }
+  }
+  if ("steelPriceId" in body) {
+    const spId = String(body.steelPriceId ?? "").trim();
+    if (spId) {
+      const sp = await prisma.materialPrice.findUnique({ where: { id: spId }, select: { id: true } });
+      if (!sp) return NextResponse.json({ message: "Không tìm thấy hàng thép NCC" }, { status: 400 });
+      data.steelPriceId = sp.id;
+    } else {
+      data.steelPriceId = null;
     }
   }
   if (Object.keys(data).length === 0) return NextResponse.json({ message: "Không có gì để sửa" }, { status: 400 });

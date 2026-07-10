@@ -3308,7 +3308,8 @@ model MaterialPrice {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  estimateLines EstimateLine[]
+  estimateLines EstimateLine[] @relation("LineMaterial")
+  steelLines    EstimateLine[] @relation("LineSteel")
   estimateMaps  EstimateMaterialMap[]
 
   @@unique([name, unit])
@@ -3992,6 +3993,12 @@ model EstimateLine {
   // Line trọn gói (cửa nhôm/nhựa… mua 1 lần, ngoài định mức, không map NCC):
   // nhập giá thẳng trên tab Hao phí, thành tiền VT = quantity × directUnitPrice.
   directUnitPrice BigInt? @map("direct_unit_price")
+  // Line cốt thép bóc theo cây/Ø: quantity theo cây (Ø≥10) hoặc kg (Ø<10);
+  // normCode = mã định mức tấn (auto-map) chỉ dùng cho NC + máy + dây/que hàn;
+  // thép chính mua riêng theo cây, giá theo steelPrice (hàng NCC).
+  steelDia     Int?     @map("steel_dia")
+  steelBarLen  Decimal? @map("steel_bar_len") @db.Decimal(6, 2)
+  steelPriceId String?  @map("steel_price_id") @db.Uuid
   name       String // tên công tác (theo Norm hoặc AI đặt)
   unit       String             @db.VarChar(20)
   formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
@@ -4007,11 +4014,13 @@ model EstimateLine {
 
   item          EstimateItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   norm          Norm?          @relation(fields: [normCode], references: [code], onDelete: SetNull)
-  materialPrice MaterialPrice? @relation(fields: [materialPriceId], references: [id], onDelete: SetNull)
+  materialPrice MaterialPrice? @relation("LineMaterial", fields: [materialPriceId], references: [id], onDelete: SetNull)
+  steelPrice    MaterialPrice? @relation("LineSteel", fields: [steelPriceId], references: [id], onDelete: SetNull)
 
   @@index([itemId, sortOrder])
   @@index([normCode])
   @@index([materialPriceId])
+  @@index([steelPriceId])
   @@map("estimate_lines")
 }
 

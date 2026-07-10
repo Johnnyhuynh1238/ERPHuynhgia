@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
 import { aggregateConsumption } from "@/app/projects/[id]/budget/totals/_lib/aggregate";
+import { STEEL_DEFAULT_BAR_LEN, steelTonnage, steelUnit, steelWaste } from "@/lib/steel";
 
 export const runtime = "nodejs";
 
@@ -25,8 +26,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         materialPriceId: true,
         directUnitPrice: true,
         status: true,
+        steelDia: true,
+        steelBarLen: true,
+        steelPriceId: true,
         item: { select: { name: true, group: { select: { name: true } } } },
         materialPrice: { select: { name: true, unit: true, price: true } },
+        steelPrice: { select: { id: true, name: true, unit: true, price: true } },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -58,30 +63,56 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     }),
   ]);
 
-  // Chỉ line có mã định mức mới đi bóc tách. Line không mã + không NCC = trọn gói (lumpLines).
-  const normLines = lines.filter((l) => l.normCode && !l.materialPriceId);
-  const directLines = lines.filter((l) => l.materialPriceId && l.materialPrice);
+  // Line cốt thép (steelDia != null): đi qua định mức để tính NC + máy + phụ, nhưng quy về TẤN.
+  const steelLines = lines.filter((l) => l.steelDia != null && l.normCode);
+  // Chỉ line có mã định mức (không thép) mới đi bóc tách thường. Không mã + không NCC = trọn gói.
+  const normLines = lines.filter((l) => l.normCode && !l.materialPriceId && l.steelDia == null);
+  const directLines = lines.filter((l) => l.materialPriceId && l.materialPrice && l.steelDia == null);
 
   const result = aggregateConsumption({
-    budgetItems: normLines.map((l) => ({
-      id: l.id,
-      name: l.name,
-      stage: l.item.group.name,
-      quantity: l.quantity,
-      normCode: l.normCode,
-      component: { name: l.item.name },
-    })),
+    budgetItems: [
+      ...normLines.map((l) => ({
+        id: l.id,
+        name: l.name,
+        stage: l.item.group.name,
+        quantity: l.quantity,
+        normCode: l.normCode,
+        component: { name: l.item.name },
+      })),
+      // Thép: quantity = tấn quy đổi (cây × dài × kg/m ÷ 1000) → định mức tính NC + máy + phụ theo tấn.
+      ...steelLines.map((l) => ({
+        id: l.id,
+        name: l.name,
+        stage: l.item.group.name,
+        quantity: steelTonnage(l.steelDia!, Number(l.quantity), Number(l.steelBarLen) || STEEL_DEFAULT_BAR_LEN),
+        normCode: l.normCode,
+        component: { name: l.item.name },
+      })),
+    ],
     normsByCode: new Map(norms.map((n) => [n.code, n])),
     priceMaterials: new Map(materialPrices.map((p) => [`${p.name}__${p.unit}`, Number(p.price)])),
     priceLabor: new Map(laborPrices.map((p) => [p.grade, Number(p.price)])),
     priceMachines: new Map(machinePrices.map((p) => [p.name, Number(p.price)])),
   });
 
+  // Thép chính (tên "Thép tròn …") đến từ định mức thép — bỏ ra khỏi bảng VT định mức,
+  // xuất riêng theo cây/kg từng Ø ở dưới (dây buộc / que hàn vẫn giữ trong định mức).
+  let steelNormThepAmount = 0;
+  let steelNormThepMissing = 0;
+  const nonSteelThep = result.materials.filter((m) => {
+    if (m.name.startsWith("Thép tròn")) {
+      if (m.amount != null) steelNormThepAmount += m.amount;
+      else steelNormThepMissing++;
+      return false;
+    }
+    return true;
+  });
+
   // Áp map NCC per dự án lên vật tư định mức
   const mapByKey = new Map(maps.map((m) => [`${m.srcName}__${m.srcUnit}`, m]));
   let deltaAmount = 0;
   let fixedMissing = 0;
-  const materials = result.materials.map((m) => {
+  const materials = nonSteelThep.map((m) => {
     const map = mapByKey.get(`${m.name}__${m.unit}`);
     if (!map) return { ...m, ncc: null };
     const factor = Number(map.factor) || 1;
@@ -160,14 +191,59 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     };
   });
 
-  const materialAmount = result.totals.materialAmount + deltaAmount + directAmount + lumpAmount;
+  // Thép chính mua riêng theo cây/kg từng Ø: số lượng mua = số bóc × hao hụt, giá theo hàng NCC thép.
+  // Gộp theo Ø + hàng NCC (nhiều công tác cùng Ø, cùng NCC → 1 dòng để đi mua).
+  // Dùng cờ direct để tái dùng hiển thị/đổi NCC ở tab Hao phí; steel để tab patch đúng steelPriceId.
+  type SteelRow = {
+    name: string; unit: string; total: number; price: number | null; amount: number | null;
+    direct: true; steel: true; dia: number; lineName: string; lineIds: string[]; materialPriceId?: string;
+    contributions: Array<{ itemId: string; itemName: string; componentName: string; stage: string; quantity: number; qtyPerUnit: number; k: number; contrib: number }>;
+  };
+  const steelMap = new Map<string, SteelRow>();
+  let steelAmount = 0;
+  let steelMissing = 0;
+  for (const l of steelLines) {
+    const dia = l.steelDia!;
+    const waste = steelWaste(dia);
+    const boc = Number(l.quantity);
+    const buyQty = boc * waste;
+    const sp = l.steelPrice;
+    const price = sp ? Number(sp.price) : null;
+    const name = sp?.name ?? `Thép Ø${dia}`;
+    const unit = sp?.unit ?? steelUnit(dia);
+    const key = `${dia}__${l.steelPriceId ?? "none"}`;
+    const contrib = { itemId: l.id, itemName: l.name, componentName: l.item.name, stage: l.item.group.name, quantity: boc, qtyPerUnit: waste, k: 1, contrib: buyQty };
+    const ex = steelMap.get(key);
+    if (ex) {
+      ex.total += buyQty;
+      if (ex.amount != null && price != null) ex.amount += Math.round(buyQty * price);
+      ex.lineIds.push(l.id);
+      ex.contributions.push(contrib);
+    } else {
+      steelMap.set(key, {
+        name, unit, total: buyQty, price,
+        amount: price != null ? Math.round(buyQty * price) : null,
+        direct: true, steel: true, dia, lineName: l.name, lineIds: [l.id],
+        materialPriceId: l.steelPriceId ?? undefined, contributions: [contrib],
+      });
+    }
+  }
+  const steelMaterials = Array.from(steelMap.values());
+  for (const s of steelMaterials) {
+    if (s.amount != null) steelAmount += s.amount;
+    else steelMissing++;
+  }
+
+  const materialAmount =
+    result.totals.materialAmount - steelNormThepAmount + deltaAmount + directAmount + lumpAmount + steelAmount;
   return NextResponse.json({
     ...result,
-    materials: [...materials, ...directMaterials, ...lumpMaterials],
+    materials: [...materials, ...directMaterials, ...lumpMaterials, ...steelMaterials],
     totals: {
       ...result.totals,
       materialAmount,
-      materialsMissingPrice: result.totals.materialsMissingPrice - fixedMissing + lumpMissing,
+      materialsMissingPrice:
+        result.totals.materialsMissingPrice - fixedMissing - steelNormThepMissing + lumpMissing + steelMissing,
       grandTotal: materialAmount + result.totals.laborAmount + result.totals.machineAmount,
     },
     lineCount: lines.length,

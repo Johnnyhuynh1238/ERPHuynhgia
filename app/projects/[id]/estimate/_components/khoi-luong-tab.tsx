@@ -5,6 +5,19 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/confirm-dialog";
+import {
+  type SteelCauKien,
+  STEEL_CAU_KIEN,
+  STEEL_CAU_KIEN_LABELS,
+  STEEL_DEFAULT_BAR_LEN,
+  STEEL_DIAS,
+  detectCauKien,
+  steelIsBar,
+  steelNormCode,
+  steelTonnage,
+  steelUnit,
+  steelWaste,
+} from "@/lib/steel";
 import { EditableText } from "./editable-text";
 import { WorkerStatusBanner } from "./worker-status-banner";
 
@@ -24,6 +37,11 @@ type Line = {
   aiAnswer: string | null;
   fixRequest: string | null;
   note: string | null;
+  steelDia: number | null;
+  steelBarLen: number | null;
+  steelPriceId: string | null;
+  steelPriceName: string | null;
+  steelPriceUnit: string | null;
 };
 
 type Item = { id: string; name: string; status: string; qaThread: Qa[]; lines: Line[] };
@@ -137,7 +155,7 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
         </thead>
         <tbody>
           {visibleGroups.map((g) => (
-            <GroupSection key={g.id} group={g} items={g.items} run={run} collapsedSet={collapsed} toggle={toggleCollapse} />
+            <GroupSection key={g.id} group={g} items={g.items} run={run} collapsedSet={collapsed} toggle={toggleCollapse} projectId={projectId} />
           ))}
         </tbody>
         </table>
@@ -197,13 +215,13 @@ export function KhoiLuongTab({ projectId }: { projectId: string }) {
       </div>
 
       {detailLine && (
-        <LineDetailModal line={detailLine} run={run} onClose={() => setDetailId(null)} />
+        <LineDetailModal line={detailLine} run={run} onClose={() => setDetailId(null)} projectId={projectId} />
       )}
     </div>
   );
 }
 
-function GroupSection({ group, items, run, collapsedSet, toggle }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void>; collapsedSet: Set<string>; toggle: (id: string) => void }) {
+function GroupSection({ group, items, run, collapsedSet, toggle, projectId }: { group: Group; items: Item[]; run: (fn: () => Promise<unknown>) => Promise<void>; collapsedSet: Set<string>; toggle: (id: string) => void; projectId: string }) {
   const collapsed = collapsedSet.has(group.id);
   return (
     <>
@@ -217,13 +235,13 @@ function GroupSection({ group, items, run, collapsedSet, toggle }: { group: Grou
         </td>
       </tr>
       {!collapsed && items.map((it) => (
-        <ItemSection key={it.id} item={it} run={run} collapsed={collapsedSet.has(it.id)} onToggle={() => toggle(it.id)} />
+        <ItemSection key={it.id} item={it} run={run} collapsed={collapsedSet.has(it.id)} onToggle={() => toggle(it.id)} projectId={projectId} />
       ))}
     </>
   );
 }
 
-function ItemSection({ item, run, collapsed, onToggle }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed: boolean; onToggle: () => void }) {
+function ItemSection({ item, run, collapsed, onToggle, projectId }: { item: Item; run: (fn: () => Promise<unknown>) => Promise<void>; collapsed: boolean; onToggle: () => void; projectId: string }) {
   return (
     <>
       {/* Câu hỏi chung của hạng mục — nằm TRÊN hàng tên hạng mục */}
@@ -245,7 +263,7 @@ function ItemSection({ item, run, collapsed, onToggle }: { item: Item; run: (fn:
         </td>
       </tr>
       {!collapsed && item.lines.map((l) => (
-        <LineRow key={l.id} line={l} run={run} />
+        <LineRow key={l.id} line={l} run={run} projectId={projectId} />
       ))}
     </>
   );
@@ -320,7 +338,7 @@ function ItemActions({ item, run, collapsed, onToggle }: { item: Item; run: (fn:
   );
 }
 
-function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+function LineRow({ line, run, projectId }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; projectId: string }) {
   const meta = LINE_STATUS[line.status];
   const [fixOpen, setFixOpen] = useState(false);
   const [fixDraft, setFixDraft] = useState(line.fixRequest ?? "");
@@ -336,7 +354,7 @@ function LineRow({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) 
     <>
       <tr className="group border-b border-[#1c1f30] align-top transition-colors hover:bg-[#171a28]">
         <td className="px-3 py-2">
-          <NormModeControl line={line} run={run} />
+          <NormModeControl line={line} run={run} projectId={projectId} />
         </td>
         <td className="px-3 py-2">
           <EditableText value={line.name} className="text-zinc-200" onSave={patch("name")} />
@@ -465,7 +483,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 // Popup chi tiết 1 công tác (mobile) — căn giữa màn hình, cuộn trong popup, sửa tại chỗ + hành động
-function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; onClose: () => void }) {
+function LineDetailModal({ line, run, onClose, projectId }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; onClose: () => void; projectId: string }) {
   const meta = LINE_STATUS[line.status];
   const [fixDraft, setFixDraft] = useState(line.fixRequest ?? "");
   const patch = (field: string) => (value: string) =>
@@ -495,7 +513,7 @@ function LineDetailModal({ line, run, onClose }: { line: Line; run: (fn: () => P
             <EditableText value={line.name} className="text-sm text-zinc-200" onSave={patch("name")} />
           </Field>
           <Field label="Kiểu công tác">
-            <NormModeControl line={line} run={run} />
+            <NormModeControl line={line} run={run} projectId={projectId} />
           </Field>
           <Field label="Khối lượng">
             <div className="flex items-center gap-1">
@@ -691,29 +709,47 @@ const CAT_PREFIX_HINT: Record<string, string> = {
 };
 const inputCls = "min-w-0 rounded-md border border-[#2b2f45] bg-[#0d0f17] px-2 py-1 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60";
 
-function NormModeControl({ line, run }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+function NormModeControl({ line, run, projectId }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; projectId: string }) {
   const [assignOpen, setAssignOpen] = useState(false);
-  const isLump = !line.normCode;
+  const [steelOpen, setSteelOpen] = useState(false);
+  const isSteel = line.steelDia != null;
+  const isLump = !line.normCode; // thép luôn có normCode nên isLump = false
+  const mode: "norm" | "steel" | "lump" = isSteel ? "steel" : isLump ? "lump" : "norm";
   const toLump = () => run(() => api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: "" }) }));
 
   return (
     <div>
       <div className="mb-1 inline-flex overflow-hidden rounded-md border border-[#2b2f45] text-[10px] font-bold">
         <button
-          onClick={() => { if (isLump) setAssignOpen(true); }}
-          className={`px-2 py-0.5 ${!isLump ? "bg-sky-500/20 text-sky-300" : "text-zinc-500 hover:text-zinc-300"}`}
+          onClick={() => { if (mode !== "norm") setAssignOpen(true); }}
+          className={`px-2 py-0.5 ${mode === "norm" ? "bg-sky-500/20 text-sky-300" : "text-zinc-500 hover:text-zinc-300"}`}
         >
           Định mức
         </button>
         <button
-          onClick={() => { if (!isLump) void toLump(); }}
-          className={`border-l border-[#2b2f45] px-2 py-0.5 ${isLump ? "bg-[#f97316]/20 text-[#fb923c]" : "text-zinc-500 hover:text-zinc-300"}`}
+          onClick={() => setSteelOpen(true)}
+          className={`border-l border-[#2b2f45] px-2 py-0.5 ${mode === "steel" ? "bg-violet-500/20 text-violet-300" : "text-zinc-500 hover:text-zinc-300"}`}
+        >
+          Thép
+        </button>
+        <button
+          onClick={() => { if (mode !== "lump") void toLump(); }}
+          className={`border-l border-[#2b2f45] px-2 py-0.5 ${mode === "lump" ? "bg-[#f97316]/20 text-[#fb923c]" : "text-zinc-500 hover:text-zinc-300"}`}
         >
           Trọn gói
         </button>
       </div>
-      {isLump ? (
+      {mode === "lump" ? (
         <p className="text-[10px] leading-tight text-amber-500/80">Nhập đơn giá ở tab Hao phí</p>
+      ) : mode === "steel" ? (
+        <button onClick={() => setSteelOpen(true)} title="Sửa quy đổi thép" className="block text-left">
+          <span className="block font-mono text-[11px] text-violet-300 hover:text-violet-200">
+            Ø{line.steelDia} · {STEEL_CAU_KIEN_LABELS[cauKienOfNorm(line.normCode)] ?? "—"}
+          </span>
+          <span className="mt-0.5 block text-[10px] leading-tight text-zinc-600">
+            {line.normCode} · {line.steelPriceName ? `NCC: ${line.steelPriceName}` : "chưa chọn thép NCC"}
+          </span>
+        </button>
       ) : (
         <>
           <button
@@ -727,7 +763,157 @@ function NormModeControl({ line, run }: { line: Line; run: (fn: () => Promise<un
         </>
       )}
       {assignOpen && <NormAssignModal line={line} run={run} onClose={() => setAssignOpen(false)} />}
+      {steelOpen && <SteelModal line={line} run={run} projectId={projectId} onClose={() => setSteelOpen(false)} />}
     </div>
+  );
+}
+
+// Suy ngược cấu kiện từ mã định mức thép (chỉ để hiển thị nhãn).
+function cauKienOfNorm(code: string | null): SteelCauKien {
+  switch (code) {
+    case "TH.1110": case "TH.1120": return "mong";
+    case "TH.1210": case "TH.1220": return "cot";
+    case "TH.1320": return "dam";
+    case "TH.1410": return "san";
+    default: return "mong";
+  }
+}
+
+type SteelNcc = { id: string; name: string; unit: string; price: number };
+
+// Popup quy đổi thép: cấu kiện + Ø + chiều dài cây + số lượng + hàng NCC → auto mã ĐM, xem tấn/số mua.
+function SteelModal({ line, run, projectId, onClose }: { line: Line; run: (fn: () => Promise<unknown>) => Promise<void>; projectId: string; onClose: () => void }) {
+  const [cauKien, setCauKien] = useState<SteelCauKien>(line.steelDia != null ? cauKienOfNorm(line.normCode) : detectCauKien(line.name));
+  const [dia, setDia] = useState<number>(line.steelDia ?? 18);
+  const [barLen, setBarLen] = useState<string>(String(line.steelBarLen ?? STEEL_DEFAULT_BAR_LEN));
+  const [qty, setQty] = useState<string>(fmtQty(line.quantity));
+  const [priceId, setPriceId] = useState<string>(line.steelPriceId ?? "");
+  const [prices, setPrices] = useState<SteelNcc[]>([]);
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await api(`/api/projects/${projectId}/estimate/material-map`);
+        setPrices(r.prices as SteelNcc[]);
+      } catch { /* ignore */ }
+    })();
+  }, [projectId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const bar = steelIsBar(dia);
+  const unit = steelUnit(dia);
+  const code = steelNormCode(cauKien, dia);
+  const qtyNum = Number(qty.replace(/\./g, "").replace(",", ".")) || 0;
+  const len = Number(barLen.replace(",", ".")) || STEEL_DEFAULT_BAR_LEN;
+  const tonnage = steelTonnage(dia, qtyNum, len);
+  const buyQty = qtyNum * steelWaste(dia);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q ? prices.filter((p) => p.name.toLowerCase().includes(q)) : prices;
+
+  const save = async () => {
+    if (qtyNum <= 0) { toast.error("Nhập số lượng thép"); return; }
+    setSaving(true);
+    await run(async () => {
+      await api(`/api/estimate/lines/${line.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          steelDia: dia,
+          steelBarLen: bar ? len : null,
+          steelPriceId: priceId || null,
+          normCode: code,
+          quantity: qtyNum,
+          unit,
+        }),
+      });
+      toast.success(`Thép Ø${dia} → ${code} (${unit})`);
+      onClose();
+    });
+    setSaving(false);
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[#252840] bg-[#13151f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#252840] px-4 py-3">
+          <span className="text-sm font-bold text-zinc-100">Quy đổi thép: <span className="text-zinc-400">{line.name}</span></span>
+          <button onClick={onClose} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Cấu kiện</p>
+              <select value={cauKien} onChange={(e) => setCauKien(e.target.value as SteelCauKien)} className={`w-full ${inputCls}`}>
+                {STEEL_CAU_KIEN.map((c) => <option key={c} value={c}>{STEEL_CAU_KIEN_LABELS[c]}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Đường kính (Ø)</p>
+              <select value={dia} onChange={(e) => setDia(Number(e.target.value))} className={`w-full ${inputCls}`}>
+                {STEEL_DIAS.map((d) => <option key={d} value={d}>Ø{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Số lượng ({unit})</p>
+              <input value={qty} inputMode="decimal" onChange={(e) => setQty(e.target.value)} className={`w-full text-right ${inputCls}`} />
+            </div>
+            {bar ? (
+              <div>
+                <p className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Dài 1 cây (m)</p>
+                <input value={barLen} inputMode="decimal" onChange={(e) => setBarLen(e.target.value)} className={`w-full text-right ${inputCls}`} />
+              </div>
+            ) : (
+              <div className="grid content-end">
+                <p className="text-[10px] leading-tight text-zinc-600">Ø{dia} &lt; 10 → tính theo kg (không quy cây).</p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">Hàng NCC thép (giá theo {unit})</p>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm thép NCC (VD: Thép Ø18)…" className="w-full rounded-lg border border-[#2b2f45] bg-[#0d0f17] py-2 pl-8 pr-2 text-xs text-zinc-100 outline-none focus:border-[#f97316]/60" />
+            </div>
+            <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto">
+              {filtered.length === 0 && <p className="py-3 text-center text-[11px] text-zinc-600">Chưa có hàng NCC. Thêm ở tab Đơn giá.</p>}
+              {filtered.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPriceId(p.id === priceId ? "" : p.id)}
+                  className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs ${priceId === p.id ? "border-[#f97316] bg-[#f97316]/10 text-zinc-100" : "border-[#252840] text-zinc-300 hover:border-[#374151]"}`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{p.name} <span className="text-zinc-600">/ {p.unit}</span></span>
+                  <span className="shrink-0 tabular-nums text-zinc-400">{p.price.toLocaleString("vi-VN")} ₫</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5 text-[11px] leading-relaxed text-zinc-300">
+            <p>Mã định mức tự gán: <b className="font-mono text-violet-300">{code}</b> <span className="text-zinc-500">(NC + máy + dây/que hàn theo tấn)</span></p>
+            <p className="mt-0.5">Quy đổi: <b>{fmtQty(qtyNum)} {unit}</b> ≈ <b className="text-violet-200">{tonnage.toLocaleString("vi-VN", { maximumFractionDigits: 4 })} tấn</b></p>
+            <p className="mt-0.5">Mua (đã +{Math.round((steelWaste(dia) - 1) * 1000) / 10}% hao): <b className="text-violet-200">{buyQty.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {unit}</b></p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-1.5 border-t border-[#252840] px-4 py-3">
+          <button onClick={onClose} className="rounded-md border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-zinc-800">Huỷ</button>
+          <button onClick={() => void save()} disabled={saving} className="inline-flex items-center gap-1 rounded-md bg-[#f97316] px-4 py-1.5 text-[11px] font-bold text-white hover:bg-[#ea580c] disabled:opacity-50">
+            {saving && <Loader2 className="h-3 w-3 animate-spin" />} Lưu thép
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -759,7 +945,7 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
 
   const assign = (code: string) =>
     run(async () => {
-      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: code }) });
+      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: code, steelDia: null }) });
       toast.success(`Đã gán mã ${code}`);
       onClose();
     });
@@ -799,7 +985,7 @@ function NormAssignModal({ line, run, onClose }: { line: Line; run: (fn: () => P
     }
     setSaving(false);
     await run(async () => {
-      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: newCode }) });
+      await api(`/api/estimate/lines/${line.id}`, { method: "PATCH", body: JSON.stringify({ normCode: newCode, steelDia: null }) });
       toast.success(`Đã tạo & gán định mức ${newCode}`);
       onClose();
     });

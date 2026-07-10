@@ -36,10 +36,12 @@ type ResourceRow = {
   contributions: Contrib[];
   ncc?: NccInfo | null; // hàng NCC đã map (vật tư định mức)
   direct?: boolean; // line vật tư mua thẳng NCC (thép bóc chi tiết)
+  steel?: boolean; // line cốt thép — mua theo cây/Ø, NCC lưu ở steelPriceId (không phải materialPriceId)
+  dia?: number; // Ø thép (khi steel)
   lump?: boolean; // line trọn gói (cửa nhôm/nhựa…) — nhập giá thẳng, không map NCC
   lineName?: string;
-  lineIds?: string[]; // direct: các estimate_line gộp cùng hàng NCC (đổi giá áp cả nhóm)
-  materialPriceId?: string; // direct: hàng NCC hiện tại
+  lineIds?: string[]; // direct/steel: các estimate_line gộp cùng hàng NCC (đổi giá áp cả nhóm)
+  materialPriceId?: string; // direct: hàng NCC hiện tại (steel: steelPriceId hiện tại)
 };
 
 // PATCH giá trọn gói lên chính estimate_line
@@ -411,7 +413,9 @@ function ResourceTable({
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
                 <span className="truncate text-[13px] text-zinc-200">{getName(r)}</span>
-                {r.direct && (
+                {r.steel ? (
+                  <span className="shrink-0 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-bold text-violet-400">THÉP Ø{r.dia}</span>
+                ) : r.direct && (
                   <span className="shrink-0 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-bold text-violet-400">MUA THẲNG</span>
                 )}
                 {r.lump && (
@@ -459,7 +463,9 @@ function ResourceTable({
                     <span className="flex items-center gap-1.5 text-zinc-200">
                       {isOpen ? <ChevronDown className="h-3 w-3 text-zinc-500" /> : <ChevronRight className="h-3 w-3 text-zinc-500" />}
                       {getName(r)}
-                      {r.direct && (
+                      {r.steel ? (
+                        <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">THÉP Ø{r.dia}</span>
+                      ) : r.direct && (
                         <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">MUA THẲNG</span>
                       )}
                       {r.lump && (
@@ -645,7 +651,9 @@ function MaterialDetailModal({
         <div className="flex items-start justify-between gap-2">
           <h4 className="flex items-center gap-1.5 text-sm font-bold text-zinc-100">
             {getName(row)}
-            {row.direct && (
+            {row.steel ? (
+              <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">THÉP Ø{row.dia}</span>
+            ) : row.direct && (
               <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">MUA THẲNG</span>
             )}
             {row.lump && (
@@ -752,7 +760,7 @@ function MapNccModal({
         r = await fetch(`/api/estimate/lines/${lineId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ materialPriceId }),
+          body: JSON.stringify(row.steel ? { steelPriceId: materialPriceId } : { materialPriceId }),
         });
         if (!r.ok) break;
       }
@@ -810,7 +818,7 @@ function MapNccModal({
           )}
         </p>
 
-        {!row.lump && (
+        {!row.lump && !row.steel && (
           <div className="mt-3 rounded-lg border border-[#f97316]/40 bg-[#f97316]/5 p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Nhập giá thẳng (₫/{row.unit})</p>
             <p className="text-[10px] text-zinc-500">Lưu vào tab Đơn giá + áp luôn, khỏi qua tab Đơn giá tạo tay.</p>
