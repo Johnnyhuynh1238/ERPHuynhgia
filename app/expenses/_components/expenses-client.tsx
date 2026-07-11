@@ -2,6 +2,7 @@
 
 import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { MoneyInput } from "@/components/money-input";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
@@ -132,6 +133,8 @@ export function ExpensesClient({
 
   const [showTreasury, setShowTreasury] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
@@ -477,35 +480,39 @@ export function ExpensesClient({
 
   return (
     <div className="space-y-3">
-      {aiOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3"
-          onClick={() => setAiOpen(false)}
-        >
+      {aiOpen &&
+        mounted &&
+        createPortal(
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
-            style={{ width: "min(420px, 100%)", height: "min(640px, calc(100vh - 24px))" }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-3"
+            style={{ height: "100dvh" }}
+            onClick={() => setAiOpen(false)}
           >
-            <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
-              <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
-              <button
-                type="button"
-                onClick={() => setAiOpen(false)}
-                className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
+              style={{ width: "min(420px, 100%)", height: "min(640px, calc(100dvh - 24px))" }}
+            >
+              <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
+                <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(false)}
+                  className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
+                  aria-label="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
+              <iframe
+                src="https://huynhgia6.com/claude/chat?arg=thuchi-admin"
+                title="AI Thu-Chi"
+                className="w-full flex-1 border-0"
+              />
             </div>
-            <iframe
-              src="https://huynhgia6.com/claude/chat?arg=thuchi-admin"
-              title="AI Thu-Chi"
-              className="w-full flex-1 border-0"
-            />
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div>
           <h1 className="text-xl font-semibold text-orange-300">Lệnh chi</h1>
