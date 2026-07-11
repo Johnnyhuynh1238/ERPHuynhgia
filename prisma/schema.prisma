@@ -754,6 +754,8 @@ model Project {
   acceptanceMilestones      AcceptanceMilestone[]
   estimateGroups            EstimateGroup[]
   estimateMaterialMaps      EstimateMaterialMap[]
+  estimateDbKhoan           EstimateDbKhoan[]
+  estimateDbMaterials       EstimateDbMaterial[]
 
   @@index([status])
   @@map("projects")
@@ -855,9 +857,10 @@ model StandardTaskCatalog {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates   TaskTemplate[]      @relation("TemplateStdCatalog")
-  tasks       Task[]              @relation("TaskStdCatalog")
-  budgetItems ProjectBudgetItem[]
+  templates          TaskTemplate[]       @relation("TemplateStdCatalog")
+  tasks              Task[]               @relation("TaskStdCatalog")
+  budgetItems        ProjectBudgetItem[]
+  estimateDbMaterials EstimateDbMaterial[]
 
   @@unique([phaseCode, taskCode])
   @@index([phaseCode, displayOrder])
@@ -4079,4 +4082,73 @@ model EstimateItemDefault {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("estimate_item_defaults")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DỰ TOÁN DB (app mới /du-toan) — app CHỈ chứa DB. AI bóc & ghi thẳng, ERP không
+// tự tính. 2 bảng độc lập + 1 danh mục lookup:
+//   1. EstimateDbKhoan     = hạng mục khoán (có HĐ + giá trị trọn gói)
+//   2. EstimateDbMaterial  = vật tư theo công tác (flat, ref catalog chuẩn) → thống kê SL VT
+//   · MaterialCategory     = danh mục chủng loại VT (lookup toàn hệ, để lọc)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Danh mục chủng loại vật tư — lookup toàn hệ thống, dùng lọc tab Vật tư.
+model MaterialCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  sortOrder Int       @default(0) @map("sort_order")
+  retiredAt DateTime? @map("retired_at") // soft-delete, giữ ràng buộc dòng cũ
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  materials EstimateDbMaterial[]
+
+  @@index([sortOrder])
+  @@map("material_categories")
+}
+
+// Bảng 1 — Hạng mục khoán. Giá trị trọn gói nhập tay (value). KL×đơn giá optional để tham chiếu.
+model EstimateDbKhoan {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  name       String
+  unit       String?  @db.VarChar(20)
+  quantity   Decimal? @db.Decimal(14, 3)
+  unitPrice  BigInt?  @map("unit_price")
+  value      BigInt   @default(0) // giá trị hợp đồng trọn gói (nhập tay)
+  contractor String? // nhà thầu nhận khoán
+  note       String?  @db.Text
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+  @@map("estimate_db_khoan")
+}
+
+// Bảng 2 — Vật tư theo công tác (flat: 1 dòng = 1 VT trong 1 công tác).
+// công tác = ref StandardTaskCatalog (mã GĐ-CT). Mục đích cuối = thống kê SL VT theo công tác/chủng loại.
+// thành tiền = quantity × unitPrice (tính runtime, không lưu).
+model EstimateDbMaterial {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  catalogId  String?  @map("catalog_id") @db.Uuid // → StandardTaskCatalog (công tác)
+  categoryId String?  @map("category_id") @db.Uuid // → MaterialCategory (chủng loại)
+  name       String // tên vật tư chi tiết
+  unit       String   @db.VarChar(20)
+  quantity   Decimal  @db.Decimal(14, 3)
+  unitPrice  BigInt   @default(0) @map("unit_price") // đơn giá dự kiến
+  note       String?  @db.Text
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  catalog  StandardTaskCatalog? @relation(fields: [catalogId], references: [id], onDelete: SetNull)
+  category MaterialCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, catalogId])
+  @@index([projectId, categoryId])
+  @@map("estimate_db_materials")
 }
