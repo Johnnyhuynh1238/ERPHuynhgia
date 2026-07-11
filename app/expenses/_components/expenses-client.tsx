@@ -131,6 +131,7 @@ export function ExpensesClient({
   const [pendingTotal, setPendingTotal] = useState<number>(0);
 
   const [showTreasury, setShowTreasury] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
@@ -476,6 +477,29 @@ export function ExpensesClient({
 
   return (
     <div className="space-y-3">
+      {aiOpen && (
+        <div
+          className="pointer-events-auto fixed bottom-3 right-3 z-[60] flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
+          style={{ width: "min(390px, calc(100vw - 20px))", height: "min(600px, calc(100vh - 90px))" }}
+        >
+          <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
+            <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
+            <button
+              type="button"
+              onClick={() => setAiOpen(false)}
+              className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
+              aria-label="Đóng"
+            >
+              ✕
+            </button>
+          </div>
+          <iframe
+            src="https://huynhgia6.com/claude/chat?arg=thuchi-admin"
+            title="AI Thu-Chi"
+            className="w-full flex-1 border-0"
+          />
+        </div>
+      )}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div>
           <h1 className="text-xl font-semibold text-orange-300">Lệnh chi</h1>
@@ -529,13 +553,7 @@ export function ExpensesClient({
           {isAdmin && (
             <button
               type="button"
-              onClick={() =>
-                window.open(
-                  "https://huynhgia6.com/claude/?arg=thuchi-admin",
-                  "ai-thuchi",
-                  "width=480,height=760,menubar=no,toolbar=no,location=no,status=no",
-                )
-              }
+              onClick={() => setAiOpen(true)}
               className="rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-xs font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
               title="Nhập lệnh chi bằng AI (chat)"
               aria-label="AI thu chi"
