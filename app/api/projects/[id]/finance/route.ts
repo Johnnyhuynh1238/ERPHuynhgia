@@ -134,15 +134,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const payrollTotal = payrolls.reduce((s, p) => s + Number(p.totalPayable), 0);
   const spent = cashExpense + cashSubPayment + materialPaid + payrollTotal;
 
-  // Công nợ NCC theo nhà cung cấp
-  const supplierDebtMap = new Map<string, { name: string; amount: number }>();
-  for (const d of debts) {
-    if (d.paidAt) continue;
-    const cur = supplierDebtMap.get(d.supplier.id) ?? { name: d.supplier.name, amount: 0 };
-    cur.amount += Number(d.totalAmount);
-    supplierDebtMap.set(d.supplier.id, cur);
-  }
-  const supplierDebts = Array.from(supplierDebtMap.values()).sort((a, b) => b.amount - a.amount);
+  // Công nợ NCC theo nhà cung cấp — cộng dồn theo dự án (nợ − đã trả, sàn 0).
+  const supplierDebtRows = await prisma.$queryRaw<
+    { supplier_name: string; con_lai: number }[]
+  >`SELECT supplier_name, con_lai::float8 AS con_lai
+    FROM ncc_cong_no_du_an
+    WHERE project_id = ${id}::uuid AND con_lai > 0
+    ORDER BY con_lai DESC`;
+  const supplierDebts = supplierDebtRows.map((r) => ({ name: r.supplier_name, amount: Number(r.con_lai) }));
   const supplierDebtTotal = supplierDebts.reduce((s, r) => s + r.amount, 0);
 
   // Công nợ thầu phụ theo HĐ
