@@ -526,6 +526,23 @@ export function ExpensesClient({
           >
             ?
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() =>
+                window.open(
+                  "https://huynhgia6.com/claude/?arg=thuchi-admin",
+                  "ai-thuchi",
+                  "width=480,height=760,menubar=no,toolbar=no,location=no,status=no",
+                )
+              }
+              className="rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-xs font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
+              title="Nhập lệnh chi bằng AI (chat)"
+              aria-label="AI thu chi"
+            >
+              🤖 AI
+            </button>
+          )}
           {canCreate && (
             <button
               onClick={() => setShowCreate((v) => !v)}
