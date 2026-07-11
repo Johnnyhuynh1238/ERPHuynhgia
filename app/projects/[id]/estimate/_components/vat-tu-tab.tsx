@@ -160,7 +160,8 @@ function TongView({ flat, run, patchVt }: ViewProps) {
         if (cur.price == null) cur.price = price;
       }
     }
-    return Array.from(m.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    // Giữ thứ tự xuất hiện theo kết cấu (nhóm → hạng mục → công tác), không sort A-B-C
+    return Array.from(m.values());
   }, [flat]);
 
   return (
