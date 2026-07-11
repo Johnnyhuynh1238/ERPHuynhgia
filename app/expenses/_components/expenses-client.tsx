@@ -3,6 +3,7 @@
 import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MoneyInput } from "@/components/money-input";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
@@ -494,7 +495,7 @@ export function ExpensesClient({
               style={{ width: "min(420px, 100%)", height: "min(640px, calc(100dvh - 24px))" }}
             >
               <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
-                <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#7aa2ff]"><Sparkles className="h-4 w-4" /> AI Thu-Chi</span>
                 <button
                   type="button"
                   onClick={() => setAiOpen(false)}
@@ -567,11 +568,11 @@ export function ExpensesClient({
             <button
               type="button"
               onClick={() => setAiOpen(true)}
-              className="rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-xs font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-xs font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
               title="Nhập lệnh chi bằng AI (chat)"
               aria-label="AI thu chi"
             >
-              🤖 AI
+              <Sparkles className="h-3.5 w-3.5" /> AI
             </button>
           )}
           {canCreate && (

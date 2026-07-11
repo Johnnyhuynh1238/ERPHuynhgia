@@ -1,11 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import { ProjectStatus } from "@prisma/client";
+import { ProjectStatus, UserRole } from "@prisma/client";
 import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectBackLink } from "./_components/project-back-link";
 import { HideOnEstimate } from "./_components/hide-on-estimate";
+import { ProjectAiButton } from "./_components/project-ai-button";
 
 type ProjectLayoutProps = {
   children: React.ReactNode;
@@ -75,9 +76,12 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
                 <h1 className="text-xl font-bold text-[#f0f2ff]">{project.name}</h1>
                 <div className="text-sm text-[#8892b0]">Chủ nhà: {project.customerName}</div>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
-                {statusLabel[project.status]}
-              </span>
+              <div className="flex items-center gap-2">
+                {user.role === UserRole.admin && <ProjectAiButton code={project.code} />}
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[project.status]}`}>
+                  {statusLabel[project.status]}
+                </span>
+              </div>
             </div>
           </div>
         </HideOnEstimate>

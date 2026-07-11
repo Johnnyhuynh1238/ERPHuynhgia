@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
 import { ProjectHubGrid } from "./_components/project-hub-grid";
+import { ProjectFinanceHeader } from "./_components/project-finance-header";
+import { getProjectFinanceSummary } from "@/lib/project-finance-summary";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
 
 function startOfTodayUtc() {
@@ -78,6 +80,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
   ]);
 
   const canViewFinancial = user.role === UserRole.admin || user.role === UserRole.accountant;
+  const financeSummary = canViewFinancial ? await getProjectFinanceSummary(project.id) : null;
   const isAdmin = user.role === UserRole.admin;
   const role = user.role as UserRole;
   const canViewSubContracts = isAdmin
@@ -110,6 +113,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
 
   return (
     <div className="space-y-4">
+      {financeSummary && <ProjectFinanceHeader summary={financeSummary} />}
       <ProjectHubGrid
         projectId={project.id}
         caps={caps}
