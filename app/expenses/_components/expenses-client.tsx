@@ -479,25 +479,31 @@ export function ExpensesClient({
     <div className="space-y-3">
       {aiOpen && (
         <div
-          className="pointer-events-auto fixed bottom-3 right-3 z-[60] flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
-          style={{ width: "min(390px, calc(100vw - 20px))", height: "min(600px, calc(100vh - 90px))" }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3"
+          onClick={() => setAiOpen(false)}
         >
-          <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
-            <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
-            <button
-              type="button"
-              onClick={() => setAiOpen(false)}
-              className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
-              aria-label="Đóng"
-            >
-              ✕
-            </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
+            style={{ width: "min(420px, 100%)", height: "min(640px, calc(100vh - 24px))" }}
+          >
+            <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
+              <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI Thu-Chi</span>
+              <button
+                type="button"
+                onClick={() => setAiOpen(false)}
+                className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <iframe
+              src="https://huynhgia6.com/claude/chat?arg=thuchi-admin"
+              title="AI Thu-Chi"
+              className="w-full flex-1 border-0"
+            />
           </div>
-          <iframe
-            src="https://huynhgia6.com/claude/chat?arg=thuchi-admin"
-            title="AI Thu-Chi"
-            className="w-full flex-1 border-0"
-          />
         </div>
       )}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
