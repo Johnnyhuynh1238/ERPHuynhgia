@@ -2,6 +2,7 @@
 
 import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -117,6 +118,9 @@ export function ProjectInfoClient({
 }) {
   const router = useRouter();
   const [data, setData] = useState(project);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMounted, setAiMounted] = useState(false);
+  useEffect(() => setAiMounted(true), []);
   const [todayRest, setTodayRest] = useState(todaySiteRest);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignmentRow[]>([]);
 
@@ -816,11 +820,54 @@ export function ProjectInfoClient({
 
   return (
     <div className="space-y-4">
+      {aiOpen &&
+        aiMounted &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-3"
+            style={{ height: "100dvh" }}
+            onClick={() => setAiOpen(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
+              style={{ width: "min(420px, 100%)", height: "min(640px, calc(100dvh - 24px))" }}
+            >
+              <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
+                <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI dự án · {data.code}</span>
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(false)}
+                  className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
+                  aria-label="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
+              <iframe
+                src={`https://huynhgia6.com/claude/chat?arg=duan-${encodeURIComponent(data.code)}`}
+                title="AI dự án"
+                className="w-full flex-1 border-0"
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
         <div className="mb-2 flex items-center gap-2 px-1">
           <span className="h-1.5 w-1.5 rounded-full bg-[#5a6080]" />
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#8892b0]">Thông tin dự án</h3>
           <span className="ml-auto text-[10px] text-[#5a6080]">{visibleInfoSections.length} mục</span>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAiOpen(true)}
+              className="rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-[11px] font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
+              title="AI quản lý dự án (chat)"
+            >
+              🤖 AI dự án
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {visibleInfoSections.map((s) => {
