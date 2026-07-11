@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, type Category, type CatalogTask } from "./du-toan-data";
 import { KhoanTab } from "./khoan-tab";
 import { VatTuTab } from "./vat-tu-tab";
@@ -28,6 +29,7 @@ export function DuToanClient({
   const [categories, setCategories] = useState<Category[]>([]);
   const [tasks, setTasks] = useState<CatalogTask[]>([]);
   const [metaErr, setMetaErr] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -50,10 +52,52 @@ export function DuToanClient({
         <Link href={`/projects/${projectId}`} className="text-sm text-slate-500 hover:text-slate-800">
           ← Dự án
         </Link>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-          Dự toán · {projectCode}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAiOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
+          >
+            🤖 AI bóc vật tư
+          </button>
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+            Dự toán · {projectCode}
+          </span>
+        </div>
       </div>
+
+      {aiOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-end bg-black/40 p-2 md:items-center"
+            onClick={() => setAiOpen(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-[#0b0d16] shadow-2xl"
+              style={{ width: "min(440px, 100%)", height: "min(680px, calc(100dvh - 24px))" }}
+            >
+              <div className="flex items-center gap-2 border-b border-slate-700 bg-[#12141f] px-3 py-2">
+                <span className="text-sm font-semibold text-[#7aa2ff]">🤖 AI bóc vật tư — {projectCode}</span>
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(false)}
+                  className="ml-auto rounded-md px-2 py-0.5 text-slate-400 hover:bg-slate-700 hover:text-white"
+                  aria-label="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
+              <iframe
+                src={`https://huynhgia6.com/claude/chat?arg=dutoan-${encodeURIComponent(projectCode)}`}
+                title="AI bóc vật tư"
+                className="w-full flex-1 border-0"
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <h1 className="text-xl font-bold text-slate-900">{projectName}</h1>
       <p className="mt-0.5 text-sm text-slate-500">
