@@ -67,6 +67,7 @@ type CtGroup = {
   catalogId: string | null;
   code: string | null;
   taskName: string;
+  taskNote: string | null;
   phaseCode: string;
   phaseName: string;
   mats: Material[];
@@ -103,6 +104,7 @@ export function DuToanClient({
   const [err, setErr] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ kind: TabKey; id: string } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [descOpen, setDescOpen] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
 
   useEffect(() => {
@@ -140,6 +142,7 @@ export function DuToanClient({
           catalogId: m.catalogId,
           code: m.taskCode ?? meta?.code ?? null,
           taskName: m.taskName ?? meta?.taskName ?? "Chưa gán công tác",
+          taskNote: m.taskNote ?? null,
           phaseCode: meta?.phaseCode ?? (m.catalogId ? "??" : "zz"),
           phaseName: meta?.phaseName ?? (m.catalogId ? "Khác" : "Chưa gán công tác"),
           mats: [],
@@ -147,6 +150,7 @@ export function DuToanClient({
         };
         map.set(key, g);
       }
+      if (!g.taskNote && m.taskNote) g.taskNote = m.taskNote;
       g.mats.push(m);
       g.value += amountOf(m);
     }
@@ -275,6 +279,33 @@ export function DuToanClient({
             </div>
           )}
         </div>
+
+        {/* MÔ TẢ CÔNG TÁC — nằm trên thanh tab */}
+        {(() => {
+          const withNote = ctGroups.filter((g) => g.taskNote);
+          if (loading || withNote.length === 0) return null;
+          return (
+            <div className="dt-desc">
+              <div className="dt-desc-h" onClick={() => setDescOpen((v) => !v)}>
+                <span className="t">Mô tả công tác · {withNote.length}</span>
+                <span className="x">{descOpen ? "Ẩn ▲" : "Hiện ▼"}</span>
+              </div>
+              {descOpen && (
+                <div className="dt-desc-b">
+                  {withNote.map((g) => (
+                    <div className="dt-desc-i" key={"d-" + (g.catalogId ?? "none")}>
+                      <div>
+                        {g.code && <span className="c">{g.code}</span>}
+                        <span className="n">{g.taskName}</span>
+                      </div>
+                      <div className="d">{g.taskNote}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* TABS */}
         <div className="dt-tabs">

@@ -49,6 +49,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       unitPrice: price,
       amount: qty * price,
       note: r.note,
+      taskNote: r.taskNote,
     };
   });
   const total = items.reduce((s, r) => s + r.amount, 0);

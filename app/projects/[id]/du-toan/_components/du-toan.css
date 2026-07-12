@@ -69,6 +69,18 @@
 .dt-track{height:6px;border-radius:4px;overflow:hidden;display:flex;background:var(--dt-line);margin-top:14px}
 .dt-track i{display:block;height:100%}
 
+/* mô tả công tác (trên thanh tab) */
+.dt-desc{margin-top:16px;background:var(--dt-card);border:1px solid var(--dt-line);border-radius:16px;padding:14px 16px}
+.dt-desc-h{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.dt-desc-h .t{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dt-terra);font-weight:700}
+.dt-desc-h .x{font-size:11px;color:var(--dt-mut2);font-weight:700}
+.dt-desc-b{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+.dt-desc-i{padding-top:10px;border-top:1px solid var(--dt-line)}
+.dt-desc-i:first-child{padding-top:0;border-top:none}
+.dt-desc-i .c{font-family:var(--dt-mono);font-size:11px;font-weight:700;color:var(--dt-gold)}
+.dt-desc-i .n{font-size:12.5px;font-weight:700;color:var(--dt-text);margin-left:6px}
+.dt-desc-i .d{font-size:12px;line-height:1.55;color:var(--dt-mut);margin-top:4px;white-space:pre-wrap}
+
 /* tabs */
 .dt-tabs{position:sticky;top:0;z-index:20;background:var(--dt-bg);display:flex;gap:6px;padding:14px 0 10px;margin-top:4px}
 .dt-tab{flex:1;padding:10px 4px;border-radius:11px;border:1px solid var(--dt-line2);background:none;color:var(--dt-mut);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}

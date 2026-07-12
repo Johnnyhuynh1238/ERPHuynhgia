@@ -34,6 +34,7 @@ export type Material = {
   unitPrice: number;
   amount: number;
   note: string | null;
+  taskNote: string | null;
 };
 
 async function j<T>(res: Response): Promise<T> {

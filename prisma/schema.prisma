@@ -4140,6 +4140,7 @@ model EstimateDbMaterial {
   quantity   Decimal  @db.Decimal(14, 3)
   unitPrice  BigInt   @default(0) @map("unit_price") // đơn giá dự kiến
   note       String?  @db.Text
+  taskNote   String?  @map("task_note") @db.Text // mô tả cấp công tác (chung cho mọi VT cùng catalog_id)
   sortOrder  Int      @default(0) @map("sort_order")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
