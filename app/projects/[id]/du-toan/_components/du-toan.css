@@ -151,8 +151,9 @@
 @keyframes dt-flash{0%{background:rgba(227,97,34,.18)}100%{background:transparent}}
 
 /* AI drawer */
-.dt-ai-scrim{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:flex-end;background:rgba(0,0,0,.4);padding:8px}
-.dt-ai-box{display:flex;flex-direction:column;overflow:hidden;border-radius:16px;border:1px solid #334;background:#0b0d16;box-shadow:0 10px 40px rgba(0,0,0,.4);width:min(440px,100%);height:min(680px,calc(100dvh - 24px))}
+.dt-ai-scrim{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.4)}
+.dt-ai-box{display:flex;flex-direction:column;overflow:hidden;border-radius:16px 16px 0 0;border:1px solid #334;background:#0b0d16;box-shadow:0 -4px 30px rgba(0,0,0,.5);width:100%;max-width:480px;height:calc(100dvh - 8px);max-height:100dvh}
+@media(min-width:640px){.dt-ai-scrim{align-items:center;justify-content:flex-end;padding:12px}.dt-ai-box{width:min(440px,100%);border-radius:16px}}
 .dt-ai-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid #334;background:#12141f;padding:8px 12px}
 .dt-ai-head b{font-size:13px;color:#7aa2ff;font-weight:600}
 .dt-ai-head .x{margin-left:auto;background:none;border:none;color:#94a3b8;font-size:15px;cursor:pointer;padding:2px 8px;border-radius:6px}
