@@ -1,4 +1,4 @@
-/* Dự toán DB — UI mobile, palette terracotta/cream (scoped .dt-app). Xem mockup v5. */
+/* Dự toán DB — UI mobile full màn, palette terracotta/cream (scoped .dt-app). Xem mockup v5. */
 .dt-app{
   --dt-bg:#F5EFE1; --dt-card:#FBF7EC; --dt-text:#2E140A;
   --dt-mut:rgba(46,20,10,.55); --dt-mut2:rgba(46,20,10,.38);
@@ -6,17 +6,29 @@
   --dt-orange:#E36122; --dt-terra:#8A3D1C; --dt-gold:#B8934A; --dt-ok:#5B7A52;
   --dt-sheet:#FBF7EC;
   --dt-mono:ui-monospace,"SF Mono","IBM Plex Mono",Menlo,monospace;
-  background:var(--dt-bg); color:var(--dt-text); min-height:100dvh;
+  /* phủ toàn màn — thoát chrome tối của ProtectedLayout (nav mobile z-40) */
+  position:fixed; inset:0; z-index:50; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  background:var(--dt-bg); color:var(--dt-text);
   letter-spacing:-.006em;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
 }
+/* dark: theo hệ thống, trừ khi người dùng ép sáng */
 @media (prefers-color-scheme:dark){
-  .dt-app{
+  .dt-app:not([data-theme="light"]){
     --dt-bg:#3A1608; --dt-card:#4A1D0C; --dt-text:#F7F2E4;
     --dt-mut:rgba(247,242,228,.60); --dt-mut2:rgba(247,242,228,.40);
     --dt-line:rgba(247,242,228,.12); --dt-line2:rgba(247,242,228,.20);
     --dt-orange:#F0752F; --dt-terra:#D8996A; --dt-gold:#D8B25E; --dt-ok:#89AB78;
     --dt-sheet:#4A1D0C;
   }
+}
+/* ép thủ công qua nút toggle */
+.dt-app[data-theme="dark"]{
+  --dt-bg:#3A1608; --dt-card:#4A1D0C; --dt-text:#F7F2E4;
+  --dt-mut:rgba(247,242,228,.60); --dt-mut2:rgba(247,242,228,.40);
+  --dt-line:rgba(247,242,228,.12); --dt-line2:rgba(247,242,228,.20);
+  --dt-orange:#F0752F; --dt-terra:#D8996A; --dt-gold:#D8B25E; --dt-ok:#89AB78;
+  --dt-sheet:#4A1D0C;
 }
 .dt-app *{box-sizing:border-box}
 .dt-num{font-family:var(--dt-mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}

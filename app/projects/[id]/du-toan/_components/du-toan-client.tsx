@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, fmt, type CatalogTask, type Khoan, type Material } from "./du-toan-data";
 import "./du-toan.css";
@@ -103,6 +103,11 @@ export function DuToanClient({
   const [err, setErr] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ kind: TabKey; id: string } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const portalTarget = mounted ? rootRef.current : null;
 
   useEffect(() => {
     Promise.all([api.meta(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
@@ -212,7 +217,7 @@ export function DuToanClient({
   };
 
   return (
-    <div className="dt-app">
+    <div className="dt-app" ref={rootRef} data-theme={theme ?? undefined}>
       <div className="dt-wrap">
         <div className="dt-top">
           <Link href={`/projects/${projectId}`} className="dt-back">
@@ -221,6 +226,14 @@ export function DuToanClient({
           <div className="dt-acts">
             <button type="button" className="dt-ibtn ai" onClick={() => setAiOpen(true)}>
               🤖 AI bóc vật tư
+            </button>
+            <button
+              type="button"
+              className="dt-ibtn"
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              aria-label="Đổi sáng/tối"
+            >
+              {theme === "dark" ? "☀" : "☾"}
             </button>
           </div>
         </div>
@@ -302,7 +315,7 @@ export function DuToanClient({
 
       {/* SHEET */}
       {sheet &&
-        typeof document !== "undefined" &&
+        portalTarget &&
         createPortal(
           <>
             <div className="dt-scrim show" onClick={() => setSheet(null)} />
@@ -331,12 +344,12 @@ export function DuToanClient({
               )}
             </div>
           </>,
-          document.body,
+          portalTarget,
         )}
 
       {/* AI drawer */}
       {aiOpen &&
-        typeof document !== "undefined" &&
+        portalTarget &&
         createPortal(
           <div className="dt-ai-scrim" onClick={() => setAiOpen(false)}>
             <div className="dt-ai-box" onClick={(e) => e.stopPropagation()}>
@@ -352,7 +365,7 @@ export function DuToanClient({
               />
             </div>
           </div>,
-          document.body,
+          portalTarget,
         )}
     </div>
   );
