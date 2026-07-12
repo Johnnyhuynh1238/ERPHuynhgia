@@ -73,15 +73,22 @@ type CtGroup = {
   mats: Material[];
   value: number;
 };
-type VtGroup = {
+// 1 vật tư (gộp theo tên+đơn vị) — nằm bên trong 1 chủng loại
+type VtItem = {
   key: string;
   name: string;
   unit: string;
-  categoryName: string | null;
   qty: number;
   amount: number;
-  members: Material[];
+  members: Material[]; // các lần xuất hiện ở nhiều công tác
   uniformPrice: number | null;
+};
+// 1 chủng loại = 1 hàng ở tab Vật tư
+type VtGroup = {
+  key: string;
+  categoryName: string | null;
+  amount: number;
+  items: VtItem[];
 };
 
 export function DuToanClient({
@@ -162,31 +169,38 @@ export function DuToanClient({
 
   // gộp theo vật tư (tên + đvt)
   const vtGroups = useMemo<VtGroup[]>(() => {
-    const map = new Map<string, VtGroup>();
+    // 2 tầng: chủng loại → vật tư (tên+đơn vị)
+    const cats = new Map<string, VtGroup>();
+    const itemMaps = new Map<string, Map<string, VtItem>>();
     for (const m of materials) {
-      const key = `${m.name.toLowerCase()}|${m.unit.toLowerCase()}`;
-      let g = map.get(key);
-      if (!g) {
-        g = {
-          key,
-          name: m.name,
-          unit: m.unit,
-          categoryName: m.categoryName,
-          qty: 0,
-          amount: 0,
-          members: [],
-          uniformPrice: null,
-        };
-        map.set(key, g);
+      const catName = m.categoryName ?? null;
+      const catKey = (catName ?? "__none").toLowerCase();
+      let cg = cats.get(catKey);
+      if (!cg) {
+        cg = { key: catKey, categoryName: catName, amount: 0, items: [] };
+        cats.set(catKey, cg);
+        itemMaps.set(catKey, new Map());
       }
-      g.qty += m.quantity;
-      g.amount += amountOf(m);
-      g.members.push(m);
+      const im = itemMaps.get(catKey)!;
+      const itemKey = `${m.name.toLowerCase()}|${m.unit.toLowerCase()}`;
+      let it = im.get(itemKey);
+      if (!it) {
+        it = { key: itemKey, name: m.name, unit: m.unit, qty: 0, amount: 0, members: [], uniformPrice: null };
+        im.set(itemKey, it);
+        cg.items.push(it);
+      }
+      it.qty += m.quantity;
+      it.amount += amountOf(m);
+      it.members.push(m);
+      cg.amount += amountOf(m);
     }
-    const arr = Array.from(map.values());
-    for (const g of arr) {
-      const prices = new Set(g.members.map((x) => x.unitPrice));
-      g.uniformPrice = prices.size === 1 ? g.members[0].unitPrice : null;
+    const arr = Array.from(cats.values());
+    for (const cg of arr) {
+      for (const it of cg.items) {
+        const prices = new Set(it.members.map((x) => x.unitPrice));
+        it.uniformPrice = prices.size === 1 ? it.members[0].unitPrice : null;
+      }
+      cg.items.sort((a, b) => b.amount - a.amount);
     }
     return arr.sort((a, b) => b.amount - a.amount);
   }, [materials]);
@@ -444,49 +458,26 @@ function VatTuPanel({
   onOpen: (id: string) => void;
 }) {
   if (groups.length === 0) return <div className="dt-empty">Chưa có vật tư. Dùng 🤖 AI để bóc vật tư.</div>;
-  // giữ thứ tự theo tiền nhưng nhóm nhãn chủng loại
-  const catTotal = new Map<string, number>();
-  for (const g of groups) {
-    const c = g.categoryName ?? "Chưa phân loại";
-    catTotal.set(c, (catTotal.get(c) ?? 0) + g.amount);
-  }
-  let lastCat = "";
   return (
     <div>
       {groups.map((g) => {
-        const cat = g.categoryName ?? "Chưa phân loại";
-        const header =
-          cat !== lastCat ? (
-            <div className="dt-phead" key={"h-" + cat}>
-              <span className="pn" style={{ flex: 1 }}>
-                {cat}
-              </span>
-              <span className="pt dt-num">{fmt(catTotal.get(cat) ?? 0)}</span>
-            </div>
-          ) : null;
-        lastCat = cat;
+        const cta = new Set<string>();
+        g.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
         return (
-          <div key={g.key}>
-            {header}
-            <button className="dt-row" onClick={() => onOpen(g.key)}>
-              <span className="swatch" style={{ background: swatchOf(g.categoryName) }} />
-              <span className="rb">
-                <span className="r1">
-                  <span className="rn">{g.name}</span>
-                  <span className="rav dt-num">{fmt(g.amount)}</span>
-                </span>
-                <span className="r2">
-                  <span className="rs">
-                    {qfmt(g.qty, g.unit)} · {g.members.length} công tác
-                  </span>
-                  <span className="rau">
-                    {g.uniformPrice != null ? `${fmt(g.uniformPrice)} đ/${g.unit}` : "nhiều giá"}
-                  </span>
-                </span>
+          <button className="dt-row" key={g.key} onClick={() => onOpen(g.key)}>
+            <span className="swatch" style={{ background: swatchOf(g.categoryName) }} />
+            <span className="rb">
+              <span className="r1">
+                <span className="rn">{g.categoryName ?? "Chưa phân loại"}</span>
+                <span className="rav dt-num">{fmt(g.amount)}</span>
               </span>
-              <span className="chev">›</span>
-            </button>
-          </div>
+              <span className="r2">
+                <span className="rs">{g.items.length} vật tư</span>
+                <span className="rau">{cta.size} công tác</span>
+              </span>
+            </span>
+            <span className="chev">›</span>
+          </button>
         );
       })}
       <div className="dt-gstrip">
@@ -643,55 +634,58 @@ function VtSheet({
   onSavePrice: (id: string, price: number) => void;
 }) {
   if (!group) return <SheetHead eye="Vật tư" title="—" onClose={onClose} />;
-  const tot = group.members.reduce((s, m) => s + amountOf(m), 0);
-  const tq = group.members.reduce((s, m) => s + m.quantity, 0);
+  const tot = group.amount;
+  const cta = new Set<string>();
+  group.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
   return (
     <>
-      <SheetHead eye={`Vật tư${group.categoryName ? " · " + group.categoryName : ""}`} title={group.name} onClose={onClose} />
+      <SheetHead eye="Vật tư · chủng loại" title={group.categoryName ?? "Chưa phân loại"} onClose={onClose} />
       <div className="dt-sbody">
         <div className="dt-kpi">
           <div className="ki">
-            <div className="kk">Tổng SL</div>
-            <div className="kv">{qfmt(tq, group.unit)}</div>
+            <div className="kk">Số vật tư</div>
+            <div className="kv">{group.items.length}</div>
           </div>
           <div className="ki">
-            <div className="kk">Đơn giá</div>
-            <div className="kv">
-              {group.uniformPrice != null ? `${fmt(group.uniformPrice)} đ/${group.unit}` : "nhiều giá"}
-            </div>
+            <div className="kk">Công tác</div>
+            <div className="kv">{cta.size}</div>
           </div>
           <div className="ki">
             <div className="kk">Thành tiền</div>
             <div className="kv hl">{fmt(tot)}</div>
           </div>
         </div>
+        <p className="dt-ephelp">Chạm đơn giá để sửa · áp cho mọi công tác dùng vật tư đó</p>
 
-        <div className="dt-blabel">Dùng cho công tác ({group.members.length})</div>
-        <p className="dt-ephelp">Chạm đơn giá để sửa · bấm ra ngoài để lưu</p>
+        <div className="dt-blabel">Vật tư trong chủng loại ({group.items.length})</div>
         <table className="dt-t">
           <thead>
             <tr>
-              <th>Công tác · SL</th>
+              <th>Vật tư · SL</th>
               <th className="r">Đơn giá</th>
               <th className="r">Thành tiền</th>
             </tr>
           </thead>
           <tbody>
-            {group.members.map((m) => (
-              <tr key={m.id}>
-                <td>
-                  <div className="dn">{m.taskName ?? "Chưa gán công tác"}</div>
-                  <div className="dsub">
-                    {m.taskCode ? <span style={{ color: "var(--dt-terra)" }}>{m.taskCode}</span> : "—"} ·{" "}
-                    {qfmt(m.quantity, m.unit)}
-                  </div>
-                </td>
-                <td className="r">
-                  <PriceCell value={m.unitPrice} onSave={(v) => onSavePrice(m.id, v)} />
-                </td>
-                <td className="r amt">{fmt(amountOf(m))}</td>
-              </tr>
-            ))}
+            {group.items.map((it) => {
+              const shown = it.uniformPrice ?? it.members[0]?.unitPrice ?? 0;
+              const apply = (v: number) => it.members.forEach((m) => onSavePrice(m.id, v));
+              return (
+                <tr key={it.key}>
+                  <td>
+                    <div className="dn">{it.name}</div>
+                    <div className="dsub">
+                      {qfmt(it.qty, it.unit)} · {it.members.length} công tác
+                    </div>
+                  </td>
+                  <td className="r">
+                    <PriceCell value={shown} onSave={apply} />
+                    <div className="dsub">đ/{it.unit}</div>
+                  </td>
+                  <td className="r amt">{fmt(it.amount)}</td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>
