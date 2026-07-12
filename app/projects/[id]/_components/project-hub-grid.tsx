@@ -14,6 +14,7 @@ import {
   ListChecks,
   Package,
   Pencil,
+  ShoppingCart,
   ShieldCheck,
   Sunset,
   TrendingUp,
@@ -95,6 +96,9 @@ export function ProjectHubGrid({
       : []),
     ...(caps.canProposeMaterials
       ? [{ href: `${base}/material-proposals`, label: "Đề xuất vật tư", icon: Package, desc: "VT cần mua" } as HubItem]
+      : []),
+    ...(caps.isAdmin
+      ? [{ href: `${base}/mua-hang`, label: "Mua hàng", icon: ShoppingCart, desc: "Đặt VT bám dự toán" } as HubItem]
       : []),
     ...(isSelf && caps.canViewPayroll
       ? [{ href: `${base}/payroll`, label: "Lương tuần", icon: Banknote, desc: "Bonus + payslip" } as HubItem]

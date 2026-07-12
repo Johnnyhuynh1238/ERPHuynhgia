@@ -857,9 +857,9 @@ model StandardTaskCatalog {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates          TaskTemplate[]       @relation("TemplateStdCatalog")
-  tasks              Task[]               @relation("TaskStdCatalog")
-  budgetItems        ProjectBudgetItem[]
+  templates           TaskTemplate[]       @relation("TemplateStdCatalog")
+  tasks               Task[]               @relation("TaskStdCatalog")
+  budgetItems         ProjectBudgetItem[]
   estimateDbMaterials EstimateDbMaterial[]
 
   @@unique([phaseCode, taskCode])
@@ -2741,10 +2741,10 @@ model MaterialProposal {
   closedAt      DateTime?              @map("closed_at")
   closedBy      String?                @map("closed_by") @db.Uuid
 
-  ks        User                          @relation("MatProposalKs", fields: [ksId], references: [id])
-  project   Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  processor User?                         @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
-  closer    User?                         @relation("MatProposalCloser", fields: [closedBy], references: [id], onDelete: SetNull)
+  ks         User                          @relation("MatProposalKs", fields: [ksId], references: [id])
+  project    Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processor  User?                         @relation("MatProposalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
+  closer     User?                         @relation("MatProposalCloser", fields: [closedBy], references: [id], onDelete: SetNull)
   comments   MaterialProposalComment[]
   receipts   MaterialProposalItemReceipt[]
   debts      MaterialProposalItemDebt[]
@@ -2823,14 +2823,14 @@ model MaterialProposalItemDebt {
 // Mỗi đợt KS Phúc nhận hàng tại công trình (nhận nhiều đợt cho 1 đơn PO).
 // Bắt buộc ảnh phiếu giao hàng NCC + ảnh hàng hoá thực tế cho từng đợt.
 model MaterialProposalDelivery {
-  id             String   @id @default(uuid()) @db.Uuid
-  proposalId     String   @map("proposal_id") @db.Uuid
-  deliveredAt    DateTime @default(now()) @map("delivered_at")
-  receivedBy     String   @map("received_by") @db.Uuid
-  invoicePhotos  Json     @default("[]") @map("invoice_photos") // ảnh phiếu giao hàng NCC (>=1)
-  goodsPhotos    Json     @default("[]") @map("goods_photos")   // ảnh hàng hoá thực tế (>=1)
-  itemsSnapshot  Json     @default("[]") @map("items_snapshot") // [{itemSeq, qty}] số nhận đợt này
-  note           String?  @db.Text
+  id            String   @id @default(uuid()) @db.Uuid
+  proposalId    String   @map("proposal_id") @db.Uuid
+  deliveredAt   DateTime @default(now()) @map("delivered_at")
+  receivedBy    String   @map("received_by") @db.Uuid
+  invoicePhotos Json     @default("[]") @map("invoice_photos") // ảnh phiếu giao hàng NCC (>=1)
+  goodsPhotos   Json     @default("[]") @map("goods_photos") // ảnh hàng hoá thực tế (>=1)
+  itemsSnapshot Json     @default("[]") @map("items_snapshot") // [{itemSeq, qty}] số nhận đợt này
+  note          String?  @db.Text
 
   proposal MaterialProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   receiver User             @relation("MatProposalDeliveryReceiver", fields: [receivedBy], references: [id])
@@ -2849,13 +2849,13 @@ enum SupplierPaymentOrderStatus {
 }
 
 model SupplierPaymentOrder {
-  id            String                    @id @default(uuid()) @db.Uuid
-  code          String                    @unique
-  supplierId    String                    @map("supplier_id") @db.Uuid
-  totalAmount   Decimal                   @map("total_amount") @db.Decimal(18, 2)
+  id            String                     @id @default(uuid()) @db.Uuid
+  code          String                     @unique
+  supplierId    String                     @map("supplier_id") @db.Uuid
+  totalAmount   Decimal                    @map("total_amount") @db.Decimal(18, 2)
   status        SupplierPaymentOrderStatus @default(pending)
-  paymentMethod String?                   @map("payment_method")
-  note          String?                   @db.Text
+  paymentMethod String?                    @map("payment_method")
+  note          String?                    @db.Text
 
   createdBy String   @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
@@ -2874,12 +2874,12 @@ model SupplierPaymentOrder {
 
   cancelledAt DateTime? @map("cancelled_at")
 
-  supplier Supplier                    @relation(fields: [supplierId], references: [id])
-  account  CashAccount?                @relation("SupplierPayOrderAccount", fields: [accountId], references: [id])
-  creator  User                        @relation("SupplierPayOrderCreator", fields: [createdBy], references: [id])
-  approver User?                       @relation("SupplierPayOrderApprover", fields: [approvedBy], references: [id])
-  rejecter User?                       @relation("SupplierPayOrderRejecter", fields: [rejectedBy], references: [id])
-  payer    User?                       @relation("SupplierPayOrderPayer", fields: [paidBy], references: [id])
+  supplier Supplier                   @relation(fields: [supplierId], references: [id])
+  account  CashAccount?               @relation("SupplierPayOrderAccount", fields: [accountId], references: [id])
+  creator  User                       @relation("SupplierPayOrderCreator", fields: [createdBy], references: [id])
+  approver User?                      @relation("SupplierPayOrderApprover", fields: [approvedBy], references: [id])
+  rejecter User?                      @relation("SupplierPayOrderRejecter", fields: [rejectedBy], references: [id])
+  payer    User?                      @relation("SupplierPayOrderPayer", fields: [paidBy], references: [id])
   items    SupplierPaymentOrderItem[]
 
   @@index([supplierId, status])
@@ -3311,8 +3311,8 @@ model MaterialPrice {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  estimateLines EstimateLine[] @relation("LineMaterial")
-  steelLines    EstimateLine[] @relation("LineSteel")
+  estimateLines EstimateLine[]        @relation("LineMaterial")
+  steelLines    EstimateLine[]        @relation("LineSteel")
   estimateMaps  EstimateMaterialMap[]
 
   @@unique([name, unit])
@@ -3865,20 +3865,20 @@ model CashTransaction {
 // Nhật ký thi công của KS PM cho dự án sub-contract.
 // Mỗi (project, ks, entryDate) chỉ có 1 entry — KS sửa lại tự nó được.
 model ConstructionDiary {
-  id          String   @id @default(uuid()) @db.Uuid
-  projectId   String   @map("project_id") @db.Uuid
-  ksId        String   @map("ks_id") @db.Uuid
-  entryDate   DateTime @map("entry_date") @db.Date
-  workerCount Int      @default(0) @map("worker_count")
-  tasksDone   String   @default("") @map("tasks_done") @db.Text
-  issues      String?  @db.Text
-  taskPhotos  Json     @default("[]") @map("task_photos") // mảng {key, contentType, width, height}
-  sitePhotos  Json     @default("[]") @map("site_photos")
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  ksId         String    @map("ks_id") @db.Uuid
+  entryDate    DateTime  @map("entry_date") @db.Date
+  workerCount  Int       @default(0) @map("worker_count")
+  tasksDone    String    @default("") @map("tasks_done") @db.Text
+  issues       String?   @db.Text
+  taskPhotos   Json      @default("[]") @map("task_photos") // mảng {key, contentType, width, height}
+  sitePhotos   Json      @default("[]") @map("site_photos")
   savedAt      DateTime? @map("saved_at")
   approvedAt   DateTime? @map("approved_at")
   approvedById String?   @map("approved_by") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   ks         User    @relation("ConstructionDiaryKs", fields: [ksId], references: [id])
@@ -3966,16 +3966,16 @@ model EstimateItem {
   drawings     Json               @default("[]") @db.JsonB // [{url, name}] ảnh bản vẽ; tương lai thêm JSON app vẽ
   // Form mẫu chuẩn (lib/estimate-templates.ts): templateKey chọn mẫu, formData là câu trả lời;
   // lưu form → renderFormText() sinh text vào 3 cột method/materialSpec/dimensions cho AI đọc.
-  templateKey String? @map("template_key") @db.VarChar(32)
-  formData    Json    @default("{}") @map("form_data") @db.JsonB
+  templateKey  String?            @map("template_key") @db.VarChar(32)
+  formData     Json               @default("{}") @map("form_data") @db.JsonB
   status       EstimateItemStatus @default(draft)
   // Q&A stateless: mỗi vòng AI hỏi/admin trả lời là 1 phần tử — session mới đọc lại đủ lịch sử
-  qaThread   Json      @default("[]") @map("qa_thread") @db.JsonB // [{q, a?, askedAt, answeredAt?}]
-  fields     Json      @default("[]") @db.JsonB // thông tin riêng: [{label, value}] — ô text tự do từng dòng
-  analyzedAt DateTime? @map("analyzed_at")
-  sortOrder  Int       @default(0) @map("sort_order")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  qaThread     Json               @default("[]") @map("qa_thread") @db.JsonB // [{q, a?, askedAt, answeredAt?}]
+  fields       Json               @default("[]") @db.JsonB // thông tin riêng: [{label, value}] — ô text tự do từng dòng
+  analyzedAt   DateTime?          @map("analyzed_at")
+  sortOrder    Int                @default(0) @map("sort_order")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
 
   group EstimateGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   lines EstimateLine[]
@@ -3987,40 +3987,40 @@ model EstimateItem {
 
 // Công tác AI bóc ra từ hạng mục — tab Khối lượng. Hao phí VT/NC/MM = quantity × Norm items (tính runtime).
 model EstimateLine {
-  id         String             @id @default(uuid()) @db.Uuid
-  itemId     String             @map("item_id") @db.Uuid
+  id              String             @id @default(uuid()) @db.Uuid
+  itemId          String             @map("item_id") @db.Uuid
   // Phân loại dòng (màn Dự toán rút gọn, không auto):
   //   kl    = công tác khối lượng (bóc tay)
   //   vt    = vật tư con của 1 công tác (parentLineId trỏ về công tác), giá mua dự kiến = directUnitPrice
   //   khoan = dòng khoán (khoanGroup = nc | khac), đơn giá = directUnitPrice
-  section     String  @default("kl") @db.VarChar(8)
-  parentLineId String? @map("parent_line_id") @db.Uuid // VT con → công tác kl
-  khoanGroup   String? @map("khoan_group") @db.VarChar(8) // nc | khac (chỉ dòng khoán)
-  normCode   String?            @map("norm_code") @db.VarChar(32) // null = công tác ngoài định mức (lump-sum/ME)
+  section         String             @default("kl") @db.VarChar(8)
+  parentLineId    String?            @map("parent_line_id") @db.Uuid // VT con → công tác kl
+  khoanGroup      String?            @map("khoan_group") @db.VarChar(8) // nc | khac (chỉ dòng khoán)
+  normCode        String?            @map("norm_code") @db.VarChar(32) // null = công tác ngoài định mức (lump-sum/ME)
   // Line vật tư mua thẳng NCC không qua định mức (thép bóc chi tiết từng loại D…):
   // quantity theo đơn vị bán NCC, thành tiền VT = quantity × giá NCC.
-  materialPriceId String? @map("material_price_id") @db.Uuid
+  materialPriceId String?            @map("material_price_id") @db.Uuid
   // Line trọn gói (cửa nhôm/nhựa… mua 1 lần, ngoài định mức, không map NCC):
   // nhập giá thẳng trên tab Hao phí, thành tiền VT = quantity × directUnitPrice.
-  directUnitPrice BigInt? @map("direct_unit_price")
+  directUnitPrice BigInt?            @map("direct_unit_price")
   // Line cốt thép bóc theo cây/Ø: quantity theo cây (Ø≥10) hoặc kg (Ø<10);
   // normCode = mã định mức tấn (auto-map) chỉ dùng cho NC + máy + dây/que hàn;
   // thép chính mua riêng theo cây, giá theo steelPrice (hàng NCC).
-  steelDia     Int?     @map("steel_dia")
-  steelBarLen  Decimal? @map("steel_bar_len") @db.Decimal(6, 2)
-  steelPriceId String?  @map("steel_price_id") @db.Uuid
-  name       String // tên công tác (theo Norm hoặc AI đặt)
-  unit       String             @db.VarChar(20)
-  formula    String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
-  quantity   Decimal            @db.Decimal(14, 3)
-  status     EstimateLineStatus @default(ai_draft)
-  aiQuestion String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này (AI hỏi)
-  aiAnswer   String?            @map("ai_answer") @db.Text // admin trả lời câu hỏi của công tác này (worker đọc rồi clear)
-  fixRequest String?            @map("fix_request") @db.Text // admin yêu cầu AI sửa lại công tác này (clear sau khi AI sửa xong)
-  note       String?            @db.Text
-  sortOrder  Int                @default(0) @map("sort_order")
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
+  steelDia        Int?               @map("steel_dia")
+  steelBarLen     Decimal?           @map("steel_bar_len") @db.Decimal(6, 2)
+  steelPriceId    String?            @map("steel_price_id") @db.Uuid
+  name            String // tên công tác (theo Norm hoặc AI đặt)
+  unit            String             @db.VarChar(20)
+  formula         String?            @db.Text // diễn giải: (1.2×1.2×0.3)×8 hố = 3.46
+  quantity        Decimal            @db.Decimal(14, 3)
+  status          EstimateLineStatus @default(ai_draft)
+  aiQuestion      String?            @map("ai_question") @db.Text // câu hỏi riêng của công tác này (AI hỏi)
+  aiAnswer        String?            @map("ai_answer") @db.Text // admin trả lời câu hỏi của công tác này (worker đọc rồi clear)
+  fixRequest      String?            @map("fix_request") @db.Text // admin yêu cầu AI sửa lại công tác này (clear sau khi AI sửa xong)
+  note            String?            @db.Text
+  sortOrder       Int                @default(0) @map("sort_order")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
   item          EstimateItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   norm          Norm?          @relation(fields: [normCode], references: [code], onDelete: SetNull)
@@ -4152,4 +4152,38 @@ model EstimateDbMaterial {
   @@index([projectId, catalogId])
   @@index([projectId, categoryId])
   @@map("estimate_db_materials")
+}
+
+// ── Module MUA HÀNG (đơn đặt VT bám dự toán) ──────────────────────────
+// Độc lập material_proposals. Chỉ tái dùng "phụ kiện" cũ (Supplier, quỹ) qua id scalar,
+// KHÔNG khai @relation để không phải sửa Project/Supplier/User.
+enum MhOrderStatus {
+  draft // nháp
+  ordered // đã đặt NCC
+  received // đã nhận
+  paid // đã thanh toán
+}
+
+// 1 đơn = 1 lần đặt hàng. items là snapshot VT lấy từ dự toán khi tạo (SL khoá).
+// item shape: { key, name, unit, qty, price } — key = "<tên gốc>|<đơn vị>".
+model MhOrder {
+  id           String        @id @default(uuid()) @db.Uuid
+  projectId    String        @map("project_id") @db.Uuid
+  seq          Int // số đơn hiển thị, tăng dần trong 1 dự án
+  status       MhOrderStatus @default(ordered)
+  supplierId   String?       @map("supplier_id") @db.Uuid // tái dùng Supplier (tuỳ chọn)
+  supplierName String?       @map("supplier_name") // tên NCC tự do nếu chưa có trong bảng
+  orderDate    DateTime      @default(now()) @map("order_date")
+  deliveryDate DateTime?     @map("delivery_date") @db.Date
+  note         String?       @db.Text
+  total        Decimal       @default(0) @db.Decimal(18, 2)
+  items        Json          @default("[]")
+  createdBy    String        @map("created_by") @db.Uuid
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@unique([projectId, seq])
+  @@index([projectId, status])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("mh_orders")
 }
