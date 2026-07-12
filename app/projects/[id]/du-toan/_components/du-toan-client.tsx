@@ -683,8 +683,10 @@ function VtSheet({
             <div className="kv">{qfmt(tq, group.unit)}</div>
           </div>
           <div className="ki">
-            <div className="kk">Số công tác</div>
-            <div className="kv">{group.members.length}</div>
+            <div className="kk">Đơn giá</div>
+            <div className="kv">
+              {group.uniformPrice != null ? `${fmt(group.uniformPrice)} đ/${group.unit}` : "nhiều giá"}
+            </div>
           </div>
           <div className="ki">
             <div className="kk">Thành tiền</div>
