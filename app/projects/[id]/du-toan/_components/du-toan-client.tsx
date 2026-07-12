@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, fmt, type CatalogTask, type Khoan, type Material } from "./du-toan-data";
 import "./du-toan.css";
@@ -104,10 +104,6 @@ export function DuToanClient({
   const [sheet, setSheet] = useState<{ kind: TabKey; id: string } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const portalTarget = mounted ? rootRef.current : null;
 
   useEffect(() => {
     Promise.all([api.meta(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
@@ -217,7 +213,7 @@ export function DuToanClient({
   };
 
   return (
-    <div className="dt-app" ref={rootRef} data-theme={theme ?? undefined}>
+    <div className="dt-app" data-theme={theme ?? undefined}>
       <div className="dt-wrap">
         <div className="dt-top">
           <Link href={`/projects/${projectId}`} className="dt-back">
@@ -315,9 +311,9 @@ export function DuToanClient({
 
       {/* SHEET */}
       {sheet &&
-        portalTarget &&
+        typeof document !== "undefined" &&
         createPortal(
-          <>
+          <div className="dt-portal" data-theme={theme ?? undefined}>
             <div className="dt-scrim show" onClick={() => setSheet(null)} />
             <div className="dt-sheet show" role="dialog" aria-modal="true">
               <div className="dt-grip" />
@@ -343,13 +339,13 @@ export function DuToanClient({
                 />
               )}
             </div>
-          </>,
-          portalTarget,
+          </div>,
+          document.body,
         )}
 
       {/* AI drawer */}
       {aiOpen &&
-        portalTarget &&
+        typeof document !== "undefined" &&
         createPortal(
           <div className="dt-ai-scrim" onClick={() => setAiOpen(false)}>
             <div className="dt-ai-box" onClick={(e) => e.stopPropagation()}>
@@ -365,7 +361,7 @@ export function DuToanClient({
               />
             </div>
           </div>,
-          portalTarget,
+          document.body,
         )}
     </div>
   );
