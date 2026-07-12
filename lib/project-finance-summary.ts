@@ -20,24 +20,30 @@ export type ProjectFinanceSummary = {
 };
 
 export async function getProjectFinanceSummary(projectId: string): Promise<ProjectFinanceSummary> {
-  const [project, schedules, extraReceipts, cashOut, payrolls, budget, debtRows] = await Promise.all([
-    prisma.project.findUnique({ where: { id: projectId }, select: { contractValue: true } }),
-    prisma.paymentSchedule.findMany({
-      where: { projectId },
-      select: { status: true, amount: true, actualPaidAmount: true, paidAmount: true },
-    }),
-    prisma.receipt.findMany({
-      where: { projectId, status: "received", source: "customer", paymentScheduleId: null },
-      select: { receivedAmount: true, amount: true },
-    }),
-    prisma.cashTransaction.findMany({ where: { projectId, direction: "out" }, select: { amount: true } }),
-    prisma.weeklyPayroll.findMany({ where: { projectId, status: "paid" }, select: { totalPayable: true } }),
-    prisma.projectBudget.findUnique({ where: { projectId }, select: { totalAmount: true } }),
-    // Nợ NCC còn lại (cộng dồn theo dự án): SUM(nợ − đã trả), sàn 0 mỗi NCC.
-    prisma.$queryRaw<{ con_lai: number }[]>`
-      SELECT COALESCE(SUM(con_lai), 0)::float8 AS con_lai
-      FROM ncc_cong_no_du_an WHERE project_id = ${projectId}::uuid`,
-  ]);
+  const [project, schedules, extraReceipts, cashOut, payrolls, khoanAgg, matRows, debtRows] =
+    await Promise.all([
+      prisma.project.findUnique({ where: { id: projectId }, select: { contractValue: true } }),
+      prisma.paymentSchedule.findMany({
+        where: { projectId },
+        select: { status: true, amount: true, actualPaidAmount: true, paidAmount: true },
+      }),
+      prisma.receipt.findMany({
+        where: { projectId, status: "received", source: "customer", paymentScheduleId: null },
+        select: { receivedAmount: true, amount: true },
+      }),
+      prisma.cashTransaction.findMany({ where: { projectId, direction: "out" }, select: { amount: true } }),
+      prisma.weeklyPayroll.findMany({ where: { projectId, status: "paid" }, select: { totalPayable: true } }),
+      // Dự toán mới (app /du-toan) — bảng 1: khoán trọn gói, tổng = SUM(value).
+      prisma.estimateDbKhoan.aggregate({ where: { projectId }, _sum: { value: true } }),
+      // Dự toán mới — bảng 2: vật tư, thành tiền = quantity × unit_price (tính runtime).
+      prisma.$queryRaw<{ total: number }[]>`
+        SELECT COALESCE(SUM(quantity * unit_price), 0)::float8 AS total
+        FROM estimate_db_materials WHERE project_id = ${projectId}::uuid`,
+      // Nợ NCC còn lại (cộng dồn theo dự án): SUM(nợ − đã trả), sàn 0 mỗi NCC.
+      prisma.$queryRaw<{ con_lai: number }[]>`
+        SELECT COALESCE(SUM(con_lai), 0)::float8 AS con_lai
+        FROM ncc_cong_no_du_an WHERE project_id = ${projectId}::uuid`,
+    ]);
 
   const contractValue = Number(project?.contractValue ?? 0);
 
@@ -56,7 +62,11 @@ export async function getProjectFinanceSummary(projectId: string): Promise<Proje
   const supplierDebt = Number(debtRows[0]?.con_lai ?? 0);
   const incurred = spent + supplierDebt;
 
-  const budgetTotal = budget && Number(budget.totalAmount) > 0 ? Number(budget.totalAmount) : null;
+  // Tổng dự toán: chỉ lấy từ app /du-toan mới (khoán trọn gói + vật tư). Trống → null ("—").
+  const duToanKhoan = Number(khoanAgg._sum.value ?? 0);
+  const duToanMaterial = Number(matRows[0]?.total ?? 0);
+  const duToanNew = duToanKhoan + duToanMaterial;
+  const budgetTotal = duToanNew > 0 ? duToanNew : null;
   const remainingToSpend = budgetTotal != null ? budgetTotal - incurred : null;
 
   const collectedPct = contractValue > 0 ? Math.min(100, Math.round((collected / contractValue) * 1000) / 10) : 0;
