@@ -485,14 +485,14 @@ export function ExpensesClient({
         mounted &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-3"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 sm:items-center sm:p-3"
             style={{ height: "100dvh" }}
             onClick={() => setAiOpen(false)}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="flex flex-col overflow-hidden rounded-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl"
-              style={{ width: "min(420px, 100%)", height: "min(640px, calc(100dvh - 24px))" }}
+              className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl sm:w-auto sm:rounded-2xl"
+              style={{ width: "min(480px, 100%)", height: "calc(100dvh - 8px)", maxHeight: "100dvh" }}
             >
               <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#7aa2ff]"><Sparkles className="h-4 w-4" /> AI Thu-Chi</span>
