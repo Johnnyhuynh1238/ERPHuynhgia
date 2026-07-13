@@ -1,6 +1,7 @@
 "use client";
 
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./mua-hang.css";
 
@@ -290,6 +291,9 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
             </div>
           </div>
           <div className="topacts">
+            <Link href={`/projects/${projectId}`} className="mhback">
+              ← Dự án
+            </Link>
             <button type="button" className="iconbtn ai" onClick={() => setAiOpen(true)} title="AI quản lý đơn hàng">
               🤖
             </button>
