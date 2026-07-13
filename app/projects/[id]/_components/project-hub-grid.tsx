@@ -17,7 +17,7 @@ import {
   ShoppingCart,
   ShieldCheck,
   Sunset,
-  TrendingUp,
+  Wallet,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -88,8 +88,8 @@ export function ProjectHubGrid({
   ];
 
   const finance: HubItem[] = [
-    ...(caps.canViewFinance
-      ? [{ href: `${base}/finance`, label: "Tài chính", icon: TrendingUp, desc: "Thu · chi · công nợ" } as HubItem]
+    ...(caps.isAdmin
+      ? [{ href: `${base}/cong-no`, label: "Công nợ NCC", icon: Wallet, desc: "Nợ · trả · còn lại" } as HubItem]
       : []),
     ...(caps.canViewPayments
       ? [{ href: `${base}/payments`, label: "Lịch thanh toán", icon: CreditCard, desc: "Đợt thu HĐ" } as HubItem]

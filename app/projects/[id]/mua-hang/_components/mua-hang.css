@@ -179,6 +179,8 @@
 .mhdoc .chip.draft { color: var(--mut); }
 .mhdoc .chip.ordered { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, transparent); }
 .mhdoc .chip.received { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 40%, transparent); }
+.mhdoc .chip.debt { color: var(--terra); border-color: color-mix(in srgb, var(--terra) 45%, transparent); }
+.mhdoc .chip.await { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
 .mhdoc .chip.paid { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 
 /* ---- toast ---- */

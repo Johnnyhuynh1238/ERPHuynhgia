@@ -53,6 +53,28 @@ const STATUS: { k: Order["status"]; l: string }[] = [
 ];
 const stLabel = (k: string) => STATUS.find((s) => s.k === k)?.l || "Đã đặt NCC";
 
+// Badge suy từ (status + có NCC hay không). received khác nghĩa tuỳ có công nợ.
+const stBadge = (
+  status: string,
+  supplierName: string | null,
+): { label: string; cls: string } => {
+  const hasNcc = !!(supplierName && supplierName.trim());
+  switch (status) {
+    case "draft":
+      return { label: "Nháp", cls: "draft" };
+    case "ordered":
+      return { label: "Đã đặt", cls: "ordered" };
+    case "received":
+      return hasNcc
+        ? { label: "Đã ghi công nợ", cls: "debt" }
+        : { label: "Chờ thanh toán", cls: "await" };
+    case "paid":
+      return { label: "Đã thanh toán", cls: "paid" };
+    default:
+      return { label: stLabel(status), cls: "ordered" };
+  }
+};
+
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
 const fmtQ = (n: number) =>
   Math.abs(n - Math.round(n)) < 1e-9
@@ -264,7 +286,7 @@ td.c,th.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabu
     )}</div>
 <div style="text-align:right"><b>Số PO:</b> #${o.seq}<br><b>Ngày đặt:</b> ${fmtDate(o.orderDate)}<br><b>Ngày nhận:</b> ${
       fmtDate(o.deliveryDate) || "................"
-    }<br><b>Trạng thái:</b> ${stLabel(o.status)}</div></div>
+    }<br><b>Trạng thái:</b> ${stBadge(o.status, o.supplierName).label}</div></div>
 <table><thead><tr><th class="c">STT</th><th>Vật tư</th><th class="c">ĐVT</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr></thead>
 <tbody>${rows}</tbody>
 <tfoot><tr><td colspan="5" class="r">TỔNG CỘNG</td><td class="r">${fmt(o.total)}</td></tr></tfoot></table>
@@ -565,7 +587,10 @@ function OrdersList({
         <div key={o.id} className="ord-card" onClick={() => onEdit(o)}>
           <div className="oh">
             <span className="on">Đơn #{o.seq}</span>
-            <span className={`chip ${o.status}`}>{stLabel(o.status)}</span>
+            {(() => {
+              const b = stBadge(o.status, o.supplierName);
+              return <span className={`chip ${b.cls}`}>{b.label}</span>;
+            })()}
           </div>
           <div className="sup">
             {o.supplierName || "Chưa gán NCC"} · {fmtDate(o.orderDate)}

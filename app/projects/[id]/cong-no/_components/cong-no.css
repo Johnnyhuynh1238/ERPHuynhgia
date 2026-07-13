@@ -1,0 +1,225 @@
+/* ============================================================
+   Công nợ NCC — Design system Huỳnh Gia (ngà/mahogany, IBM Plex).
+   Scope .cndoc. Copy theme mua-hang + popup NCC giữa màn.
+   ============================================================ */
+
+.cndoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b4472a;
+  --sheet: #fbf7ec;
+
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  color-scheme: light;
+}
+.cndoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --red: #e08a6a;
+  --sheet: #4a1d0c;
+}
+
+.cndoc * { box-sizing: border-box; }
+.cndoc .num { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.cndoc .wrap { max-width: 560px; margin: 0 auto; padding: 0 clamp(14px, 4.5vw, 20px); }
+
+/* ---- topbar ---- */
+.cndoc .topbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 12px; }
+.cndoc .brand { display: flex; align-items: center; gap: 9px; }
+.cndoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: -0.02em; }
+.cndoc .brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.cndoc .brand span { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.cndoc .topacts { display: flex; align-items: center; gap: 8px; }
+.cndoc .cnback { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.cndoc .cnback:active { transform: scale(0.96); }
+.cndoc .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 15px; display: grid; place-items: center; line-height: 1; }
+.cndoc .iconbtn:active { transform: scale(0.94); }
+.cndoc .iconbtn.ai { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.cndoc .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.cndoc h1 { font-size: clamp(18px, 5vw, 23px); font-weight: 600; letter-spacing: -0.022em; margin: 6px 0 6px; line-height: 1.14; }
+.cndoc .meta { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.cndoc .meta .d { color: var(--line2); }
+
+/* ---- summary 3 số ---- */
+.cndoc .sum { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 15px 13px; display: flex; gap: 0; }
+.cndoc .sum .c { flex: 1 1 0; padding-left: 11px; border-left: 1px solid var(--line); min-width: 0; }
+.cndoc .sum .c:first-child { padding-left: 0; border-left: none; }
+.cndoc .sum .k { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cndoc .sum .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: clamp(12.5px, 3.5vw, 18px); letter-spacing: -0.03em; line-height: 1.15; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cndoc .sum .v.t { color: var(--terra); }
+.cndoc .sum .v.o { color: var(--ok); }
+.cndoc .sum .v.r { color: var(--red); }
+.cndoc .sum .sp { font-size: 10px; color: var(--mut2); margin-top: 2px; }
+
+.cndoc .seclabel { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); padding: 20px 2px 4px; }
+
+/* ---- danh sách NCC ---- */
+.cndoc .nlist { padding-bottom: 10px; }
+.cndoc .nccrow { width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; margin-top: 10px; cursor: pointer; display: flex; align-items: center; gap: 12px; font-family: inherit; color: inherit; transition: border-color 0.15s; }
+.cndoc .nccrow:active { border-color: var(--line2); transform: scale(0.995); }
+.cndoc .nccrow.paidoff { opacity: 0.62; }
+.cndoc .nccrow .nl { flex: 1; min-width: 0; }
+.cndoc .nccrow .nn { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; overflow-wrap: anywhere; }
+.cndoc .nccrow .nsub { font-size: 11px; color: var(--mut); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 2px 9px; }
+.cndoc .nccrow .nr { flex: none; text-align: right; }
+.cndoc .nccrow .nr .rv { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: var(--red); letter-spacing: -0.02em; }
+.cndoc .nccrow.paidoff .nr .rv { color: var(--ok); }
+.cndoc .nccrow .nr .rk { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut2); font-weight: 600; margin-top: 1px; }
+.cndoc .nccrow .nr .chev { color: var(--mut2); font-size: 15px; }
+
+/* ---- popup NCC giữa màn ---- */
+.cndoc .npop-scrim { position: fixed; inset: 0; background: rgba(20, 8, 3, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cndoc .npop-scrim.show { opacity: 1; pointer-events: auto; }
+.cndoc .npop { width: 100%; max-width: 520px; max-height: 90dvh; background: var(--sheet); border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(20, 8, 3, 0.4); transform: scale(0.94) translateY(10px); opacity: 0; transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s; }
+.cndoc .npop-scrim.show .npop { transform: scale(1) translateY(0); opacity: 1; }
+
+.cndoc .nph { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 12px; }
+.cndoc .nph .ht { flex: 1; min-width: 0; }
+.cndoc .nph .he { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--terra); }
+.cndoc .nph .hn { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; margin-top: 3px; line-height: 1.2; overflow-wrap: anywhere; }
+.cndoc .nph .hs { font-size: 11px; color: var(--mut); margin-top: 4px; }
+.cndoc .nph .xclose { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--text); font-size: 15px; cursor: pointer; }
+
+/* 3 số trong popup */
+.cndoc .npie { display: flex; padding: 12px 18px; gap: 0; border-bottom: 1px solid var(--line); }
+.cndoc .npie .c { flex: 1 1 0; padding-left: 12px; border-left: 1px solid var(--line); min-width: 0; }
+.cndoc .npie .c:first-child { padding-left: 0; border-left: none; }
+.cndoc .npie .k { font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--mut); font-weight: 600; }
+.cndoc .npie .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; margin-top: 3px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.cndoc .npie .v.t { color: var(--terra); }
+.cndoc .npie .v.o { color: var(--ok); }
+.cndoc .npie .v.r { color: var(--red); }
+
+.cndoc .nbody { overflow-y: auto; padding: 10px 18px 16px; -webkit-overflow-scrolling: touch; }
+.cndoc .nbody .blbl { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); padding: 4px 2px 2px; }
+
+/* nút trả tiền + form */
+.cndoc .payrow { padding: 12px 18px; border-top: 1px solid var(--line); }
+.cndoc .paybtn { width: 100%; border: none; border-radius: 12px; background: var(--orange); color: #fff; font-family: inherit; font-weight: 600; font-size: 14px; padding: 12px; cursor: pointer; }
+.cndoc .paybtn:active { transform: scale(0.98); }
+.cndoc .paybtn.done { background: var(--ok); }
+.cndoc .payform { padding: 10px 0 2px; display: flex; flex-direction: column; gap: 10px; }
+.cndoc .payform .fld { margin: 0; }
+
+/* lịch sử thanh toán */
+.cndoc .payhist { margin-top: 6px; }
+.cndoc .payhist .ph { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.cndoc .payhist .ph:last-child { border-bottom: none; }
+.cndoc .payhist .phd { color: var(--mut); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 11px; flex: none; }
+.cndoc .payhist .phn { flex: 1; min-width: 0; color: var(--mut); overflow-wrap: anywhere; }
+.cndoc .payhist .phv { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ok); flex: none; }
+
+/* ---- order card (trong popup) ---- */
+.cndoc .ord-card { background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; margin-top: 9px; cursor: pointer; transition: border-color 0.15s; }
+.cndoc .ord-card:active { border-color: var(--line2); }
+.cndoc .ord-card .oh { display: flex; align-items: center; gap: 9px; }
+.cndoc .ord-card .oh .on { font-size: 13.5px; font-weight: 600; flex: 1; }
+.cndoc .ord-card .sup { font-size: 11px; color: var(--mut); margin-top: 4px; }
+.cndoc .ord-card .ov { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 14.5px; font-weight: 600; color: var(--terra); margin-top: 6px; }
+.cndoc .ord-card .ov .cnt2 { font-family: var(--font-plex-sans), sans-serif; font-size: 11px; font-weight: 600; color: var(--mut); margin-left: 8px; }
+.cndoc .ord-card .oact { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+.cndoc .linkbtn { background: none; border: 1.5px solid var(--line2); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 11px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
+.cndoc .linkbtn:active { transform: scale(0.97); }
+
+.cndoc .empty { text-align: center; color: var(--mut); font-size: 13px; padding: 40px 20px; }
+.cndoc .empty .ic { font-size: 34px; margin-bottom: 12px; opacity: 0.5; }
+.cndoc .foot { text-align: center; font-size: 10.5px; color: var(--mut2); letter-spacing: 0.05em; padding: 18px 0 8px; }
+.cndoc .load { color: var(--mut); font-size: 13px; padding: 40px 4px; text-align: center; }
+
+/* ---- status chip ---- */
+.cndoc .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--line2); white-space: nowrap; }
+.cndoc .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.9; }
+.cndoc .chip.debt { color: var(--terra); border-color: color-mix(in srgb, var(--terra) 45%, transparent); }
+.cndoc .chip.paidoff { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.cndoc .chip.await { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
+
+/* ---- toast ---- */
+.cndoc .toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(20px); z-index: 60; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; padding: 11px 18px; border-radius: 11px; opacity: 0; pointer-events: none; transition: all 0.28s; box-shadow: 0 8px 30px rgba(20, 8, 3, 0.3); max-width: 90vw; text-align: center; }
+.cndoc .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---- sheet (sửa đơn — copy mua hàng) ---- */
+.cndoc .btn { border: none; border-radius: 12px; font-family: inherit; font-weight: 600; cursor: pointer; font-size: 14px; padding: 13px 20px; background: var(--orange); color: #fff; letter-spacing: 0.01em; white-space: nowrap; }
+.cndoc .btn:active { transform: scale(0.97); }
+.cndoc .btn:disabled { opacity: 0.5; }
+.cndoc .btn.ghost { background: none; border: 1.5px solid var(--line2); color: var(--text); padding: 11px 15px; }
+.cndoc .scrim { position: fixed; inset: 0; background: rgba(20, 8, 3, 0.44); opacity: 0; pointer-events: none; transition: opacity 0.22s; z-index: 50; }
+.cndoc .scrim.show { opacity: 1; pointer-events: auto; }
+.cndoc .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 51; background: var(--sheet); border-radius: 20px 20px 0 0; max-width: 560px; margin: 0 auto; max-height: 94dvh; transform: translateY(102%); transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1); display: flex; flex-direction: column; box-shadow: 0 -8px 40px rgba(20, 8, 3, 0.25); }
+.cndoc .sheet.show { transform: translateY(0); }
+.cndoc .grip { width: 38px; height: 4px; border-radius: 3px; background: var(--line2); margin: 9px auto 2px; }
+.cndoc .shead { display: flex; align-items: flex-start; gap: 12px; padding: 8px 20px 14px; border-bottom: 1px solid var(--line); }
+.cndoc .shead .se { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--terra); }
+.cndoc .shead .st { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-top: 3px; line-height: 1.18; }
+.cndoc .xclose { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--text); font-size: 15px; cursor: pointer; flex: none; }
+.cndoc .sbody { overflow-y: auto; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+
+.cndoc .fld { margin-bottom: 14px; }
+.cndoc .fld > label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; margin-bottom: 6px; }
+.cndoc .fld input, .cndoc .fld textarea, .cndoc .fld select { width: 100%; font-family: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 10px 12px; outline: none; -webkit-appearance: none; }
+.cndoc .fld input:focus, .cndoc .fld textarea:focus, .cndoc .fld select:focus { border-color: var(--orange); }
+.cndoc .fld textarea { resize: vertical; min-height: 58px; line-height: 1.5; }
+.cndoc .fld input.mono { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.cndoc .segs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cndoc .seg { flex: 1; min-width: calc(33% - 4px); text-align: center; font-family: inherit; font-size: 12px; font-weight: 600; padding: 9px 6px; border-radius: 9px; border: 1.5px solid var(--line2); background: none; color: var(--mut); cursor: pointer; }
+.cndoc .seg.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.cndoc .row2 { display: flex; gap: 10px; }
+.cndoc .row2 .fld { flex: 1; }
+/* view read-only */
+.cndoc .vgrid { display: flex; flex-wrap: wrap; gap: 14px 12px; margin-bottom: 14px; }
+.cndoc .vf { flex: 1 1 calc(50% - 6px); min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.cndoc .vk { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; }
+.cndoc .vv { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.cndoc .vnote { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; line-height: 1.45; }
+.cndoc .vnote > div { color: var(--text); }
+.cndoc .eit.ro .epv { flex: none; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 600; color: var(--terra); white-space: nowrap; }
+
+.cndoc .eitems { margin-top: 4px; }
+.cndoc .eit { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.cndoc .eit .en { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.3; }
+.cndoc .eit .en .eq { font-size: 11px; color: var(--mut2); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; margin-top: 2px; }
+.cndoc .eit .ep { flex: none; width: 120px; }
+.cndoc .eit .ep input { width: 100%; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; text-align: right; background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; padding: 7px 9px; outline: none; color: var(--text); -webkit-appearance: none; }
+.cndoc .eit .ep input:focus { border-color: var(--orange); }
+.cndoc .etot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--gold); font-weight: 600; }
+.cndoc .etot .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--terra); }
+.cndoc .etot .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--orange); }
+.cndoc .sactions { display: flex; gap: 9px; margin-top: 18px; }
+.cndoc .sactions .btn { flex: 1; justify-content: center; }
+
+/* ---- AI drawer (portal ra body — KHÔNG scope .cndoc) ---- */
+.cn-ai-scrim { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.4); }
+.cn-ai-box { display: flex; flex-direction: column; overflow: hidden; border-radius: 16px 16px 0 0; border: 1px solid #334; background: #0b0d16; box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5); width: 100%; max-width: 480px; height: calc(100dvh - 8px); max-height: 100dvh; }
+@media (min-width: 640px) {
+  .cn-ai-scrim { align-items: center; justify-content: flex-end; padding: 12px; }
+  .cn-ai-box { width: min(440px, 100%); border-radius: 16px; height: calc(100dvh - 24px); }
+}
+.cn-ai-head { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #334; background: #12141f; padding: 8px 12px; }
+.cn-ai-head b { font-size: 13px; color: #7aa2ff; font-weight: 600; }
+.cn-ai-head .x { margin-left: auto; background: none; border: none; color: #94a3b8; font-size: 15px; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
+.cn-ai-box iframe { width: 100%; flex: 1; border: 0; }
