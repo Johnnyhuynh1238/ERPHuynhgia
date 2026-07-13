@@ -1,8 +1,11 @@
 "use client";
 
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { Sparkles } from "lucide-react";
+import "./mua-hang.css";
+
+const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 // ── kiểu dữ liệu ──────────────────────────────────────────────
 type Material = {
@@ -47,12 +50,6 @@ const STATUS: { k: Order["status"]; l: string }[] = [
   { k: "paid", l: "Đã thanh toán" },
 ];
 const stLabel = (k: string) => STATUS.find((s) => s.k === k)?.l || "Đã đặt NCC";
-const stChip: Record<string, string> = {
-  draft: "border-[#3a3f55] bg-[#22273a] text-[#9aa3c0]",
-  ordered: "border-[#f97316]/50 bg-[#f97316]/15 text-[#fb923c]",
-  received: "border-[#2d6cf6]/50 bg-[#2d6cf6]/15 text-[#7aa2ff]",
-  paid: "border-emerald-500/50 bg-emerald-500/15 text-emerald-400",
-};
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
 const fmtQ = (n: number) =>
@@ -91,9 +88,19 @@ export function MuaHangClient({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  useEffect(() => setMounted(true), []);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("muahang-theme");
+    if (saved === "dark" || saved === "light") setTheme(saved);
+  }, []);
+  const toggleTheme = () =>
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      localStorage.setItem("muahang-theme", next);
+      return next;
+    });
 
   const toast = (m: string) => {
     setToastMsg(m);
@@ -268,122 +275,144 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
     }
   };
 
-  if (loading) return <div className="p-6 text-sm text-[#8892b0]">Đang tải dự toán…</div>;
-  if (err) return <div className="p-6 text-sm text-red-400">{err}</div>;
+  const cartOn = tab === "buy" && cart.cnt > 0;
 
   return (
-    <div className="mx-auto max-w-3xl px-3 pb-28 pt-3 text-[#e6e9f5]">
-      {/* header */}
-      <div className="mb-3 flex items-center gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-lg font-bold text-[#f0f2ff]">Mua hàng</div>
-          <div className="truncate text-xs text-[#7c85a8]">{projectName} · bám dự toán</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAiOpen(true)}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-3 py-1.5 text-sm font-semibold text-[#7aa2ff] hover:bg-[#2d6cf6]/25"
-          title="AI quản lý đơn mua hàng"
-        >
-          <Sparkles className="h-4 w-4" /> AI đơn
-        </button>
-      </div>
-
-      {/* summary */}
-      <div className="mb-3 grid grid-cols-3 gap-2">
-        <Stat label={`${groups.length} chủng loại`} value={`${fmt(summary.tot)} đ`} sub="Dự toán VT" />
-        <Stat label={`${summary.pct}% dự toán`} value={`${fmt(summary.pl)} đ`} sub="Đã đặt" accent />
-        <Stat label={`${orders.length} đơn`} value={`${fmt(summary.remain)} đ`} sub="Còn lại" />
-      </div>
-
-      {/* tabs */}
-      <div className="mb-3 flex gap-1 rounded-xl border border-[#252840] bg-[#13151f] p-1">
-        {(["buy", "orders"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-              tab === t ? "bg-[#f97316]/20 text-[#fb923c]" : "text-[#7c85a8] hover:text-[#e6e9f5]"
-            }`}
-          >
-            {t === "buy" ? "Mua hàng" : `Đơn đã tạo (${orders.length})`}
-          </button>
-        ))}
-      </div>
-
-      {tab === "buy" ? (
-        <BuyList
-          groups={groups}
-          phaseNames={phaseNames}
-          placed={placed}
-          pending={pending}
-          open={open}
-          setOpen={setOpen}
-          setQty={setQty}
-        />
-      ) : (
-        <OrdersList orders={orders} onEdit={setEditing} onDel={delOrder} onPO={downloadPO} />
-      )}
-
-      {/* cart nổi */}
-      {tab === "buy" && cart.cnt > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#252840] bg-[#0d0f18]/95 px-3 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setPending({})}
-              className="rounded-lg border border-[#2b3048] px-3 py-2 text-sm text-[#9aa3c0] hover:bg-[#1a1d2e]"
-            >
-              Xoá
-            </button>
-            <div className="text-sm text-[#9aa3c0]">
-              <b className="text-[#f0f2ff]">{cart.cnt}</b> VT · ~
-              <b className="text-[#fb923c]"> {fmt(cart.sum)} đ</b>
+    <div className={`mhdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="wrap">
+        {/* topbar */}
+        <div className="topbar">
+          <div className="brand">
+            <div className="mark">H6</div>
+            <div>
+              <b>HUỲNH GIA</b>
+              <span>Mua hàng</span>
             </div>
-            <button
-              type="button"
-              onClick={createOrder}
-              className="ml-auto rounded-lg bg-[#f97316] px-5 py-2 text-sm font-bold text-white hover:bg-[#ea6a0e]"
-            >
-              Tạo đơn
+          </div>
+          <div className="topacts">
+            <button type="button" className="iconbtn ai" onClick={() => setAiOpen(true)} title="AI quản lý đơn hàng">
+              🤖
+            </button>
+            <button type="button" className="iconbtn" onClick={toggleTheme} aria-label="Sáng/tối">
+              {theme === "dark" ? "☀" : "☾"}
             </button>
           </div>
         </div>
-      )}
 
+        <div className="eyebrow">Đặt mua vật tư · {projectCode}</div>
+        <h1>{projectName}</h1>
+        <div className="meta">
+          <span>
+            {loading ? "…" : groups.length} chủng loại
+          </span>
+          <span className="d">·</span>
+          <span>Bám dự toán</span>
+        </div>
+
+        {/* summary */}
+        <div className="sum">
+          <div className="c">
+            <div className="k">Dự toán VT</div>
+            <div className="v t num">{loading ? "—" : fmt(summary.tot)}</div>
+            <div className="sp">{loading ? "—" : `${groups.length} chủng loại`}</div>
+          </div>
+          <div className="c">
+            <div className="k">Đã đặt</div>
+            <div className="v o num">{loading ? "—" : fmt(summary.pl)}</div>
+            <div className="sp">{loading ? "—" : `${summary.pct}% dự toán`}</div>
+          </div>
+          <div className="c">
+            <div className="k">Còn lại</div>
+            <div className="v g num">{loading ? "—" : fmt(summary.remain)}</div>
+            <div className="sp">so dự toán</div>
+          </div>
+        </div>
+
+        {/* tabs */}
+        <div className="tabs">
+          <button type="button" className={`tab${tab === "buy" ? " on" : ""}`} onClick={() => setTab("buy")}>
+            <span>Mua hàng</span>
+          </button>
+          <button type="button" className={`tab${tab === "orders" ? " on" : ""}`} onClick={() => setTab("orders")}>
+            <span>Đơn đã tạo</span>
+            <span className="cnt">{orders.length}</span>
+          </button>
+        </div>
+
+        <div className="panel">
+          {loading ? (
+            <div className="load">Đang tải dự toán…</div>
+          ) : err ? (
+            <div className="empty">{err}</div>
+          ) : tab === "buy" ? (
+            <>
+              <BuyList
+                groups={groups}
+                phaseNames={phaseNames}
+                placed={placed}
+                pending={pending}
+                open={open}
+                setOpen={setOpen}
+                setQty={setQty}
+              />
+              <div className="foot">Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền</div>
+            </>
+          ) : (
+            <OrdersList orders={orders} onEdit={setEditing} onDel={delOrder} onPO={downloadPO} />
+          )}
+        </div>
+      </div>
+
+      {/* cart nổi */}
+      <div className={`cart${cartOn ? " show" : ""}`}>
+        <div className="in">
+          <button type="button" className="btn ghost sm" onClick={() => setPending({})}>
+            Xoá
+          </button>
+          <div className="info">
+            <div className="l1">{cart.cnt} vật tư trong đơn</div>
+            <div className="l2 num">
+              {fmt(cart.sum)}
+              <span className="u">đ</span>
+            </div>
+          </div>
+          <button type="button" className="btn" onClick={createOrder}>
+            Tạo đơn
+          </button>
+        </div>
+      </div>
+
+      {/* sửa đơn */}
       {editing && (
         <EditSheet
           order={editing}
+          projectId={projectId}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
             await loadOrders();
             toast("Đã lưu đơn");
           }}
-          projectId={projectId}
         />
       )}
 
-      {aiOpen && mounted && (
-        <AiSheet code={projectCode} onClose={() => setAiOpen(false)} />
-      )}
-
-      {toastMsg && (
-        <div className="fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-[#1a1d2e] px-4 py-2 text-sm text-[#e6e9f5] shadow-xl ring-1 ring-[#2d3249]">
-          {toastMsg}
+      {/* AI */}
+      {aiOpen && (
+        <div className="aiwrap">
+          <div className="aihead">
+            <span className="se">🤖 AI đơn mua hàng · {projectCode}</span>
+            <button type="button" className="iconbtn" onClick={() => setAiOpen(false)} aria-label="Đóng">
+              ✕
+            </button>
+          </div>
+          <iframe
+            src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
+            title="AI đơn mua hàng"
+          />
         </div>
       )}
-    </div>
-  );
-}
 
-function Stat({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
-  return (
-    <div className="rounded-xl border border-[#252840] bg-[#13151f] p-2.5">
-      <div className="text-[10px] uppercase tracking-wide text-[#5a6080]">{sub}</div>
-      <div className={`mt-0.5 truncate text-sm font-bold ${accent ? "text-[#fb923c]" : "text-[#f0f2ff]"}`}>{value}</div>
-      <div className="truncate text-[10px] text-[#6b7396]">{label}</div>
+      <div className={`toast${toastMsg ? " show" : ""}`}>{toastMsg}</div>
     </div>
   );
 }
@@ -406,98 +435,89 @@ function BuyList({
   setQty: (key: string, v: string) => void;
 }) {
   if (!groups.length)
-    return <div className="rounded-xl border border-[#252840] bg-[#13151f] p-6 text-center text-sm text-[#7c85a8]">Dự toán chưa có vật tư nào.</div>;
+    return (
+      <div className="empty">
+        <div className="ic">📦</div>
+        Dự toán chưa có vật tư nào.
+      </div>
+    );
   let lastph = "";
   return (
-    <div className="space-y-2">
+    <div>
       {groups.map((g) => {
         const head = g.minph !== lastph ? ((lastph = g.minph), true) : false;
         const pl = placed[g.key] || 0;
         const rem = g.total - pl;
         const done = rem <= 0.0001;
-        const uv = pending[g.key] || "";
+        const uv = pending[g.key];
+        const has = !!uv && uv > 0;
         const isOpen = !!open[g.key];
         return (
           <div key={g.key}>
             {head && (
-              <div className="mb-1 mt-3 flex items-center gap-2 px-1">
-                <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#fb923c]">GĐ {g.minph}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-[#7c85a8]">{phaseNames[g.minph] || ""}</span>
+              <div className="phead">
+                <span className="pi">GĐ {g.minph}</span>
+                <span className="pn">{phaseNames[g.minph] || ""}</span>
               </div>
             )}
-            <div className="rounded-xl border border-[#252840] bg-[#13151f]">
-              <div className="flex flex-col gap-2 p-2.5 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div className="flex items-center gap-1.5 font-semibold text-[#f0f2ff]">
-                    <span className={`text-[#f97316] transition ${isOpen ? "rotate-90" : ""}`}>▸</span>
-                    <span className="truncate">{g.name}</span>
+            <div className={`mc${isOpen ? " open" : ""}`}>
+              <div className="top">
+                <button type="button" className="tapzone" onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}>
+                  <div className="rn">
+                    <span className="chev">▸</span>
+                    <span className="nm">{g.name}</span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 text-[11px]">
-                    <span className="text-[#9aa3c0]">
-                      DT <b className="text-[#e6e9f5]">{fmtQ(g.total)}</b> {g.unit}
+                  <div className="nums">
+                    <span>
+                      DT <b>{fmtQ(g.total)}</b> {g.unit}
                     </span>
                     {pl > 0 && (
-                      <span className="text-emerald-400">
+                      <span className="done">
                         Đặt <b>{fmtQ(pl)}</b>
                       </span>
                     )}
-                    <span className={done ? "text-emerald-400" : "text-[#fb923c]"}>
+                    <span className={done ? "done" : "rem"}>
                       Còn <b>{fmtQ(rem > 0 ? rem : 0)}</b>
                     </span>
                     {g.uprice > 0 && (
-                      <span className="tabular-nums text-[#6b7396]">
-                        {fmt(g.uprice)} đ/{g.unit}
+                      <span className="price">
+                        <b>{fmt(g.uprice)}</b> đ/{g.unit}
                       </span>
                     )}
                   </div>
                 </button>
-                <div className="flex items-center gap-2 pl-5 sm:pl-0">
-                  <div className="flex items-center gap-1 rounded-lg border border-[#2b3048] bg-[#0d0f18] px-2 py-1">
+                <div className="ord">
+                  <label>Mua</label>
+                  <div className={`inrow${has ? " has" : ""}`}>
                     <input
                       type="number"
                       inputMode="decimal"
                       step="any"
                       min="0"
                       placeholder="0"
-                      value={uv}
+                      value={uv || ""}
                       onChange={(e) => setQty(g.key, e.target.value)}
-                      className="w-16 bg-transparent text-right text-sm text-[#f0f2ff] outline-none"
                     />
-                    <span className="text-xs text-[#6b7396]">{g.unit}</span>
+                    <span className="u">{g.unit}</span>
                   </div>
                   {rem > 0.0001 && (
-                    <button
-                      type="button"
-                      onClick={() => setQty(g.key, String(Math.round(rem * 1000) / 1000))}
-                      className="whitespace-nowrap text-[11px] text-[#7aa2ff] hover:underline"
-                    >
+                    <button type="button" className="fill" onClick={() => setQty(g.key, String(Math.round(rem * 1000) / 1000))}>
                       = còn {fmtQ(rem)}
                     </button>
                   )}
                 </div>
               </div>
-              {isOpen && (
-                <div className="border-t border-[#1f2333] px-3 py-2">
-                  <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-wide text-[#5a6080]">
-                    Dùng cho {g.lines.length} công tác
+              <div className="bd">
+                {g.lines.map((l) => (
+                  <div key={l.id} className="bl">
+                    <span className="bc">{l.taskCode}</span>
+                    <span className="bn">{l.taskName}</span>
+                    <span className="bq">
+                      {fmtQ(l.quantity)} {l.unit}
+                    </span>
                   </div>
-                  <div className="space-y-0.5">
-                    {g.lines.map((l) => (
-                      <div key={l.id} className="flex items-center gap-2 text-[11px]">
-                        <span className="rounded bg-[#1a1d2e] px-1 py-0.5 font-mono text-[10px] text-[#7c85a8]">{l.taskCode}</span>
-                        <span className="min-w-0 flex-1 truncate text-[#9aa3c0]">{l.taskName}</span>
-                        <span className="tabular-nums text-[#e6e9f5]">
-                          {fmtQ(l.quantity)} {l.unit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           </div>
         );
@@ -519,46 +539,32 @@ function OrdersList({
 }) {
   if (!orders.length)
     return (
-      <div className="rounded-xl border border-[#252840] bg-[#13151f] p-8 text-center text-sm text-[#7c85a8]">
-        <div className="mb-1 text-2xl">📋</div>
+      <div className="empty">
+        <div className="ic">📋</div>
         Chưa có đơn nào.
         <br />
         Qua tab Mua hàng, nhập SL rồi bấm Tạo đơn.
       </div>
     );
   return (
-    <div className="space-y-2">
+    <div>
       {orders.map((o) => (
-        <div
-          key={o.id}
-          className="cursor-pointer rounded-xl border border-[#252840] bg-[#13151f] p-3 transition hover:border-[#f97316]/50"
-          onClick={() => onEdit(o)}
-        >
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-[#f0f2ff]">Đơn #{o.seq}</span>
-            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stChip[o.status]}`}>
-              {stLabel(o.status)}
-            </span>
+        <div key={o.id} className="ord-card" onClick={() => onEdit(o)}>
+          <div className="oh">
+            <span className="on">Đơn #{o.seq}</span>
+            <span className={`chip ${o.status}`}>{stLabel(o.status)}</span>
           </div>
-          <div className="mt-1 text-xs text-[#7c85a8]">
+          <div className="sup">
             {o.supplierName || "Chưa gán NCC"} · {fmtDate(o.orderDate)}
           </div>
-          <div className="mt-1 text-sm tabular-nums text-[#e6e9f5]">
-            {fmt(o.total)} đ · {o.items.length} vật tư
+          <div className="ov num">
+            {fmt(o.total)} đ<span className="cnt2">{o.items.length} vật tư</span>
           </div>
-          <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => onPO(o)}
-              className="rounded-lg border border-[#2b3048] px-3 py-1 text-xs text-[#9aa3c0] hover:bg-[#1a1d2e]"
-            >
+          <div className="oact" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               ⭳ Tải PO
             </button>
-            <button
-              type="button"
-              onClick={() => onDel(o)}
-              className="rounded-lg border border-red-500/30 px-3 py-1 text-xs text-red-400 hover:bg-red-500/10"
-            >
+            <button type="button" className="del" onClick={() => onDel(o)}>
               Xoá
             </button>
           </div>
@@ -579,6 +585,7 @@ function EditSheet({
   onSaved: () => void;
   projectId: string;
 }) {
+  const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
   const [orderDate, setOrderDate] = useState(order.orderDate ? order.orderDate.slice(0, 10) : "");
   const [deliveryDate, setDeliveryDate] = useState(order.deliveryDate ? order.deliveryDate.slice(0, 10) : "");
@@ -586,6 +593,11 @@ function EditSheet({
   const [note, setNote] = useState(order.note || "");
   const [prices, setPrices] = useState<number[]>(order.items.map((it) => it.price));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const total = order.items.reduce((s, it, i) => s + it.qty * (prices[i] || 0), 0);
 
@@ -607,160 +619,96 @@ function EditSheet({
     if (r.ok) onSaved();
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 sm:items-center sm:p-3" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#2d3249] bg-[#0d0f18] text-[#e6e9f5] shadow-2xl sm:w-[480px] sm:rounded-2xl"
-      >
-        <div className="flex items-center gap-2 border-b border-[#252840] px-4 py-3">
-          <span className="font-bold text-[#f0f2ff]">Đơn #{order.seq}</span>
-          <button type="button" onClick={onClose} className="ml-auto text-[#8b95b7] hover:text-white">
+  return (
+    <>
+      <div className={`scrim${show ? " show" : ""}`} onClick={onClose} />
+      <div className={`sheet${show ? " show" : ""}`} role="dialog" aria-modal="true">
+        <div className="grip" />
+        <div className="shead">
+          <div>
+            <div className="se">Đơn đặt hàng</div>
+            <div className="st">Đơn #{order.seq}</div>
+          </div>
+          <button type="button" className="xclose" onClick={onClose} aria-label="Đóng">
             ✕
           </button>
         </div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          <Field label="Nhà cung cấp (NCC)">
-            <input
-              value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
-              placeholder="Tên NCC / cửa hàng"
-              className="w-full rounded-lg border border-[#2b3048] bg-[#13151f] px-3 py-2 text-sm outline-none focus:border-[#f97316]/60"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Ngày đặt">
-              <input
-                type="date"
-                value={orderDate}
-                onChange={(e) => setOrderDate(e.target.value)}
-                className="w-full rounded-lg border border-[#2b3048] bg-[#13151f] px-3 py-2 text-sm outline-none focus:border-[#f97316]/60"
-              />
-            </Field>
-            <Field label="Ngày nhận dự kiến">
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full rounded-lg border border-[#2b3048] bg-[#13151f] px-3 py-2 text-sm outline-none focus:border-[#f97316]/60"
-              />
-            </Field>
+        <div className="sbody">
+          <div className="fld">
+            <label>Nhà cung cấp (NCC)</label>
+            <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Tên NCC / cửa hàng" />
           </div>
-          <Field label="Trạng thái">
-            <div className="flex flex-wrap gap-1.5">
+          <div className="row2">
+            <div className="fld">
+              <label>Ngày đặt</label>
+              <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+            </div>
+            <div className="fld">
+              <label>Ngày nhận dự kiến</label>
+              <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="fld">
+            <label>Trạng thái</label>
+            <div className="segs">
               {STATUS.map((s) => (
-                <button
-                  key={s.k}
-                  type="button"
-                  onClick={() => setStatus(s.k)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-                    status === s.k ? stChip[s.k] : "border-[#2b3048] text-[#7c85a8] hover:text-[#e6e9f5]"
-                  }`}
-                >
+                <button key={s.k} type="button" className={`seg${status === s.k ? " on" : ""}`} onClick={() => setStatus(s.k)}>
                   {s.l}
                 </button>
               ))}
             </div>
-          </Field>
-          <Field label="Ghi chú">
+          </div>
+          <div className="fld">
+            <label>Ghi chú</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Điều kiện giao, thanh toán, phụ kiện..."
               rows={2}
-              className="w-full rounded-lg border border-[#2b3048] bg-[#13151f] px-3 py-2 text-sm outline-none focus:border-[#f97316]/60"
             />
-          </Field>
-          <Field label="Vật tư · đơn giá (sửa được, SL khoá theo dự toán)">
-            <div className="space-y-1.5">
+          </div>
+          <div className="fld">
+            <label>Vật tư · đơn giá (sửa được, SL khoá theo dự toán)</label>
+            <div className="eitems">
               {order.items.map((it, i) => (
-                <div key={it.key} className="flex items-center gap-2 rounded-lg border border-[#1f2333] bg-[#13151f] px-2.5 py-1.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-[#e6e9f5]">{it.name}</div>
-                    <div className="text-[11px] text-[#6b7396]">
-                      {fmtQ(it.qty)} {it.unit} <span className="text-[#5a6080]">· SL khoá 🔒</span>
+                <div key={it.key} className="eit">
+                  <div className="en">
+                    {it.name}
+                    <div className="eq">
+                      {fmtQ(it.qty)} {it.unit} · SL khoá 🔒
                     </div>
                   </div>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    step="any"
-                    min="0"
-                    value={prices[i]}
-                    onChange={(e) => {
-                      const v = Math.round(parseFloat(e.target.value) || 0);
-                      setPrices((p) => p.map((x, j) => (j === i ? v : x)));
-                    }}
-                    className="w-24 rounded-lg border border-[#2b3048] bg-[#0d0f18] px-2 py-1 text-right text-sm outline-none focus:border-[#f97316]/60"
-                  />
+                  <div className="ep">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      step="any"
+                      min="0"
+                      value={prices[i]}
+                      onChange={(e) => {
+                        const v = Math.round(parseFloat(e.target.value) || 0);
+                        setPrices((p) => p.map((x, j) => (j === i ? v : x)));
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="mt-2 flex items-center justify-between rounded-lg bg-[#13151f] px-3 py-2">
-              <span className="text-xs text-[#7c85a8]">Tổng đơn</span>
-              <span className="tabular-nums font-bold text-[#fb923c]">{fmt(total)} đ</span>
+            <div className="etot">
+              <span className="k">Tổng đơn</span>
+              <span className="v num">{fmt(total)} đ</span>
             </div>
-          </Field>
-        </div>
-        <div className="flex gap-2 border-t border-[#252840] p-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-[#2b3048] py-2 text-sm text-[#9aa3c0] hover:bg-[#1a1d2e]"
-          >
-            Huỷ
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="flex-1 rounded-lg bg-[#f97316] py-2 text-sm font-bold text-white hover:bg-[#ea6a0e] disabled:opacity-50"
-          >
-            {saving ? "Đang lưu…" : "Lưu đơn"}
-          </button>
+          </div>
+          <div className="sactions">
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Huỷ
+            </button>
+            <button type="button" className="btn" onClick={save} disabled={saving}>
+              {saving ? "Đang lưu…" : "Lưu đơn"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>,
-    document.body,
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#6b7396]">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function AiSheet({ code, onClose }: { code: string; onClose: () => void }) {
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 sm:items-center sm:p-3"
-      style={{ height: "100dvh" }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl sm:w-auto sm:rounded-2xl"
-        style={{ width: "min(480px, 100%)", height: "calc(100dvh - 8px)", maxHeight: "100dvh" }}
-      >
-        <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
-          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#7aa2ff]">
-            <Sparkles className="h-4 w-4" /> AI đơn mua hàng · {code}
-          </span>
-          <button type="button" onClick={onClose} className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white">
-            ✕
-          </button>
-        </div>
-        <iframe
-          src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(code)}`}
-          title="AI đơn mua hàng"
-          className="w-full flex-1 border-0"
-        />
-      </div>
-    </div>,
-    document.body,
+    </>
   );
 }
