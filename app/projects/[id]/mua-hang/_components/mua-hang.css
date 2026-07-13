@@ -26,8 +26,10 @@
   line-height: 1.4;
   letter-spacing: -0.006em;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  color-scheme: light;
 }
 .mhdoc[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #3a1608;
   --card: #4a1d0c;
   --text: #f7f2e4;
@@ -74,11 +76,11 @@
 .mhdoc .meta .d { color: var(--line2); }
 
 /* ---- summary ---- */
-.mhdoc .sum { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 15px 16px; display: flex; gap: 0; }
-.mhdoc .sum .c { flex: 1; padding-left: 14px; border-left: 1px solid var(--line); min-width: 0; }
+.mhdoc .sum { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 15px 13px; display: flex; gap: 0; }
+.mhdoc .sum .c { flex: 1 1 0; padding-left: 11px; border-left: 1px solid var(--line); min-width: 0; }
 .mhdoc .sum .c:first-child { padding-left: 0; border-left: none; }
-.mhdoc .sum .k { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; }
-.mhdoc .sum .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: clamp(15px, 4.6vw, 19px); margin-top: 5px; }
+.mhdoc .sum .k { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mhdoc .sum .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: clamp(12.5px, 3.5vw, 18px); letter-spacing: -0.03em; line-height: 1.15; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mhdoc .sum .v.o { color: var(--orange); }
 .mhdoc .sum .v.t { color: var(--terra); }
 .mhdoc .sum .v.g { color: var(--ok); }
@@ -105,7 +107,7 @@
 .mhdoc .mc .rn { font-size: 14px; font-weight: 600; letter-spacing: -0.012em; line-height: 1.28; display: flex; align-items: baseline; gap: 7px; }
 .mhdoc .mc .rn .chev { color: var(--mut2); font-size: 13px; transition: transform 0.2s; flex: none; }
 .mhdoc .mc.open .rn .chev { transform: rotate(90deg); }
-.mhdoc .mc .rn .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mhdoc .mc .rn .nm { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .mhdoc .mc .nums { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--mut); }
 .mhdoc .mc .nums b { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
 .mhdoc .mc .nums .rem { color: var(--orange); }
