@@ -3,6 +3,7 @@
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import "./mua-hang.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -89,8 +90,11 @@ export function MuaHangClient({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const saved = localStorage.getItem("muahang-theme");
@@ -400,23 +404,28 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         />
       )}
 
-      {/* AI */}
-      {aiOpen && (
-        <div className="aiwrap">
-          <div className="aihead">
-            <span className="se">🤖 AI đơn mua hàng · {projectCode}</span>
-            <button type="button" className="iconbtn" onClick={() => setAiOpen(false)} aria-label="Đóng">
-              ✕
-            </button>
-          </div>
-          <iframe
-            src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
-            title="AI đơn mua hàng"
-          />
-        </div>
-      )}
-
       <div className={`toast${toastMsg ? " show" : ""}`}>{toastMsg}</div>
+
+      {/* AI drawer — portal ra body (pattern proven của du-toan) */}
+      {aiOpen &&
+        mounted &&
+        createPortal(
+          <div className="mh-ai-scrim" onClick={() => setAiOpen(false)}>
+            <div className="mh-ai-box" onClick={(e) => e.stopPropagation()}>
+              <div className="mh-ai-head">
+                <b>🤖 AI đơn mua hàng — {projectCode}</b>
+                <button type="button" className="x" onClick={() => setAiOpen(false)} aria-label="Đóng">
+                  ✕
+                </button>
+              </div>
+              <iframe
+                src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
+                title="AI đơn mua hàng"
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
