@@ -6,6 +6,6 @@ import { usePathname } from "next/navigation";
 // tối của project layout (back-link + card tên dự án) ở các route đó.
 export function HideOnEstimate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname && /\/(estimate|du-toan|mua-hang|cong-no)(\/|$)/.test(pathname)) return null;
+  if (pathname && /\/(estimate|du-toan|mua-hang|cong-no|overview)(\/|$)/.test(pathname)) return null;
   return <>{children}</>;
 }

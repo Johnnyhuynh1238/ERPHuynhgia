@@ -1,0 +1,170 @@
+/* ============================================================
+   Tổng quan dự án — Design system Huỳnh Gia (bám mockup đã duyệt).
+   Ngà (sáng) / Mahogany (tối). IBM Plex. Phẳng, kẻ mảnh, mono số.
+   Mọi thứ scope trong .ovdoc để không đụng app shell tối của ERP.
+   ============================================================ */
+
+.ovdoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b4472a;
+  --track: rgba(46, 20, 10, 0.07);
+  --t1: rgba(46, 20, 10, 0.86);
+  --t2: rgba(46, 20, 10, 0.3);
+  --t3: rgba(46, 20, 10, 0.12);
+
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  color-scheme: light;
+}
+.ovdoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --red: #e08a6a;
+  --track: rgba(247, 242, 228, 0.09);
+  --t1: rgba(247, 242, 228, 0.88);
+  --t2: rgba(247, 242, 228, 0.32);
+  --t3: rgba(247, 242, 228, 0.14);
+}
+
+.ovdoc * { box-sizing: border-box; margin: 0; padding: 0; }
+.ovdoc .num { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.ovdoc .wrap { max-width: 560px; margin: 0 auto; padding: 0 clamp(14px, 4.5vw, 20px); }
+
+/* topbar */
+.ovdoc .topbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 12px; }
+.ovdoc .brand { display: flex; align-items: center; gap: 9px; }
+.ovdoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; letter-spacing: -0.02em; }
+.ovdoc .brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.ovdoc .brand span { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.ovdoc .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 15px; display: grid; place-items: center; line-height: 1; }
+.ovdoc .iconbtn:active { transform: scale(0.94); }
+.ovdoc .tbtns { display: flex; align-items: center; gap: 8px; }
+.ovdoc .aibtn { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--orange); background: none; color: var(--orange); font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer; line-height: 1; }
+.ovdoc .aibtn svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.ovdoc .aibtn:active { transform: scale(0.96); }
+
+/* overlay chat AI */
+.ovdoc .aiov { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none; flex-direction: column; }
+.ovdoc .aiov.show { display: flex; }
+.ovdoc .aihd { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--card); }
+.ovdoc .aihd b { font-size: 13px; font-weight: 600; color: var(--text); }
+.ovdoc .aihd .x { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--text); font-size: 15px; cursor: pointer; flex: none; }
+.ovdoc .aiov iframe { flex: 1; width: 100%; border: none; background: var(--bg); }
+
+/* header */
+.ovdoc .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.ovdoc h1 { font-size: clamp(20px, 6vw, 25px); font-weight: 600; letter-spacing: -0.022em; margin: 6px 0 7px; line-height: 1.12; }
+.ovdoc .status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--ok); vertical-align: middle; margin-left: 8px; }
+.ovdoc .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ovdoc .meta { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 3px 9px; align-items: center; }
+.ovdoc .meta .num { color: var(--terra); font-size: 11px; font-weight: 600; }
+.ovdoc .meta .d { color: var(--line2); }
+.ovdoc .meta b { color: var(--text); font-weight: 500; }
+
+/* ── VALUE BARS: flat KHÔNG card, đơn sắc gạch dọc ── */
+.ovdoc .vbars { margin-top: 16px; border-top: 1px solid var(--line); }
+.ovdoc .vb { border-bottom: 1px solid var(--line); }
+.ovdoc .vb-btn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 15px 2px; cursor: pointer; font-family: inherit; color: inherit; position: relative; }
+.ovdoc .chev { position: absolute; top: 15px; right: 2px; color: var(--mut2); font-size: 12px; line-height: 1; transition: transform 0.2s; background: var(--bg); padding-left: 5px; }
+.ovdoc .vb.open .chev { transform: rotate(180deg); }
+.ovdoc .vb-bar { display: block; }
+.ovdoc .barcol { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.ovdoc .slabels { display: flex; align-items: flex-end; gap: 2px; overflow: hidden; }
+.ovdoc .sl { flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; align-items: center; text-align: center; }
+.ovdoc .sl.hi { align-items: flex-start; text-align: left; }
+.ovdoc .slabels .sl.ovf { align-items: flex-end; text-align: right; }
+.ovdoc .sl .snm { font-size: 10px; font-weight: 500; color: var(--mut2); white-space: nowrap; }
+.ovdoc .sl .sn { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 400; font-size: 11px; color: var(--mut2); white-space: nowrap; }
+.ovdoc .sl.hi .snm { color: var(--orange); font-weight: 600; }
+.ovdoc .sl.hi .sn { color: var(--orange); font-size: 15px; font-weight: 600; }
+.ovdoc .sl.hi .sn .den { font-size: 11px; font-weight: 400; color: var(--mut2); }
+.ovdoc .thinbar { display: flex; height: 6px; border-radius: 4px; overflow: hidden; background: var(--track); gap: 2px; }
+.ovdoc .thinbar .tf { flex: 0 0 auto; height: 100%; }
+.ovdoc .thinbar .tf.m { background: var(--t2); }
+.ovdoc .thinbar .tf.l { background: var(--t3); }
+.ovdoc .thinbar .tf.hi { background: var(--orange); }
+/* bar chờ dữ liệu */
+.ovdoc .vb.wait .sl.hi .snm,
+.ovdoc .vb.wait .sl.hi .sn { color: var(--mut2); }
+.ovdoc .vb.wait .thinbar .tf.hi { background: var(--mut2); }
+.ovdoc .waitnote { font-size: 10.5px; color: var(--mut2); margin-top: 6px; font-style: italic; }
+
+/* section head */
+.ovdoc .phead { display: flex; align-items: baseline; gap: 9px; padding: 22px 2px 8px; }
+.ovdoc .phead .pn { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); }
+.ovdoc .phead a { margin-left: auto; font-size: 11.5px; color: var(--orange); text-decoration: none; font-weight: 600; letter-spacing: 0; }
+
+.ovdoc .card { background: var(--card); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; }
+
+/* tổng tiến độ — 1 thanh */
+.ovdoc .ovp { padding: 15px; }
+.ovdoc .ovp-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.ovdoc .ovp-n { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+.ovdoc .ovp-pc { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; color: var(--orange); line-height: 1; }
+.ovdoc .ovp .bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.ovdoc .ovp .bar > i { display: block; height: 100%; border-radius: 4px; background: var(--orange); }
+.ovdoc .ovp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 11px; font-size: 11.5px; color: var(--mut); }
+.ovdoc .ovp-meta b { color: var(--text); font-weight: 600; }
+.ovdoc .ovp-meta .d { color: var(--mut2); }
+
+/* cost split */
+.ovdoc .cost { padding: 15px; }
+.ovdoc .split { display: flex; height: 11px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.ovdoc .split > span { display: block; }
+.ovdoc .lgd { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; margin-top: 14px; }
+.ovdoc .lgd .li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mut); }
+.ovdoc .lgd .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ovdoc .lgd .li .num { margin-left: auto; color: var(--text); font-size: 12px; font-weight: 600; }
+
+/* tiles */
+.ovdoc .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.ovdoc .tile { display: block; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 13px 14px; transition: border-color 0.15s, transform 0.12s; }
+.ovdoc .tile:active { transform: scale(0.98); }
+.ovdoc .tile .tt { display: flex; align-items: center; justify-content: space-between; }
+.ovdoc .tile .ic { font-size: 18px; line-height: 1; }
+.ovdoc .tile .nm { font-size: 13px; font-weight: 600; margin-top: 9px; letter-spacing: -0.01em; }
+.ovdoc .tile .st { font-size: 11px; color: var(--mut); margin-top: 2px; }
+.ovdoc .badge { font-size: 9.5px; font-weight: 600; padding: 3px 8px; border-radius: 20px; letter-spacing: 0.01em; }
+.ovdoc .badge.warn { color: var(--orange); background: rgba(227, 97, 34, 0.13); }
+.ovdoc .badge.ok { color: var(--ok); background: rgba(91, 122, 82, 0.16); }
+.ovdoc .badge.info { color: var(--gold); background: rgba(184, 147, 74, 0.18); }
+
+/* feed */
+.ovdoc .feed { padding: 3px 15px 6px; }
+.ovdoc .fi { display: grid; grid-template-columns: 8px 1fr auto; column-gap: 11px; padding: 11px 0; border-top: 1px solid var(--line); align-items: start; }
+.ovdoc .fi:first-child { border-top: none; }
+.ovdoc .fdot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--terra); }
+.ovdoc .fdot.ok { background: var(--ok); }
+.ovdoc .fdot.info { background: var(--gold); }
+.ovdoc .fdot.warn { background: var(--orange); }
+.ovdoc .fi .tx { font-size: 13px; line-height: 1.35; }
+.ovdoc .fi .tx b { font-weight: 600; }
+.ovdoc .fi .mt { font-size: 11px; color: var(--mut2); margin-top: 1px; }
+.ovdoc .fi .tm { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--mut2); white-space: nowrap; }
+
+.ovdoc .foot { text-align: center; font-size: 10.5px; color: var(--mut2); padding: 26px 0 8px; letter-spacing: 0.02em; }
