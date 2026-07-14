@@ -19,7 +19,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     select: { id: true, email: true, fullName: true, role: true, isActive: true },
   });
   if (!target) return NextResponse.json({ message: "User không tồn tại" }, { status: 404 });
-  if (!target.isActive) return NextResponse.json({ message: "User đã bị vô hiệu hoá" }, { status: 400 });
+  // Cho phép đóng vai cả tk đã khoá (isActive=false) — vd nhân viên đã nghỉ việc.
   if (target.role === UserRole.admin) {
     return NextResponse.json({ message: "Không đóng vai admin khác" }, { status: 400 });
   }

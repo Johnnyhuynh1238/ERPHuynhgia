@@ -18,7 +18,8 @@ export async function getCurrentUser() {
   if (!session?.user?.id) return null;
 
   // Admin đóng vai user khác (cookie HMAC 60'): swap sang user đích.
-  // Chỉ admin thật mới được swap; user đích phải active và không phải admin.
+  // Chỉ admin thật mới được swap; user đích không phải admin.
+  // Cho phép đổi vai cả user đã bị khoá (isActive=false) để admin xem/hỗ trợ tk nhân viên đã nghỉ.
   if (session.user.role === "admin") {
     const targetId = readImpersonationTarget();
     if (targetId && targetId !== session.user.id) {
@@ -26,7 +27,7 @@ export async function getCurrentUser() {
         where: { id: targetId },
         select: { id: true, email: true, fullName: true, role: true, isActive: true },
       });
-      if (target && target.isActive && target.role !== "admin") {
+      if (target && target.role !== "admin") {
         return {
           ...session.user,
           id: target.id,
