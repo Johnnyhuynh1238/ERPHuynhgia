@@ -10,7 +10,6 @@ import {
   FolderOpen,
   Handshake,
   History,
-  LayoutDashboard,
   Library,
   ListChecks,
   Package,
@@ -89,9 +88,6 @@ export function ProjectHubGrid({
   ];
 
   const finance: HubItem[] = [
-    ...(caps.isAdmin
-      ? [{ href: `${base}/overview`, label: "Tổng quan", icon: LayoutDashboard, desc: "Tài chính · tiến độ" } as HubItem]
-      : []),
     ...(caps.isAdmin
       ? [{ href: `${base}/cong-no`, label: "Công nợ NCC", icon: Wallet, desc: "Nợ · trả · còn lại" } as HubItem]
       : []),

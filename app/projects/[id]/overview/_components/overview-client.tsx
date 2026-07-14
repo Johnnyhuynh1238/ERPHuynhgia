@@ -46,7 +46,15 @@ const ddmm = (s: string | null) => {
 
 const COST_COLORS = ["var(--orange)", "var(--ok)", "var(--gold)", "var(--terra)", "var(--mut)"];
 
-export function OverviewClient({ projectId }: { projectId: string }) {
+export function OverviewClient({
+  projectId,
+  laborMode = "self",
+  pendingDiaries = 0,
+}: {
+  projectId: string;
+  laborMode?: "self" | "subcontract";
+  pendingDiaries?: number;
+}) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [data, setData] = useState<Overview | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -133,6 +141,29 @@ export function OverviewClient({ projectId }: { projectId: string }) {
   const f = data.finance;
   const p = data.project;
   const spentTotal = f.spent || 1;
+  const isSelf = laborMode === "self";
+
+  type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean };
+  const tiles: Tile[] = [
+    { href: `${base}/tasks`, emoji: "📊", name: "Tiến độ", sub: "Mốc thi công" },
+    { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
+    { href: `${base}/mua-hang`, emoji: "🛒", name: "Mua hàng", sub: `${data.tiles.muaHang.count} đơn · ${fmt(data.tiles.muaHang.total)}`, badge: data.tiles.muaHang.received ? { cls: "info", text: `${data.tiles.muaHang.received} đã nhận` } : undefined },
+    { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },
+    { href: `${base}/cong-no`, emoji: "💰", name: "Công nợ NCC", sub: `Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
+    { href: `${base}/material-proposals`, emoji: "📦", name: "Đề xuất vật tư", sub: "VT cần mua" },
+    { href: `${base}/work-orders`, emoji: "👷", name: "Giao việc", sub: "Phiếu hàng ngày", show: isSelf },
+    { href: `${base}/eod`, emoji: "🌇", name: "Cuối ngày", sub: "Chấm công · sản lượng", show: isSelf },
+    { href: `${base}/qc-mapping`, emoji: "✅", name: "QC Mapping", sub: "Checklist NC", show: isSelf },
+    { href: `${base}/payroll`, emoji: "🏦", name: "Lương tuần", sub: "Bonus · payslip", show: isSelf },
+    { href: `${base}/acceptance`, emoji: "📋", name: "Nghiệm thu", sub: `${Math.max(0, data.tiles.acceptance.total - data.tiles.acceptance.signed)} mốc chờ ký`, badge: { cls: "ok", text: `${data.tiles.acceptance.signed}/${data.tiles.acceptance.total} mốc` } },
+    { href: `${base}/construction-log`, emoji: "📖", name: "Nhật ký", sub: `${data.tiles.diary.count} bản ghi`, badge: data.diary[0] ? { cls: "info", text: ddmm(data.diary[0].date) } : undefined },
+    { href: `${base}/diary-approval`, emoji: "📝", name: "Duyệt nhật ký", sub: "Nhật ký KS QL", badge: pendingDiaries ? { cls: "warn", text: `${pendingDiaries} chờ` } : undefined },
+    { href: `${base}/documents`, emoji: "📁", name: "Hồ sơ", sub: "File · ảnh · HĐ" },
+    { href: `${base}/members`, emoji: "👥", name: "Thành viên", sub: "Đội thi công" },
+    { href: `${base}/sub-contracts`, emoji: "🤝", name: "Thầu phụ", sub: "Hợp đồng phụ", show: !isSelf },
+    { href: `${base}/edit`, emoji: "✏️", name: "Sửa dự án", sub: "Thông tin chung" },
+    { href: `${base}/log`, emoji: "🕘", name: "Log dự án", sub: "Activity log" },
+  ].filter((t) => t.show !== false);
 
   return (
     <div className={`ovdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme} ref={rootRef}>
@@ -252,30 +283,12 @@ export function OverviewClient({ projectId }: { projectId: string }) {
         {/* ── PHÂN HỆ ── */}
         <div className="phead"><span className="pn">Phân hệ dự án</span></div>
         <div className="tiles">
-          <Link className="tile" href={`${base}/mua-hang`}>
-            <div className="tt"><span className="ic">🛒</span>{data.tiles.muaHang.received ? <span className="badge info">{data.tiles.muaHang.received} đã nhận</span> : null}</div>
-            <div className="nm">Mua hàng</div><div className="st">{data.tiles.muaHang.count} đơn · {fmt(data.tiles.muaHang.total)}</div>
-          </Link>
-          <Link className="tile" href={`${base}/du-toan`}>
-            <div className="tt"><span className="ic">📐</span><span className="badge ok">Dự toán</span></div>
-            <div className="nm">Dự toán</div><div className="st">Giá vốn {fmt(f.budgetCost)}</div>
-          </Link>
-          <Link className="tile" href={`${base}/payments`}>
-            <div className="tt"><span className="ic">💵</span><span className="badge info">{data.payments.doneInstallments}/{data.payments.totalInstallments} đợt</span></div>
-            <div className="nm">Thanh toán HĐ</div><div className="st">Đã thu {fmt(f.collected)}</div>
-          </Link>
-          <Link className="tile" href={`${base}/cong-no`}>
-            <div className="tt"><span className="ic">💰</span>{f.supplierCount ? <span className="badge warn">{f.supplierCount} NCC</span> : null}</div>
-            <div className="nm">Công nợ NCC</div><div className="st">Còn nợ {fmt(f.supplierDebt)}</div>
-          </Link>
-          <Link className="tile" href={`${base}/acceptance`}>
-            <div className="tt"><span className="ic">📋</span><span className="badge ok">{data.tiles.acceptance.signed}/{data.tiles.acceptance.total} mốc</span></div>
-            <div className="nm">Nghiệm thu</div><div className="st">{Math.max(0, data.tiles.acceptance.total - data.tiles.acceptance.signed)} mốc chờ ký</div>
-          </Link>
-          <Link className="tile" href={`${base}/construction-log`}>
-            <div className="tt"><span className="ic">📖</span>{data.diary[0] ? <span className="badge info">{ddmm(data.diary[0].date)}</span> : null}</div>
-            <div className="nm">Nhật ký</div><div className="st">{data.tiles.diary.count} bản ghi</div>
-          </Link>
+          {tiles.map((t) => (
+            <Link className="tile" href={t.href} key={t.href}>
+              <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
+              <div className="nm">{t.name}</div>{t.sub ? <div className="st">{t.sub}</div> : null}
+            </Link>
+          ))}
         </div>
 
         {/* ── NHẬT KÝ ── */}

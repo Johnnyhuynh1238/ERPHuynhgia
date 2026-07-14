@@ -8,6 +8,7 @@ import { ProjectHubGrid } from "./_components/project-hub-grid";
 import { ProjectFinanceHeader } from "./_components/project-finance-header";
 import { getProjectFinanceSummary } from "@/lib/project-finance-summary";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
+import { OverviewClient } from "./overview/_components/overview-client";
 
 function startOfTodayUtc() {
   const now = new Date();
@@ -64,6 +65,21 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
     const exists = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
     if (!exists) notFound();
     redirect("/projects?denied=1");
+  }
+
+  // Admin: màn chi tiết dự án = màn Tổng quan (tài chính + tiến độ + nhật ký), full-bleed ngà.
+  // (chrome tối đã ẩn ở layout qua HideOnEstimate isAdmin). Vai trò khác giữ hub + info.
+  if (user.role === UserRole.admin) {
+    const pendingDiariesAdmin = await prisma.constructionDiary.count({
+      where: { projectId: params.id, savedAt: { not: null }, approvedAt: null },
+    });
+    return (
+      <OverviewClient
+        projectId={project.id}
+        laborMode={project.laborMode}
+        pendingDiaries={pendingDiariesAdmin}
+      />
+    );
   }
 
   const [admins, engineers] = await Promise.all([
