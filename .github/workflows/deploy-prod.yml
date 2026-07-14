@@ -26,6 +26,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # next build (collect page data) cần các biến env "có mặt" nếu không sẽ throw
+      # ở lúc import module. Runtime dùng .env.production THẬT trên VPS (compose env_file);
+      # ở đây chỉ cần giá trị giả để build qua. Ngoại lệ: NEXT_PUBLIC_* bị bake vào bundle
+      # client -> phải là giá trị THẬT (VAPID public key vốn công khai, không nhạy cảm).
+      # File này chỉ tồn tại ở builder stage, KHÔNG vào image cuối (runner stage không COPY).
+      - name: Write build-time env
+        run: |
+          cat > .env.production <<'ENVEOF'
+          POSTGRES_DB=build
+          POSTGRES_USER=build
+          POSTGRES_PASSWORD=build
+          DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+          NEXTAUTH_SECRET=build-time-placeholder-not-used-at-runtime
+          NEXTAUTH_URL=https://erp.huynhgia6.com
+          AUTH_TRUST_HOST=true
+          MINIO_ROOT_USER=build
+          MINIO_ROOT_PASSWORD=build
+          MINIO_ENDPOINT=http://localhost:9000
+          MINIO_ACCESS_KEY=build
+          MINIO_SECRET_KEY=build
+          MINIO_BUCKET=build
+          OPENAI_API_KEY=sk-build-placeholder
+          OPENAI_MODEL=gpt-4o-mini
+          VAPID_SUBJECT=mailto:build@example.com
+          VAPID_PUBLIC_KEY=BBdD-RFMIYmCmtJS7hA82w5JAdHa6SaUbhOpwFTU9Au9anp1rVEvodGf6p12wzQuNJgu0Msnfa6DyE8UsVqbIkA
+          VAPID_PRIVATE_KEY=build-placeholder
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY=BBdD-RFMIYmCmtJS7hA82w5JAdHa6SaUbhOpwFTU9Au9anp1rVEvodGf6p12wzQuNJgu0Msnfa6DyE8UsVqbIkA
+          PUSH_CRON_KEY=build
+          HDTK_PDF_SECRET=build
+          ENVEOF
+          echo "wrote build-time .env.production ($(wc -l < .env.production) lines)"
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
