@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Dùng legacy builder: BuildKit trên VPS không resolve DNS -> next/font/google
+# (fonts.gstatic.com) EAI_AGAIN làm build fail khi cache nguội. Legacy dùng
+# default bridge, resolve được. (Fix bền hơn: self-host font.)
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.prod.yml"

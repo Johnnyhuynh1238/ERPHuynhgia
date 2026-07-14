@@ -96,13 +96,13 @@ export async function GET(request: Request) {
   }
 
   for (const c of designContracts) {
-    const key = normalizePhone(c.customerPhone);
+    const key = normalizePhone(c.customerPhone ?? "");
     if (!key) continue;
     const meta = computeDesignContractStage(c, now);
     upsert({
       customerKey: key,
       customerName: c.customerName,
-      customerPhone: c.customerPhone,
+      customerPhone: c.customerPhone ?? "",
       stage: meta.stage,
       stageLabel: STAGE_LABEL[meta.stage],
       subLabel: meta.subLabel,

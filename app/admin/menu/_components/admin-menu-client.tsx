@@ -61,6 +61,7 @@ const SECTIONS: MenuSection[] = [
     icon: TrendingUp,
     items: [
       { label: "Pipeline KH", href: "/customer-pipeline", icon: UserPlus, desc: "Phễu khách hàng tiềm năng" },
+      { label: "Hợp đồng", href: "/admin/contracts", icon: FileSignature, desc: "HĐ thiết kế + thi công · thu/chi" },
       { label: "Lead báo giá", href: "/leads", icon: FileText, desc: "Yêu cầu báo giá từ web" },
       { label: "Analytics", href: "/admin/analytics", icon: TrendingUp, desc: "Số liệu kinh doanh" },
     ],

@@ -3014,7 +3014,7 @@ enum DesignContractStepStatus {
 model DesignContract {
   id            String               @id @default(uuid()) @db.Uuid
   customerName  String               @map("customer_name")
-  customerPhone String               @map("customer_phone")
+  customerPhone String?              @map("customer_phone")
   leadId        String?              @map("lead_id") @db.Uuid
   projectId     String?              @unique @map("project_id") @db.Uuid
   signedAt      DateTime             @map("signed_at") @db.Date
@@ -3024,9 +3024,10 @@ model DesignContract {
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
 
-  lead    BaogiaLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  project Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  steps   DesignContractStep[]
+  lead             BaogiaLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  project          Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  steps            DesignContractStep[]
+  cashTransactions CashTransaction[]
 
   @@index([status, signedAt(sort: Desc)])
   @@index([customerPhone])
@@ -3843,12 +3844,14 @@ model CashTransaction {
   counterAccountId String?          @map("counter_account_id") @db.Uuid
   projectId        String?          @map("project_id") @db.Uuid
   categoryId       String?          @map("category_id") @db.Uuid
+  designContractId String?          @map("design_contract_id") @db.Uuid
   note             String?          @db.Text
   createdBy        String           @map("created_by") @db.Uuid
   createdAt        DateTime         @default(now()) @map("created_at")
 
   project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   category       ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  designContract DesignContract?  @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   creator        User             @relation("CashTransactionCreator", fields: [createdBy], references: [id])
   account        CashAccount      @relation("CashTransactionAccount", fields: [accountId], references: [id])
   counterAccount CashAccount?     @relation("CashTransactionCounterAccount", fields: [counterAccountId], references: [id], onDelete: SetNull)
@@ -3857,6 +3860,7 @@ model CashTransaction {
   @@index([refType, refId])
   @@index([projectId, occurredAt])
   @@index([categoryId, occurredAt])
+  @@index([designContractId])
   @@index([createdAt(sort: Desc)])
   @@index([accountId, occurredAt(sort: Desc)])
   @@map("cash_transactions")

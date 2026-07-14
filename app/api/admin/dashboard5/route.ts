@@ -97,10 +97,10 @@ export async function GET() {
     upsert(key, l.name, l.phone, meta.stage as PipelineStage, l.id, null, null);
   }
   for (const c of designContracts) {
-    const key = normalizePhone(c.customerPhone);
+    const key = normalizePhone(c.customerPhone ?? "");
     if (!key) continue;
     const meta = computeDesignContractStage(c, now);
-    upsert(key, c.customerName, c.customerPhone, meta.stage, null, c.id, null);
+    upsert(key, c.customerName, c.customerPhone ?? "", meta.stage, null, c.id, null);
   }
   for (const p of projects) {
     const key = normalizePhone(p.customerPhone);
