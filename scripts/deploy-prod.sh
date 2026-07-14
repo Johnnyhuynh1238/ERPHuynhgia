@@ -46,8 +46,12 @@ fi
 echo "[Deploy] Running pre-deploy checks (backup + migrate)..."
 "$PRE_DEPLOY_SCRIPT"
 
-echo "[Deploy] Building and restarting app container..."
-docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" up -d --build app
+echo "[Deploy] Pulling image + restarting app container..."
+# Image build sẵn trên GitHub Actions -> VPS chỉ pull (nhẹ, không build tại chỗ).
+# APP_IMAGE (vd ghcr.io/.../erphuynhgia-app:<sha>) do workflow truyền vào; mặc định :latest.
+# Chạy tay: cần `docker login ghcr.io` trước, hoặc `docker compose ... build app` để build tại chỗ.
+docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" pull app
+docker compose --env-file "$ROOT_DIR/.env.production" -f "$COMPOSE_FILE" up -d app
 
 echo "[Deploy] Waiting for app container to be running..."
 for _ in $(seq 1 30); do
