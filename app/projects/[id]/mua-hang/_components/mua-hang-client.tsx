@@ -93,14 +93,116 @@ const fmtDate = (iso: string | null) => {
 const esc = (s: string) =>
   (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// Đọc số tiền → chữ tiếng Việt (đủ dùng cho đơn hàng, tới hàng tỷ)
+const CHUSO = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+const docBaSo = (n: number, full: boolean): string => {
+  const tram = Math.floor(n / 100);
+  const chuc = Math.floor((n % 100) / 10);
+  const dv = n % 10;
+  let s = "";
+  if (full || tram > 0) s += `${CHUSO[tram]} trăm`;
+  if (chuc > 1) {
+    s += ` ${CHUSO[chuc]} mươi`;
+    if (dv === 1) s += " mốt";
+    else if (dv === 5) s += " lăm";
+    else if (dv > 0) s += ` ${CHUSO[dv]}`;
+  } else if (chuc === 1) {
+    s += " mười";
+    if (dv === 5) s += " lăm";
+    else if (dv > 0) s += ` ${CHUSO[dv]}`;
+  } else if (dv > 0) {
+    if (full || tram > 0) s += " lẻ";
+    s += ` ${CHUSO[dv]}`;
+  }
+  return s.trim();
+};
+const docTien = (num: number): string => {
+  const n = Math.round(num || 0);
+  if (n <= 0) return "Không đồng";
+  const units = ["", "nghìn", "triệu", "tỷ"];
+  const groups: number[] = [];
+  let x = n;
+  while (x > 0) {
+    groups.push(x % 1000);
+    x = Math.floor(x / 1000);
+  }
+  const parts: string[] = [];
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i] === 0) continue;
+    parts.push(docBaSo(groups[i], i < groups.length - 1) + (units[i] ? ` ${units[i]}` : ""));
+  }
+  const s = parts.join(" ").replace(/\s+/g, " ").trim();
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)} đồng`;
+};
+
+// CSS phiếu PO — scope dưới .po-sheet, dùng chung cho modal (xem/ảnh) và cửa sổ in.
+const PO_CSS = `
+.po-sheet{box-sizing:border-box;background:#fff;color:#1c1917;font-family:"Segoe UI",Roboto,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:13px;line-height:1.5;padding:30px 32px}
+.po-sheet *{box-sizing:border-box}
+.po-sheet .h{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.po-sheet .brand-logo{height:34px;width:auto;display:block}
+.po-sheet .co{margin-top:9px;font-size:10.5px;color:#4b4540;line-height:1.6;max-width:340px}
+.po-sheet .co .nm{font-weight:700;color:#1c1917;font-size:11.5px;letter-spacing:.2px;text-transform:uppercase}
+.po-sheet .co .row span{color:#8a8178}
+.po-sheet .doc-id{text-align:right;flex-shrink:0}
+.po-sheet .doc-id .kicker{font-size:9.5px;letter-spacing:2.5px;color:#8a8178;text-transform:uppercase}
+.po-sheet .doc-id .no{font-size:21px;font-weight:800;color:#e36122;letter-spacing:.5px;line-height:1.15;margin-top:2px}
+.po-sheet .doc-id .no small{color:#8a8178;font-weight:600;font-size:12px}
+.po-sheet .rule{height:2px;background:#1c1917;margin:12px 0 0}
+.po-sheet .title{text-align:center;margin:20px 0 4px}
+.po-sheet .title h1{margin:0;font-size:23px;font-weight:800;letter-spacing:5px}
+.po-sheet .title .sub{font-size:10px;letter-spacing:4px;color:#8a8178;text-transform:uppercase;margin-top:3px}
+.po-sheet .title .brand{height:3px;width:64px;background:#e36122;margin:8px auto 0}
+.po-sheet .meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.po-sheet .card{border:1px solid #e2dcd2;border-radius:8px;padding:12px 14px}
+.po-sheet .card h3{margin:0 0 8px;font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#a6410f;font-weight:700}
+.po-sheet .kv{display:grid;grid-template-columns:96px 1fr;row-gap:6px;font-size:12px;line-height:1.5;margin:0}
+.po-sheet .kv dt{color:#8a8178}
+.po-sheet .kv dd{margin:0;font-weight:600;color:#1c1917}
+.po-sheet .kv dd.blank{color:#c9c1b4;font-weight:400;letter-spacing:2px}
+.po-sheet .tbl-wrap{margin-top:16px;overflow-x:auto}
+.po-sheet table{width:100%;border-collapse:collapse;font-size:12px}
+.po-sheet thead th{background:#1c1917;color:#fff;font-weight:600;font-size:10px;letter-spacing:.6px;text-transform:uppercase;padding:9px 10px;text-align:left}
+.po-sheet thead th.c{text-align:center}
+.po-sheet thead th.r{text-align:right}
+.po-sheet tbody td{padding:8px 10px;border-bottom:1px solid #e2dcd2;vertical-align:top}
+.po-sheet tbody tr:nth-child(even){background:#faf7f2}
+.po-sheet td.c{text-align:center;color:#4b4540}
+.po-sheet td.r{text-align:right;font-variant-numeric:tabular-nums}
+.po-sheet td.nm{font-weight:600}
+.po-sheet tfoot td{padding:11px 10px;font-weight:700}
+.po-sheet tfoot .lbl{text-align:right;letter-spacing:.5px;text-transform:uppercase;font-size:11px}
+.po-sheet tfoot .sum{text-align:right;font-variant-numeric:tabular-nums}
+.po-sheet tfoot .grand td{background:#fbeee5;color:#a6410f;font-size:15px;border-top:2px solid #e36122}
+.po-sheet .amount-words{margin-top:10px;font-size:12px;color:#4b4540}
+.po-sheet .amount-words b{color:#1c1917;font-style:italic}
+.po-sheet .terms{margin-top:16px;border-left:3px solid #e36122;background:#fbeee5;padding:11px 14px;border-radius:0 8px 8px 0}
+.po-sheet .terms h4{margin:0 0 6px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#a6410f}
+.po-sheet .terms ol{margin:0;padding-left:18px;font-size:11.5px;color:#4b4540;line-height:1.7}
+.po-sheet .sign{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:36px;text-align:center}
+.po-sheet .sign .role{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.po-sheet .sign .hint{font-size:10px;color:#8a8178;margin-top:2px}
+.po-sheet .sign .space{height:60px}
+.po-sheet .sign .name{font-size:11px;color:#8a8178;border-top:1px dotted #c9c1b4;padding-top:5px}
+.po-sheet .sign .ks{border:2px solid #e36122;border-radius:8px;padding:12px 14px 10px}
+.po-sheet .sign .ks .role{color:#a6410f}
+.po-sheet .sign .ks .hint{color:#a6410f;font-weight:600}
+.po-sheet .sign .ks .name{color:#1c1917;font-weight:600;border-top-color:#e36122}
+.po-sheet .foot{margin-top:20px;text-align:center;font-size:10px;color:#8a8178;letter-spacing:.3px}
+`;
+
 export function MuaHangClient({
   projectId,
   projectCode,
   projectName,
+  ksName,
+  ksPhone,
 }: {
   projectId: string;
   projectCode: string;
   projectName: string;
+  ksName: string;
+  ksPhone: string;
 }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [phaseNames, setPhaseNames] = useState<Record<string, string>>({});
@@ -259,48 +361,81 @@ export function MuaHangClient({
 
   // Nội dung PO dùng chung cho modal (xem/ảnh) và cửa sổ in
   const poBodyHtml = (o: Order) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const logoSrc = `${origin}/po-logo.png`;
+    const pad = String(o.seq).padStart(4, "0");
+    const dots = "................";
     const rows = o.items
       .map(
         (it, i) =>
-          `<tr><td class="c">${i + 1}</td><td>${esc(it.name)}</td><td class="c">${esc(it.unit)}</td><td class="r">${fmtQ(
-            it.qty,
-          )}</td><td class="r">${fmt(it.price)}</td><td class="r">${fmt(it.qty * it.price)}</td></tr>`,
+          `<tr><td class="c">${i + 1}</td><td class="nm">${esc(it.name)}</td><td class="c">${esc(
+            it.unit,
+          )}</td><td class="r">${fmtQ(it.qty)}</td><td class="r">${fmt(it.price)}</td><td class="r">${fmt(
+            it.qty * it.price,
+          )}</td></tr>`,
       )
       .join("");
-    return `<div class="h"><div class="co"><b>CÔNG TY XÂY DỰNG HUỲNH GIA</b><div>ERP · erp.huynhgia6.com</div></div>
-<div style="text-align:right;font-size:11px;color:#444">Đúng — Đẹp — Bền</div></div>
-<div class="t"><h1>ĐƠN ĐẶT HÀNG</h1><div class="s">Purchase Order</div></div>
-<div class="meta"><div><b>Công trình:</b> ${esc(projectName)}<br><b>Mã dự án:</b> ${esc(projectCode)}<br><b>NCC:</b> ${esc(
-      o.supplierName || "..............................",
-    )}</div>
-<div style="text-align:right"><b>Số PO:</b> #${o.seq}<br><b>Ngày đặt:</b> ${fmtDate(o.orderDate)}<br><b>Ngày nhận:</b> ${
-      fmtDate(o.deliveryDate) || "................"
-    }<br><b>Trạng thái:</b> ${stBadge(o.status, o.supplierName).label}</div></div>
-<table><thead><tr><th class="c">STT</th><th>Vật tư</th><th class="c">ĐVT</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr></thead>
-<tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r">TỔNG CỘNG</td><td class="r">${fmt(o.total)}</td></tr></tfoot></table>
-${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
-<div class="sign"><div><div class="role">NHÀ CUNG CẤP</div><div class="sp"></div>(Ký, ghi rõ họ tên)</div>
-<div><div class="role">ĐẠI DIỆN HUỲNH GIA</div><div class="sp"></div>(Ký, ghi rõ họ tên)</div></div>
-<div class="pf">In từ ERP Huỳnh Gia · ${fmtDate(new Date().toISOString())}</div>`;
+    const ksSignName = ksName ? `${esc(ksName)}${ksPhone ? ` · ${esc(ksPhone)}` : ""}` : "&nbsp;";
+    return `<style>${PO_CSS}</style>
+<div class="h">
+  <div>
+    <img class="brand-logo" src="${logoSrc}" alt="Huỳnh Gia">
+    <div class="co">
+      <div class="nm">Công ty TNHH Kiến trúc Xây dựng và Nội thất Huỳnh Gia</div>
+      <div class="row"><span>Địa chỉ:</span> Số 2157 – QL.51, Ấp 1, Phước Bình, Long Thành, Đồng Nai</div>
+      <div class="row"><span>MST:</span> 3604008952 · <span>Điện thoại:</span> 0931.316.513 · huynhgia6.com</div>
+    </div>
+  </div>
+  <div class="doc-id"><div class="kicker">Số đơn hàng</div><div class="no">PO-${pad}<br><small>Ngày ${fmtDate(
+      o.orderDate,
+    )}</small></div></div>
+</div>
+<div class="rule"></div>
+<div class="title"><h1>ĐƠN ĐẶT HÀNG</h1><div class="sub">Purchase Order</div><div class="brand"></div></div>
+<div class="meta">
+  <div class="card"><h3>Nhà cung cấp</h3><dl class="kv">
+    <dt>Đơn vị</dt><dd${o.supplierName ? "" : ' class="blank"'}>${esc(o.supplierName || dots)}</dd>
+    <dt>Người liên hệ</dt><dd class="blank">${dots}</dd>
+    <dt>Điện thoại</dt><dd class="blank">${dots}</dd>
+  </dl></div>
+  <div class="card"><h3>Thông tin giao hàng</h3><dl class="kv">
+    <dt>Công trình</dt><dd>${esc(projectName)}</dd>
+    <dt>Ngày cần giao</dt><dd${o.deliveryDate ? "" : ' class="blank"'}>${fmtDate(o.deliveryDate) || dots}</dd>
+    <dt>Hình thức</dt><dd>Giao tận công trình</dd>
+    <dt>KS phụ trách</dt><dd${ksName ? "" : ' class="blank"'}>${esc(ksName || dots)}</dd>
+    <dt>SĐT liên hệ</dt><dd${ksPhone ? "" : ' class="blank"'}>${esc(ksPhone || dots)}</dd>
+  </dl></div>
+</div>
+<div class="tbl-wrap"><table>
+  <thead><tr><th class="c">STT</th><th>Tên vật tư / quy cách</th><th class="c">ĐVT</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr class="grand"><td colspan="4"></td><td class="lbl">Tổng cộng</td><td class="sum">${fmt(o.total)}</td></tr></tfoot>
+</table></div>
+<p class="amount-words">Bằng chữ: <b>${docTien(o.total)}.</b></p>
+${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;padding-left:0"><li>${esc(o.note)}</li></ol></div>` : ""}
+<div class="terms"><h4>Điều kiện đặt hàng</h4><ol>
+  <li>Giao đúng chủng loại, quy cách, số lượng ghi trên đơn. Hàng không đạt được trả lại.</li>
+  <li>Xuất hóa đơn / phiếu giao hàng kèm theo lô hàng.</li>
+  <li><b>Đơn hàng CHỈ được thanh toán khi có chữ ký xác nhận của KS phụ trách công trình (ô ký bên phải). Không có chữ ký này, Huỳnh Gia không thanh toán.</b></li>
+</ol></div>
+<div class="sign">
+  <div><div class="role">Nhà cung cấp</div><div class="hint">(Ký, ghi rõ họ tên)</div><div class="space"></div><div class="name">&nbsp;</div></div>
+  <div class="ks"><div class="role">KS phụ trách công trình</div><div class="hint">Bắt buộc — đơn không có chữ ký này sẽ không được thanh toán</div><div class="space"></div><div class="name">${ksSignName}</div></div>
+</div>
+<div class="foot">Công ty TNHH Kiến trúc Xây dựng và Nội thất Huỳnh Gia · Xây Dựng Huỳnh Gia – Yên Tâm Nhận Nhà</div>`;
   };
 
   const printPOWindow = (o: Order) => {
-    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>PO don #${o.seq}</title><style>
-@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:"Times New Roman",serif;color:#111;font-size:13px;line-height:1.45;margin:0}
-.h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}
-.co b{font-size:17px;letter-spacing:.5px}.co div{font-size:11px;color:#444}
-.t{text-align:center;margin:18px 0 4px}.t h1{font-size:19px;margin:0;letter-spacing:1px}.t .s{font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase}
-.meta{display:flex;justify-content:space-between;margin:14px 0;font-size:12.5px}.meta div{line-height:1.7}
-table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #999;padding:6px 8px}th{background:#f0ece2;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
-td.c,th.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:bold;background:#faf8f2}
-.note{margin-top:12px;font-size:12px}.sign{display:flex;justify-content:space-between;margin-top:34px;text-align:center;font-size:12px}
-.sign div{width:45%}.sign .role{font-weight:bold}.sign .sp{height:60px}
-.pf{position:fixed;bottom:8mm;right:16mm;font-size:10px;color:#888}@media print{.noprint{display:none}}
-.pbtn{position:fixed;top:12px;right:12px;background:#E36122;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px sans-serif;cursor:pointer}
+    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>Đơn đặt hàng PO-${String(
+      o.seq,
+    ).padStart(4, "0")}</title><style>
+@page{size:A4;margin:13mm}html,body{margin:0}
+.po-sheet.po-print{padding:0;box-shadow:none;width:auto}
+@media print{.noprint{display:none}}
+.pbtn{position:fixed;top:12px;right:12px;background:#e36122;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px "Segoe UI",sans-serif;cursor:pointer;z-index:9}
 </style></head><body>
 <button class="pbtn noprint" onclick="window.print()">In / Lưu PDF</button>
-${poBodyHtml(o)}
+<div class="po-sheet po-print">${poBodyHtml(o)}</div>
 </body></html>`;
     const w = window.open("", "_blank");
     if (w) {

@@ -14,9 +14,22 @@ export default async function MuaHangPage({ params }: { params: { id: string } }
 
   const project = await prisma.project.findUnique({
     where: { id: params.id },
-    select: { id: true, code: true, name: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      mainEngineer: { select: { fullName: true, phone: true } },
+    },
   });
   if (!project) notFound();
 
-  return <MuaHangClient projectId={project.id} projectCode={project.code} projectName={project.name} />;
+  return (
+    <MuaHangClient
+      projectId={project.id}
+      projectCode={project.code}
+      projectName={project.name}
+      ksName={project.mainEngineer?.fullName || ""}
+      ksPhone={project.mainEngineer?.phone || ""}
+    />
+  );
 }
