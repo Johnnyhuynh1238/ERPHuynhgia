@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const orders = await prisma.mhOrder.findMany({
     where: { projectId: params.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: { seq: "desc" },
   });
 
   return NextResponse.json({

@@ -233,3 +233,37 @@
 .mh-ai-head b { font-size: 13px; color: #7aa2ff; font-weight: 600; }
 .mh-ai-head .x { margin-left: auto; background: none; border: none; color: #94a3b8; font-size: 15px; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
 .mh-ai-box iframe { width: 100%; flex: 1; border: 0; }
+
+/* ---- PO modal (portal ra body — KHÔNG scope .mhdoc) ---- */
+.po-overlay { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; background: rgba(20, 8, 3, 0.55); padding: 10px; }
+.po-modal { display: flex; flex-direction: column; width: 100%; max-width: 720px; max-height: 96dvh; overflow: hidden; border-radius: 14px; background: #efece6; box-shadow: 0 12px 50px rgba(0, 0, 0, 0.45); }
+.po-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: #1c1310; }
+.po-x { background: rgba(255, 255, 255, 0.12); color: #fff; border: none; border-radius: 9px; width: 38px; height: 38px; font-size: 17px; line-height: 1; cursor: pointer; }
+.po-x:hover { background: rgba(255, 255, 255, 0.22); }
+.po-acts { display: flex; gap: 8px; }
+.po-btn { background: #3a2a22; color: #f5efe1; border: none; border-radius: 9px; padding: 9px 15px; font: 600 13.5px var(--font-plex-sans), sans-serif; cursor: pointer; }
+.po-btn:hover { filter: brightness(1.12); }
+.po-btn.share { background: #e36122; color: #fff; }
+.po-scroll { flex: 1; overflow: auto; padding: 16px; display: flex; justify-content: center; background: #7a7168; -webkit-overflow-scrolling: touch; }
+/* Tờ PO luôn sáng (nền trắng, chữ đen) — để ảnh & in đẹp bất kể theme */
+.po-sheet { width: 640px; max-width: 100%; align-self: flex-start; background: #fff; color: #111; font-family: "Times New Roman", serif; font-size: 13px; line-height: 1.45; padding: 28px 30px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2); }
+.po-sheet .h { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 10px; }
+.po-sheet .co b { font-size: 17px; letter-spacing: 0.5px; }
+.po-sheet .co div { font-size: 11px; color: #444; }
+.po-sheet .t { text-align: center; margin: 18px 0 4px; }
+.po-sheet .t h1 { font-size: 19px; margin: 0; letter-spacing: 1px; }
+.po-sheet .t .s { font-size: 11px; color: #555; letter-spacing: 2px; text-transform: uppercase; }
+.po-sheet .meta { display: flex; justify-content: space-between; margin: 14px 0; font-size: 12.5px; }
+.po-sheet .meta div { line-height: 1.7; }
+.po-sheet table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.po-sheet th, .po-sheet td { border: 1px solid #999; padding: 6px 8px; }
+.po-sheet th { background: #f0ece2; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+.po-sheet td.c, .po-sheet th.c { text-align: center; }
+.po-sheet td.r, .po-sheet th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.po-sheet tfoot td { font-weight: bold; background: #faf8f2; }
+.po-sheet .note { margin-top: 12px; font-size: 12px; }
+.po-sheet .sign { display: flex; justify-content: space-between; margin-top: 34px; text-align: center; font-size: 12px; }
+.po-sheet .sign div { width: 45%; }
+.po-sheet .sign .role { font-weight: bold; }
+.po-sheet .sign .sp { height: 60px; }
+.po-sheet .pf { margin-top: 22px; text-align: right; font-size: 10px; color: #888; }

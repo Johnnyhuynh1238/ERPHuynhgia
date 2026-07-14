@@ -2,7 +2,7 @@
 
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./mua-hang.css";
 
@@ -111,6 +111,8 @@ export function MuaHangClient({
   const [pending, setPending] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
+  const [poOrder, setPoOrder] = useState<Order | null>(null);
+  const poRef = useRef<HTMLDivElement>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -255,7 +257,8 @@ export function MuaHangClient({
     }
   };
 
-  const downloadPO = (o: Order) => {
+  // Nội dung PO dùng chung cho modal (xem/ảnh) và cửa sổ in
+  const poBodyHtml = (o: Order) => {
     const rows = o.items
       .map(
         (it, i) =>
@@ -264,21 +267,7 @@ export function MuaHangClient({
           )}</td><td class="r">${fmt(it.price)}</td><td class="r">${fmt(it.qty * it.price)}</td></tr>`,
       )
       .join("");
-    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>PO don #${o.seq}</title><style>
-@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:"Times New Roman",serif;color:#111;font-size:13px;line-height:1.45;margin:0}
-.h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}
-.co b{font-size:17px;letter-spacing:.5px}.co div{font-size:11px;color:#444}
-.t{text-align:center;margin:18px 0 4px}.t h1{font-size:19px;margin:0;letter-spacing:1px}.t .s{font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase}
-.meta{display:flex;justify-content:space-between;margin:14px 0;font-size:12.5px}.meta div{line-height:1.7}
-table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #999;padding:6px 8px}th{background:#f0ece2;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
-td.c,th.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:bold;background:#faf8f2}
-.note{margin-top:12px;font-size:12px}.sign{display:flex;justify-content:space-between;margin-top:34px;text-align:center;font-size:12px}
-.sign div{width:45%}.sign .role{font-weight:bold}.sign .sp{height:60px}
-.pf{position:fixed;bottom:8mm;right:16mm;font-size:10px;color:#888}@media print{.noprint{display:none}}
-.pbtn{position:fixed;top:12px;right:12px;background:#E36122;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px sans-serif;cursor:pointer}
-</style></head><body>
-<button class="pbtn noprint" onclick="window.print()">In / Lưu PDF</button>
-<div class="h"><div class="co"><b>CÔNG TY XÂY DỰNG HUỲNH GIA</b><div>ERP · erp.huynhgia6.com</div></div>
+    return `<div class="h"><div class="co"><b>CÔNG TY XÂY DỰNG HUỲNH GIA</b><div>ERP · erp.huynhgia6.com</div></div>
 <div style="text-align:right;font-size:11px;color:#444">Đúng — Đẹp — Bền</div></div>
 <div class="t"><h1>ĐƠN ĐẶT HÀNG</h1><div class="s">Purchase Order</div></div>
 <div class="meta"><div><b>Công trình:</b> ${esc(projectName)}<br><b>Mã dự án:</b> ${esc(projectCode)}<br><b>NCC:</b> ${esc(
@@ -293,12 +282,65 @@ td.c,th.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabu
 ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
 <div class="sign"><div><div class="role">NHÀ CUNG CẤP</div><div class="sp"></div>(Ký, ghi rõ họ tên)</div>
 <div><div class="role">ĐẠI DIỆN HUỲNH GIA</div><div class="sp"></div>(Ký, ghi rõ họ tên)</div></div>
-<div class="pf">In từ ERP Huỳnh Gia · ${fmtDate(new Date().toISOString())}</div>
+<div class="pf">In từ ERP Huỳnh Gia · ${fmtDate(new Date().toISOString())}</div>`;
+  };
+
+  const printPOWindow = (o: Order) => {
+    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>PO don #${o.seq}</title><style>
+@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:"Times New Roman",serif;color:#111;font-size:13px;line-height:1.45;margin:0}
+.h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px}
+.co b{font-size:17px;letter-spacing:.5px}.co div{font-size:11px;color:#444}
+.t{text-align:center;margin:18px 0 4px}.t h1{font-size:19px;margin:0;letter-spacing:1px}.t .s{font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase}
+.meta{display:flex;justify-content:space-between;margin:14px 0;font-size:12.5px}.meta div{line-height:1.7}
+table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #999;padding:6px 8px}th{background:#f0ece2;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+td.c,th.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:bold;background:#faf8f2}
+.note{margin-top:12px;font-size:12px}.sign{display:flex;justify-content:space-between;margin-top:34px;text-align:center;font-size:12px}
+.sign div{width:45%}.sign .role{font-weight:bold}.sign .sp{height:60px}
+.pf{position:fixed;bottom:8mm;right:16mm;font-size:10px;color:#888}@media print{.noprint{display:none}}
+.pbtn{position:fixed;top:12px;right:12px;background:#E36122;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px sans-serif;cursor:pointer}
+</style></head><body>
+<button class="pbtn noprint" onclick="window.print()">In / Lưu PDF</button>
+${poBodyHtml(o)}
 </body></html>`;
     const w = window.open("", "_blank");
     if (w) {
       w.document.write(html);
       w.document.close();
+    }
+  };
+
+  // Chụp PO thành ảnh PNG → chia sẻ (Zalo…) hoặc tải về
+  const sharePO = async () => {
+    const node = poRef.current;
+    if (!node || !poOrder) return;
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) {
+        toast("Tạo ảnh lỗi");
+        return;
+      }
+      const file = new File([blob], `PO-${poOrder.seq}.png`, { type: "image/png" });
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try {
+          await nav.share({ files: [file], title: `PO #${poOrder.seq}` });
+          return;
+        } catch {
+          /* user huỷ chia sẻ → thôi */
+          return;
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `PO-${poOrder.seq}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Đã tải ảnh PO");
+    } catch {
+      toast("Không tạo được ảnh PO");
     }
   };
 
@@ -388,7 +430,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
               <div className="foot">Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền</div>
             </>
           ) : (
-            <OrdersList orders={orders} onEdit={setEditing} onDel={delOrder} onPO={downloadPO} />
+            <OrdersList orders={orders} onEdit={setEditing} onDel={delOrder} onPO={setPoOrder} />
           )}
         </div>
       </div>
@@ -444,6 +486,33 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
                 src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
                 title="AI đơn mua hàng"
               />
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* PO modal — portal ra body: xem PO, ✕ đóng, 📷 gửi ảnh Zalo, in/PDF */}
+      {poOrder &&
+        mounted &&
+        createPortal(
+          <div className="po-overlay" onClick={() => setPoOrder(null)}>
+            <div className="po-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="po-bar">
+                <button type="button" className="po-x" onClick={() => setPoOrder(null)} aria-label="Đóng">
+                  ✕
+                </button>
+                <div className="po-acts">
+                  <button type="button" className="po-btn share" onClick={sharePO}>
+                    📷 Gửi ảnh
+                  </button>
+                  <button type="button" className="po-btn" onClick={() => printPOWindow(poOrder)}>
+                    🖨 In / PDF
+                  </button>
+                </div>
+              </div>
+              <div className="po-scroll">
+                <div className="po-sheet" ref={poRef} dangerouslySetInnerHTML={{ __html: poBodyHtml(poOrder) }} />
+              </div>
             </div>
           </div>,
           document.body,
@@ -600,7 +669,7 @@ function OrdersList({
           </div>
           <div className="oact" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
-              ⭳ Tải PO
+              📄 Xem PO
             </button>
             <button type="button" className="del" onClick={() => onDel(o)}>
               Xoá
