@@ -383,7 +383,7 @@ export function MuaHangClient({
     <div class="co">
       <div class="nm">Công ty TNHH Kiến trúc Xây dựng và Nội thất Huỳnh Gia</div>
       <div class="row"><span>Địa chỉ:</span> Số 2157 – QL.51, Ấp 1, Phước Bình, Long Thành, Đồng Nai</div>
-      <div class="row"><span>MST:</span> 3604008952 · <span>Điện thoại:</span> 0931.316.513</div>
+      <div class="row"><span>MST:</span> 3604008952 · <span>Điện thoại:</span> 0931.316.513 · huynhgia6.com</div>
     </div>
   </div>
   <div class="doc-id"><div class="kicker">Số đơn hàng</div><div class="no">PO-${pad}<br><small>Ngày ${fmtDate(
