@@ -334,11 +334,32 @@ export function MuaHangClient({
     return out;
   }, [materials]);
 
-  const placed = useMemo<Record<string, number>>(() => {
+  // Tổng đã đặt theo VẬT TƯ (không phân biệt GĐ) — gộp theo tên+đơn vị.
+  const placedByMat = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
-    orders.forEach((o) => o.items.forEach((it) => (m[it.key] = (m[it.key] || 0) + it.qty)));
+    orders.forEach((o) =>
+      o.items.forEach((it) => {
+        const mk = `${it.name}|${it.unit}`;
+        m[mk] = (m[mk] || 0) + it.qty;
+      }),
+    );
     return m;
   }, [orders]);
+
+  // Phân bổ waterfall: số đã đặt của 1 vật tư fill GĐ sớm nhất trước, dư mới sang GĐ sau.
+  // (groups đã sắp theo GĐ tăng dần nên duyệt tuần tự là đúng thứ tự.)
+  const placed = useMemo<Record<string, number>>(() => {
+    const pool: Record<string, number> = { ...placedByMat };
+    const res: Record<string, number> = {};
+    for (const g of groups) {
+      const mk = `${g.name}|${g.unit}`;
+      const avail = pool[mk] || 0;
+      const take = Math.min(avail, g.total);
+      res[g.key] = take;
+      pool[mk] = avail - take;
+    }
+    return res;
+  }, [groups, placedByMat]);
 
   // "Đã nhận" = đã nhận hàng (received) hoặc đã thanh toán (paid). Còn lại = chưa nhận.
   const isReceived = (s: Order["status"]) => s === "received" || s === "paid";
@@ -410,15 +431,28 @@ export function MuaHangClient({
     const logoSrc = `${origin}/po-logo.png`;
     const pad = String(o.seq).padStart(4, "0");
     const dots = "................";
-    const rows = o.items
-      .map(
-        (it, i) =>
-          `<tr><td class="c">${i + 1}</td><td class="nm">${esc(it.name)}</td><td class="c">${esc(
-            it.unit,
-          )}</td><td class="r">${fmtQ(it.qty)}</td><td class="r">${fmt(it.price)}</td><td class="r">${fmt(
-            it.qty * it.price,
-          )}</td></tr>`,
-      )
+    // Gộp vật tư cùng tên+ĐVT (đặt ở nhiều GĐ) thành 1 dòng trên PO. Đơn giá = thành tiền / SL.
+    const merged: { name: string; unit: string; qty: number; amount: number }[] = [];
+    const midx: Record<string, number> = {};
+    o.items.forEach((it) => {
+      const mk = `${it.name}|${it.unit}`;
+      if (midx[mk] == null) {
+        midx[mk] = merged.length;
+        merged.push({ name: it.name, unit: it.unit, qty: 0, amount: 0 });
+      }
+      const mm = merged[midx[mk]];
+      mm.qty += it.qty;
+      mm.amount += it.qty * it.price;
+    });
+    const rows = merged
+      .map((it, i) => {
+        const price = it.qty > 0 ? it.amount / it.qty : 0;
+        return `<tr><td class="c">${i + 1}</td><td class="nm">${esc(it.name)}</td><td class="c">${esc(
+          it.unit,
+        )}</td><td class="r">${fmtQ(it.qty)}</td><td class="r">${fmt(price)}</td><td class="r">${fmt(
+          it.amount,
+        )}</td></tr>`;
+      })
       .join("");
     const ksSignName = ksName ? `${esc(ksName)}${ksPhone ? ` · ${esc(ksPhone)}` : ""}` : "&nbsp;";
     return `<style>${PO_CSS}</style>
