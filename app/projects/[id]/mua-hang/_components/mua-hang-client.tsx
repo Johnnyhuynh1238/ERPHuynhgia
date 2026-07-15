@@ -383,7 +383,7 @@ export function MuaHangClient({
     <div class="co">
       <div class="nm">Công ty TNHH Kiến trúc Xây dựng và Nội thất Huỳnh Gia</div>
       <div class="row"><span>Địa chỉ:</span> Số 2157 – QL.51, Ấp 1, Phước Bình, Long Thành, Đồng Nai</div>
-      <div class="row"><span>MST:</span> 3604008952 · <span>Điện thoại:</span> 0931.316.513 · huynhgia6.com</div>
+      <div class="row"><span>MST:</span> 3604008952 · <span>Điện thoại:</span> 0931.316.513</div>
     </div>
   </div>
   <div class="doc-id"><div class="kicker">Số đơn hàng</div><div class="no">PO-${pad}<br><small>Ngày ${fmtDate(
@@ -446,11 +446,32 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
 
   // Chụp PO thành ảnh PNG → chia sẻ (Zalo…) hoặc tải về
   const sharePO = async () => {
-    const node = poRef.current;
-    if (!node || !poOrder) return;
+    if (!poOrder) return;
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+      // Dựng bản A4 cố định (794×1123px @96dpi) ngoài màn hình → ảnh luôn đúng khổ A4,
+      // không co hẹp theo bề rộng điện thoại (tránh ảnh dài sọc).
+      const holder = document.createElement("div");
+      holder.className = "po-sheet";
+      holder.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;min-height:1123px;background:#fff";
+      holder.innerHTML = poBodyHtml(poOrder);
+      document.body.appendChild(holder);
+      // Chờ logo tải xong trước khi chụp
+      await Promise.all(
+        Array.from(holder.querySelectorAll("img")).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((r) => {
+                img.onload = img.onerror = () => r();
+              }),
+        ),
+      );
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await html2canvas(holder, { scale: 2, backgroundColor: "#ffffff", width: 794, windowWidth: 794 });
+      } finally {
+        holder.remove();
+      }
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
       if (!blob) {
         toast("Tạo ảnh lỗi");
