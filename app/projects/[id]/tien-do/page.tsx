@@ -14,9 +14,16 @@ export default async function TienDoPage({ params }: { params: { id: string } })
 
   const project = await prisma.project.findUnique({
     where: { id: params.id },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, address: true },
   });
   if (!project) notFound();
 
-  return <TienDoClient projectId={project.id} projectCode={project.code} projectName={project.name} />;
+  return (
+    <TienDoClient
+      projectId={project.id}
+      projectCode={project.code}
+      projectName={project.name}
+      projectAddress={project.address}
+    />
+  );
 }
