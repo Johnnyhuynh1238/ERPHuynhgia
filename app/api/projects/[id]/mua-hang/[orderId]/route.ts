@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/estimate";
+import { requireMuaHang } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { error } = await requireAdmin();
+  const { isKeToan, error } = await requireMuaHang();
   if (error) return error;
 
   const order = await prisma.mhOrder.findFirst({
@@ -48,7 +48,8 @@ export async function PATCH(
   }
 
   // Đơn giá: KHÔNG đụng qty. Cập nhật price theo index rồi tính lại total.
-  if (Array.isArray(body.prices)) {
+  // Kế toán không được đặt giá (giá do admin quy định trong dự toán) → bỏ qua prices.
+  if (Array.isArray(body.prices) && !isKeToan) {
     const items = (order.items as unknown as OrderItem[]).map((it, i) => {
       const p = Math.round(Number((body.prices as unknown[])[i]));
       return { ...it, price: Number.isFinite(p) && p >= 0 ? p : it.price };
@@ -66,7 +67,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { error } = await requireAdmin();
+  const { error } = await requireMuaHang();
   if (error) return error;
 
   const res = await prisma.mhOrder.deleteMany({

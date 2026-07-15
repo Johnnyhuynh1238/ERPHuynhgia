@@ -121,20 +121,12 @@ const APPS: AppDef[] = [
     },
   },
   {
-    key: "don-hang",
-    label: "Đơn hàng",
+    // Flow mới: mua hàng bám dự toán theo từng dự án (thay /proposals cũ).
+    // Kế toán chọn dự án → icon 🛒 Mua hàng + Công nợ NCC trong màn dự án.
+    key: "mua-hang",
+    label: "Mua hàng",
     Icon: PackageCheck,
-    buildItems: (data) => {
-      const d = data?.donHangBreakdown;
-      return [
-        { label: "Chờ duyệt đề xuất", href: "/proposals?status=pending", badge: d?.proposalPending ?? 0 },
-        { label: "Cần đặt NCC", href: "/proposals?status=accepted&orderStatus=not_ordered", badge: d?.proposalToOrder ?? 0 },
-        { label: "Chờ ghi công nợ", href: "/proposals?filter=needs_debt", badge: d?.receiptNeedsDebt ?? 0 },
-        { label: "Đã thanh toán", href: "/proposals?orderStatus=paid", badge: d?.proposalPaid ?? 0 },
-        "divider",
-        { label: "Tất cả đơn hàng", href: "/proposals" },
-      ];
-    },
+    href: "/projects",
   },
   {
     key: "cong-no",

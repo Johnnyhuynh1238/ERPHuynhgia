@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/estimate";
+import { requireMuaHang } from "@/lib/estimate";
 import { recordCashTxn } from "@/lib/treasury";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ type OrderItem = { key: string; name: string; unit: string; qty: number; price: 
 //  - Trả = Σ ncc_thanh_toan (theo project + supplier).
 //  - Gộp theo NCC: mỗi NCC kèm danh sách đơn (cũ→mới) + lịch sử thanh toán.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAdmin();
+  const { error } = await requireMuaHang();
   if (error) return error;
 
   const orders = await prisma.mhOrder.findMany({
@@ -130,7 +130,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 //  → tạo ncc_thanh_toan + phiếu chi cash_transactions (out) trong 1 transaction.
 // Body { supplierId, amount, accountId, date?(YYYY-MM-DD), note? }
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { user, error } = await requireAdmin();
+  const { user, error } = await requireMuaHang();
   if (error) return error;
 
   const body = (await req.json().catch(() => ({}))) as {

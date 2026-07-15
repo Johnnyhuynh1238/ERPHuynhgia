@@ -48,6 +48,7 @@ type Caps = {
   canViewMembers: boolean;
   canViewFinance: boolean;
   canViewAcceptance: boolean;
+  canMuaHang: boolean;
   isAdmin: boolean;
 };
 
@@ -88,7 +89,7 @@ export function ProjectHubGrid({
   ];
 
   const finance: HubItem[] = [
-    ...(caps.isAdmin
+    ...(caps.canMuaHang
       ? [{ href: `${base}/cong-no`, label: "Công nợ NCC", icon: Wallet, desc: "Nợ · trả · còn lại" } as HubItem]
       : []),
     ...(caps.canViewPayments
@@ -97,7 +98,7 @@ export function ProjectHubGrid({
     ...(caps.canProposeMaterials
       ? [{ href: `${base}/material-proposals`, label: "Đề xuất vật tư", icon: Package, desc: "VT cần mua" } as HubItem]
       : []),
-    ...(caps.isAdmin
+    ...(caps.canMuaHang
       ? [{ href: `${base}/mua-hang`, label: "Mua hàng", icon: ShoppingCart, desc: "Đặt VT bám dự toán" } as HubItem]
       : []),
     ...(isSelf && caps.canViewPayroll

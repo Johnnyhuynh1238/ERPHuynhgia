@@ -4191,3 +4191,28 @@ model MhOrder {
   @@index([projectId, createdAt(sort: Desc)])
   @@map("mh_orders")
 }
+
+// Loại lỗi khi kế toán bị chặn tạo đơn.
+enum MhBlockKind {
+  missing_price // vật tư chưa có giá trong dự toán → admin cần duyệt giá
+  over_budget   // SL định mua vượt dự toán (hoặc vật tư không có trong dự toán)
+}
+
+// Nhật ký chặn đơn của kế toán — admin xem để biết VT nào thiếu giá / vượt SL.
+// projectId/userId để scalar (không @relation) để khỏi phải thêm back-relation vào Project/User;
+// FK thật gắn ở migration SQL.
+model MhOrderBlock {
+  id           String      @id @default(uuid()) @db.Uuid
+  projectId    String      @map("project_id") @db.Uuid
+  userId       String      @map("user_id") @db.Uuid // kế toán bị chặn
+  kind         MhBlockKind
+  materialName String      @map("material_name")
+  unit         String      @db.VarChar(20)
+  need         Decimal     @default(0) @db.Decimal(14, 3) // SL định mua
+  have         Decimal     @default(0) @db.Decimal(14, 3) // SL còn lại theo dự toán (0 nếu thiếu giá / ngoài dự toán)
+  budget       Decimal     @default(0) @db.Decimal(14, 3) // tổng SL dự toán của VT
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("mh_order_blocks")
+}

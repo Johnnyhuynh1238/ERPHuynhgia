@@ -201,25 +201,41 @@ const PO_CSS = `
 }
 `;
 
+type Block = {
+  key: string;
+  kind: "missing_price" | "over_budget";
+  materialName: string;
+  unit: string;
+  need: number;
+  have: number;
+  budget: number;
+  count: number;
+  lastAt: string;
+  lastBy: string;
+};
+
 export function MuaHangClient({
   projectId,
   projectCode,
   projectName,
   ksName,
   ksPhone,
+  isKeToan = false,
 }: {
   projectId: string;
   projectCode: string;
   projectName: string;
   ksName: string;
   ksPhone: string;
+  isKeToan?: boolean;
 }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [phaseNames, setPhaseNames] = useState<Record<string, string>>({});
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<"buy" | "orders" | "received">("buy");
+  const [tab, setTab] = useState<"buy" | "orders" | "received" | "blocks">("buy");
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [pending, setPending] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
@@ -283,6 +299,18 @@ export function MuaHangClient({
     const j = await r.json();
     setOrders(Array.isArray(j.items) ? j.items : []);
   }, [projectId]);
+
+  // Log chặn (chỉ admin). Tải khi mở tab.
+  const loadBlocks = useCallback(async () => {
+    const r = await fetch(`/api/projects/${projectId}/mua-hang/blocks`, { cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json();
+    setBlocks(Array.isArray(j.items) ? j.items : []);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (tab === "blocks" && !isKeToan) loadBlocks();
+  }, [tab, isKeToan, loadBlocks]);
 
   useEffect(() => {
     (async () => {
@@ -368,9 +396,15 @@ export function MuaHangClient({
   const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
   const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
 
-  const setQty = (key: string, v: string) => {
-    const n = parseFloat(v);
-    setPending((p) => ({ ...p, [key]: !isNaN(n) && n > 0 ? n : 0 }));
+  // Kế toán: SL không vượt "còn lại" dự toán (max). Admin: max undefined = tự do.
+  const setQty = (key: string, v: string, max?: number) => {
+    let n = parseFloat(v);
+    if (isNaN(n) || n <= 0) n = 0;
+    if (max != null && n > max) {
+      n = max > 0 ? Math.round(max * 1000) / 1000 : 0;
+      toast("Vượt dự toán — đã chỉnh về SL còn lại. Cần thêm: gọi admin.");
+    }
+    setPending((p) => ({ ...p, [key]: n }));
   };
 
   const cart = useMemo(() => {
@@ -660,6 +694,16 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
             <span>Đã nhận</span>
             <span className="cnt">{ordersReceived.length}</span>
           </button>
+          {!isKeToan && (
+            <button
+              type="button"
+              className={`tab${tab === "blocks" ? " on" : ""}`}
+              onClick={() => setTab("blocks")}
+            >
+              <span>⚠ Chặn KT</span>
+              {blocks.length > 0 && <span className="cnt">{blocks.length}</span>}
+            </button>
+          )}
         </div>
 
         <div className="panel">
@@ -667,6 +711,8 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
             <div className="load">Đang tải dự toán…</div>
           ) : err ? (
             <div className="empty">{err}</div>
+          ) : tab === "blocks" ? (
+            <BlocksList blocks={blocks} />
           ) : tab === "buy" ? (
             <>
               <BuyList
@@ -677,8 +723,13 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
                 open={open}
                 setOpen={setOpen}
                 setQty={setQty}
+                isKeToan={isKeToan}
               />
-              <div className="foot">Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền</div>
+              <div className="foot">
+                {isKeToan
+                  ? "Nhập SL trong dự toán → Tạo đơn · Giá & định mức do admin quy định"
+                  : "Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền"}
+              </div>
             </>
           ) : tab === "orders" ? (
             <OrdersList
@@ -724,6 +775,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
         <EditSheet
           order={editing}
           projectId={projectId}
+          isKeToan={isKeToan}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -800,6 +852,7 @@ function BuyList({
   open,
   setOpen,
   setQty,
+  isKeToan,
 }: {
   groups: Group[];
   phaseNames: Record<string, string>;
@@ -807,7 +860,8 @@ function BuyList({
   pending: Record<string, number>;
   open: Record<string, boolean>;
   setOpen: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  setQty: (key: string, v: string) => void;
+  setQty: (key: string, v: string, max?: number) => void;
+  isKeToan: boolean;
 }) {
   if (!groups.length)
     return (
@@ -869,9 +923,10 @@ function BuyList({
                       inputMode="decimal"
                       step="any"
                       min="0"
+                      max={isKeToan ? (rem > 0 ? rem : 0) : undefined}
                       placeholder="0"
                       value={uv || ""}
-                      onChange={(e) => setQty(g.key, e.target.value)}
+                      onChange={(e) => setQty(g.key, e.target.value, isKeToan ? rem : undefined)}
                     />
                     <span className="u">{g.unit}</span>
                   </div>
@@ -958,16 +1013,62 @@ function OrdersList({
   );
 }
 
+// Log chặn kế toán — admin xem VT nào thiếu giá / vượt SL để xử lý dự toán.
+function BlocksList({ blocks }: { blocks: Block[] }) {
+  if (!blocks.length)
+    return (
+      <div className="empty">
+        <div className="ic">✅</div>
+        Chưa có lần chặn nào. Kế toán đặt hàng đều trong dự toán.
+      </div>
+    );
+  return (
+    <div>
+      <div className="phead">
+        <span className="pi">Cảnh báo</span>
+        <span className="pn">Kế toán bị chặn — cần admin xử (duyệt giá / nới dự toán)</span>
+      </div>
+      {blocks.map((b) => {
+        const miss = b.kind === "missing_price";
+        return (
+          <div key={b.key} className="ord-card" style={{ cursor: "default" }}>
+            <div className="oh">
+              <span className="on">{b.materialName}</span>
+              <span className={`chip ${miss ? "await" : "debt"}`}>
+                {miss ? "Thiếu giá" : "Vượt SL"}
+              </span>
+            </div>
+            <div className="sup">
+              {miss ? (
+                <>Chưa có giá trong dự toán — cần admin duyệt giá vật tư.</>
+              ) : (
+                <>
+                  Cần {fmtQ(b.need)} {b.unit} · còn {fmtQ(b.have)} · dự toán {fmtQ(b.budget)} {b.unit}
+                </>
+              )}
+            </div>
+            <div className="ov num" style={{ fontSize: 12, opacity: 0.7 }}>
+              {b.count} lần · gần nhất {fmtDate(b.lastAt)} · {b.lastBy}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EditSheet({
   order,
   onClose,
   onSaved,
   projectId,
+  isKeToan,
 }: {
   order: Order;
   onClose: () => void;
   onSaved: () => void;
   projectId: string;
+  isKeToan: boolean;
 }) {
   const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
@@ -1052,7 +1153,11 @@ function EditSheet({
             />
           </div>
           <div className="fld">
-            <label>Vật tư · đơn giá (sửa được, SL khoá theo dự toán)</label>
+            <label>
+              {isKeToan
+                ? "Vật tư · đơn giá (giá & SL do dự toán quy định 🔒)"
+                : "Vật tư · đơn giá (sửa được, SL khoá theo dự toán)"}
+            </label>
             <div className="eitems">
               {order.items.map((it, i) => (
                 <div key={it.key} className="eit">
@@ -1063,17 +1168,23 @@ function EditSheet({
                     </div>
                   </div>
                   <div className="ep">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      step="any"
-                      min="0"
-                      value={prices[i]}
-                      onChange={(e) => {
-                        const v = Math.round(parseFloat(e.target.value) || 0);
-                        setPrices((p) => p.map((x, j) => (j === i ? v : x)));
-                      }}
-                    />
+                    {isKeToan ? (
+                      <span className="num" style={{ fontWeight: 600 }}>
+                        {fmt(prices[i])}
+                      </span>
+                    ) : (
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step="any"
+                        min="0"
+                        value={prices[i]}
+                        onChange={(e) => {
+                          const v = Math.round(parseFloat(e.target.value) || 0);
+                          setPrices((p) => p.map((x, j) => (j === i ? v : x)));
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               ))}

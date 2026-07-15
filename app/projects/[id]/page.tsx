@@ -119,6 +119,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
     canViewQcMapping: inAllowedSet([UserRole.admin, UserRole.construction_manager]),
     canViewPayroll: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
     canProposeMaterials: inAllowedSet([UserRole.admin, UserRole.engineer]),
+    canMuaHang: inAllowedSet([UserRole.admin, UserRole.accountant]),
     canViewSubContracts,
     canViewConstructionLog: role !== UserRole.accountant,
     canViewPayments: inAllowedSet([UserRole.admin, UserRole.accountant]),

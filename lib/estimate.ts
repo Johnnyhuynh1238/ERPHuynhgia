@@ -15,3 +15,16 @@ export async function requireAdmin() {
   }
   return { user, error: null };
 }
+
+// Mua hàng: admin (tự do) + kế toán (bị chặn giá/SL theo dự toán).
+// isKeToan = true → API áp 2 tường: giá lấy từ dự toán, SL không vượt dự toán.
+export async function requireMuaHang() {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) {
+    return { user: null, isKeToan: false, error: NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 }) };
+  }
+  if (user.role !== "admin" && user.role !== "accountant") {
+    return { user: null, isKeToan: false, error: NextResponse.json({ message: "Không có quyền mua hàng" }, { status: 403 }) };
+  }
+  return { user, isKeToan: user.role === "accountant", error: null };
+}
