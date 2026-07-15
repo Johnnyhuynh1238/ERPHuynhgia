@@ -84,7 +84,7 @@ export function TienDoClient({
       if (g) g.items.push(t);
       else map.set(t.phaseCode, { phaseCode: t.phaseCode, phaseName: t.phaseName, items: [t] });
     }
-    return [...map.values()];
+    return Array.from(map.values());
   }, [tasks]);
 
   const save = useCallback(

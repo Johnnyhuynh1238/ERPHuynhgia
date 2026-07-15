@@ -76,7 +76,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
   }
 
   const tasks: ProgressTask[] = [];
-  for (const [refId, c] of catMap) {
+  for (const [refId, c] of Array.from(catMap)) {
     const pr = progMap.get(`catalog|${refId}`);
     tasks.push({
       refType: "catalog",
