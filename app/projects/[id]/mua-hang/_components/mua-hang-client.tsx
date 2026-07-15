@@ -153,12 +153,12 @@ const PO_CSS = `
 .po-sheet .title h1{margin:0;font-size:23px;font-weight:800;letter-spacing:5px}
 .po-sheet .title .sub{font-size:10px;letter-spacing:4px;color:#8a8178;text-transform:uppercase;margin-top:3px}
 .po-sheet .title .brand{height:3px;width:64px;background:#e36122;margin:8px auto 0}
-.po-sheet .meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
-.po-sheet .card{border:1px solid #e2dcd2;border-radius:8px;padding:12px 14px}
+.po-sheet .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:18px}
+.po-sheet .card{border:1px solid #e2dcd2;border-radius:8px;padding:12px 14px;min-width:0}
 .po-sheet .card h3{margin:0 0 8px;font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#a6410f;font-weight:700}
-.po-sheet .kv{display:grid;grid-template-columns:96px 1fr;row-gap:6px;font-size:12px;line-height:1.5;margin:0}
+.po-sheet .kv{display:grid;grid-template-columns:96px 1fr;row-gap:6px;font-size:12px;line-height:1.5;margin:0;min-width:0}
 .po-sheet .kv dt{color:#8a8178}
-.po-sheet .kv dd{margin:0;font-weight:600;color:#1c1917}
+.po-sheet .kv dd{margin:0;font-weight:600;color:#1c1917;min-width:0;overflow-wrap:anywhere}
 .po-sheet .kv dd.blank{color:#c9c1b4;font-weight:400;letter-spacing:2px}
 .po-sheet .tbl-wrap{margin-top:16px;overflow-x:auto}
 .po-sheet table{width:100%;border-collapse:collapse;font-size:12px}
