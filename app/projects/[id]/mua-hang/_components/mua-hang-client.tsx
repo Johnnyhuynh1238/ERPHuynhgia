@@ -453,11 +453,19 @@ export function MuaHangClient({
   };
 
   const delOrder = async (o: Order) => {
+    // Kế toán không được xoá đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
+    if (isKeToan && isReceived(o.status)) {
+      toast("Đơn đã nhận — kế toán không được xoá. Liên hệ admin.");
+      return;
+    }
     if (!window.confirm(`Xoá đơn #${o.seq}? Số đã đặt sẽ trừ lại.`)) return;
     const r = await fetch(`/api/projects/${projectId}/mua-hang/${o.id}`, { method: "DELETE" });
     if (r.ok) {
       await loadOrders();
       toast(`Đã xoá đơn #${o.seq}`);
+    } else {
+      const j = await r.json().catch(() => ({}));
+      toast(j.message || "Không xoá được đơn.");
     }
   };
 
@@ -738,6 +746,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
               onDel={delOrder}
               onPO={setPoOrder}
               emptyText="Chưa có đơn hàng nào chờ nhận."
+              hideDel={(o) => isKeToan && isReceived(o.status)}
             />
           ) : (
             <OrdersList
@@ -746,6 +755,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
               onDel={delOrder}
               onPO={setPoOrder}
               emptyText="Chưa có đơn nào đã nhận."
+              hideDel={(o) => isKeToan && isReceived(o.status)}
             />
           )}
         </div>
@@ -962,12 +972,14 @@ function OrdersList({
   onDel,
   onPO,
   emptyText,
+  hideDel,
 }: {
   orders: Order[];
   onEdit: (o: Order) => void;
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
   emptyText?: string;
+  hideDel?: (o: Order) => boolean;
 }) {
   if (!orders.length)
     return (
@@ -1003,9 +1015,11 @@ function OrdersList({
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>
-            <button type="button" className="del" onClick={() => onDel(o)}>
-              Xoá
-            </button>
+            {!hideDel?.(o) && (
+              <button type="button" className="del" onClick={() => onDel(o)}>
+                Xoá
+              </button>
+            )}
           </div>
         </div>
       ))}

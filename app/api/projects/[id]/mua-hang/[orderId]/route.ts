@@ -67,12 +67,23 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { error } = await requireMuaHang();
+  const { isKeToan, error } = await requireMuaHang();
   if (error) return error;
 
-  const res = await prisma.mhOrder.deleteMany({
+  const order = await prisma.mhOrder.findFirst({
     where: { id: params.orderId, projectId: params.id },
+    select: { id: true, status: true },
   });
-  if (!res.count) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
+  if (!order) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
+
+  // Kế toán KHÔNG được xoá đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
+  if (isKeToan && (order.status === "received" || order.status === "paid")) {
+    return NextResponse.json(
+      { message: "Đơn đã nhận — kế toán không được xoá. Liên hệ admin." },
+      { status: 403 },
+    );
+  }
+
+  await prisma.mhOrder.delete({ where: { id: order.id } });
   return NextResponse.json({ ok: true });
 }
