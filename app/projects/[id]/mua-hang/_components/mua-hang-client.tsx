@@ -334,12 +334,14 @@ export function MuaHangClient({
     return out;
   }, [materials]);
 
-  // Tổng đã đặt theo VẬT TƯ (không phân biệt GĐ) — gộp theo tên+đơn vị.
+  // Tổng đã đặt theo VẬT TƯ (không phân biệt GĐ). Dùng it.key ("tên gốc|đvt") — KHÔNG dùng
+  // it.name (nhãn tự do do người đặt gõ). Bỏ tiền tố GĐ "NN|" nếu có để về "tên|đvt".
+  const matKey = (k: string) => k.replace(/^\d{2}\|/, "");
   const placedByMat = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     orders.forEach((o) =>
       o.items.forEach((it) => {
-        const mk = `${it.name}|${it.unit}`;
+        const mk = matKey(it.key || `${it.name}|${it.unit}`);
         m[mk] = (m[mk] || 0) + it.qty;
       }),
     );
@@ -435,7 +437,7 @@ export function MuaHangClient({
     const merged: { name: string; unit: string; qty: number; amount: number }[] = [];
     const midx: Record<string, number> = {};
     o.items.forEach((it) => {
-      const mk = `${it.name}|${it.unit}`;
+      const mk = matKey(it.key || `${it.name}|${it.unit}`);
       if (midx[mk] == null) {
         midx[mk] = merged.length;
         merged.push({ name: it.name, unit: it.unit, qty: 0, amount: 0 });
