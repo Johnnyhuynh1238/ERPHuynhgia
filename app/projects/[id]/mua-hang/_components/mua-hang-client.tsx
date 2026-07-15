@@ -318,7 +318,8 @@ export function MuaHangClient({
     for (const m of materials) {
       const ph = (m.taskCode || "").split("-")[0] || "99";
       const b = baseName(m.name);
-      const key = `${b}|${m.unit}`;
+      // Tách theo giai đoạn: cùng vật tư nhưng khác GĐ = dòng riêng (bê tông hiện ở cả GĐ 02/03/04)
+      const key = `${ph}|${b}|${m.unit}`;
       if (!map[key]) {
         map[key] = { key, name: b, unit: m.unit, lines: [], total: 0, amount: 0, uprice: 0, minph: ph };
         out.push(map[key]);
@@ -327,7 +328,6 @@ export function MuaHangClient({
       g.lines.push(m);
       g.total += m.quantity;
       g.amount += m.quantity * m.unitPrice;
-      if (ph < g.minph) g.minph = ph;
     }
     out.forEach((g) => (g.uprice = g.total > 0 ? g.amount / g.total : 0));
     out.sort((a, b) => (a.minph !== b.minph ? (a.minph < b.minph ? -1 : 1) : b.amount - a.amount));
