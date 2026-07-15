@@ -13,10 +13,9 @@ export default async function AdminMenuPage() {
   if (user.role !== "admin") redirect("/?denied=1");
 
   // Badge số việc tiền chờ admin duyệt trên icon menu Tài chính
-  const [ktExpensePending, ktReceiptPending, poPending] = await Promise.all([
+  const [ktExpensePending, ktReceiptPending] = await Promise.all([
     prisma.expense.count({ where: { status: "tptc_pending", creator: { role: UserRole.accountant } } }),
     prisma.receipt.count({ where: { status: "awaiting_approval" } }),
-    prisma.supplierPaymentOrder.count({ where: { status: "pending" } }),
   ]);
 
   return (
@@ -25,7 +24,6 @@ export default async function AdminMenuPage() {
         badges={{
           "/expenses": ktExpensePending,
           "/receipts": ktReceiptPending,
-          "/payment-orders": poPending,
         }}
       />
     </ProtectedLayout>

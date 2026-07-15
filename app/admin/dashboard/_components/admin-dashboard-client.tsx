@@ -143,8 +143,7 @@ const APPS: AppDef[] = [
     buildItems: (data) => [
       { label: "Lệnh thu", href: "/receipts", badge: data?.todos.receiptAwaitingApproval ?? 0 },
       { label: "Lệnh chi", href: "/expenses", badge: data?.todos.expensePending ?? 0 },
-      { label: "Công nợ NCC", href: "/payables" },
-      { label: "Lệnh TT NCC", href: "/payment-orders" },
+      { label: "Công nợ NCC", href: "/projects" },
       "divider",
       { label: "Sổ quỹ", href: "/treasury" },
     ],

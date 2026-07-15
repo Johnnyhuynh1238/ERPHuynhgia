@@ -850,16 +850,10 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ActionCard
-          href="/payables"
+          href="/projects"
           icon={<Wallet className="h-5 w-5" />}
           title="Công nợ NCC vật tư"
-          subtitle="Xem nợ + tạo lệnh thanh toán"
-        />
-        <ActionCard
-          href="/payment-orders"
-          icon={<Receipt className="h-5 w-5" />}
-          title="Lệnh thanh toán NCC"
-          subtitle="Theo dõi & ghi chi sau khi admin duyệt"
+          subtitle="Theo từng dự án (mua hàng)"
         />
         <ActionCard
           href="/proposals"

@@ -23,7 +23,6 @@ export async function GET() {
     debtsPaid,
     payrollPaid,
     generalExpenseRows,
-    debtsUnpaid,
     subContracts,
     subPaymentsPaid,
     budgets,
@@ -61,10 +60,6 @@ export async function GET() {
       by: ["categoryId"],
       where: { direction: "out", projectId: null, refType: { not: "material_proposal" } },
       _sum: { amount: true },
-    }),
-    prisma.materialProposalItemDebt.findMany({
-      where: { paidAt: null },
-      select: { totalAmount: true, proposal: { select: { projectId: true } } },
     }),
     prisma.subContract.findMany({
       where: { status: { in: ["active", "completed"] } },
@@ -104,12 +99,17 @@ export async function GET() {
   const payrollByProject = new Map<string, number>();
   for (const row of payrollPaid) add(payrollByProject, row.projectId, Number(row._sum.totalPayable ?? 0));
 
+  // Công nợ NCC (flow mới): con_lai theo dự án từ view ncc_cong_no_du_an (nguồn mh_orders).
+  const nccDebtRows = await prisma.$queryRaw<{ project_id: string; con_lai: number }[]>`
+    SELECT project_id, con_lai::float8 AS con_lai
+    FROM ncc_cong_no_du_an
+    WHERE con_lai > 0`;
   const supplierDebtByProject = new Map<string, number>();
   let supplierDebtTotal = 0;
-  for (const d of debtsUnpaid) {
-    const v = Number(d.totalAmount);
+  for (const r of nccDebtRows) {
+    const v = Number(r.con_lai);
     supplierDebtTotal += v;
-    add(supplierDebtByProject, d.proposal.projectId, v);
+    add(supplierDebtByProject, r.project_id, v);
   }
 
   const subDebtByProject = new Map<string, number>();

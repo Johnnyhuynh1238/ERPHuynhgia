@@ -26,7 +26,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     schedules,
     receiptsOffSchedule,
     cashOut,
-    debts,
     payrolls,
     subContracts,
     subPayments,
@@ -62,10 +61,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     prisma.cashTransaction.findMany({
       where: { projectId: id, direction: "out" },
       select: { amount: true, refType: true, categoryId: true },
-    }),
-    prisma.materialProposalItemDebt.findMany({
-      where: { proposal: { projectId: id } },
-      select: { totalAmount: true, paidAt: true, supplier: { select: { id: true, name: true } } },
     }),
     prisma.weeklyPayroll.findMany({
       where: { projectId: id, status: "paid" },
@@ -130,7 +125,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       byCategory.set(key, (byCategory.get(key) ?? 0) + v);
     }
   }
-  const materialPaid = debts.filter((d) => d.paidAt).reduce((s, d) => s + Number(d.totalAmount), 0);
+  // Vật tư NCC trả qua flow mới đi thẳng sổ quỹ (đã nằm trong cashExpense) → không cộng riêng, tránh trùng.
+  const materialPaid = 0;
   const payrollTotal = payrolls.reduce((s, p) => s + Number(p.totalPayable), 0);
   const spent = cashExpense + cashSubPayment + materialPaid + payrollTotal;
 

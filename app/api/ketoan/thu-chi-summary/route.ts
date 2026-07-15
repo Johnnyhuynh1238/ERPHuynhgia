@@ -20,18 +20,7 @@ export async function GET() {
   }).format(new Date());
   const startOfTodayVn = new Date(`${vnDateStr}T00:00:00+07:00`);
 
-  const [
-    accounts,
-    expensePending,
-    receiptPending,
-    paymentOrderApproved,
-    proposalPending,
-    proposalToOrder,
-    receiptNeedsDebtRows,
-    proposalPaid,
-    supplierOrderActive,
-    todayFlowRows,
-  ] = await Promise.all([
+  const [accounts, expensePending, receiptPending, todayFlowRows] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
@@ -39,25 +28,6 @@ export async function GET() {
     }),
     prisma.expense.count({ where: { status: "pending" } }),
     prisma.receipt.count({ where: { status: "pending" } }),
-    prisma.supplierPaymentOrder.count({ where: { status: "approved" } }),
-    prisma.materialProposal.count({ where: { status: "pending" } }),
-    prisma.materialProposal.count({
-      where: { status: "accepted", orderStatus: "not_ordered" },
-    }),
-    // Receipt (KS đã nhận) chưa có debt tương ứng (KT chưa ghi công nợ).
-    prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::bigint AS count
-      FROM material_proposal_item_receipts r
-      LEFT JOIN material_proposal_item_debts d
-        ON d.proposal_id = r.proposal_id AND d.item_seq = r.item_seq
-      WHERE d.id IS NULL
-    `,
-    // Đơn hàng đã thanh toán (KT đã trả NCC xong).
-    prisma.materialProposal.count({ where: { orderStatus: "paid" } }),
-    // Công nợ NCC "ping": lệnh TT NCC do KT/Admin khởi động — pending (chờ duyệt) + approved (chờ chi).
-    prisma.supplierPaymentOrder.count({
-      where: { status: { in: ["pending", "approved"] } },
-    }),
     // Dòng tiền hôm nay (giờ VN) — bỏ chuyển nội bộ giữa 2 quỹ (không đổi tổng số dư).
     prisma.cashTransaction.groupBy({
       by: ["direction"],
@@ -67,7 +37,6 @@ export async function GET() {
   ]);
   const todayIn = Number(todayFlowRows.find((r) => r.direction === "in")?._sum.amount ?? 0);
   const todayOut = Number(todayFlowRows.find((r) => r.direction === "out")?._sum.amount ?? 0);
-  const receiptNeedsDebt = Number(receiptNeedsDebtRows[0]?.count ?? 0);
   // Công nợ KH "ping": lệnh thu do admin tạo — pending (KT chưa nhận). Dùng lại count đã có.
   const kkhReceiptActive = receiptPending;
 
@@ -80,10 +49,9 @@ export async function GET() {
   }));
   const totalBalance = accountsOut.reduce((sum, a) => sum + a.currentBalance, 0);
 
-  const processTotal = expensePending + receiptPending + paymentOrderApproved;
-  const donHangPing = proposalPending + proposalToOrder + receiptNeedsDebt;
-  // Công nợ badge = ping do admin/KT khởi động lệnh (NCC active + lệnh thu chờ nhận).
-  const congNoPing = supplierOrderActive + kkhReceiptActive;
+  const processTotal = expensePending + receiptPending;
+  // Công nợ badge = ping do admin tạo lệnh thu (KT chưa nhận). Công nợ NCC nay theo dự án.
+  const congNoPing = kkhReceiptActive;
 
   return NextResponse.json({
     balance: {
@@ -100,31 +68,18 @@ export async function GET() {
       process: processTotal,
       journal: 0,
       congNo: congNoPing,
-      donHang: donHangPing,
+      donHang: 0,
     },
     processBreakdown: {
       expense: expensePending,
       receipt: receiptPending,
-      paymentOrder: paymentOrderApproved,
     },
     congNoBreakdown: {
-      // Lệnh do admin/KT vừa tạo — cần KT xử lý ngay.
-      payableNccActive: supplierOrderActive,
       paymentDueKhActive: kkhReceiptActive,
     },
-    donHangBreakdown: {
-      proposalPending,
-      proposalToOrder,
-      receiptNeedsDebt,
-      proposalPaid,
-    },
     todos: {
-      proposalPending,
-      proposalToOrder,
-      receiptNeedsDebt,
       expensePending,
       receiptPending,
-      paymentOrderApproved,
     },
   });
 }

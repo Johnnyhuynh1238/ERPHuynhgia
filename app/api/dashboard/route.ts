@@ -117,7 +117,6 @@ export async function GET() {
       contractsWithoutEvaluation,
       ktExpensePending,
       ktReceiptPending,
-      poPending,
     ] = await Promise.all([
       prisma.project.count({ where: { ...projectAccess, status: "in_progress" } }),
       prisma.task.count({
@@ -222,9 +221,6 @@ export async function GET() {
         : Promise.resolve(0),
       user.role === UserRole.admin
         ? prisma.receipt.count({ where: { status: "awaiting_approval" } })
-        : Promise.resolve(0),
-      user.role === UserRole.admin
-        ? prisma.supplierPaymentOrder.count({ where: { status: "pending" } })
         : Promise.resolve(0),
     ]);
 
@@ -372,8 +368,8 @@ export async function GET() {
             {
               key: "admin_money_approvals",
               label: "Lệnh tiền chờ anh duyệt (KT gửi)",
-              value: ktExpensePending + ktReceiptPending + poPending,
-              tone: ktExpensePending + ktReceiptPending + poPending > 0 ? ("danger" as const) : ("good" as const),
+              value: ktExpensePending + ktReceiptPending,
+              tone: ktExpensePending + ktReceiptPending > 0 ? ("danger" as const) : ("good" as const),
             },
             {
               key: "admin_payment_due",

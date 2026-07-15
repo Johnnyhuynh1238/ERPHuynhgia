@@ -104,7 +104,7 @@ export function FinanceOverviewClient() {
         <KpiCard label="Lãi gộp tạm tính" value={s.grossProfit} tone={s.grossProfit >= 0 ? "green" : "red"} />
         <KpiCard label="Số dư quỹ" value={s.cashBalance} href="/treasury" />
         <KpiCard label="Công nợ khách hàng" value={s.customerDebt} tone="amber" />
-        <KpiCard label="Công nợ NCC" value={s.supplierDebt} tone="amber" href="/payables" />
+        <KpiCard label="Công nợ NCC" value={s.supplierDebt} tone="amber" href="/projects" />
         <KpiCard label="Công nợ thầu phụ" value={s.subcontractorDebt} tone="amber" href="/sub-payments" />
         <KpiCard label="Chi chung công ty" value={s.generalTotal} href="#general-expenses" />
       </div>
@@ -198,7 +198,7 @@ export function FinanceOverviewClient() {
         <Link href="/treasury" className="rounded-xl border border-[#252840] bg-[#13151f] p-3 text-center text-sm text-[#f0f2ff] hover:bg-[#1a1d2e]">
           Sổ quỹ
         </Link>
-        <Link href="/payables" className="rounded-xl border border-[#252840] bg-[#13151f] p-3 text-center text-sm text-[#f0f2ff] hover:bg-[#1a1d2e]">
+        <Link href="/projects" className="rounded-xl border border-[#252840] bg-[#13151f] p-3 text-center text-sm text-[#f0f2ff] hover:bg-[#1a1d2e]">
           Công nợ NCC
         </Link>
       </div>

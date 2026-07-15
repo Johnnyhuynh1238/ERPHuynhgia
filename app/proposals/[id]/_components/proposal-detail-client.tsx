@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { ProposalComments } from "./proposal-comments";
 import { ProposalDeliveries } from "./proposal-deliveries";
-import { ProposalKtItems } from "./proposal-kt-items";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 // Legacy format (AI parse): {ten, sl, dvt}. New format (Phúc giao khoán): {name, qty, unit, task}.
@@ -189,11 +188,6 @@ export function ProposalDetailClient({
               unit?: string;
               dvt?: string;
             }>}
-          />
-          <ProposalKtItems
-            proposalId={proposal.id}
-            currentUserRole={currentRole}
-            onProposalUpdated={reload}
           />
         </>
       )}

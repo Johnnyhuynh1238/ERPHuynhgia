@@ -17,11 +17,9 @@ import {
   ClipboardList,
   ClipboardCheck,
   LayoutGrid,
-  ShoppingCart,
   PackageCheck,
   ArrowDownCircle,
   ArrowUpCircle,
-  Send,
   Clock,
   ChevronRight,
   type LucideIcon,
@@ -45,24 +43,13 @@ type SummaryDto = {
     congNo: number;
     donHang: number;
   };
-  processBreakdown: { expense: number; receipt: number; paymentOrder: number };
+  processBreakdown: { expense: number; receipt: number };
   congNoBreakdown: {
-    payableNccActive: number;
     paymentDueKhActive: number;
   };
-  donHangBreakdown: {
-    proposalPending: number;
-    proposalToOrder: number;
-    receiptNeedsDebt: number;
-    proposalPaid: number;
-  };
   todos?: {
-    proposalPending: number;
-    proposalToOrder: number;
-    receiptNeedsDebt: number;
     expensePending: number;
     receiptPending: number;
-    paymentOrderApproved: number;
   };
 };
 
@@ -114,7 +101,6 @@ const APPS: AppDef[] = [
         "divider",
         { label: "Lệnh chi chờ chuyển", href: "/expenses?status=pending", badge: pb?.expense ?? 0 },
         { label: "Lệnh thu chờ nhận", href: "/receipts?status=pending", badge: pb?.receipt ?? 0 },
-        { label: "Lệnh thanh toán NCC", href: "/payment-orders?status=approved", badge: pb?.paymentOrder ?? 0 },
         "divider",
         { label: "Sổ cái thu - chi", href: "/treasury" },
       ];
@@ -136,9 +122,8 @@ const APPS: AppDef[] = [
       const cn = data?.congNoBreakdown;
       return [
         { label: "Công nợ KH", href: "/payments", badge: cn?.paymentDueKhActive ?? 0 },
-        { label: "Công nợ NCC", href: "/payables", badge: cn?.payableNccActive ?? 0 },
-        "divider",
-        { label: "Lệnh TT NCC", href: "/payment-orders" },
+        // Công nợ NCC flow mới: theo từng dự án (mh_orders → /projects/[id]/cong-no)
+        { label: "Công nợ NCC", href: "/projects" },
       ];
     },
   },
@@ -281,27 +266,6 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
   if (!t) return [];
   const raw: TodoRow[] = [
     {
-      key: "proposal-pending",
-      label: "KS gửi đề xuất — cần duyệt",
-      href: "/proposals?status=pending",
-      count: t.proposalPending,
-      Icon: Send,
-    },
-    {
-      key: "proposal-to-order",
-      label: "Đề xuất đã duyệt — cần đặt NCC",
-      href: "/proposals?status=accepted&orderStatus=not_ordered",
-      count: t.proposalToOrder,
-      Icon: ShoppingCart,
-    },
-    {
-      key: "receipt-needs-debt",
-      label: "KS đã nhận hàng — chờ ghi công nợ",
-      href: "/proposals?filter=needs_debt",
-      count: t.receiptNeedsDebt,
-      Icon: PackageCheck,
-    },
-    {
       key: "expense-pending",
       label: "Lệnh chi — chờ chuyển",
       href: "/expenses?status=pending",
@@ -314,13 +278,6 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
       href: "/receipts?status=pending",
       count: t.receiptPending,
       Icon: ArrowDownCircle,
-    },
-    {
-      key: "payment-order-approved",
-      label: "Lệnh TT NCC đã duyệt — chờ chi",
-      href: "/payment-orders?status=approved",
-      count: t.paymentOrderApproved,
-      Icon: Banknote,
     },
   ];
   return raw.filter((r) => r.count > 0);
