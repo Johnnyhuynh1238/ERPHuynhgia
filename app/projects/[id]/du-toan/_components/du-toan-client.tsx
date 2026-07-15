@@ -463,6 +463,12 @@ function VatTuPanel({
       {groups.map((g) => {
         const cta = new Set<string>();
         g.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
+        // Tổng SL theo đơn vị (1 chủng loại có thể nhiều đvt: Thép có cây + kg)
+        const byUnit = new Map<string, number>();
+        g.items.forEach((it) => byUnit.set(it.unit, (byUnit.get(it.unit) ?? 0) + it.qty));
+        const qtyStr = Array.from(byUnit.entries())
+          .map(([u, q]) => qfmt(q, u))
+          .join(" · ");
         return (
           <button className="dt-row" key={g.key} onClick={() => onOpen(g.key)}>
             <span className="swatch" style={{ background: swatchOf(g.categoryName) }} />
@@ -472,7 +478,9 @@ function VatTuPanel({
                 <span className="rav dt-num">{fmt(g.amount)}</span>
               </span>
               <span className="r2">
-                <span className="rs">{g.items.length} vật tư</span>
+                <span className="rs">
+                  {g.items.length} vật tư · <b className="dt-num">{qtyStr}</b>
+                </span>
                 <span className="rau">{cta.size} công tác</span>
               </span>
             </span>
