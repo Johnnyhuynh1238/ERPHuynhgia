@@ -3,6 +3,7 @@
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import "./overview.css";
 
@@ -60,7 +61,9 @@ export function OverviewClient({
   const [err, setErr] = useState<string | null>(null);
   const [aiOn, setAiOn] = useState(false);
   const [aiSrc, setAiSrc] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const saved = (typeof localStorage !== "undefined" && localStorage.getItem("overview-theme")) as "light" | "dark" | null;
@@ -313,12 +316,17 @@ export function OverviewClient({
         <div className="foot">TỔNG QUAN · {p.code}</div>
       </div>
 
-      {aiOn ? (
-        <div className="aiov show">
-          <div className="aihd"><b>🤖 Trợ lý dự án · {p.name}</b><button className="x" onClick={() => setAiOn(false)} type="button" aria-label="Đóng">✕</button></div>
-          {aiSrc ? <iframe src={aiSrc} title="Trợ lý AI" allow="clipboard-write; clipboard-read" /> : null}
-        </div>
-      ) : null}
+      {aiOn && mounted
+        ? createPortal(
+            <div className={`ovdoc ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+              <div className="aiov show">
+                <div className="aihd"><b>🤖 Trợ lý dự án · {p.name}</b><button className="x" onClick={() => setAiOn(false)} type="button" aria-label="Đóng">✕</button></div>
+                {aiSrc ? <iframe src={aiSrc} title="Trợ lý AI" allow="clipboard-write; clipboard-read" /> : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
