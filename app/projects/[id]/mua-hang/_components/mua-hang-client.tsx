@@ -18,7 +18,6 @@ type Material = {
   unitPrice: number;
   taskCode: string | null; // "07-030"
   taskName: string | null;
-  categoryName: string | null; // chủng loại: Thép, Bê tông, Cốp pha…
 };
 type CatalogTask = { phaseCode: string; phaseName: string };
 
@@ -44,7 +43,6 @@ type Group = {
   amount: number; // Σ SL*đơn giá
   uprice: number; // đơn giá bình quân
   minph: string; // giai đoạn nhỏ nhất
-  cat: string; // chủng loại (Thép, Bê tông…)
 };
 
 const STATUS: { k: Order["status"]; l: string }[] = [
@@ -322,17 +320,7 @@ export function MuaHangClient({
       const b = baseName(m.name);
       const key = `${b}|${m.unit}`;
       if (!map[key]) {
-        map[key] = {
-          key,
-          name: b,
-          unit: m.unit,
-          lines: [],
-          total: 0,
-          amount: 0,
-          uprice: 0,
-          minph: ph,
-          cat: m.categoryName || "Khác",
-        };
+        map[key] = { key, name: b, unit: m.unit, lines: [], total: 0, amount: 0, uprice: 0, minph: ph };
         out.push(map[key]);
       }
       const g = map[key];
@@ -342,16 +330,7 @@ export function MuaHangClient({
       if (ph < g.minph) g.minph = ph;
     }
     out.forEach((g) => (g.uprice = g.total > 0 ? g.amount / g.total : 0));
-    // Sắp: GĐ → chủng loại (theo tên) → giá trị giảm dần
-    out.sort((a, b) =>
-      a.minph !== b.minph
-        ? a.minph < b.minph
-          ? -1
-          : 1
-        : a.cat !== b.cat
-          ? a.cat.localeCompare(b.cat, "vi")
-          : b.amount - a.amount,
-    );
+    out.sort((a, b) => (a.minph !== b.minph ? (a.minph < b.minph ? -1 : 1) : b.amount - a.amount));
     return out;
   }, [materials]);
 
@@ -802,12 +781,10 @@ function BuyList({
       </div>
     );
   let lastph = "";
-  let lastcat = "";
   return (
     <div>
       {groups.map((g) => {
-        const head = g.minph !== lastph ? ((lastph = g.minph), (lastcat = ""), true) : false;
-        const catHead = g.cat !== lastcat ? ((lastcat = g.cat), true) : false;
+        const head = g.minph !== lastph ? ((lastph = g.minph), true) : false;
         const pl = placed[g.key] || 0;
         const rem = g.total - pl;
         const done = rem <= 0.0001;
@@ -822,7 +799,6 @@ function BuyList({
                 <span className="pn">{phaseNames[g.minph] || ""}</span>
               </div>
             )}
-            {catHead && <div className="chead">{g.cat}</div>}
             <div className={`mc${isOpen ? " open" : ""}`}>
               <div className="top">
                 <button type="button" className="tapzone" onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}>
