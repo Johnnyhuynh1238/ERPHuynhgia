@@ -137,7 +137,7 @@ const docTien = (num: number): string => {
 
 // CSS phiếu PO — scope dưới .po-sheet, dùng chung cho modal (xem/ảnh) và cửa sổ in.
 const PO_CSS = `
-.po-sheet{box-sizing:border-box;background:#fff;color:#1c1917;font-family:"Segoe UI",Roboto,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:13px;line-height:1.5;padding:30px 32px}
+.po-sheet{box-sizing:border-box;background:#fff;color:#1c1917;font-family:"Segoe UI",Roboto,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:13px;line-height:1.5;padding:30px 32px;min-width:0;container-type:inline-size}
 .po-sheet *{box-sizing:border-box}
 .po-sheet .h{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
 .po-sheet .brand-logo{height:34px;width:auto;display:block}
@@ -189,6 +189,16 @@ const PO_CSS = `
 .po-sheet .sign .ks .hint{color:#a6410f;font-weight:600}
 .po-sheet .sign .ks .name{color:#1c1917;font-weight:600;border-top-color:#e36122}
 .po-sheet .foot{margin-top:20px;text-align:center;font-size:10px;color:#8a8178;letter-spacing:.3px}
+/* Tờ giấy hẹp (xem trên điện thoại): thu gọn để bảng 6 cột đủ chỗ, không cắt. Ảnh/in dùng khổ rộng nên không dính. */
+@container (max-width:440px){
+  .po-sheet{padding:22px 13px}
+  .po-sheet .title h1{font-size:19px;letter-spacing:2px}
+  .po-sheet table{font-size:9.5px}
+  .po-sheet thead th{font-size:8px;letter-spacing:0;padding:6px 3px}
+  .po-sheet tbody td{padding:6px 3px}
+  .po-sheet tfoot td{padding:8px 3px}
+  .po-sheet tfoot .grand td{font-size:12px}
+}
 `;
 
 export function MuaHangClient({
