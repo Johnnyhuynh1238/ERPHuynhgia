@@ -247,3 +247,6 @@
 .po-scroll { flex: 1; overflow: auto; padding: 16px; display: flex; justify-content: center; background: #7a7168; -webkit-overflow-scrolling: touch; }
 /* Tờ PO luôn sáng (nền trắng) — chi tiết bố cục nằm trong PO_CSS (mua-hang-client) dùng chung modal + in */
 .po-sheet { width: 640px; max-width: 100%; align-self: flex-start; background: #fff; color: #1c1917; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2); }
+/* Preview WYSIWYG: tờ A4 794px cố định, JS scale nhỏ vừa modal; .po-fit giữ chỗ theo kích thước đã thu nhỏ */
+.po-fit { position: relative; overflow: hidden; align-self: flex-start; }
+.po-sheet.po-a4 { width: 794px; max-width: none; min-height: 1123px; }

@@ -225,6 +225,8 @@ export function MuaHangClient({
   const [editing, setEditing] = useState<Order | null>(null);
   const [poOrder, setPoOrder] = useState<Order | null>(null);
   const poRef = useRef<HTMLDivElement>(null);
+  const poScrollRef = useRef<HTMLDivElement>(null);
+  const poFitRef = useRef<HTMLDivElement>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -247,6 +249,34 @@ export function MuaHangClient({
     setToastMsg(m);
     window.setTimeout(() => setToastMsg(null), 2600);
   };
+
+  // Preview PO = tờ A4 cố định 794px thu nhỏ vừa modal (WYSIWYG — giống hệt ảnh/bản in, chỉ zoom nhỏ)
+  useEffect(() => {
+    if (!poOrder || !mounted) return;
+    const scroll = poScrollRef.current;
+    const fit = poFitRef.current;
+    const sheet = poRef.current;
+    if (!scroll || !fit || !sheet) return;
+    const apply = () => {
+      const avail = scroll.clientWidth - 32; // trừ padding .po-scroll (16*2)
+      const scale = Math.min(1, avail / 794);
+      sheet.style.transformOrigin = "top left";
+      sheet.style.transform = `scale(${scale})`;
+      fit.style.width = `${794 * scale}px`;
+      fit.style.height = `${sheet.offsetHeight * scale}px`;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(scroll);
+    sheet.querySelectorAll("img").forEach((img) => {
+      if (!img.complete) img.addEventListener("load", apply, { once: true });
+    });
+    const t = window.setTimeout(apply, 150);
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(t);
+    };
+  }, [poOrder, mounted]);
 
   const loadOrders = useCallback(async () => {
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, { cache: "no-store" });
@@ -682,8 +712,14 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
                   </button>
                 </div>
               </div>
-              <div className="po-scroll">
-                <div className="po-sheet" ref={poRef} dangerouslySetInnerHTML={{ __html: poBodyHtml(poOrder) }} />
+              <div className="po-scroll" ref={poScrollRef}>
+                <div className="po-fit" ref={poFitRef}>
+                  <div
+                    className="po-sheet po-a4"
+                    ref={poRef}
+                    dangerouslySetInnerHTML={{ __html: poBodyHtml(poOrder) }}
+                  />
+                </div>
               </div>
             </div>
           </div>,
