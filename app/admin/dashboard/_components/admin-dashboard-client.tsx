@@ -76,6 +76,7 @@ const formatVndShort = (n: number) => {
 
 type AppKey =
   | "kinh-doanh"
+  | "hop-dong"
   | "du-an"
   | "tai-chinh"
   | "nhan-su"
@@ -106,6 +107,15 @@ const APPS: AppDef[] = [
       { label: "Pipeline KH", href: "/customer-pipeline" },
       { label: "Lead báo giá", href: "/leads", badge: data?.todos.leadsNew ?? 0 },
       { label: "Analytics", href: "/admin/analytics" },
+    ],
+  },
+  {
+    key: "hop-dong",
+    label: "Hợp đồng",
+    Icon: FileSignature,
+    buildItems: () => [
+      { label: "Tất cả hợp đồng", href: "/admin/contracts" },
+      { label: "HĐ thiết kế + thi công", href: "/admin/contracts" },
     ],
   },
   {
@@ -185,6 +195,7 @@ const APPS: AppDef[] = [
 
 const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "kinh-doanh": ["leadsNew"],
+  "hop-dong": [],
   "du-an": ["proposalPending"],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
   "nhan-su": [],
