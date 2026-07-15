@@ -431,11 +431,17 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
     ).padStart(4, "0")}</title><style>
 @page{size:A4;margin:13mm}html,body{margin:0}
 .po-sheet.po-print{padding:0;box-shadow:none;width:auto}
-@media print{.noprint{display:none}}
-.pbtn{position:fixed;top:12px;right:12px;background:#e36122;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px "Segoe UI",sans-serif;cursor:pointer;z-index:9}
+@media print{.noprint{display:none}.po-print{margin-top:0 !important}}
+.pbar{position:fixed;top:12px;right:12px;left:12px;display:flex;justify-content:space-between;align-items:center;z-index:9;pointer-events:none}
+.pbar button{pointer-events:auto;border:none;border-radius:8px;font:600 14px "Segoe UI",sans-serif;cursor:pointer}
+.pclose{background:#3a2a22;color:#f5efe1;width:42px;height:42px;font-size:18px}
+.pbtn{background:#e36122;color:#fff;padding:11px 18px}
 </style></head><body>
-<button class="pbtn noprint" onclick="window.print()">In / Lưu PDF</button>
-<div class="po-sheet po-print">${poBodyHtml(o)}</div>
+<div class="pbar noprint">
+<button class="pclose" onclick="window.close()" aria-label="Đóng">✕</button>
+<button class="pbtn" onclick="window.print()">In / Lưu PDF</button>
+</div>
+<div class="po-sheet po-print" style="margin-top:56px">${poBodyHtml(o)}</div>
 </body></html>`;
     const w = window.open("", "_blank");
     if (w) {
