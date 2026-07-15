@@ -786,6 +786,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           order={editing}
           projectId={projectId}
           isKeToan={isKeToan}
+          theme={theme}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -1077,12 +1078,14 @@ function EditSheet({
   onSaved,
   projectId,
   isKeToan,
+  theme,
 }: {
   order: Order;
   onClose: () => void;
   onSaved: () => void;
   projectId: string;
   isKeToan: boolean;
+  theme: "light" | "dark";
 }) {
   const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
@@ -1118,8 +1121,9 @@ function EditSheet({
     if (r.ok) onSaved();
   };
 
-  return (
-    <>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className={`mhdoc mhp ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
       <div className={`scrim${show ? " show" : ""}`} onClick={onClose} />
       <div className={`sheet${show ? " show" : ""}`} role="dialog" aria-modal="true">
         <div className="grip" />
@@ -1218,6 +1222,7 @@ function EditSheet({
           </div>
         </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }

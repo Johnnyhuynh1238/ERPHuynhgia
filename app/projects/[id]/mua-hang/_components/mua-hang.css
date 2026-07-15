@@ -45,6 +45,10 @@
   --sheet: #4a1d0c;
 }
 
+/* Wrapper khi portal sheet ra body: giữ biến màu + font, KHÔNG paint nền/min-height */
+.mhdoc.mhp {
+  display: contents;
+}
 .mhdoc * {
   box-sizing: border-box;
 }
