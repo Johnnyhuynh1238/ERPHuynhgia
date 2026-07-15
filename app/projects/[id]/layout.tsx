@@ -67,7 +67,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   return (
     <ProtectedLayout>
       <div className="space-y-4">
-        <HideOnEstimate isAdmin={user.role === UserRole.admin}>
+        <HideOnEstimate hideOnBase={user.role === UserRole.admin || user.role === UserRole.accountant}>
           <ProjectBackLink projectId={project.id} projectName={project.name} />
           <div className="mt-4 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
             <div className="flex flex-wrap items-center justify-between gap-3">

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { ProjectInfoClient } from "./_components/project-info-client";
 import { ProjectHubGrid } from "./_components/project-hub-grid";
+import { KetoanProjectHub } from "./_components/ketoan-project-hub";
 import { ProjectFinanceHeader } from "./_components/project-finance-header";
 import { getProjectFinanceSummary } from "@/lib/project-finance-summary";
 import { canUserAccessProjectSubContracts } from "@/lib/sub-contract-auth";
@@ -78,6 +79,47 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
         projectId={project.id}
         laborMode={project.laborMode}
         pendingDiaries={pendingDiariesAdmin}
+      />
+    );
+  }
+
+  // Kế toán vào dự án chỉ để mua hàng: màn ngà riêng (Mua hàng + Công nợ NCC),
+  // KHÔNG finance header / info card / tile thi công như admin.
+  if (user.role === UserRole.accountant) {
+    const [orderAgg, pendingCount, nccRows] = await Promise.all([
+      prisma.mhOrder.aggregate({
+        where: { projectId: params.id },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
+      prisma.mhOrder.count({
+        where: { projectId: params.id, status: { in: ["draft", "ordered"] } },
+      }),
+      prisma.$queryRaw<
+        Array<{ tong_no: string; da_tra: string; con_lai: string; ncc_count: number | bigint }>
+      >`
+        SELECT COALESCE(SUM(tong_no),0) AS tong_no,
+               COALESCE(SUM(da_tra),0)  AS da_tra,
+               COALESCE(SUM(con_lai),0) AS con_lai,
+               COUNT(*) FILTER (WHERE con_lai > 0)::int AS ncc_count
+        FROM ncc_cong_no_du_an
+        WHERE project_id = ${params.id}::uuid`,
+    ]);
+    const ncc = nccRows[0] ?? { tong_no: "0", da_tra: "0", con_lai: "0", ncc_count: 0 };
+    return (
+      <KetoanProjectHub
+        projectId={project.id}
+        code={project.code}
+        name={project.name}
+        customerName={project.customerName}
+        status={project.status}
+        orderCount={orderAgg._count._all}
+        orderTotal={Number(orderAgg._sum.total ?? 0)}
+        pendingCount={pendingCount}
+        nccCount={Number(ncc.ncc_count)}
+        tongNo={Number(ncc.tong_no)}
+        daTra={Number(ncc.da_tra)}
+        conLai={Number(ncc.con_lai)}
       />
     );
   }
