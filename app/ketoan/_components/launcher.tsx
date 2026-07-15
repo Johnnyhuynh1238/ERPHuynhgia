@@ -71,7 +71,7 @@ const formatVnd = (n: number) =>
 
 const kindIcon = (kind: string) => (kind === "cash" ? "💵" : "🏦");
 
-type AppKey = "thu-chi" | "cong-no" | "don-hang" | "cham-cong";
+type AppKey = "thu-chi" | "mua-hang" | "cong-no" | "don-hang" | "cham-cong";
 
 type PopItem = {
   label: string;

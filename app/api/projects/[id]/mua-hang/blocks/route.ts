@@ -16,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     take: 200,
   });
 
-  const userIds = [...new Set(rows.map((r) => r.userId))];
+  const userIds = Array.from(new Set(rows.map((r) => r.userId)));
   const users = userIds.length
     ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })
     : [];
