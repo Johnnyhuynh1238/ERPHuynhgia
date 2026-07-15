@@ -4192,6 +4192,25 @@ model MhOrder {
   @@map("mh_orders")
 }
 
+// Tiến độ thi công theo công tác dự toán (flow mới).
+// refType='catalog' → refId = StandardTaskCatalog.id (công tác VT); 'khoan' → refId = EstimateDbKhoan.id.
+// percent 0..100; done = admin đánh dấu hoàn thành (kèm percent=100).
+model EstimateTaskProgress {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  refType   String   @map("ref_type") @db.VarChar(16)
+  refId     String   @map("ref_id") // uuid dạng text (catalog hoặc khoan)
+  percent   Int      @default(0)
+  done      Boolean  @default(false)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, refType, refId])
+  @@index([projectId])
+  @@map("estimate_task_progress")
+}
+
 // Loại lỗi khi kế toán bị chặn tạo đơn.
 enum MhBlockKind {
   missing_price // vật tư chưa có giá trong dự toán → admin cần duyệt giá

@@ -70,7 +70,7 @@ export function ProjectHubGrid({
   const isSelf = laborMode === "self";
 
   const construction: HubItem[] = [
-    { href: `${base}/tasks`, label: "Tiến độ", icon: ListChecks, desc: "Mốc thi công" },
+    { href: `${base}/tien-do`, label: "Tiến độ", icon: ListChecks, desc: "Theo công tác dự toán" },
     ...(caps.canViewBudget
       ? [{ href: `${base}/budget`, label: "Dự toán", icon: Calculator, desc: "NC · VT · MM" } as HubItem]
       : []),

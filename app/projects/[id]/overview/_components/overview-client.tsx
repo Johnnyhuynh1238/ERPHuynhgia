@@ -145,7 +145,7 @@ export function OverviewClient({
 
   type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean };
   const tiles: Tile[] = [
-    { href: `${base}/tasks`, emoji: "📊", name: "Tiến độ", sub: "Mốc thi công" },
+    { href: `${base}/tien-do`, emoji: "📊", name: "Tiến độ", sub: "Theo công tác dự toán" },
     { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
     { href: `${base}/mua-hang`, emoji: "🛒", name: "Mua hàng", sub: `${data.tiles.muaHang.count} đơn · ${fmt(data.tiles.muaHang.total)}`, badge: data.tiles.muaHang.received ? { cls: "info", text: `${data.tiles.muaHang.received} đã nhận` } : undefined },
     { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },

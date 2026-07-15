@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { computeEstimateProgress } from "@/lib/estimate-progress";
 
 export const dynamic = "force-dynamic";
 
@@ -119,8 +120,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     SELECT count(*)::int AS n FROM construction_diaries WHERE project_id = ${id}::uuid`;
   const diaryCount = Number(diaryCntRows[0]?.n ?? 0);
 
-  // Tiến độ — TẠM proxy theo mốc thanh toán (chờ chốt nguồn % theo công tác)
-  const progressPct = contract > 0 ? Math.round((collected / contract) * 100) : 0;
+  // Tiến độ — earned value theo công tác dự toán (flow mới). 0 nếu chưa có công tác/dự toán.
+  const estProgress = await computeEstimateProgress(id);
+  const progressPct = estProgress.earnedPct;
   const daysLeft = project.expectedEndDate
     ? Math.max(0, Math.ceil((new Date(project.expectedEndDate).getTime() - Date.now()) / 86400000))
     : null;
@@ -164,7 +166,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     },
     progress: {
       pct: progressPct,
-      source: "payment", // tạm theo mốc thanh toán
+      source: "cong-tac", // earned value theo công tác dự toán
     },
     tiles: {
       muaHang: { count: Number(mhRows[0]?.n ?? 0), total: Number(mhRows[0]?.total ?? 0), received: Number(mhRows[0]?.received ?? 0) },
