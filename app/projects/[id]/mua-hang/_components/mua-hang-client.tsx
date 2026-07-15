@@ -219,7 +219,7 @@ export function MuaHangClient({
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<"buy" | "orders">("buy");
+  const [tab, setTab] = useState<"buy" | "orders" | "received">("buy");
   const [pending, setPending] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
@@ -339,6 +339,11 @@ export function MuaHangClient({
     orders.forEach((o) => o.items.forEach((it) => (m[it.key] = (m[it.key] || 0) + it.qty)));
     return m;
   }, [orders]);
+
+  // "Đã nhận" = đã nhận hàng (received) hoặc đã thanh toán (paid). Còn lại = chưa nhận.
+  const isReceived = (s: Order["status"]) => s === "received" || s === "paid";
+  const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
+  const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
 
   const setQty = (key: string, v: string) => {
     const n = parseFloat(v);
@@ -608,8 +613,16 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
             <span>Mua hàng</span>
           </button>
           <button type="button" className={`tab${tab === "orders" ? " on" : ""}`} onClick={() => setTab("orders")}>
-            <span>Đơn đã tạo</span>
-            <span className="cnt">{orders.length}</span>
+            <span>Đơn hàng</span>
+            <span className="cnt">{ordersPending.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`tab${tab === "received" ? " on" : ""}`}
+            onClick={() => setTab("received")}
+          >
+            <span>Đã nhận</span>
+            <span className="cnt">{ordersReceived.length}</span>
           </button>
         </div>
 
@@ -631,8 +644,22 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
               />
               <div className="foot">Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền</div>
             </>
+          ) : tab === "orders" ? (
+            <OrdersList
+              orders={ordersPending}
+              onEdit={setEditing}
+              onDel={delOrder}
+              onPO={setPoOrder}
+              emptyText="Chưa có đơn hàng nào chờ nhận."
+            />
           ) : (
-            <OrdersList orders={orders} onEdit={setEditing} onDel={delOrder} onPO={setPoOrder} />
+            <OrdersList
+              orders={ordersReceived}
+              onEdit={setEditing}
+              onDel={delOrder}
+              onPO={setPoOrder}
+              emptyText="Chưa có đơn nào đã nhận."
+            />
           )}
         </div>
       </div>
@@ -843,19 +870,25 @@ function OrdersList({
   onEdit,
   onDel,
   onPO,
+  emptyText,
 }: {
   orders: Order[];
   onEdit: (o: Order) => void;
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
+  emptyText?: string;
 }) {
   if (!orders.length)
     return (
       <div className="empty">
         <div className="ic">📋</div>
-        Chưa có đơn nào.
-        <br />
-        Qua tab Mua hàng, nhập SL rồi bấm Tạo đơn.
+        {emptyText || (
+          <>
+            Chưa có đơn nào.
+            <br />
+            Qua tab Mua hàng, nhập SL rồi bấm Tạo đơn.
+          </>
+        )}
       </div>
     );
   return (
