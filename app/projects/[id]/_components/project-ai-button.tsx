@@ -9,6 +9,16 @@ export function ProjectAiButton({ code }: { code: string }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (e.origin !== "https://huynhgia6.com") return;
+      if (e.data && e.data.type === "hg-ai-closed") setOpen(false);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   return (
     <>
       <button

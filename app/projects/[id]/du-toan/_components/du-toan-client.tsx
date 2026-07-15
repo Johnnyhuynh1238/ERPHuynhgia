@@ -113,6 +113,16 @@ export function DuToanClient({
   const [aiOpen, setAiOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
 
+  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (e.origin !== "https://huynhgia6.com") return;
+      if (e.data && e.data.type === "hg-ai-closed") setAiOpen(false);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   useEffect(() => {
     Promise.all([api.meta(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
       .then(([m, mat, kh]) => {

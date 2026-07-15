@@ -250,6 +250,16 @@ export function MuaHangClient({
 
   useEffect(() => setMounted(true), []);
 
+  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (e.origin !== "https://huynhgia6.com") return;
+      if (e.data && e.data.type === "hg-ai-closed") setAiOpen(false);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem("muahang-theme");
     if (saved === "dark" || saved === "light") setTheme(saved);

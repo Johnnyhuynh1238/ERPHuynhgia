@@ -65,6 +65,16 @@ export function OverviewClient({
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => setMounted(true), []);
 
+  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (e.origin !== "https://huynhgia6.com") return;
+      if (e.data && e.data.type === "hg-ai-closed") setAiOn(false);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   useEffect(() => {
     const saved = (typeof localStorage !== "undefined" && localStorage.getItem("overview-theme")) as "light" | "dark" | null;
     if (saved === "light" || saved === "dark") setTheme(saved);
