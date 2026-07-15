@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/estimate";
+import { requireMuaHang } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 //   categories = danh mục chủng loại VT (lọc + gán)
 //   tasks      = catalog chuẩn 92 công tác (mã GĐ-CT), chưa retire
 export async function GET() {
-  const { error } = await requireAdmin();
+  // Kế toán cần meta (chủng loại + công tác) để duyệt VT khi mua hàng.
+  const { error } = await requireMuaHang();
   if (error) return error;
 
   const [categories, tasks] = await Promise.all([

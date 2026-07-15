@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/estimate";
+import { requireAdmin, requireMuaHang } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,8 @@ type MatBody = {
 // GET: toàn bộ VT của dự án (flat) kèm tên công tác + chủng loại — client tự lọc/gộp.
 // Lọc tuỳ chọn: ?catalogId=… &categoryId=…
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAdmin();
+  // Kế toán cần đọc VT dự toán để mua hàng (chỉ đọc; POST/sửa vẫn admin).
+  const { error } = await requireMuaHang();
   if (error) return error;
 
   const url = new URL(req.url);
