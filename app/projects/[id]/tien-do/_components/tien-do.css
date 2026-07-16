@@ -78,9 +78,12 @@
 /* section giai đoạn */
 .tddoc .sec { margin-top: 2px; }
 .tddoc .phead { display: flex; align-items: baseline; gap: 9px; padding: 20px 0 4px; }
-.tddoc .phead .pc { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--orange); }
-.tddoc .phead .pnm { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--mut); }
-.tddoc .phead .pr { margin-left: auto; font-size: 11px; color: var(--mut2); font-weight: 500; }
+.tddoc .phead .pc { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--orange); flex: none; }
+.tddoc .phead .pnm { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--mut); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tddoc .phead .pr { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none; }
+.tddoc .phead .pr-m { font-size: 11.5px; font-weight: 600; color: var(--terra); }
+.tddoc .phead .pr-m .pr-den { color: var(--mut2); font-weight: 400; }
+.tddoc .phead .pr-d { font-size: 10px; color: var(--mut2); font-weight: 500; }
 
 /* dòng công tác — PHẲNG, kẻ mảnh, không card */
 .tddoc .row { padding: 11px 0; border-bottom: 1px solid var(--line); }
@@ -89,7 +92,10 @@
 .tddoc .rc { font-size: 11px; font-weight: 600; color: var(--terra); flex: none; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
 .tddoc .rc.kh { color: var(--gold); }
 .tddoc .rnm { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tddoc .ramt { margin-left: auto; font-size: 11.5px; color: var(--mut); flex: none; font-weight: 500; }
+.tddoc .ramt { margin-left: auto; font-size: 11.5px; color: var(--mut); flex: none; font-weight: 500; white-space: nowrap; }
+.tddoc .ramt b { color: var(--orange); font-weight: 600; }
+.tddoc .row:not(.done) .ramt b { color: var(--terra); }
+.tddoc .ramt .ramt-den { color: var(--mut2); }
 
 .tddoc .rctl { display: flex; align-items: center; gap: 11px; margin-top: 9px; }
 .tddoc .rctl input[type="range"] { flex: 1; min-width: 0; height: 20px; accent-color: var(--orange); cursor: pointer; background: transparent; }

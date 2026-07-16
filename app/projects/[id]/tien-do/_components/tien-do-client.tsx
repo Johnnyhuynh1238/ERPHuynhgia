@@ -248,12 +248,19 @@ export function TienDoClient({
           <>
             {groups.map((g) => {
               const dn = g.items.filter((x) => x.done).length;
+              const gAmt = g.items.reduce((s, x) => s + x.amount, 0);
+              const gEarned = g.items.reduce((s, x) => s + (x.percent / 100) * x.amount, 0);
               return (
                 <div key={g.phaseCode} className="sec">
                   <div className="phead">
                     <span className="pc num">{g.phaseCode === "KHOAN" ? "KHOÁN" : `GĐ ${g.phaseCode}`}</span>
                     <span className="pnm">{g.phaseName}</span>
-                    <span className="pr">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} công tác`}</span>
+                    <span className="pr">
+                      <span className="pr-m num">
+                        {fmt(gEarned)}<span className="pr-den"> / {fmt(gAmt)} đ</span>
+                      </span>
+                      <span className="pr-d">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} công tác`}</span>
+                    </span>
                   </div>
                   {g.items.map((t) => (
                     <div key={keyOf(t)} className={`row${t.done ? " done" : ""}`}>
@@ -266,7 +273,10 @@ export function TienDoClient({
                           )}
                           <span className="rnm">{t.name}</span>
                         </div>
-                        <span className="ramt num">{fmt(t.amount)}</span>
+                        <span className="ramt num">
+                          <b>{fmt((t.percent / 100) * t.amount)}</b>
+                          <span className="ramt-den"> / {fmt(t.amount)}</span>
+                        </span>
                       </div>
                       <div className="rctl">
                         <input

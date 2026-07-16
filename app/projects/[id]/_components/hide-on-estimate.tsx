@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 // kế toán = màn Mua hàng ngà) → ẩn chrome tối.
 export function HideOnEstimate({ children, hideOnBase = false }: { children: React.ReactNode; hideOnBase?: boolean }) {
   const pathname = usePathname();
-  if (pathname && /\/(estimate|du-toan|mua-hang|cong-no|overview)(\/|$)/.test(pathname)) return null;
+  if (pathname && /\/(estimate|du-toan|mua-hang|cong-no|overview|tien-do)(\/|$)/.test(pathname)) return null;
   if (hideOnBase && pathname && /^\/projects\/[^/]+$/.test(pathname)) return null;
   return <>{children}</>;
 }
