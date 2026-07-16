@@ -34,6 +34,8 @@ type Order = {
   items: OrderItem[];
 };
 
+type Supplier = { id: string; name: string };
+
 type Group = {
   key: string;
   name: string;
@@ -237,6 +239,8 @@ export function MuaHangClient({
   const [tab, setTab] = useState<"buy" | "orders" | "received" | "blocks">("buy");
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [pending, setPending] = useState<Record<string, number>>({});
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [buySupplier, setBuySupplier] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
   const [poOrder, setPoOrder] = useState<Order | null>(null);
@@ -321,6 +325,35 @@ export function MuaHangClient({
   useEffect(() => {
     if (tab === "blocks" && !isKeToan) loadBlocks();
   }, [tab, isKeToan, loadBlocks]);
+
+  // Danh mục NCC (admin+kế toán đều xem được) → combobox chọn NCC. Lỗi thì im, gõ tay như cũ.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`/api/admin/suppliers`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        setSuppliers(
+          (Array.isArray(j.suppliers) ? j.suppliers : []).map((s: { id: string; name: string }) => ({
+            id: s.id,
+            name: s.name,
+          })),
+        );
+      } catch {
+        /* danh mục NCC lỗi → vẫn gõ tay được */
+      }
+    })();
+  }, []);
+
+  // Khớp tên NCC (không phân biệt hoa/thường) → id để lưu FK; không khớp = NCC gõ tay mới.
+  const matchSupplierId = useCallback(
+    (name: string) => {
+      const n = name.trim().toLowerCase();
+      if (!n) return null;
+      return suppliers.find((s) => s.name.trim().toLowerCase() === n)?.id ?? null;
+    },
+    [suppliers],
+  );
 
   useEffect(() => {
     (async () => {
@@ -447,10 +480,11 @@ export function MuaHangClient({
       if (q > 0) items.push({ key: g.key, name: g.name, unit: g.unit, qty: q, price: Math.round(g.uprice) });
     });
     if (!items.length) return;
+    const sup = buySupplier.trim();
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, supplierName: sup || undefined, supplierId: matchSupplierId(sup) }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -458,6 +492,7 @@ export function MuaHangClient({
       return;
     }
     setPending({});
+    setBuySupplier("");
     await loadOrders();
     toast(`Đã tạo đơn #${j.seq} · ${items.length} vật tư`);
   };
@@ -773,6 +808,19 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
 
       {/* cart nổi */}
       <div className={`cart${cartOn ? " show" : ""}`}>
+        <div className="ncc">
+          <input
+            list="mh-ncc"
+            value={buySupplier}
+            onChange={(e) => setBuySupplier(e.target.value)}
+            placeholder="Nhà cung cấp (chọn hoặc gõ tên NCC — có thể bỏ trống)"
+          />
+          <datalist id="mh-ncc">
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.name} />
+            ))}
+          </datalist>
+        </div>
         <div className="in">
           <button type="button" className="btn ghost sm" onClick={() => setPending({})}>
             Xoá
@@ -796,6 +844,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           order={editing}
           projectId={projectId}
           isKeToan={isKeToan}
+          suppliers={suppliers}
           theme={theme}
           onClose={() => setEditing(null)}
           onSaved={async () => {
@@ -1088,6 +1137,7 @@ function EditSheet({
   onSaved,
   projectId,
   isKeToan,
+  suppliers,
   theme,
 }: {
   order: Order;
@@ -1095,6 +1145,7 @@ function EditSheet({
   onSaved: () => void;
   projectId: string;
   isKeToan: boolean;
+  suppliers: Supplier[];
   theme: "light" | "dark";
 }) {
   const [show, setShow] = useState(false);
@@ -1120,6 +1171,8 @@ function EditSheet({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         supplierName,
+        supplierId:
+          suppliers.find((s) => s.name.trim().toLowerCase() === supplierName.trim().toLowerCase())?.id ?? null,
         orderDate: orderDate ? new Date(orderDate).toISOString() : undefined,
         deliveryDate: deliveryDate || null,
         status,
@@ -1149,7 +1202,17 @@ function EditSheet({
         <div className="sbody">
           <div className="fld">
             <label>Nhà cung cấp (NCC)</label>
-            <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Tên NCC / cửa hàng" />
+            <input
+              list="mh-ncc-edit"
+              value={supplierName}
+              onChange={(e) => setSupplierName(e.target.value)}
+              placeholder="Chọn hoặc gõ tên NCC / cửa hàng"
+            />
+            <datalist id="mh-ncc-edit">
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.name} />
+              ))}
+            </datalist>
           </div>
           <div className="row2">
             <div className="fld">

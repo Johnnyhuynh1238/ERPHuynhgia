@@ -69,6 +69,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const body = (await req.json().catch(() => ({}))) as {
     items?: unknown;
     supplierName?: string;
+    supplierId?: string | null;
     note?: string;
   };
   const items = cleanItems(body.items);
@@ -191,6 +192,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       seq,
       status: "ordered",
       supplierName: body.supplierName?.trim() || null,
+      supplierId: body.supplierId ? String(body.supplierId) : null,
       note: body.note?.trim() || null,
       total: money(items),
       items,

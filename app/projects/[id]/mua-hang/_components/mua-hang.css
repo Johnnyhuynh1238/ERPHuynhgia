@@ -152,6 +152,9 @@
 .mhdoc .cart .info .l1 { font-size: 11px; color: var(--mut); font-weight: 600; }
 .mhdoc .cart .info .l2 { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 600; color: var(--orange); margin-top: 1px; }
 .mhdoc .cart .info .l2 .u { font-size: 0.55em; color: var(--mut2); margin-left: 2px; }
+.mhdoc .cart .ncc { max-width: 560px; margin: 0 auto 10px; }
+.mhdoc .cart .ncc input { width: 100%; font-family: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 10px 12px; outline: none; -webkit-appearance: none; }
+.mhdoc .cart .ncc input:focus { border-color: var(--orange); }
 .mhdoc .btn { border: none; border-radius: 12px; font-family: inherit; font-weight: 600; cursor: pointer; font-size: 14px; padding: 13px 20px; background: var(--orange); color: #fff; letter-spacing: 0.01em; white-space: nowrap; }
 .mhdoc .btn:active { transform: scale(0.97); }
 .mhdoc .btn:disabled { opacity: 0.5; }
