@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/confirm-dialog";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
@@ -344,34 +344,61 @@ function Lightbox({
 }) {
   const [index, setIndex] = useState(startIndex);
   const [mounted, setMounted] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => setMounted(true), []);
+
+  const scrollToIndex = useCallback(
+    (i: number, smooth = true) => {
+      const s = scrollerRef.current;
+      if (!s) return;
+      const clamped = Math.max(0, Math.min(photos.length - 1, i));
+      s.scrollTo({ left: clamped * s.clientWidth, behavior: smooth ? "smooth" : "auto" });
+    },
+    [photos.length],
+  );
+
+  // Nhảy tới ảnh được bấm khi mở (không animate)
+  useEffect(() => {
+    if (!mounted) return;
+    scrollToIndex(startIndex, false);
+    setIndex(startIndex);
+  }, [mounted, startIndex, scrollToIndex]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft") setIndex((i) => Math.max(0, i - 1));
-      if (e.key === "ArrowRight") setIndex((i) => Math.min(photos.length - 1, i + 1));
+      if (e.key === "ArrowLeft") scrollToIndex(index - 1);
+      if (e.key === "ArrowRight") scrollToIndex(index + 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, photos.length]);
+  }, [onClose, index, scrollToIndex]);
+
   if (!mounted) return null;
-  const photo = photos[index];
-  if (!photo) return null;
   const canPrev = index > 0;
   const canNext = index < photos.length - 1;
   return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
-      onClick={onClose}
-    >
-      <div className="relative h-full w-full" onClick={(e) => e.stopPropagation()}>
-        <Image
-          src={photoSrc(projectId, photo.key)}
-          alt=""
-          fill
-          className="object-contain"
-          unoptimized
-        />
+    <div className="fixed inset-0 z-[100] flex flex-col bg-black/90">
+      {/* Vuốt ngang để lướt ảnh (scroll-snap native — mượt như cổng chủ nhà) */}
+      <div
+        ref={scrollerRef}
+        onScroll={(e) => {
+          const s = e.currentTarget;
+          if (s.clientWidth > 0) setIndex(Math.round(s.scrollLeft / s.clientWidth));
+        }}
+        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-contain"
+      >
+        {photos.map((p) => (
+          <div key={p.key} className="flex min-w-full snap-center items-center justify-center p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoSrc(projectId, p.key)}
+              alt=""
+              draggable={false}
+              className="max-h-full max-w-full select-none object-contain"
+            />
+          </div>
+        ))}
       </div>
       <button
         type="button"
@@ -384,11 +411,8 @@ function Lightbox({
       {canPrev ? (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIndex((i) => Math.max(0, i - 1));
-          }}
-          className="absolute left-3 top-1/2 z-[110] -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          onClick={() => scrollToIndex(index - 1)}
+          className="absolute left-3 top-1/2 z-[110] hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:block"
           aria-label="Ảnh trước"
         >
           <ChevronLeft className="h-6 w-6" />
@@ -397,11 +421,8 @@ function Lightbox({
       {canNext ? (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIndex((i) => Math.min(photos.length - 1, i + 1));
-          }}
-          className="absolute right-3 top-1/2 z-[110] -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          onClick={() => scrollToIndex(index + 1)}
+          className="absolute right-3 top-1/2 z-[110] hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:block"
           aria-label="Ảnh sau"
         >
           <ChevronRight className="h-6 w-6" />
