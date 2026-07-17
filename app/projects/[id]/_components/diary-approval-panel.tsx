@@ -8,6 +8,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Loader2,
   ShieldCheck,
@@ -356,22 +357,13 @@ function Lightbox({
   if (!mounted) return null;
   const photo = photos[index];
   if (!photo) return null;
+  const canPrev = index > 0;
+  const canNext = index < photos.length - 1;
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
       onClick={onClose}
     >
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-        aria-label="Đóng"
-      >
-        <X className="h-5 w-5" />
-      </button>
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white">
-        {index + 1} / {photos.length}
-      </div>
       <div className="relative h-full w-full" onClick={(e) => e.stopPropagation()}>
         <Image
           src={photoSrc(projectId, photo.key)}
@@ -380,6 +372,43 @@ function Lightbox({
           className="object-contain"
           unoptimized
         />
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-3 top-3 z-[110] rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+        aria-label="Đóng"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      {canPrev ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIndex((i) => Math.max(0, i - 1));
+          }}
+          className="absolute left-3 top-1/2 z-[110] -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Ảnh trước"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      ) : null}
+      {canNext ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIndex((i) => Math.min(photos.length - 1, i + 1));
+          }}
+          className="absolute right-3 top-1/2 z-[110] -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Ảnh sau"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      ) : null}
+      <div className="absolute bottom-3 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white">
+        {index + 1} / {photos.length}
       </div>
     </div>,
     document.body,
