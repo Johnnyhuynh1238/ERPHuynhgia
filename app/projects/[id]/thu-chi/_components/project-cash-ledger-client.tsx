@@ -1,7 +1,23 @@
 "use client";
 
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import "./thu-chi.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
 
 type CategoryOption = { id: string; code: string; name: string };
 type TxnAccount = { id: string; code: string; name: string; kind: "cash" | "bank" };
@@ -25,9 +41,7 @@ type Txn = {
   attachments: { url: string; isImage: boolean }[];
 };
 
-function money(v: number | null | undefined) {
-  return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
-}
+const fmt = (n: number | null | undefined) => Math.round(n || 0).toLocaleString("vi-VN");
 function fmtDate(s: string | null) {
   if (!s) return "—";
   const d = new Date(s);
@@ -36,9 +50,7 @@ function fmtDate(s: string | null) {
 function fmtDateTime(s: string | null) {
   if (!s) return "—";
   const d = new Date(s);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(
-    d.getHours(),
-  ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${fmtDate(s)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 const REFTYPE_LABEL: Record<Txn["refType"], string> = {
@@ -50,27 +62,42 @@ const REFTYPE_LABEL: Record<Txn["refType"], string> = {
   receipt: "Lệnh thu",
   transfer: "Chuyển quỹ",
 };
-const REFTYPE_CHIP: Record<Txn["refType"], string> = {
-  opening: "bg-slate-500/15 text-slate-300",
-  expense: "bg-orange-500/15 text-orange-300",
-  sub_payment: "bg-purple-500/15 text-purple-300",
-  material_proposal: "bg-cyan-500/15 text-cyan-300",
-  payment_schedule: "bg-emerald-500/15 text-emerald-300",
-  receipt: "bg-green-500/15 text-green-300",
-  transfer: "bg-indigo-500/15 text-indigo-300",
-};
-const ACCOUNT_KIND_LABEL: Record<"cash" | "bank", string> = {
-  cash: "Tiền mặt",
-  bank: "Ngân hàng",
-};
+const ACCOUNT_KIND_LABEL: Record<"cash" | "bank", string> = { cash: "Tiền mặt", bank: "Ngân hàng" };
 
 export function ProjectCashLedgerClient({
   projectId,
+  projectCode,
+  projectName,
+  projectAddress,
   categories,
 }: {
   projectId: string;
+  projectCode: string;
+  projectName: string;
+  projectAddress?: string | null;
   categories: CategoryOption[];
 }) {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("tiendo-theme");
+      if (saved === "light" || saved === "dark") setTheme(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("tiendo-theme", next);
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
   const [rows, setRows] = useState<Txn[]>([]);
   const [totals, setTotals] = useState<{ in: number; out: number }>({ in: 0, out: 0 });
   const [loading, setLoading] = useState(true);
@@ -91,15 +118,11 @@ export function ProjectCashLedgerClient({
   const [catValue, setCatValue] = useState<string>("");
   const [catSaving, setCatSaving] = useState(false);
 
-  useEffect(() => {
-    setCatValue(selectedTxn?.category?.id ?? "");
-  }, [selectedTxn]);
+  useEffect(() => setCatValue(selectedTxn?.category?.id ?? ""), [selectedTxn]);
 
   useEffect(() => {
     if (!lightboxUrl) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxUrl(null);
-    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setLightboxUrl(null);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxUrl]);
@@ -137,11 +160,7 @@ export function ProjectCashLedgerClient({
   useEffect(() => {
     load();
   }, [load]);
-
-  // Reset về trang 1 khi đổi bộ lọc
-  useEffect(() => {
-    setPage(1);
-  }, [direction, refType, categoryFilter, from, to]);
+  useEffect(() => setPage(1), [direction, refType, categoryFilter, from, to]);
 
   function reset() {
     setDirection("");
@@ -152,11 +171,7 @@ export function ProjectCashLedgerClient({
   }
 
   async function saveCategory() {
-    if (!selectedTxn) return;
-    if (!catValue) {
-      toast.error("Chọn danh mục");
-      return;
-    }
+    if (!selectedTxn || !catValue) return;
     setCatSaving(true);
     const res = await fetch(`/api/treasury/transactions/${selectedTxn.id}/category`, {
       method: "PATCH",
@@ -180,268 +195,213 @@ export function ProjectCashLedgerClient({
   const csvHref = `/api/treasury/transactions?${filterQs.toString()}&format=csv`;
 
   return (
-    <div className="space-y-4">
-      {/* Header tổng thu/chi của dự án (khớp bộ lọc) */}
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-orange-300">💸 Thu chi dự án</h2>
-          <a
-            href={csvHref}
-            className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-500/25"
-          >
-            ⤓ Tải CSV
-          </a>
+    <div className={`tcdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="wrap">
+        <div className="topbar">
+          <div className="brand">
+            <div className="mark">HG</div>
+            <div>
+              <b>HUỲNH GIA</b>
+              <span>Thu chi dự án</span>
+            </div>
+          </div>
+          <div className="tbtns">
+            <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
+              ◑
+            </button>
+            <Link href={`/projects/${projectId}`} className="iconbtn" aria-label="Về dự án">
+              ‹
+            </Link>
+          </div>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-emerald-500/25 bg-[#0b0d16] p-3">
-            <div className="text-[11px] uppercase tracking-wide text-[#8b95b7]">Tổng thu</div>
-            <div className="mt-1 text-xl font-bold text-emerald-300">{money(totals.in)}</div>
+
+        <div className="eyebrow">Thu chi · sổ quỹ dự án</div>
+        <h1>{projectName}</h1>
+        <div className="meta">
+          <span>{projectCode}</span>
+          {projectAddress ? (
+            <>
+              <span className="d">·</span>
+              <span>{projectAddress}</span>
+            </>
+          ) : null}
+          <span className="d">·</span>
+          <span>
+            <span className="num">{total}</span> giao dịch{hasActiveFilter ? " (lọc)" : ""}
+          </span>
+        </div>
+
+        {/* Tổng thu / chi / chênh lệch */}
+        <div className="tot">
+          <div>
+            <div className="st-l">Tổng thu</div>
+            <div className="st-v in num">{fmt(totals.in)}</div>
           </div>
-          <div className="rounded-xl border border-red-500/25 bg-[#0b0d16] p-3">
-            <div className="text-[11px] uppercase tracking-wide text-[#8b95b7]">Tổng chi</div>
-            <div className="mt-1 text-xl font-bold text-red-300">{money(totals.out)}</div>
+          <div>
+            <div className="st-l">Tổng chi</div>
+            <div className="st-v out num">{fmt(totals.out)}</div>
           </div>
-          <div className="rounded-xl border border-[#2d3249] bg-[#0b0d16] p-3">
-            <div className="text-[11px] uppercase tracking-wide text-[#8b95b7]">Chênh lệch (thu − chi)</div>
-            <div className={`mt-1 text-xl font-bold ${net >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-              {net >= 0 ? "+" : "−"} {money(Math.abs(net))}
+          <div>
+            <div className="st-l">Chênh lệch</div>
+            <div className={`st-v num ${net >= 0 ? "net-pos" : "net-neg"}`}>
+              {net >= 0 ? "+" : "−"}
+              {fmt(Math.abs(net))}
             </div>
           </div>
         </div>
-        <div className="mt-2 text-xs text-[#8b95b7]">{total} giao dịch{hasActiveFilter ? " (đang lọc)" : ""}</div>
-      </div>
 
-      {/* Filter toggle bar */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShowFilters((v) => !v)}
-          className="rounded-lg border border-[#2d3249] bg-[#13151f] px-3 py-1.5 text-sm text-[#cfd4e8] hover:border-orange-400/40"
-        >
-          {showFilters ? "Ẩn bộ lọc" : "Bộ lọc"}{hasActiveFilter ? " •" : ""}
-        </button>
-        {hasActiveFilter && (
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#8b95b7] hover:text-[#f0f2ff]"
-          >
-            Reset
+        {/* Công cụ */}
+        <div className="tools">
+          <button type="button" className={`tbtn ${showFilters || hasActiveFilter ? "on" : ""}`} onClick={() => setShowFilters((v) => !v)}>
+            ⚲ Bộ lọc{hasActiveFilter ? " •" : ""}
           </button>
-        )}
-      </div>
-
-      {showFilters && (
-        <div className="grid gap-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-xs text-[#8b95b7]">Loại</label>
-            <select
-              value={direction}
-              onChange={(e) => setDirection(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            >
-              <option value="">Thu & chi</option>
-              <option value="in">Chỉ thu</option>
-              <option value="out">Chỉ chi</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-[#8b95b7]">Nguồn</label>
-            <select
-              value={refType}
-              onChange={(e) => setRefType(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            >
-              <option value="">Tất cả nguồn</option>
-              {(Object.keys(REFTYPE_LABEL) as Txn["refType"][]).map((k) => (
-                <option key={k} value={k}>
-                  {REFTYPE_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-[#8b95b7]">Danh mục</label>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            >
-              <option value="">Tất cả danh mục</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-[#8b95b7]">Từ ngày</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-[#8b95b7]">Đến ngày</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            />
-          </div>
+          {hasActiveFilter ? (
+            <button type="button" className="tbtn" onClick={reset}>
+              Xoá lọc
+            </button>
+          ) : null}
+          <a className="tbtn csv" href={csvHref}>
+            ⤓ CSV
+          </a>
         </div>
-      )}
 
-      {/* Nhật ký dạng card */}
-      <div className="space-y-2">
-        {loading && (
-          <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
-            Đang tải…
+        {showFilters ? (
+          <div className="filters">
+            <div className="fld">
+              <label>Loại</label>
+              <select className="sel" value={direction} onChange={(e) => setDirection(e.target.value)}>
+                <option value="">Thu & chi</option>
+                <option value="in">Chỉ thu</option>
+                <option value="out">Chỉ chi</option>
+              </select>
+            </div>
+            <div className="fld">
+              <label>Nguồn</label>
+              <select className="sel" value={refType} onChange={(e) => setRefType(e.target.value)}>
+                <option value="">Tất cả</option>
+                {(Object.keys(REFTYPE_LABEL) as Txn["refType"][]).map((k) => (
+                  <option key={k} value={k}>
+                    {REFTYPE_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="fld full">
+              <label>Danh mục</label>
+              <select className="sel" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="">Tất cả danh mục</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="fld">
+              <label>Từ ngày</label>
+              <input className="dt" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </div>
+            <div className="fld">
+              <label>Đến ngày</label>
+              <input className="dt" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
           </div>
-        )}
-        {!loading && rows.length === 0 && (
-          <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
-            Chưa có giao dịch thu chi nào cho dự án này.
-          </div>
-        )}
-        {!loading &&
-          rows.map((r) => {
-            const isIn = r.direction === "in";
-            return (
-              <div
-                key={r.id}
-                onClick={() => setSelectedTxn(r)}
-                className="cursor-pointer rounded-xl border border-[#2d3249] bg-[#13151f] p-3 shadow-sm transition hover:border-orange-400/40 hover:bg-[#181b28]"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${REFTYPE_CHIP[r.refType]}`}>
-                      {REFTYPE_LABEL[r.refType]}
+        ) : null}
+
+        {/* Danh sách giao dịch */}
+        <div className="list">
+          {loading ? (
+            <div className="load">Đang tải…</div>
+          ) : rows.length === 0 ? (
+            <div className="empty">
+              <div className="ic">💸</div>
+              Chưa có giao dịch thu chi nào cho dự án này.
+            </div>
+          ) : (
+            rows.map((r) => {
+              const isIn = r.direction === "in";
+              return (
+                <button type="button" className="row" key={r.id} onClick={() => setSelectedTxn(r)}>
+                  <div className="rtop">
+                    <span className="chip">{REFTYPE_LABEL[r.refType]}</span>
+                    <span className="rdate">{fmtDate(r.occurredAt)}</span>
+                    <span className={`ramt ${isIn ? "in" : "out"}`}>
+                      {isIn ? "+" : "−"}
+                      {fmt(r.amount)}
                     </span>
-                    <span className="text-xs text-[#8b95b7]">{fmtDate(r.occurredAt)}</span>
                   </div>
-                  <div className={`text-base font-bold whitespace-nowrap ${isIn ? "text-emerald-300" : "text-red-300"}`}>
-                    {isIn ? "+" : "−"} {money(r.amount)}
-                  </div>
-                </div>
-
-                {(r.note || r.category || r.account) && (
-                  <div className="mt-2 space-y-1 text-sm text-[#cfd4e8]">
-                    {r.note && <div className="break-words">{r.note}</div>}
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#8b95b7]">
-                      {r.account && (
-                        <span className="text-indigo-300">
-                          {r.refType === "transfer" && r.counterAccount
-                            ? r.direction === "out"
-                              ? `${r.account.name} → ${r.counterAccount.name}`
-                              : `${r.counterAccount.name} → ${r.account.name}`
-                            : r.account.name}
-                        </span>
-                      )}
-                      {r.category && <span>· {r.category.name}</span>}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#2d3249]/60 pt-2 text-xs text-[#8b95b7]">
-                  <span className="flex items-center gap-2">
-                    {r.creator.fullName}
-                    {r.attachments.length > 0 && (
-                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] text-indigo-300">
-                        📎 {r.attachments.length}
+                  {r.note ? <div className="rnote">{r.note}</div> : null}
+                  <div className="rsub">
+                    {r.account ? (
+                      <span>
+                        {r.refType === "transfer" && r.counterAccount
+                          ? r.direction === "out"
+                            ? `${r.account.name} → ${r.counterAccount.name}`
+                            : `${r.counterAccount.name} → ${r.account.name}`
+                          : r.account.name}
                       </span>
-                    )}
-                  </span>
-                  <span>
-                    Số dư sau: <span className="font-semibold text-[#cfd4e8]">{money(r.balanceAfter)}</span>
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+                    ) : null}
+                    {r.category ? <span>· {r.category.name}</span> : null}
+                    {r.attachments.length > 0 ? <span className="clip">· 📎 {r.attachments.length}</span> : null}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {totalPages > 1 ? (
+          <div className="pager">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              ‹ Trước
+            </button>
+            <span className="pc">
+              Trang {page}/{totalPages}
+            </span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              Sau ›
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#cfd4e8] disabled:opacity-40"
-          >
-            ‹ Trước
-          </button>
-          <span className="text-sm text-[#8b95b7]">
-            Trang {page}/{totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#cfd4e8] disabled:opacity-40"
-          >
-            Sau ›
-          </button>
-        </div>
-      )}
-
-      {/* Detail modal */}
-      {selectedTxn && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setSelectedTxn(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#2d3249] bg-[#13151f] p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${REFTYPE_CHIP[selectedTxn.refType]}`}>
-                  {REFTYPE_LABEL[selectedTxn.refType]}
-                </span>
-                <span className="text-sm text-[#8b95b7]">{selectedTxn.direction === "in" ? "Thu" : "Chi"}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTxn(null)}
-                className="text-[#8b95b7] hover:text-[#f0f2ff]"
-                aria-label="Đóng"
-              >
+      {/* Modal chi tiết */}
+      {selectedTxn ? (
+        <div className="ovl" onClick={() => setSelectedTxn(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sh-top">
+              <span className="chip">
+                {REFTYPE_LABEL[selectedTxn.refType]} · {selectedTxn.direction === "in" ? "Thu" : "Chi"}
+              </span>
+              <button type="button" className="sh-x" onClick={() => setSelectedTxn(null)} aria-label="Đóng">
                 ✕
               </button>
             </div>
-
-            <div className={`text-2xl font-bold ${selectedTxn.direction === "in" ? "text-emerald-300" : "text-red-300"}`}>
-              {selectedTxn.direction === "in" ? "+" : "−"} {money(selectedTxn.amount)}
+            <div className={`sh-amt ${selectedTxn.direction === "in" ? "in" : "out"}`}>
+              {selectedTxn.direction === "in" ? "+" : "−"}
+              {fmt(selectedTxn.amount)} đ
             </div>
-            <div className="mt-1 text-xs text-[#8b95b7]">
-              Số dư sau giao dịch:{" "}
-              <span className="font-semibold text-[#cfd4e8]">{money(selectedTxn.balanceAfter)}</span>
+            <div className="sh-bal">
+              Số dư sau: <span className="num">{fmt(selectedTxn.balanceAfter)}</span> đ
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <span className="text-[#8b95b7]">Ngày phát sinh</span>
-                <span className="text-[#f0f2ff]">{fmtDate(selectedTxn.occurredAt)}</span>
+            <div style={{ marginTop: 14 }}>
+              <div className="kv">
+                <span className="k">Ngày phát sinh</span>
+                <span className="v">{fmtDate(selectedTxn.occurredAt)}</span>
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-[#8b95b7]">Tạo lúc</span>
-                <span className="text-[#f0f2ff]">{fmtDateTime(selectedTxn.createdAt)}</span>
+              <div className="kv">
+                <span className="k">Tạo lúc</span>
+                <span className="v">{fmtDateTime(selectedTxn.createdAt)}</span>
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-[#8b95b7]">Người tạo</span>
-                <span className="text-[#f0f2ff]">{selectedTxn.creator.fullName}</span>
+              <div className="kv">
+                <span className="k">Người tạo</span>
+                <span className="v">{selectedTxn.creator.fullName}</span>
               </div>
-              {selectedTxn.account && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-[#8b95b7]">Tài khoản</span>
-                  <span className="text-indigo-300">
+              {selectedTxn.account ? (
+                <div className="kv">
+                  <span className="k">Tài khoản</span>
+                  <span className="v">
                     {selectedTxn.refType === "transfer" && selectedTxn.counterAccount
                       ? selectedTxn.direction === "out"
                         ? `${selectedTxn.account.name} → ${selectedTxn.counterAccount.name}`
@@ -449,116 +409,72 @@ export function ProjectCashLedgerClient({
                       : `${selectedTxn.account.name} (${ACCOUNT_KIND_LABEL[selectedTxn.account.kind]})`}
                   </span>
                 </div>
-              )}
-              {selectedTxn.refType === "expense" ? (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[#8b95b7]">Danh mục</span>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={catValue}
-                      onChange={(e) => setCatValue(e.target.value)}
-                      className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-2 py-1 text-sm text-[#f0f2ff]"
-                    >
-                      <option value="">— Chọn danh mục —</option>
+              ) : null}
+              <div className="kv">
+                <span className="k">Danh mục</span>
+                {selectedTxn.refType === "expense" ? (
+                  <span className="catbox">
+                    <select className="sel" value={catValue} onChange={(e) => setCatValue(e.target.value)}>
+                      <option value="">— Chọn —</option>
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>
                       ))}
                     </select>
-                    {catValue !== (selectedTxn.category?.id ?? "") && (
-                      <button
-                        type="button"
-                        onClick={saveCategory}
-                        disabled={catSaving}
-                        className="rounded-lg bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                      >
+                    {catValue !== (selectedTxn.category?.id ?? "") && catValue ? (
+                      <button type="button" className="catsave" onClick={saveCategory} disabled={catSaving}>
                         {catSaving ? "..." : "Lưu"}
                       </button>
-                    )}
-                  </div>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="v">{selectedTxn.category?.name ?? "—"}</span>
+                )}
+              </div>
+              {selectedTxn.refId ? (
+                <div className="kv">
+                  <span className="k">Mã tham chiếu</span>
+                  <span className="v mono">{selectedTxn.refId}</span>
                 </div>
-              ) : (
-                selectedTxn.category && (
-                  <div className="flex justify-between gap-3">
-                    <span className="text-[#8b95b7]">Danh mục</span>
-                    <span className="text-[#f0f2ff]">{selectedTxn.category.name}</span>
-                  </div>
-                )
-              )}
-              {selectedTxn.refId && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-[#8b95b7]">Mã tham chiếu</span>
-                  <span className="font-mono text-[11px] text-[#8b95b7]">{selectedTxn.refId}</span>
-                </div>
-              )}
+              ) : null}
             </div>
 
-            {selectedTxn.note && (
-              <div className="mt-4 rounded-lg border border-[#2d3249] bg-[#0b0d16] p-3">
-                <div className="mb-1 text-xs uppercase tracking-wide text-[#8b95b7]">Ghi chú</div>
-                <div className="whitespace-pre-wrap break-words text-sm text-[#cfd4e8]">{selectedTxn.note}</div>
+            {selectedTxn.note ? (
+              <div className="sh-note">
+                <span className="k">Ghi chú</span>
+                {selectedTxn.note}
               </div>
-            )}
+            ) : null}
 
-            {selectedTxn.attachments.length > 0 && (
-              <div className="mt-4">
-                <div className="mb-2 text-xs uppercase tracking-wide text-[#8b95b7]">
-                  Chứng từ ({selectedTxn.attachments.length})
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {selectedTxn.attachments.map((att, i) =>
-                    att.isImage ? (
-                      <button
-                        key={`${att.url}-${i}`}
-                        type="button"
-                        onClick={() => setLightboxUrl(att.url)}
-                        className="aspect-square overflow-hidden rounded-lg border border-[#2d3249] bg-[#0b0d16] transition hover:border-orange-400/60"
-                        aria-label="Xem ảnh"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={att.url} alt="Chứng từ" loading="lazy" className="h-full w-full object-cover" />
-                      </button>
-                    ) : (
-                      <a
-                        key={`${att.url}-${i}`}
-                        href={att.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[#2d3249] bg-[#0b0d16] text-xs text-indigo-300 hover:border-orange-400/60"
-                      >
-                        <span className="text-2xl">📎</span>
-                        Mở tệp
-                      </a>
-                    ),
-                  )}
-                </div>
+            {selectedTxn.attachments.length > 0 ? (
+              <div className="atts">
+                {selectedTxn.attachments.map((att, i) =>
+                  att.isImage ? (
+                    <button type="button" className="att" key={`${att.url}-${i}`} onClick={() => setLightboxUrl(att.url)} aria-label="Xem ảnh">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={att.url} alt="Chứng từ" loading="lazy" />
+                    </button>
+                  ) : (
+                    <a className="att" key={`${att.url}-${i}`} href={att.url} target="_blank" rel="noreferrer">
+                      <span style={{ fontSize: 22 }}>📎</span>
+                      Mở tệp
+                    </a>
+                  ),
+                )}
               </div>
-            )}
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedTxn(null)}
-                className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#8b95b7]"
-              >
-                Đóng
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setLightboxUrl(null)}
-        >
+      {lightboxUrl ? (
+        <div className="lb" onClick={() => setLightboxUrl(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightboxUrl} alt="Chứng từ" className="max-h-[90vh] max-w-full rounded-lg object-contain" />
+          <img src={lightboxUrl} alt="Chứng từ" />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

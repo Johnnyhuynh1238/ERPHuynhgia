@@ -162,7 +162,6 @@ export function OverviewClient({
     { href: `${base}/mua-hang`, emoji: "🛒", name: "Mua hàng", sub: `${data.tiles.muaHang.count} đơn · ${fmt(data.tiles.muaHang.total)}`, badge: data.tiles.muaHang.received ? { cls: "info", text: `${data.tiles.muaHang.received} đã nhận` } : undefined },
     { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },
     { href: `${base}/cong-no`, emoji: "💰", name: "Công nợ NCC", sub: `Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
-    { href: `${base}/thu-chi`, emoji: "💸", name: "Thu chi", sub: "Toàn bộ tiền vào / ra dự án" },
     { href: `${base}/material-proposals`, emoji: "📦", name: "Đề xuất vật tư", sub: "VT cần mua" },
     { href: `${base}/work-orders`, emoji: "👷", name: "Giao việc", sub: "Phiếu hàng ngày", show: isSelf },
     { href: `${base}/eod`, emoji: "🌇", name: "Cuối ngày", sub: "Chấm công · sản lượng", show: isSelf },
@@ -280,9 +279,9 @@ export function OverviewClient({
           </div>
         </Link>
 
-        {/* ── CƠ CẤU CHI PHÍ ── */}
-        <div className="phead"><span className="pn">Cơ cấu chi phí</span><Link href={`${base}/finance`}>Chi tiết →</Link></div>
-        <div className="card cost">
+        {/* ── CƠ CẤU CHI PHÍ (bấm vào xem toàn bộ thu chi) ── */}
+        <div className="phead"><span className="pn">Cơ cấu chi phí</span></div>
+        <Link className="card cost ovplink" href={`${base}/thu-chi`}>
           <div className="split">
             {f.costBreakdown.map((c, i) => (<span key={c.name} style={{ width: `${clampW(pct(c.amount, spentTotal))}%`, background: COST_COLORS[i % COST_COLORS.length] }} />))}
           </div>
@@ -291,7 +290,7 @@ export function OverviewClient({
               <div className="li" key={c.name}><span className="dot" style={{ background: COST_COLORS[i % COST_COLORS.length] }} />{c.name}<span className="num">{fmt(c.amount)}</span></div>
             ))}
           </div>
-        </div>
+        </Link>
 
         {/* ── PHÂN HỆ ── */}
         <div className="phead"><span className="pn">Phân hệ dự án</span></div>
