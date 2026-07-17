@@ -4,6 +4,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { buildVtGroups, type VtGroup, type VtItem } from "@/lib/estimate-vt-groups";
 import "./mua-hang.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -16,10 +17,10 @@ type Material = {
   unit: string;
   quantity: number;
   unitPrice: number;
+  categoryName: string | null; // chủng loại (Thép, Xi măng…)
   taskCode: string | null; // "07-030"
   taskName: string | null;
 };
-type CatalogTask = { phaseCode: string; phaseName: string };
 
 type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 type Order = {
@@ -35,17 +36,7 @@ type Order = {
 };
 
 type Supplier = { id: string; name: string };
-
-type Group = {
-  key: string;
-  name: string;
-  unit: string;
-  lines: Material[];
-  total: number; // Σ SL dự toán
-  amount: number; // Σ SL*đơn giá
-  uprice: number; // đơn giá bình quân
-  minph: string; // giai đoạn nhỏ nhất
-};
+type NccPrice = { id: string; materialName: string; unit: string; unitPrice: number; supplierItemCode: string | null };
 
 const STATUS: { k: Order["status"]; l: string }[] = [
   { k: "draft", l: "Nháp" },
@@ -85,6 +76,17 @@ const fmtQ = (n: number) =>
 const baseName = (n: string) => {
   const i = n.indexOf(" (");
   return (i >= 0 ? n.slice(0, i) : n).trim();
+};
+// Đơn giá vật tư: giá thống nhất nếu mọi lần cùng giá, ngược lại bình quân theo SL.
+const upriceOf = (it: VtItem) => it.uniformPrice ?? (it.qty > 0 ? it.amount / it.qty : 0);
+// Khoá đã đặt theo vật tư (baseName + đvt, thường hoá chữ thường).
+const itemKeyOf = (name: string, unit: string) =>
+  `${baseName(name).toLowerCase()}|${unit.trim().toLowerCase()}`;
+// Neo đơn theo it.key GỐC (dự toán) nếu có → KT sửa tên hàng vẫn trừ đúng dòng dự toán.
+// Đơn cũ có tiền tố GĐ "NN|" → bỏ. Không có key → suy từ tên.
+const orderItemKey = (it: OrderItem) => {
+  const raw = (it.key || "").replace(/^\d{2}\|/, "").trim().toLowerCase();
+  return raw || itemKeyOf(it.name, it.unit);
 };
 const fmtDate = (iso: string | null) => {
   if (!iso) return "";
@@ -232,7 +234,6 @@ export function MuaHangClient({
   isKeToan?: boolean;
 }) {
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [phaseNames, setPhaseNames] = useState<Record<string, string>>({});
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -240,8 +241,6 @@ export function MuaHangClient({
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [pending, setPending] = useState<Record<string, number>>({});
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [buySupplier, setBuySupplier] = useState("");
-  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Order | null>(null);
   const [poOrder, setPoOrder] = useState<Order | null>(null);
   const poRef = useRef<HTMLDivElement>(null);
@@ -345,34 +344,13 @@ export function MuaHangClient({
     })();
   }, []);
 
-  // Khớp tên NCC (không phân biệt hoa/thường) → id để lưu FK; không khớp = NCC gõ tay mới.
-  const matchSupplierId = useCallback(
-    (name: string) => {
-      const n = name.trim().toLowerCase();
-      if (!n) return null;
-      return suppliers.find((s) => s.name.trim().toLowerCase() === n)?.id ?? null;
-    },
-    [suppliers],
-  );
-
   useEffect(() => {
     (async () => {
       try {
-        const [mRes, metaRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/estimate-db/materials`, { cache: "no-store" }),
-          fetch(`/api/projects/${projectId}/estimate-db/meta`, { cache: "no-store" }),
-        ]);
+        const mRes = await fetch(`/api/projects/${projectId}/estimate-db/materials`, { cache: "no-store" });
         if (!mRes.ok) throw new Error("Không đọc được vật tư dự toán");
         const mj = await mRes.json();
         setMaterials(mj.items || []);
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          const pn: Record<string, string> = {};
-          (meta.tasks as CatalogTask[])?.forEach((t) => {
-            if (t.phaseCode) pn[t.phaseCode] = t.phaseName;
-          });
-          setPhaseNames(pn);
-        }
         await loadOrders();
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
@@ -382,57 +360,31 @@ export function MuaHangClient({
     })();
   }, [projectId, loadOrders]);
 
-  // ── gộp VT theo tên gốc + đơn vị ──────────────────────────
-  const groups = useMemo<Group[]>(() => {
-    const map: Record<string, Group> = {};
-    const out: Group[] = [];
-    for (const m of materials) {
-      const ph = (m.taskCode || "").split("-")[0] || "99";
-      const b = baseName(m.name);
-      // Tách theo giai đoạn: cùng vật tư nhưng khác GĐ = dòng riêng (bê tông hiện ở cả GĐ 02/03/04)
-      const key = `${ph}|${b}|${m.unit}`;
-      if (!map[key]) {
-        map[key] = { key, name: b, unit: m.unit, lines: [], total: 0, amount: 0, uprice: 0, minph: ph };
-        out.push(map[key]);
-      }
-      const g = map[key];
-      g.lines.push(m);
-      g.total += m.quantity;
-      g.amount += m.quantity * m.unitPrice;
-    }
-    out.forEach((g) => (g.uprice = g.total > 0 ? g.amount / g.total : 0));
-    out.sort((a, b) => (a.minph !== b.minph ? (a.minph < b.minph ? -1 : 1) : b.amount - a.amount));
-    return out;
-  }, [materials]);
+  // ── gộp VT: chủng loại → vật tư (baseName, tổng SL) ─────────
+  // Nguồn CHUNG với tab "Vật tư" của dự toán (lib/estimate-vt-groups). collapseBase=true
+  // gộp bỏ phần " (vị trí công tác…)" → mỗi vật tư 1 dòng tổng SL để mua.
+  const cats = useMemo<VtGroup<Material>[]>(
+    () => buildVtGroups(materials, { collapseBase: true }),
+    [materials],
+  );
+  const allItems = useMemo(() => cats.flatMap((c) => c.items), [cats]);
 
-  // Tổng đã đặt theo VẬT TƯ (không phân biệt GĐ). Dùng it.key ("tên gốc|đvt") — KHÔNG dùng
-  // it.name (nhãn tự do do người đặt gõ). Bỏ tiền tố GĐ "NN|" nếu có để về "tên|đvt".
-  const matKey = (k: string) => k.replace(/^\d{2}\|/, "");
-  const placedByMat = useMemo<Record<string, number>>(() => {
+  const placedByItem = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     orders.forEach((o) =>
       o.items.forEach((it) => {
-        const mk = matKey(it.key || `${it.name}|${it.unit}`);
-        m[mk] = (m[mk] || 0) + it.qty;
+        const k = orderItemKey(it);
+        m[k] = (m[k] || 0) + it.qty;
       }),
     );
     return m;
   }, [orders]);
 
-  // Phân bổ waterfall: số đã đặt của 1 vật tư fill GĐ sớm nhất trước, dư mới sang GĐ sau.
-  // (groups đã sắp theo GĐ tăng dần nên duyệt tuần tự là đúng thứ tự.)
   const placed = useMemo<Record<string, number>>(() => {
-    const pool: Record<string, number> = { ...placedByMat };
     const res: Record<string, number> = {};
-    for (const g of groups) {
-      const mk = `${g.name}|${g.unit}`;
-      const avail = pool[mk] || 0;
-      const take = Math.min(avail, g.total);
-      res[g.key] = take;
-      pool[mk] = avail - take;
-    }
+    for (const it of allItems) res[it.key] = Math.min(placedByItem[it.key] || 0, it.qty);
     return res;
-  }, [groups, placedByMat]);
+  }, [allItems, placedByItem]);
 
   // "Đã nhận" = đã nhận hàng (received) hoặc đã thanh toán (paid). Còn lại = chưa nhận.
   const isReceived = (s: Order["status"]) => s === "received" || s === "paid";
@@ -453,38 +405,38 @@ export function MuaHangClient({
   const cart = useMemo(() => {
     let cnt = 0;
     let sum = 0;
-    groups.forEach((g) => {
-      const q = pending[g.key] || 0;
+    allItems.forEach((it) => {
+      const q = pending[it.key] || 0;
       if (q > 0) {
         cnt++;
-        sum += q * g.uprice;
+        sum += q * upriceOf(it);
       }
     });
     return { cnt, sum };
-  }, [groups, pending]);
+  }, [allItems, pending]);
 
   const summary = useMemo(() => {
     let tot = 0;
     let pl = 0;
-    groups.forEach((g) => {
-      tot += g.amount;
-      pl += (placed[g.key] || 0) * g.uprice;
+    allItems.forEach((it) => {
+      tot += it.amount;
+      pl += (placed[it.key] || 0) * upriceOf(it);
     });
     return { tot, pl, remain: tot - pl, pct: tot > 0 ? Math.round((pl / tot) * 100) : 0 };
-  }, [groups, placed]);
+  }, [allItems, placed]);
 
   const createOrder = async () => {
     const items: OrderItem[] = [];
-    groups.forEach((g) => {
-      const q = pending[g.key] || 0;
-      if (q > 0) items.push({ key: g.key, name: g.name, unit: g.unit, qty: q, price: Math.round(g.uprice) });
+    allItems.forEach((it) => {
+      const q = pending[it.key] || 0;
+      if (q > 0) items.push({ key: it.key, name: it.name, unit: it.unit, qty: q, price: Math.round(upriceOf(it)) });
     });
     if (!items.length) return;
-    const sup = buySupplier.trim();
+    // NCC chọn ở bước sửa đơn (tab Đơn hàng), không chọn ở màn mua.
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items, supplierName: sup || undefined, supplierId: matchSupplierId(sup) }),
+      body: JSON.stringify({ items }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -492,9 +444,17 @@ export function MuaHangClient({
       return;
     }
     setPending({});
-    setBuySupplier("");
     await loadOrders();
     toast(`Đã tạo đơn #${j.seq} · ${items.length} vật tư`);
+  };
+
+  // Kế toán không được SỬA đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
+  const openEdit = (o: Order) => {
+    if (isKeToan && isReceived(o.status)) {
+      toast("Đơn đã nhận — kế toán không được sửa. Liên hệ admin.");
+      return;
+    }
+    setEditing(o);
   };
 
   const delOrder = async (o: Order) => {
@@ -524,7 +484,7 @@ export function MuaHangClient({
     const merged: { name: string; unit: string; qty: number; amount: number }[] = [];
     const midx: Record<string, number> = {};
     o.items.forEach((it) => {
-      const mk = matKey(it.key || `${it.name}|${it.unit}`);
+      const mk = itemKeyOf(it.name, it.unit);
       if (midx[mk] == null) {
         midx[mk] = merged.length;
         merged.push({ name: it.name, unit: it.unit, qty: 0, amount: 0 });
@@ -705,7 +665,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
         <h1>{projectName}</h1>
         <div className="meta">
           <span>
-            {loading ? "…" : groups.length} chủng loại
+            {loading ? "…" : cats.length} chủng loại
           </span>
           <span className="d">·</span>
           <span>Bám dự toán</span>
@@ -716,7 +676,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           <div className="c">
             <div className="k">Dự toán VT</div>
             <div className="v t num">{loading ? "—" : fmt(summary.tot)}</div>
-            <div className="sp">{loading ? "—" : `${groups.length} chủng loại`}</div>
+            <div className="sp">{loading ? "—" : `${cats.length} chủng loại`}</div>
           </div>
           <div className="c">
             <div className="k">Đã đặt</div>
@@ -769,12 +729,9 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : tab === "buy" ? (
             <>
               <BuyList
-                groups={groups}
-                phaseNames={phaseNames}
+                cats={cats}
                 placed={placed}
                 pending={pending}
-                open={open}
-                setOpen={setOpen}
                 setQty={setQty}
                 isKeToan={isKeToan}
               />
@@ -787,7 +744,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : tab === "orders" ? (
             <OrdersList
               orders={ordersPending}
-              onEdit={setEditing}
+              onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
               emptyText="Chưa có đơn hàng nào chờ nhận."
@@ -796,7 +753,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : (
             <OrdersList
               orders={ordersReceived}
-              onEdit={setEditing}
+              onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
               emptyText="Chưa có đơn nào đã nhận."
@@ -808,19 +765,6 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
 
       {/* cart nổi */}
       <div className={`cart${cartOn ? " show" : ""}`}>
-        <div className="ncc">
-          <input
-            list="mh-ncc"
-            value={buySupplier}
-            onChange={(e) => setBuySupplier(e.target.value)}
-            placeholder="Nhà cung cấp (chọn hoặc gõ tên NCC — có thể bỏ trống)"
-          />
-          <datalist id="mh-ncc">
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.name} />
-            ))}
-          </datalist>
-        </div>
         <div className="in">
           <button type="button" className="btn ghost sm" onClick={() => setPending({})}>
             Xoá
@@ -843,7 +787,6 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
         <EditSheet
           order={editing}
           projectId={projectId}
-          isKeToan={isKeToan}
           suppliers={suppliers}
           theme={theme}
           onClose={() => setEditing(null)}
@@ -915,113 +858,87 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
 }
 
 function BuyList({
-  groups,
-  phaseNames,
+  cats,
   placed,
   pending,
-  open,
-  setOpen,
   setQty,
   isKeToan,
 }: {
-  groups: Group[];
-  phaseNames: Record<string, string>;
+  cats: VtGroup<Material>[];
   placed: Record<string, number>;
   pending: Record<string, number>;
-  open: Record<string, boolean>;
-  setOpen: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setQty: (key: string, v: string, max?: number) => void;
   isKeToan: boolean;
 }) {
-  if (!groups.length)
+  if (!cats.length)
     return (
       <div className="empty">
         <div className="ic">📦</div>
         Dự toán chưa có vật tư nào.
       </div>
     );
-  let lastph = "";
   return (
     <div>
-      {groups.map((g) => {
-        const head = g.minph !== lastph ? ((lastph = g.minph), true) : false;
-        const pl = placed[g.key] || 0;
-        const rem = g.total - pl;
-        const done = rem <= 0.0001;
-        const uv = pending[g.key];
-        const has = !!uv && uv > 0;
-        const isOpen = !!open[g.key];
-        return (
-          <div key={g.key}>
-            {head && (
-              <div className="phead">
-                <span className="pi">GĐ {g.minph}</span>
-                <span className="pn">{phaseNames[g.minph] || ""}</span>
-              </div>
-            )}
-            <div className={`mc${isOpen ? " open" : ""}`}>
-              <div className="top">
-                <button type="button" className="tapzone" onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}>
-                  <div className="rn">
-                    <span className="chev">▸</span>
-                    <span className="nm">{g.name}</span>
-                  </div>
-                  <div className="nums">
-                    <span>
-                      DT <b>{fmtQ(g.total)}</b> {g.unit}
-                    </span>
-                    {pl > 0 && (
-                      <span className="done">
-                        Đặt <b>{fmtQ(pl)}</b>
+      {cats.map((c) => (
+        <div key={c.key} className="catgrp">
+          <div className="cathd">
+            <span className="cn">{c.categoryName ?? "Chưa phân loại"}</span>
+            <span className="ca">{fmt(c.amount)} đ</span>
+          </div>
+          {c.items.map((it) => {
+            const pl = placed[it.key] || 0;
+            const rem = it.qty - pl;
+            const done = rem <= 0.0001;
+            const uv = pending[it.key];
+            const has = !!uv && uv > 0;
+            return (
+              <div key={it.key} className="mc">
+                <div className="top">
+                  <div className="tapzone">
+                    <div className="rn">
+                      <span className="nm">{it.name}</span>
+                    </div>
+                    <div className="nums">
+                      <span>
+                        DT <b>{fmtQ(it.qty)}</b> {it.unit}
                       </span>
-                    )}
-                    <span className={done ? "done" : "rem"}>
-                      Còn <b>{fmtQ(rem > 0 ? rem : 0)}</b>
-                    </span>
-                    {g.uprice > 0 && (
-                      <span className="price">
-                        <b>{fmt(g.uprice)}</b> đ/{g.unit}
+                      {pl > 0 && (
+                        <span className="done">
+                          Đặt <b>{fmtQ(pl)}</b>
+                        </span>
+                      )}
+                      <span className={done ? "done" : "rem"}>
+                        Còn <b>{fmtQ(rem > 0 ? rem : 0)}</b>
                       </span>
+                    </div>
+                  </div>
+                  <div className="ord">
+                    <label>Mua</label>
+                    <div className={`inrow${has ? " has" : ""}`}>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        max={isKeToan ? (rem > 0 ? rem : 0) : undefined}
+                        placeholder="0"
+                        value={uv || ""}
+                        onChange={(e) => setQty(it.key, e.target.value, isKeToan ? rem : undefined)}
+                      />
+                      <span className="u">{it.unit}</span>
+                    </div>
+                    {rem > 0.0001 && (
+                      <button type="button" className="fill" onClick={() => setQty(it.key, String(Math.round(rem * 1000) / 1000))}>
+                        = còn {fmtQ(rem)}
+                      </button>
                     )}
                   </div>
-                </button>
-                <div className="ord">
-                  <label>Mua</label>
-                  <div className={`inrow${has ? " has" : ""}`}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      min="0"
-                      max={isKeToan ? (rem > 0 ? rem : 0) : undefined}
-                      placeholder="0"
-                      value={uv || ""}
-                      onChange={(e) => setQty(g.key, e.target.value, isKeToan ? rem : undefined)}
-                    />
-                    <span className="u">{g.unit}</span>
-                  </div>
-                  {rem > 0.0001 && (
-                    <button type="button" className="fill" onClick={() => setQty(g.key, String(Math.round(rem * 1000) / 1000))}>
-                      = còn {fmtQ(rem)}
-                    </button>
-                  )}
                 </div>
               </div>
-              <div className="bd">
-                {g.lines.map((l) => (
-                  <div key={l.id} className="bl">
-                    <span className="bc">{l.taskCode}</span>
-                    <span className="bn">{l.taskName}</span>
-                    <span className="bq">
-                      {fmtQ(l.quantity)} {l.unit}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1136,7 +1053,6 @@ function EditSheet({
   onClose,
   onSaved,
   projectId,
-  isKeToan,
   suppliers,
   theme,
 }: {
@@ -1144,7 +1060,6 @@ function EditSheet({
   onClose: () => void;
   onSaved: () => void;
   projectId: string;
-  isKeToan: boolean;
   suppliers: Supplier[];
   theme: "light" | "dark";
 }) {
@@ -1154,7 +1069,10 @@ function EditSheet({
   const [deliveryDate, setDeliveryDate] = useState(order.deliveryDate ? order.deliveryDate.slice(0, 10) : "");
   const [status, setStatus] = useState<Order["status"]>(order.status);
   const [note, setNote] = useState(order.note || "");
-  const [prices, setPrices] = useState<number[]>(order.items.map((it) => it.price));
+  // Bản sao vật tư để sửa tên/đvt/SL/đơn giá (KT + admin đều được, không thêm/bớt dòng).
+  const [items, setItems] = useState<OrderItem[]>(order.items.map((it) => ({ ...it })));
+  // Bảng giá hàng của NCC đang chọn → droplist "hàng theo NCC" + tự điền đơn giá.
+  const [nccPrices, setNccPrices] = useState<NccPrice[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1162,7 +1080,44 @@ function EditSheet({
     return () => cancelAnimationFrame(id);
   }, []);
 
-  const total = order.items.reduce((s, it, i) => s + it.qty * (prices[i] || 0), 0);
+  // Đổi NCC → tải bảng giá hàng của NCC đó (nếu khớp tên trong danh mục).
+  const supplierId = suppliers.find((s) => s.name.trim().toLowerCase() === supplierName.trim().toLowerCase())?.id ?? null;
+  useEffect(() => {
+    if (!supplierId) {
+      setNccPrices([]);
+      return;
+    }
+    let alive = true;
+    fetch(`/api/admin/suppliers/${supplierId}/prices`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { prices: [] }))
+      .then((j) => {
+        if (alive) setNccPrices(Array.isArray(j.prices) ? j.prices : []);
+      })
+      .catch(() => alive && setNccPrices([]));
+    return () => {
+      alive = false;
+    };
+  }, [supplierId]);
+
+  const total = items.reduce((s, it) => s + it.qty * (it.price || 0), 0);
+
+  // Sửa 1 dòng; nếu đổi "tên" khớp hàng trong bảng giá NCC → tự điền đvt + đơn giá.
+  const patchItem = (i: number, patch: Partial<OrderItem>) => {
+    setItems((arr) =>
+      arr.map((it, j) => {
+        if (j !== i) return it;
+        const next = { ...it, ...patch };
+        if (patch.name != null) {
+          const hit = nccPrices.find((p) => p.materialName.trim().toLowerCase() === patch.name!.trim().toLowerCase());
+          if (hit) {
+            next.price = Math.round(hit.unitPrice);
+            if (hit.unit) next.unit = hit.unit;
+          }
+        }
+        return next;
+      }),
+    );
+  };
 
   const save = async () => {
     setSaving(true);
@@ -1171,13 +1126,12 @@ function EditSheet({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         supplierName,
-        supplierId:
-          suppliers.find((s) => s.name.trim().toLowerCase() === supplierName.trim().toLowerCase())?.id ?? null,
+        supplierId,
         orderDate: orderDate ? new Date(orderDate).toISOString() : undefined,
         deliveryDate: deliveryDate || null,
         status,
         note,
-        prices,
+        items,
       }),
     });
     setSaving(false);
@@ -1244,38 +1198,49 @@ function EditSheet({
             />
           </div>
           <div className="fld">
-            <label>
-              {isKeToan
-                ? "Vật tư · đơn giá (giá & SL do dự toán quy định 🔒)"
-                : "Vật tư · đơn giá (sửa được, SL khoá theo dự toán)"}
-            </label>
+            <label>Vật tư — tên · SL · đơn giá (sửa theo thực tế mua)</label>
+            <datalist id="mh-hang-ncc">
+              {nccPrices.map((p) => (
+                <option key={p.id} value={p.materialName}>
+                  {fmt(p.unitPrice)} đ/{p.unit}
+                </option>
+              ))}
+            </datalist>
             <div className="eitems">
-              {order.items.map((it, i) => (
-                <div key={it.key} className="eit">
-                  <div className="en">
-                    {it.name}
-                    <div className="eq">
-                      {fmtQ(it.qty)} {it.unit} · SL khoá 🔒
+              {items.map((it, i) => (
+                <div key={it.key || i} className="eitr">
+                  <input
+                    className="ein-name"
+                    list="mh-hang-ncc"
+                    value={it.name}
+                    onChange={(e) => patchItem(i, { name: e.target.value })}
+                    placeholder="Tên hàng (chọn theo NCC hoặc gõ tay)"
+                  />
+                  <div className="ein-row">
+                    <div className="ein-qty">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        value={it.qty || ""}
+                        onChange={(e) => patchItem(i, { qty: parseFloat(e.target.value) || 0 })}
+                      />
+                      <span className="u">{it.unit}</span>
                     </div>
-                  </div>
-                  <div className="ep">
-                    {isKeToan ? (
-                      <span className="num" style={{ fontWeight: 600 }}>
-                        {fmt(prices[i])}
-                      </span>
-                    ) : (
+                    <span className="ein-x">×</span>
+                    <div className="ein-price">
                       <input
                         type="number"
                         inputMode="numeric"
                         step="any"
                         min="0"
-                        value={prices[i]}
-                        onChange={(e) => {
-                          const v = Math.round(parseFloat(e.target.value) || 0);
-                          setPrices((p) => p.map((x, j) => (j === i ? v : x)));
-                        }}
+                        value={it.price || ""}
+                        onChange={(e) => patchItem(i, { price: Math.round(parseFloat(e.target.value) || 0) })}
                       />
-                    )}
+                      <span className="u">đ</span>
+                    </div>
+                    <span className="ein-sum num">{fmt(it.qty * (it.price || 0))}</span>
                   </div>
                 </div>
               ))}

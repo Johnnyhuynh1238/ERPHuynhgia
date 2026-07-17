@@ -106,6 +106,12 @@
 .mhdoc .phead .pi { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 10px; color: var(--gold); font-weight: 600; }
 .mhdoc .phead .pn { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); }
 
+/* ---- nhóm chủng loại (Thép, Xi măng…) ---- */
+.mhdoc .catgrp { margin-bottom: 8px; }
+.mhdoc .cathd { display: flex; align-items: baseline; justify-content: space-between; gap: 9px; padding: 16px 2px 6px; position: sticky; top: 56px; background: var(--bg); z-index: 5; }
+.mhdoc .cathd .cn { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.mhdoc .cathd .ca { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 11px; color: var(--mut); }
+
 /* ---- material card ---- */
 .mhdoc .mc { border-bottom: 1px solid var(--line); padding: 12px 2px; }
 .mhdoc .mc .top { display: flex; align-items: flex-start; gap: 10px; }
@@ -217,12 +223,14 @@
 .mhdoc .row2 { display: flex; gap: 10px; }
 .mhdoc .row2 .fld { flex: 1; }
 .mhdoc .eitems { margin-top: 4px; }
-.mhdoc .eit { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.mhdoc .eit .en { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.3; }
-.mhdoc .eit .en .eq { font-size: 11px; color: var(--mut2); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; margin-top: 2px; }
-.mhdoc .eit .ep { flex: none; width: 120px; }
-.mhdoc .eit .ep input { width: 100%; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; text-align: right; background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; padding: 7px 9px; outline: none; color: var(--text); -webkit-appearance: none; }
-.mhdoc .eit .ep input:focus { border-color: var(--orange); }
+.mhdoc .eitr { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.mhdoc .eitr .ein-name { margin-bottom: 0; }
+.mhdoc .ein-row { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.mhdoc .ein-qty, .mhdoc .ein-price { display: flex; align-items: center; gap: 4px; flex: 1 1 0; min-width: 0; }
+.mhdoc .ein-row input { width: 100%; min-width: 0; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; text-align: right; padding: 8px 9px; }
+.mhdoc .ein-row .u { flex: none; font-size: 12px; color: var(--mut2); }
+.mhdoc .ein-x { flex: none; color: var(--mut2); font-size: 13px; }
+.mhdoc .ein-sum { flex: none; min-width: 74px; text-align: right; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; color: var(--text); }
 .mhdoc .etot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--gold); font-weight: 600; }
 .mhdoc .etot .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--terra); }
 .mhdoc .etot .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--orange); }

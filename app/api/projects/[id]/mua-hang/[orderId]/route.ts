@@ -9,9 +9,11 @@ type OrderItem = { key: string; name: string; unit: string; qty: number; price: 
 const STATUSES = ["draft", "ordered", "received", "paid"] as const;
 type St = (typeof STATUSES)[number];
 
-// PATCH: sửa mọi thứ TRỪ số lượng (SL khoá). Body có thể có:
+// PATCH: sửa đơn. Body có thể có:
 //   supplierName, supplierId, status, orderDate(ISO), deliveryDate("YYYY-MM-DD"|null),
-//   note, prices(number[] khớp thứ tự items — chỉ đổi đơn giá, tính lại total).
+//   note,
+//   items(OrderItem[] — sửa tên/đvt/SL/đơn giá theo thứ tự, KT+admin đều được, tính lại total),
+//   prices(number[] — legacy, chỉ đổi đơn giá) — dùng khi không gửi items.
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string; orderId: string } },
@@ -23,6 +25,14 @@ export async function PATCH(
     where: { id: params.orderId, projectId: params.id },
   });
   if (!order) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
+
+  // Kế toán KHÔNG được sửa đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
+  if (isKeToan && (order.status === "received" || order.status === "paid")) {
+    return NextResponse.json(
+      { message: "Đơn đã nhận — kế toán không được sửa. Liên hệ admin." },
+      { status: 403 },
+    );
+  }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
@@ -47,10 +57,29 @@ export async function PATCH(
     }
   }
 
-  // Đơn giá: KHÔNG đụng qty. Cập nhật price theo index rồi tính lại total.
-  // Kế toán không được đặt giá (giá do admin quy định trong dự toán) → bỏ qua prices.
-  if (Array.isArray(body.prices) && !isKeToan) {
-    const items = (order.items as unknown as OrderItem[]).map((it, i) => {
+  // Sửa vật tư (tên/đvt/SL/đơn giá) — KT + admin đều được. Giữ it.key GỐC để neo dự toán.
+  const orig = order.items as unknown as OrderItem[];
+  if (Array.isArray(body.items)) {
+    const items = (body.items as unknown[]).map((raw, i) => {
+      const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+      const base = orig[i];
+      const qty = Number(o.qty);
+      const price = Math.round(Number(o.price));
+      const name = String(o.name ?? base?.name ?? "").trim();
+      const unit = String(o.unit ?? base?.unit ?? "").trim();
+      return {
+        key: String(o.key ?? base?.key ?? `${name}|${unit}`),
+        name,
+        unit,
+        qty: Number.isFinite(qty) && qty > 0 ? qty : base?.qty ?? 0,
+        price: Number.isFinite(price) && price >= 0 ? price : base?.price ?? 0,
+      } as OrderItem;
+    });
+    data.items = items;
+    data.total = items.reduce((s, it) => s + it.qty * it.price, 0);
+  } else if (Array.isArray(body.prices)) {
+    // legacy: chỉ đổi đơn giá theo index.
+    const items = orig.map((it, i) => {
       const p = Math.round(Number((body.prices as unknown[])[i]));
       return { ...it, price: Number.isFinite(p) && p >= 0 ? p : it.price };
     });

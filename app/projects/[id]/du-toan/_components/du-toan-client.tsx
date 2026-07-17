@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { buildVtGroups, type VtGroup } from "@/lib/estimate-vt-groups";
 import { api, fmt, type CatalogTask, type Khoan, type Material } from "./du-toan-data";
 import "./du-toan.css";
 
@@ -73,24 +74,6 @@ type CtGroup = {
   mats: Material[];
   value: number;
 };
-// 1 vật tư (gộp theo tên+đơn vị) — nằm bên trong 1 chủng loại
-type VtItem = {
-  key: string;
-  name: string;
-  unit: string;
-  qty: number;
-  amount: number;
-  members: Material[]; // các lần xuất hiện ở nhiều công tác
-  uniformPrice: number | null;
-};
-// 1 chủng loại = 1 hàng ở tab Vật tư
-type VtGroup = {
-  key: string;
-  categoryName: string | null;
-  amount: number;
-  items: VtItem[];
-};
-
 export function DuToanClient({
   projectId,
   projectCode,
@@ -177,43 +160,8 @@ export function DuToanClient({
     );
   }, [materials, phaseByCatalog]);
 
-  // gộp theo vật tư (tên + đvt)
-  const vtGroups = useMemo<VtGroup[]>(() => {
-    // 2 tầng: chủng loại → vật tư (tên+đơn vị)
-    const cats = new Map<string, VtGroup>();
-    const itemMaps = new Map<string, Map<string, VtItem>>();
-    for (const m of materials) {
-      const catName = m.categoryName ?? null;
-      const catKey = (catName ?? "__none").toLowerCase();
-      let cg = cats.get(catKey);
-      if (!cg) {
-        cg = { key: catKey, categoryName: catName, amount: 0, items: [] };
-        cats.set(catKey, cg);
-        itemMaps.set(catKey, new Map());
-      }
-      const im = itemMaps.get(catKey)!;
-      const itemKey = `${m.name.toLowerCase()}|${m.unit.toLowerCase()}`;
-      let it = im.get(itemKey);
-      if (!it) {
-        it = { key: itemKey, name: m.name, unit: m.unit, qty: 0, amount: 0, members: [], uniformPrice: null };
-        im.set(itemKey, it);
-        cg.items.push(it);
-      }
-      it.qty += m.quantity;
-      it.amount += amountOf(m);
-      it.members.push(m);
-      cg.amount += amountOf(m);
-    }
-    const arr = Array.from(cats.values());
-    for (const cg of arr) {
-      for (const it of cg.items) {
-        const prices = new Set(it.members.map((x) => x.unitPrice));
-        it.uniformPrice = prices.size === 1 ? it.members[0].unitPrice : null;
-      }
-      cg.items.sort((a, b) => b.amount - a.amount);
-    }
-    return arr.sort((a, b) => b.amount - a.amount);
-  }, [materials]);
+  // gộp theo vật tư (tên + đvt) — nguồn chung với màn Mua hàng (lib/estimate-vt-groups)
+  const vtGroups = useMemo<VtGroup<Material>[]>(() => buildVtGroups(materials), [materials]);
 
   const selectTab = (key: TabKey) => {
     setTab(key);
@@ -463,7 +411,7 @@ function VatTuPanel({
   total,
   onOpen,
 }: {
-  groups: VtGroup[];
+  groups: VtGroup<Material>[];
   total: number;
   onOpen: (id: string) => void;
 }) {
@@ -647,7 +595,7 @@ function VtSheet({
   onClose,
   onSavePrice,
 }: {
-  group?: VtGroup;
+  group?: VtGroup<Material>;
   onClose: () => void;
   onSavePrice: (id: string, price: number) => void;
 }) {

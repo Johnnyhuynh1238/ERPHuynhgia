@@ -76,3 +76,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
     price: { ...price, unitPrice: Number(price.unitPrice) },
   });
 }
+
+// GET: bảng giá hàng hoá của 1 NCC → droplist "hàng theo NCC" ở màn mua hàng.
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user?.id || !user.role) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!STAFF_ROLES.has(user.role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+
+  const prices = await prisma.supplierMaterialPrice.findMany({
+    where: { supplierId: params.id },
+    orderBy: { materialName: "asc" },
+    select: { id: true, materialName: true, unit: true, unitPrice: true, supplierItemCode: true },
+  });
+  return NextResponse.json({
+    prices: prices.map((p) => ({ ...p, unitPrice: Number(p.unitPrice) })),
+  });
+}
