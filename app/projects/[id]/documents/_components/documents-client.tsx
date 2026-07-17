@@ -61,6 +61,7 @@ export function DocumentsClient({
   const [accessDialog, setAccessDialog] = useState<{ doc: DocumentDto; selected: Set<string> } | null>(null);
   const [savingAccess, setSavingAccess] = useState(false);
   const [accessSearch, setAccessSearch] = useState("");
+  const [viewingDoc, setViewingDoc] = useState<DocumentDto | null>(null);
 
   async function refreshList() {
     const res = await fetch(`/api/projects/${projectId}/documents`, { cache: "no-store" });
@@ -227,13 +228,19 @@ export function DocumentsClient({
                 {documents.map((doc) => (
                   <tr key={doc.id} className="border-t border-[#2d3249] text-[#d1d5e0]">
                     <td className="py-2 pr-2">
-                      <a
-                        href={doc.viewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-[#fb923c] hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => setViewingDoc(doc)}
+                        className="text-left font-medium text-[#fb923c] hover:underline"
                       >
                         {doc.title}
+                      </button>
+                      <a
+                        href={`${doc.viewUrl}?download=1`}
+                        download
+                        className="ml-3 inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline"
+                      >
+                        ⤓ Tải về
                       </a>
                       {isAdmin && doc.grantedUsers && doc.grantedUsers.length > 0 ? (
                         <div className="mt-1 text-xs text-[#94a3b8]">
@@ -350,6 +357,51 @@ export function DocumentsClient({
                 {savingAccess ? "Đang lưu..." : "Lưu phân quyền"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {viewingDoc ? (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-black/80 p-3 sm:p-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h4 className="truncate text-sm font-semibold text-[#f0f2ff]">{viewingDoc.title}</h4>
+            <div className="flex flex-none items-center gap-2">
+              <a
+                href={`${viewingDoc.viewUrl}?download=1`}
+                download
+                className="rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-3 py-1.5 text-xs text-[#7dd3fc] hover:bg-[#13151f]"
+              >
+                ⤓ Tải về
+              </a>
+              <button
+                type="button"
+                onClick={() => setViewingDoc(null)}
+                className="rounded-lg bg-[#f97316] px-3 py-1.5 text-xs font-medium text-white"
+              >
+                ✕ Đóng
+              </button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[#2d3249] bg-[#0f1119]">
+            {viewingDoc.mimeType === "application/pdf" ? (
+              <iframe src={viewingDoc.viewUrl} title={viewingDoc.title} className="h-full w-full" />
+            ) : viewingDoc.mimeType.startsWith("image/") ? (
+              <div className="flex h-full w-full items-center justify-center p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={viewingDoc.viewUrl} alt={viewingDoc.title} className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-[#8892b0]">
+                <p>Không xem trước được định dạng này ({viewingDoc.fileName}).</p>
+                <a
+                  href={`${viewingDoc.viewUrl}?download=1`}
+                  download
+                  className="rounded-lg bg-[#f97316] px-4 py-2 text-sm font-medium text-white"
+                >
+                  ⤓ Tải về để mở
+                </a>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

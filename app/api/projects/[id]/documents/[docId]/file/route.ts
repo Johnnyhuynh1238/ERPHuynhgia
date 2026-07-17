@@ -25,7 +25,9 @@ export async function GET(request: Request, { params }: { params: { id: string; 
   });
   if (!doc) return NextResponse.json({ message: "Không tìm thấy hồ sơ" }, { status: 404 });
 
-  const token = new URL(request.url).searchParams.get("token");
+  const searchParams = new URL(request.url).searchParams;
+  const token = searchParams.get("token");
+  const forceDownload = searchParams.get("download") === "1";
   if (token) {
     const access = await requireCustomerPortalApiAccess(token);
     if (!access.ok) return NextResponse.json({ message: access.message }, { status: access.status });
@@ -47,7 +49,9 @@ export async function GET(request: Request, { params }: { params: { id: string; 
 
   const object = await getObjectFromMinio(key);
   const contentType = object.contentType || doc.mimeType || "application/octet-stream";
-  const disposition = contentType === "application/pdf" || contentType.startsWith("image/") ? "inline" : "attachment";
+  const disposition = forceDownload
+    ? "attachment"
+    : contentType === "application/pdf" || contentType.startsWith("image/") ? "inline" : "attachment";
 
   return new NextResponse(new Uint8Array(object.buffer), {
     headers: {
