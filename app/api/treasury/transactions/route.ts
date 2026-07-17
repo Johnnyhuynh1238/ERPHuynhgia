@@ -113,7 +113,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const pageSize = Math.min(200, Math.max(10, Number(url.searchParams.get("pageSize")) || 50));
 
-  const [rows, total] = await Promise.all([
+  const [rows, total, totalsByDir] = await Promise.all([
     prisma.cashTransaction.findMany({
       where,
       orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
@@ -128,7 +128,19 @@ export async function GET(request: Request) {
       take: pageSize,
     }),
     prisma.cashTransaction.count({ where }),
+    prisma.cashTransaction.groupBy({
+      by: ["direction"],
+      where,
+      _sum: { amount: true },
+    }),
   ]);
+
+  // Tổng thu/chi khớp bộ lọc hiện tại (không phân trang) — dùng cho header màn Thu chi dự án.
+  const totals = { in: 0, out: 0 };
+  for (const g of totalsByDir) {
+    if (g.direction === "in") totals.in = Number(g._sum.amount ?? 0);
+    else if (g.direction === "out") totals.out = Number(g._sum.amount ?? 0);
+  }
 
   const idsByType = {
     expense: [] as string[],
@@ -222,6 +234,7 @@ export async function GET(request: Request) {
       attachments: r.refId ? attMap.get(keyOf(r.refType, r.refId)) ?? [] : [],
     })),
     total,
+    totals,
     page,
     pageSize,
   });
