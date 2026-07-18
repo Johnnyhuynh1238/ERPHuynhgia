@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { SwipeLightbox } from "@/components/swipe-lightbox";
 import "./thu-chi.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -118,18 +119,12 @@ export function ProjectCashLedgerClient({
   const [showFilters, setShowFilters] = useState(false);
 
   const [selectedTxn, setSelectedTxn] = useState<Txn | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [catValue, setCatValue] = useState<string>("");
   const [catSaving, setCatSaving] = useState(false);
 
   useEffect(() => setCatValue(selectedTxn?.category?.id ?? ""), [selectedTxn]);
-
-  useEffect(() => {
-    if (!lightboxUrl) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setLightboxUrl(null);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxUrl]);
+  const imgAtts = selectedTxn ? selectedTxn.attachments.filter((a) => a.isImage) : [];
 
   const hasActiveFilter = !!(direction || refType || categoryFilter || from || to);
 
@@ -371,7 +366,7 @@ export function ProjectCashLedgerClient({
 
       {/* Overlay portal ra body (tránh app-shell transform neo fixed xuống đáy) */}
       {mounted &&
-        (selectedTxn || lightboxUrl) &&
+        selectedTxn &&
         createPortal(
           <div className={`tcportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
             {/* Modal chi tiết */}
@@ -460,7 +455,7 @@ export function ProjectCashLedgerClient({
               <div className="atts">
                 {selectedTxn.attachments.map((att, i) =>
                   att.isImage ? (
-                    <button type="button" className="att" key={`${att.url}-${i}`} onClick={() => setLightboxUrl(att.url)} aria-label="Xem ảnh">
+                    <button type="button" className="att" key={`${att.url}-${i}`} onClick={() => setLightboxIdx(imgAtts.findIndex((x) => x.url === att.url))} aria-label="Xem ảnh">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={att.url} alt="Chứng từ" loading="lazy" />
                     </button>
@@ -477,16 +472,14 @@ export function ProjectCashLedgerClient({
               </div>
             ) : null}
 
-            {/* Lightbox */}
-            {lightboxUrl ? (
-              <div className="lb" onClick={() => setLightboxUrl(null)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={lightboxUrl} alt="Chứng từ" />
-              </div>
-            ) : null}
           </div>,
           document.body,
         )}
+
+      {/* Lightbox ảnh — vuốt ngang, tự portal ra body */}
+      {selectedTxn && lightboxIdx !== null ? (
+        <SwipeLightbox imgs={imgAtts.map((a) => a.url)} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+      ) : null}
     </div>
   );
 }
