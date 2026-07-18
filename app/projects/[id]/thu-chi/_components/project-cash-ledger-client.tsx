@@ -3,6 +3,7 @@
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "./thu-chi.css";
 
@@ -77,6 +78,9 @@ export function ProjectCashLedgerClient({
   projectAddress?: string | null;
   categories: CategoryOption[];
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   useEffect(() => {
     try {
@@ -365,9 +369,14 @@ export function ProjectCashLedgerClient({
         ) : null}
       </div>
 
-      {/* Modal chi tiết */}
-      {selectedTxn ? (
-        <div className="ovl" onClick={() => setSelectedTxn(null)}>
+      {/* Overlay portal ra body (tránh app-shell transform neo fixed xuống đáy) */}
+      {mounted &&
+        (selectedTxn || lightboxUrl) &&
+        createPortal(
+          <div className={`tcportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+            {/* Modal chi tiết */}
+            {selectedTxn ? (
+              <div className="ovl" onClick={() => setSelectedTxn(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sh-top">
               <span className="chip">
@@ -464,17 +473,20 @@ export function ProjectCashLedgerClient({
                 )}
               </div>
             ) : null}
-          </div>
-        </div>
-      ) : null}
+                </div>
+              </div>
+            ) : null}
 
-      {/* Lightbox */}
-      {lightboxUrl ? (
-        <div className="lb" onClick={() => setLightboxUrl(null)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightboxUrl} alt="Chứng từ" />
-        </div>
-      ) : null}
+            {/* Lightbox */}
+            {lightboxUrl ? (
+              <div className="lb" onClick={() => setLightboxUrl(null)}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={lightboxUrl} alt="Chứng từ" />
+              </div>
+            ) : null}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
