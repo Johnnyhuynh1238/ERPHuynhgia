@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { PayCountdown } from "./countdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +67,10 @@ const CSS = `
   .pay-kt .who{font-size:12px;color:#9a8b78}
   .pay-kt .who b{display:block;font-size:15px;color:#5a2d18}
   .pay-call{margin-top:14px}
+  .pay-count{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 12px;padding:9px 13px;border-radius:11px;background:#fff2e6;border:1px solid #f4cba3}
+  .pay-count .lbl{font-size:12px;color:#9a6b45;font-weight:600}
+  .pay-count .clk{font-size:19px;font-weight:800;color:#D94E1E;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+  .pay-count.over{background:#fdecec;border-color:#f3b4b4;color:#c0392b;font-size:12.5px;font-weight:700;justify-content:center;text-align:center}
   .pay-call.zalo{margin-top:9px}
   .pay-call a{display:block;text-align:center;padding:13px;border-radius:12px;font-weight:800;font-size:15px;text-decoration:none;background:#D94E1E;color:#fff}
   .pay-call.zalo a{background:#0068FF}
@@ -163,7 +168,10 @@ export default async function PayTrackPage({ params }: { params: { token: string
 
           <div style={{ display: "grid", gap: 16 }}>
             <div className="pay-card pay-contact">
-              <div className="pay-sec">Liên hệ nhận tiền</div>
+              <div className="pay-sec">Liên hệ nếu chờ quá 30 phút</div>
+              {!paid && !cancelled && (
+                <PayCountdown deadlineMs={expense.createdAt.getTime() + 30 * 60 * 1000} />
+              )}
               <div className="pay-kt">
                 <div className="av">₫</div>
                 <div className="who"><b>Kế toán Huỳnh Gia</b>Gọi để nhận thanh toán</div>
