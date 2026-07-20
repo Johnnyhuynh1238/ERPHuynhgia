@@ -1028,6 +1028,12 @@ export function ExpensesClient({
             const isExpanded = expandedId === r.id;
             const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
             const bank = r.payeeBankBin ? findBankByBin(r.payeeBankBin) : null;
+            // Bấm cả dòng: CK -> mở chi tiết chuyển khoản; tiền mặt pending -> mở popup ghi nhận chi.
+            const rowAction: (() => void) | null = canQuickTransfer
+              ? toggle
+              : r.status === "pending" && canMarkPaid
+                ? () => openPayDialog(r)
+                : null;
 
             const statusBadge =
               r.status === "pending"
@@ -1052,22 +1058,22 @@ export function ExpensesClient({
               <div
                 key={r.id}
                 ref={r.id === highlightId ? highlightRef : undefined}
-                onClick={canQuickTransfer ? toggle : undefined}
-                role={canQuickTransfer ? "button" : undefined}
-                tabIndex={canQuickTransfer ? 0 : undefined}
+                onClick={rowAction ?? undefined}
+                role={rowAction ? "button" : undefined}
+                tabIndex={rowAction ? 0 : undefined}
                 aria-expanded={canQuickTransfer ? isExpanded : undefined}
                 onKeyDown={
-                  canQuickTransfer
+                  rowAction
                     ? (e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          toggle();
+                          rowAction();
                         }
                       }
                     : undefined
                 }
                 className={`rounded-2xl border bg-gradient-to-br from-[#13151f] to-[#0f111a] p-4 flex flex-col gap-3 ${cardBorder} ${
-                  canQuickTransfer ? "cursor-pointer transition hover:border-orange-400/40 active:scale-[0.995]" : ""
+                  rowAction ? "cursor-pointer transition hover:border-orange-400/40 active:scale-[0.995]" : ""
                 } ${isExpanded ? "md:col-span-2 xl:col-span-3 ring-1 ring-orange-400/30" : ""} ${
                   r.id === highlightId ? "ring-2 ring-orange-400/80 animate-pulse" : ""
                 }`}

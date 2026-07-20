@@ -71,9 +71,7 @@ const CSS = `
   .pay-count .lbl{font-size:12px;color:#9a6b45;font-weight:600}
   .pay-count .clk{font-size:19px;font-weight:800;color:#D94E1E;font-variant-numeric:tabular-nums;letter-spacing:.5px}
   .pay-count.over{background:#fdecec;border-color:#f3b4b4;color:#c0392b;font-size:12.5px;font-weight:700;justify-content:center;text-align:center}
-  .pay-call.zalo{margin-top:9px}
   .pay-call a{display:block;text-align:center;padding:13px;border-radius:12px;font-weight:800;font-size:15px;text-decoration:none;background:#D94E1E;color:#fff}
-  .pay-call.zalo a{background:#0068FF}
   .pay-paidline{font-size:13px;color:#127a45;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .pay-bills{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
   @media(max-width:520px){.pay-bills{grid-template-columns:repeat(2,1fr)}}
@@ -177,7 +175,6 @@ export default async function PayTrackPage({ params }: { params: { token: string
                 <div className="who"><b>Kế toán Huỳnh Gia</b>Gọi để nhận thanh toán</div>
               </div>
               <div className="pay-call"><a href={`tel:${KT_PHONE}`}>📞 {KT_PHONE_LABEL}</a></div>
-              <div className="pay-call zalo"><a href={`https://zalo.me/${KT_PHONE}`} target="_blank" rel="noreferrer">💬 Nhắn Zalo kế toán</a></div>
             </div>
 
             {!paid && !cancelled && (
