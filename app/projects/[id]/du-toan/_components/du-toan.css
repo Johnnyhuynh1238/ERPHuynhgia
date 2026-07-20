@@ -109,6 +109,17 @@
 .dt-row .rau{font-size:11px;color:var(--dt-mut2);white-space:nowrap;flex:none;font-family:var(--dt-mono)}
 .dt-row .chev{color:var(--dt-mut2);font-size:16px;flex:none;align-self:center}
 
+/* Siêu nhóm Thô / ME / Hoàn thiện */
+.dt-super{margin-top:2px}
+.dt-suphead{width:100%;display:flex;align-items:center;gap:9px;background:none;border:none;font:inherit;color:var(--dt-text);
+  padding:12px 2px;border-bottom:1.5px solid var(--dt-line2);cursor:pointer;position:sticky;top:64px;background:var(--dt-bg);z-index:10}
+.dt-suphead .sc{font-size:12px;color:var(--dt-mut2);transition:transform .18s;flex:none}
+.dt-suphead .sc.open{transform:rotate(90deg)}
+.dt-suphead .sl{font-size:14px;font-weight:800;letter-spacing:-.01em;flex:none}
+.dt-suphead .sm{flex:1;font-size:11px;color:var(--dt-mut2);font-family:var(--dt-mono)}
+.dt-suphead .sv{font-family:var(--dt-mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:700;color:var(--dt-text);white-space:nowrap;flex:none}
+.dt-super .dt-row{padding-left:14px}
+
 .dt-gstrip{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:2.5px solid var(--dt-orange)}
 .dt-gstrip .gk{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dt-text)}
 .dt-gstrip .gv{font-family:var(--dt-mono);font-variant-numeric:tabular-nums;font-size:19px;font-weight:700;color:var(--dt-text)}

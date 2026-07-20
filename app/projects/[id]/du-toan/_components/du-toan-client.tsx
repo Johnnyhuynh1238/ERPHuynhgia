@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { buildVtGroups, type VtGroup } from "@/lib/estimate-vt-groups";
+import { buildVtGroups, buildSuperGroups, type VtGroup, type SuperGroup } from "@/lib/estimate-vt-groups";
 import { api, fmt, type CatalogTask, type Khoan, type Material } from "./du-toan-data";
 import "./du-toan.css";
 
@@ -162,6 +162,7 @@ export function DuToanClient({
 
   // gộp theo vật tư (tên + đvt) — nguồn chung với màn Mua hàng (lib/estimate-vt-groups)
   const vtGroups = useMemo<VtGroup<Material>[]>(() => buildVtGroups(materials), [materials]);
+  const vtSuperGroups = useMemo<SuperGroup<Material>[]>(() => buildSuperGroups(vtGroups), [vtGroups]);
 
   const selectTab = (key: TabKey) => {
     setTab(key);
@@ -276,7 +277,7 @@ export function DuToanClient({
         ) : tab === "ct" ? (
           <CongTacPanel groups={ctGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "ct", id })} />
         ) : tab === "vt" ? (
-          <VatTuPanel groups={vtGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "vt", id })} />
+          <VatTuPanel superGroups={vtSuperGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "vt", id })} />
         ) : (
           <KhoanPanel rows={khoan} total={khoanTotal} onOpen={(id) => setSheet({ kind: "kh", id })} />
         )}
@@ -406,44 +407,66 @@ function CongTacPanel({
   );
 }
 
+// 1 dòng chủng loại (giữ nguyên markup cũ) — dùng trong các siêu nhóm.
+function ChungLoaiRow({ g, onOpen }: { g: VtGroup<Material>; onOpen: (id: string) => void }) {
+  const cta = new Set<string>();
+  g.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
+  // Tổng SL theo đơn vị (1 chủng loại có thể nhiều đvt: Thép có cây + kg)
+  const byUnit = new Map<string, number>();
+  g.items.forEach((it) => byUnit.set(it.unit, (byUnit.get(it.unit) ?? 0) + it.qty));
+  const qtyStr = Array.from(byUnit.entries())
+    .map(([u, q]) => qfmt(q, u))
+    .join(" · ");
+  return (
+    <button className="dt-row" onClick={() => onOpen(g.key)}>
+      <span className="swatch" style={{ background: swatchOf(g.categoryName) }} />
+      <span className="rb">
+        <span className="r1">
+          <span className="rn">{g.categoryName ?? "Chưa phân loại"}</span>
+          <span className="rav dt-num">{fmt(g.amount)}</span>
+        </span>
+        <span className="r2">
+          <span className="rs">
+            {g.items.length} vật tư · <b className="dt-num">{qtyStr}</b>
+          </span>
+          <span className="rau">{cta.size} công tác</span>
+        </span>
+      </span>
+      <span className="chev">›</span>
+    </button>
+  );
+}
+
+// Vật tư gộp thành 3 siêu nhóm Thô / ME / Hoàn thiện (nguồn chung với màn Mua hàng).
 function VatTuPanel({
-  groups,
+  superGroups,
   total,
   onOpen,
 }: {
-  groups: VtGroup<Material>[];
+  superGroups: SuperGroup<Material>[];
   total: number;
   onOpen: (id: string) => void;
 }) {
-  if (groups.length === 0) return <div className="dt-empty">Chưa có vật tư. Dùng 🤖 AI để bóc vật tư.</div>;
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  if (superGroups.length === 0) return <div className="dt-empty">Chưa có vật tư. Dùng 🤖 AI để bóc vật tư.</div>;
   return (
     <div>
-      {groups.map((g) => {
-        const cta = new Set<string>();
-        g.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
-        // Tổng SL theo đơn vị (1 chủng loại có thể nhiều đvt: Thép có cây + kg)
-        const byUnit = new Map<string, number>();
-        g.items.forEach((it) => byUnit.set(it.unit, (byUnit.get(it.unit) ?? 0) + it.qty));
-        const qtyStr = Array.from(byUnit.entries())
-          .map(([u, q]) => qfmt(q, u))
-          .join(" · ");
+      {superGroups.map((sg) => {
+        const isOpen = open[sg.key] ?? true; // mặc định mở
         return (
-          <button className="dt-row" key={g.key} onClick={() => onOpen(g.key)}>
-            <span className="swatch" style={{ background: swatchOf(g.categoryName) }} />
-            <span className="rb">
-              <span className="r1">
-                <span className="rn">{g.categoryName ?? "Chưa phân loại"}</span>
-                <span className="rav dt-num">{fmt(g.amount)}</span>
-              </span>
-              <span className="r2">
-                <span className="rs">
-                  {g.items.length} vật tư · <b className="dt-num">{qtyStr}</b>
-                </span>
-                <span className="rau">{cta.size} công tác</span>
-              </span>
-            </span>
-            <span className="chev">›</span>
-          </button>
+          <div className="dt-super" key={sg.key}>
+            <button
+              className="dt-suphead"
+              onClick={() => setOpen((o) => ({ ...o, [sg.key]: !isOpen }))}
+              aria-expanded={isOpen}
+            >
+              <span className={"sc" + (isOpen ? " open" : "")}>▸</span>
+              <span className="sl">{sg.label}</span>
+              <span className="sm">{sg.groups.length} chủng loại</span>
+              <span className="sv dt-num">{fmt(sg.amount)}</span>
+            </button>
+            {isOpen && sg.groups.map((g) => <ChungLoaiRow key={g.key} g={g} onOpen={onOpen} />)}
+          </div>
         );
       })}
       <div className="dt-gstrip">

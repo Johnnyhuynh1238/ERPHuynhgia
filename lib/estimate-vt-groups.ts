@@ -82,3 +82,46 @@ export function buildVtGroups<M extends MaterialLike>(
   }
   return arr.sort((a, b) => b.amount - a.amount);
 }
+
+// ── Siêu nhóm: gộp chủng loại → 3 nhóm Thô / ME / Hoàn thiện theo giai đoạn (phaseCode) ──
+//   phaseCode lấy từ taskCode "GĐ-CT" (vd "07-03" -> GĐ "07"). 01–06 = Thô, 07 = ME, 08–09 = HT.
+//   VT không có catalog -> Thô. Nguồn CHUNG cho tab Vật tư (dự toán) + màn Mua hàng.
+export type SuperKey = "tho" | "me" | "ht";
+export const SUPER_LABEL: Record<SuperKey, string> = { tho: "Thô", me: "ME (Cơ điện)", ht: "Hoàn thiện" };
+export const SUPER_ORDER: SuperKey[] = ["tho", "me", "ht"];
+
+function phaseToSuper(phase: string | null): SuperKey {
+  if (phase === "07") return "me";
+  if (phase === "08" || phase === "09") return "ht";
+  return "tho"; // 01–06 + không xác định
+}
+
+export type SuperGroup<M extends MaterialLike = MaterialLike> = {
+  key: SuperKey;
+  label: string;
+  amount: number;
+  groups: VtGroup<M>[];
+};
+
+// Chủng loại thuộc siêu nhóm có tổng tiền trội nhất (member tính theo phaseCode của nó).
+function superOfGroup<M extends MaterialLike>(g: VtGroup<M>): SuperKey {
+  const tally: Record<SuperKey, number> = { tho: 0, me: 0, ht: 0 };
+  for (const it of g.items) {
+    for (const m of it.members) {
+      const phase = (m.taskCode ?? "").split("-")[0] || null;
+      tally[phaseToSuper(phase)] += amountOf(m);
+    }
+  }
+  return SUPER_ORDER.reduce((best, k) => (tally[k] > tally[best] ? k : best), "tho" as SuperKey);
+}
+
+export function buildSuperGroups<M extends MaterialLike>(vtGroups: VtGroup<M>[]): SuperGroup<M>[] {
+  const buckets: Record<SuperKey, VtGroup<M>[]> = { tho: [], me: [], ht: [] };
+  for (const g of vtGroups) buckets[superOfGroup(g)].push(g);
+  return SUPER_ORDER.map((k) => ({
+    key: k,
+    label: SUPER_LABEL[k],
+    amount: buckets[k].reduce((s, g) => s + g.amount, 0),
+    groups: buckets[k],
+  })).filter((sg) => sg.groups.length > 0);
+}
