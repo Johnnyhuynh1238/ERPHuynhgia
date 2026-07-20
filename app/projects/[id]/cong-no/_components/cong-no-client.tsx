@@ -267,6 +267,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         <NccPopup
           key={openSup.supplierId}
           sup={openSup}
+          projectId={projectId}
           onClose={() => setOpenSid(null)}
           onEditOrder={setEditing}
           onPO={downloadPO}
@@ -302,11 +303,13 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
 
 function NccPopup({
   sup,
+  projectId,
   onClose,
   onEditOrder,
   onPO,
 }: {
   sup: Supplier;
+  projectId: string;
   onClose: () => void;
   onEditOrder: (o: Order) => void;
   onPO: (o: Order) => void;
@@ -319,6 +322,22 @@ function NccPopup({
   }, []);
 
   const off = sup.conLai <= 0.0001;
+
+  // Mở màn Lệnh chi điền sẵn số còn phải trả (admin/KT sửa được). Chi xong → tự ghi trả công nợ NCC.
+  const goLenhChi = () => {
+    const bank = sup.bankAccount ? ` — ${sup.bankName || ""} ${sup.bankAccount}`.trim() : "";
+    const qs = new URLSearchParams({
+      create: "1",
+      projectId,
+      amount: String(Math.round(sup.conLai || 0)),
+      method: "transfer",
+      payee: sup.supplierName,
+      note: `Trả công nợ NCC ${sup.supplierName}${bank}`,
+      sourceType: "ncc_congno",
+      sourceId: sup.supplierId,
+    });
+    window.location.href = `/expenses?${qs.toString()}`;
+  };
 
   return (
     <div className={`npop-scrim${show ? " show" : ""}`} onClick={onClose}>
@@ -352,6 +371,14 @@ function NccPopup({
             <div className={`v ${off ? "o" : "r"} num`}>{fmt(sup.conLai)}</div>
           </div>
         </div>
+
+        {!off && (
+          <div className="npay">
+            <button type="button" className="btn pay" onClick={goLenhChi}>
+              🧾 Gửi lệnh chi trả NCC
+            </button>
+          </div>
+        )}
 
         <div className="nbody">
           {sup.payments.length > 0 && (

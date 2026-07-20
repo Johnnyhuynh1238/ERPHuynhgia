@@ -34,6 +34,7 @@ const createSchema = z.object({
   categoryId: z.string().uuid("Danh mục không hợp lệ"),
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   payee: z.string().trim().max(255).optional().nullable(),
+  payeePhone: z.string().trim().max(20).optional().nullable(),
   paymentMethod: z.enum(["cash", "transfer"]).optional(),
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
@@ -42,6 +43,8 @@ const createSchema = z.object({
   payeeBankBin: z.string().trim().max(20).optional().nullable(),
   payeeAccountNumber: z.string().trim().max(40).optional().nullable(),
   payeeAccountName: z.string().trim().max(200).optional().nullable(),
+  sourceType: z.enum(["mua_hang_order", "ncc_congno"]).optional().nullable(),
+  sourceId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -139,6 +142,7 @@ export async function POST(request: Request) {
       categoryId: data.categoryId,
       amount: new Prisma.Decimal(data.amount),
       payee: data.payee?.trim() || null,
+      payeePhone: data.payeePhone?.trim() || null,
       paymentMethod: data.paymentMethod || null,
       note: data.note?.trim() || null,
       attachmentUrl: urls[0] ?? null,
@@ -149,6 +153,8 @@ export async function POST(request: Request) {
       payeeBankBin: data.payeeBankBin?.trim() || null,
       payeeAccountNumber: data.payeeAccountNumber?.trim() || null,
       payeeAccountName: data.payeeAccountName?.trim() || null,
+      sourceType: data.sourceType || null,
+      sourceId: data.sourceId || null,
       createdBy: user.id,
     },
     include: {

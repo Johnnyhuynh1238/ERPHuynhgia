@@ -92,6 +92,13 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // Trang theo dõi thanh toán công khai cho NCC (lệnh chi). Tự auth bằng
+  // publicToken random trên URL — không gắn user, không đi qua NextAuth.
+  // Gồm trang /pay/[token] và proxy ảnh CK /pay/[token]/receipt.
+  if (pathname.startsWith("/pay/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);

@@ -32,8 +32,11 @@ type Expense = {
   paidAmount: number | null;
   paidNote: string | null;
   paidReceiptUrl: string | null;
+  paidReceiptUrls: string[];
   cancelledAt: string | null;
   cancelledReason: string | null;
+  payeePhone: string | null;
+  publicToken: string | null;
   payeeBankBin: string | null;
   payeeAccountNumber: string | null;
   payeeAccountName: string | null;
@@ -63,6 +66,7 @@ type CreateForm = {
   categoryId: string;
   amount: string;
   payee: string;
+  payeePhone: string;
   paymentMethod: "cash" | "transfer";
   priority: "normal" | "urgent";
   note: string;
@@ -70,6 +74,8 @@ type CreateForm = {
   payeeBankBin: string;
   payeeAccountNumber: string;
   payeeAccountName: string;
+  sourceType: string;
+  sourceId: string;
 };
 
 const emptyCreate: CreateForm = {
@@ -77,6 +83,7 @@ const emptyCreate: CreateForm = {
   categoryId: "",
   amount: "",
   payee: "",
+  payeePhone: "",
   paymentMethod: "transfer",
   priority: "normal",
   note: "",
@@ -84,6 +91,8 @@ const emptyCreate: CreateForm = {
   payeeBankBin: "",
   payeeAccountNumber: "",
   payeeAccountName: "",
+  sourceType: "",
+  sourceId: "",
 };
 
 export function ExpensesClient({
@@ -125,8 +134,28 @@ export function ExpensesClient({
       setStatus("all");
     }
     if (id) setHighlightId(id);
+    // Prefill từ màn Mua hàng: /expenses?create=1&projectId&amount&method&note → mở sẵn form Lệnh chi
+    if (sp.get("create") === "1" && canCreate) {
+      const method = sp.get("method") === "cash" ? "cash" : "transfer";
+      const st = sp.get("sourceType");
+      // Danh mục điền sẵn theo mã (vd mua hàng -> VATTU); admin đổi được ở dropdown.
+      const cc = sp.get("categoryCode");
+      const prefillCatId = cc ? categories.find((c) => c.code === cc)?.id || "" : "";
+      setForm({
+        ...emptyCreate,
+        projectId: sp.get("projectId") || "",
+        categoryId: prefillCatId,
+        amount: sp.get("amount") || "",
+        note: sp.get("note") || "",
+        payee: sp.get("payee") || "",
+        paymentMethod: method,
+        sourceType: st === "mua_hang_order" || st === "ncc_congno" ? st : "",
+        sourceId: sp.get("sourceId") || "",
+      });
+      setShowCreate(true);
+    }
     setFiltersReady(true);
-  }, []);
+  }, [canCreate]);
 
   const [balance, setBalance] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -160,7 +189,7 @@ export function ExpensesClient({
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payNote, setPayNote] = useState("");
-  const [payReceiptUrl, setPayReceiptUrl] = useState("");
+  const [payReceiptUrls, setPayReceiptUrls] = useState<string[]>([]);
   const [payAccountId, setPayAccountId] = useState("");
   const { accounts: cashAccounts } = useCashAccounts();
 
@@ -370,6 +399,10 @@ export function ExpensesClient({
       toast.error("Nhập số tiền > 0");
       return;
     }
+    if (!form.payeePhone.trim()) {
+      toast.error("Nhập SĐT người nhận");
+      return;
+    }
     if ((form.payeeBankBin && !form.payeeAccountNumber.trim()) || (!form.payeeBankBin && form.payeeAccountNumber.trim())) {
       toast.error("Chọn ngân hàng và nhập STK hoặc bỏ trống cả 2");
       return;
@@ -383,6 +416,7 @@ export function ExpensesClient({
         categoryId: form.categoryId,
         amount: amt,
         payee: form.payee.trim() || null,
+        payeePhone: form.payeePhone.trim() || null,
         paymentMethod: form.paymentMethod,
         priority: form.priority,
         note: form.note.trim() || null,
@@ -390,6 +424,8 @@ export function ExpensesClient({
         payeeBankBin: form.payeeBankBin || null,
         payeeAccountNumber: form.payeeAccountNumber.trim() || null,
         payeeAccountName: form.payeeAccountName.trim() || null,
+        sourceType: form.sourceType || null,
+        sourceId: form.sourceId || null,
       }),
     });
     const j = await res.json().catch(() => ({}));
@@ -425,7 +461,7 @@ export function ExpensesClient({
         paidAt: payDate,
         paidAmount: amt,
         paidNote: payNote.trim() || null,
-        paidReceiptUrl: payReceiptUrl.trim() || null,
+        paidReceiptUrls: payReceiptUrls,
         accountId: payAccountId,
       }),
     });
@@ -439,7 +475,7 @@ export function ExpensesClient({
     setOpenPay(null);
     setPayAmount("");
     setPayNote("");
-    setPayReceiptUrl("");
+    setPayReceiptUrls([]);
     setPayAccountId("");
     setPayDate(new Date().toISOString().slice(0, 10));
     load();
@@ -475,8 +511,31 @@ export function ExpensesClient({
     setOpenPay(e);
     setPayAmount(String(e.amount));
     setPayNote("");
-    setPayReceiptUrl("");
+    setPayReceiptUrls([]);
     setPayDate(new Date().toISOString().slice(0, 10));
+  }
+
+  const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
+  // Lấy (lazy-tạo) link theo dõi công khai rồi copy để gửi NCC.
+  async function sendPublicLink(e: Expense) {
+    setLinkBusyId(e.id);
+    try {
+      const res = await fetch(`/api/expenses/${e.id}/public-link`, { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.path) {
+        toast.error(j.message || "Không tạo được link");
+        return;
+      }
+      const url = `${window.location.origin}${j.path}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Đã copy link theo dõi — gửi cho NCC");
+      } catch {
+        window.prompt("Copy link theo dõi gửi NCC:", url);
+      }
+    } finally {
+      setLinkBusyId(null);
+    }
   }
 
   const balanceTone =
@@ -707,6 +766,18 @@ export function ExpensesClient({
                 value={form.payee}
                 onChange={(e) => setForm({ ...form, payee: e.target.value })}
                 placeholder="VD: Cửa hàng VLXD Minh Anh"
+                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-[#8b95b7]">SĐT người nhận *</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                value={form.payeePhone}
+                onChange={(e) => setForm({ ...form, payeePhone: e.target.value.replace(/[^0-9+ ]/g, "") })}
+                placeholder="VD: 0912 345 678"
+                required
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
             </label>
@@ -1096,9 +1167,20 @@ export function ExpensesClient({
                   (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
                   (r.status === "pending" && isAdmin) ||
                   (r.status === "tptc_pending" && isAdmin) ||
+                  (canCreate && r.status !== "cancelled") ||
                   attachmentList(r).length > 0 ||
                   r.paidReceiptUrl) && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#2d3249]/40" onClick={(e) => e.stopPropagation()}>
+                    {canCreate && r.status !== "cancelled" && (
+                      <button
+                        onClick={() => sendPublicLink(r)}
+                        disabled={linkBusyId === r.id}
+                        title="Copy link theo dõi thanh toán để gửi NCC"
+                        className="rounded-lg bg-orange-500/15 text-orange-300 px-3 py-1.5 text-xs font-semibold hover:bg-orange-500/25 disabled:opacity-50"
+                      >
+                        {linkBusyId === r.id ? "Đang tạo…" : "🔗 Gửi link NCC"}
+                      </button>
+                    )}
                     {canQuickTransfer && (
                       <button
                         onClick={toggle}
@@ -1317,7 +1399,7 @@ export function ExpensesClient({
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               />
             </label>
-            <ReceiptFilePicker value={payReceiptUrl} onChange={setPayReceiptUrl} />
+            <ReceiptMultiPicker value={payReceiptUrls} onChange={setPayReceiptUrls} />
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Tài khoản quỹ *</span>
               <select
@@ -1573,6 +1655,104 @@ function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: s
           </button>
         )}
         {value && <span className="text-[11px] text-emerald-300">✓ đã đính kèm</span>}
+      </div>
+    </div>
+  );
+}
+
+// Chọn nhiều ảnh chứng từ chuyển khoản (bill) — hiện trên trang theo dõi công khai của NCC.
+function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const MAX = 20;
+
+  async function handleFiles(files: FileList | File[]) {
+    const list = Array.from(files);
+    const remaining = MAX - value.length;
+    if (remaining <= 0) {
+      toast.error(`Tối đa ${MAX} ảnh`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const added: string[] = [];
+      for (const file of list.slice(0, remaining)) {
+        if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+          toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
+          continue;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+          toast.error("File quá lớn (tối đa 8MB)");
+          continue;
+        }
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("kind", "receipt");
+        const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(j.message || "Upload thất bại");
+          continue;
+        }
+        added.push(j.url);
+      }
+      if (added.length) {
+        onChange([...value, ...added]);
+        toast.success(`Đã tải ${added.length} ảnh`);
+      }
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  }
+
+  return (
+    <div className="block">
+      <span className="text-xs text-[#8b95b7]">
+        Ảnh chuyển khoản (tuỳ chọn){value.length > 0 && ` — ${value.length}/${MAX}`}
+      </span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const fs = e.target.files;
+          if (fs && fs.length) handleFiles(fs);
+        }}
+      />
+      {value.length > 0 && (
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {value.map((url, i) => (
+            <div key={i} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/expenses/upload-preview?url=${encodeURIComponent(url)}`}
+                alt={`Bill ${i + 1}`}
+                className="h-16 w-full rounded-md border border-[#2d3249] object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white"
+                aria-label="Xoá ảnh"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={uploading || value.length >= MAX}
+          className="rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-xs font-medium text-[#cfd4e8] disabled:opacity-50"
+        >
+          {uploading ? "Đang tải…" : value.length ? "📷 Thêm ảnh" : "📷 Chọn ảnh (nhiều)"}
+        </button>
       </div>
     </div>
   );

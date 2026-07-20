@@ -12,6 +12,7 @@ const schema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày chi không hợp lệ"),
   paidAmount: z.coerce.number().positive("Số tiền đã chi phải > 0"),
   paidReceiptUrl: z.string().trim().max(500).optional().nullable(),
+  paidReceiptUrls: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
   paidNote: z.string().trim().max(2000).optional().nullable(),
   accountId: z.string().uuid("Tài khoản quỹ không hợp lệ"),
 });
@@ -44,6 +45,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const paidAt = atUtcDate(data.paidAt);
 
+  const receiptUrls = (data.paidReceiptUrls ?? []).map((u) => u.trim()).filter(Boolean);
+  const legacyReceipt = data.paidReceiptUrl?.trim() || null;
+  if (legacyReceipt && !receiptUrls.includes(legacyReceipt)) receiptUrls.unshift(legacyReceipt);
+
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const upd = await tx.expense.update({
@@ -54,7 +59,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           paidAt,
           paidAmount: new Prisma.Decimal(data.paidAmount),
           paidNote: data.paidNote?.trim() || null,
-          paidReceiptUrl: data.paidReceiptUrl?.trim() || null,
+          paidReceiptUrl: receiptUrls[0] ?? null,
+          paidReceiptUrls: receiptUrls,
           nextReminderAt: null,
         },
         include: {
@@ -74,6 +80,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
         note: `${expense.code} — ${expense.category.name}${expense.payee ? ` / ${expense.payee}` : ""}${data.paidNote ? ` — ${data.paidNote}` : ""}`,
         createdBy: user.id,
       });
+
+      // Cập nhật ngược nguồn phát sinh (nếu lệnh chi gắn nguồn từ Mua hàng / Công nợ NCC).
+      // Dùng paidAmount thực chi (admin có thể sửa) chứ không phải số dự kiến.
+      if (expense.sourceType === "mua_hang_order" && expense.sourceId) {
+        // Đơn mua trả ngay: chi xong → đánh dấu đã thanh toán.
+        await tx.mhOrder.updateMany({
+          where: { id: expense.sourceId, status: "received" },
+          data: { status: "paid" },
+        });
+      } else if (expense.sourceType === "ncc_congno" && expense.sourceId && expense.projectId) {
+        // Trả công nợ NCC: chi xong → ghi 1 dòng thanh toán NCC (giảm công nợ đúng số đã chi).
+        await tx.$executeRaw`
+          INSERT INTO ncc_thanh_toan (supplier_id, so_tien, ngay, ghi_chu, created_by, project_id)
+          VALUES (${expense.sourceId}::uuid, ${data.paidAmount}, ${paidAt}, ${
+            data.paidNote?.trim() || `Trả qua ${expense.code}`
+          }, ${user.id}::uuid, ${expense.projectId}::uuid)`;
+      }
+
       return upd;
     });
 

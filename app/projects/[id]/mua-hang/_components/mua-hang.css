@@ -179,6 +179,7 @@
 .mhdoc .ord-card .oact { margin-top: 11px; display: flex; gap: 8px; justify-content: flex-end; }
 .mhdoc .linkbtn { background: none; border: 1.5px solid var(--line2); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
 .mhdoc .linkbtn:active { transform: scale(0.97); }
+.mhdoc .linkbtn.pay { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .mhdoc .del { color: var(--red); background: none; border: 1.5px solid var(--line2); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; }
 
 .mhdoc .empty { text-align: center; color: var(--mut); font-size: 13px; padding: 50px 20px; }

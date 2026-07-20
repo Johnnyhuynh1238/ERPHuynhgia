@@ -744,6 +744,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : tab === "orders" ? (
             <OrdersList
               orders={ordersPending}
+              projectId={projectId}
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
@@ -753,6 +754,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : (
             <OrdersList
               orders={ordersReceived}
+              projectId={projectId}
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
@@ -943,8 +945,28 @@ function BuyList({
   );
 }
 
+// Đơn "trả ngay" = đã nhận, KHÔNG có NCC (đơn có NCC đã ghi công nợ → trả ở màn Công nợ).
+// Chỉ đơn này mới mở lệnh chi. Đơn đã "paid" thì thôi (tránh chi trùng).
+const canPayNow = (o: Order) => o.status === "received" && !(o.supplierName && o.supplierName.trim());
+// Mở màn Lệnh chi (/expenses) với số + nội dung điền sẵn — admin/kế toán bấm xác nhận thủ công.
+const goLenhChi = (projectId: string, o: Order) => {
+  const note = `Mua hàng trả ngay — Đơn #${o.seq}${o.items.length ? ` (${o.items.length} vật tư)` : ""}`;
+  const qs = new URLSearchParams({
+    create: "1",
+    projectId,
+    amount: String(Math.round(o.total || 0)),
+    method: "cash",
+    note,
+    categoryCode: "VATTU", // danh mục điền sẵn "Vật tư" (admin đổi được)
+    sourceType: "mua_hang_order",
+    sourceId: o.id,
+  });
+  window.location.href = `/expenses?${qs.toString()}`;
+};
+
 function OrdersList({
   orders,
+  projectId,
   onEdit,
   onDel,
   onPO,
@@ -952,6 +974,7 @@ function OrdersList({
   hideDel,
 }: {
   orders: Order[];
+  projectId: string;
   onEdit: (o: Order) => void;
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
@@ -992,6 +1015,11 @@ function OrdersList({
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>
+            {canPayNow(o) && (
+              <button type="button" className="linkbtn pay" onClick={() => goLenhChi(projectId, o)}>
+                🧾 Gửi lệnh chi
+              </button>
+            )}
             {!hideDel?.(o) && (
               <button type="button" className="del" onClick={() => onDel(o)}>
                 Xoá

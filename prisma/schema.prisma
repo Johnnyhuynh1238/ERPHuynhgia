@@ -3759,6 +3759,7 @@ model Expense {
   paidAmount         Decimal?        @map("paid_amount") @db.Decimal(18, 2)
   paidNote           String?         @map("paid_note") @db.Text
   paidReceiptUrl     String?         @map("paid_receipt_url")
+  paidReceiptUrls    String[]        @default([]) @map("paid_receipt_urls")
   cancelledBy        String?         @map("cancelled_by") @db.Uuid
   cancelledAt        DateTime?       @map("cancelled_at")
   cancelledReason    String?         @map("cancelled_reason") @db.Text
@@ -3768,6 +3769,14 @@ model Expense {
   payeeAccountNumber String?         @map("payee_account_number") @db.VarChar(40)
   payeeAccountName   String?         @map("payee_account_name") @db.VarChar(200)
   payeeQrUrl         String?         @map("payee_qr_url")
+  payeePhone         String?         @map("payee_phone") @db.VarChar(20)
+  publicToken        String?         @unique @map("public_token")
+
+  // Nguồn phát sinh lệnh chi (để khi chi xong tự cập nhật ngược):
+  //  - "mua_hang_order" → sourceId = mh_orders.id → set đơn = paid
+  //  - "ncc_congno"     → sourceId = suppliers.id → insert ncc_thanh_toan (giảm công nợ)
+  sourceType         String?   @map("source_type")
+  sourceId           String?   @map("source_id") @db.Uuid
 
   tptcApprovedBy     String?   @map("tptc_approved_by") @db.Uuid
   tptcApprovedAt     DateTime? @map("tptc_approved_at")
