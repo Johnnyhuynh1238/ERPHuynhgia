@@ -1028,12 +1028,10 @@ export function ExpensesClient({
             const isExpanded = expandedId === r.id;
             const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
             const bank = r.payeeBankBin ? findBankByBin(r.payeeBankBin) : null;
-            // Bấm cả dòng: CK -> mở chi tiết chuyển khoản; tiền mặt pending -> mở popup ghi nhận chi.
-            const rowAction: (() => void) | null = canQuickTransfer
-              ? toggle
-              : r.status === "pending" && canMarkPaid
-                ? () => openPayDialog(r)
-                : null;
+            // Bấm cả dòng lệnh chi pending -> mở popup full màn (thông tin đủ + ghi nhận chi).
+            // Nút "💸 Chuyển khoản" riêng vẫn mở khay QR chuyển nhanh.
+            const rowAction: (() => void) | null =
+              r.status === "pending" && canMarkPaid ? () => openPayDialog(r) : null;
 
             const statusBadge =
               r.status === "pending"
@@ -1392,7 +1390,7 @@ export function ExpensesClient({
           <form
             onSubmit={submitPay}
             onClick={(e) => e.stopPropagation()}
-            className="mx-auto min-h-dvh w-full max-w-xl space-y-4 bg-[#0b0d16] p-5 sm:my-6 sm:min-h-0 sm:rounded-2xl sm:border sm:border-[#2d3249]"
+            className="mx-auto min-h-dvh w-full max-w-2xl space-y-4 bg-[#0b0d16] p-5 sm:px-8"
           >
             <div className="sticky top-0 -mx-5 -mt-5 flex items-start justify-between gap-3 border-b border-[#2d3249] bg-[#0b0d16] px-5 py-4">
               <div>
