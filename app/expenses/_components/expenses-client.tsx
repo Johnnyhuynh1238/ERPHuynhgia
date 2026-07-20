@@ -1386,18 +1386,58 @@ export function ExpensesClient({
       {/* Pay dialog (for cash / non-bank expenses) */}
       {openPay && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-6"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/70"
           onClick={() => setOpenPay(null)}
         >
           <form
             onSubmit={submitPay}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-4"
+            className="mx-auto min-h-dvh w-full max-w-xl space-y-4 bg-[#0b0d16] p-5 sm:my-6 sm:min-h-0 sm:rounded-2xl sm:border sm:border-[#2d3249]"
           >
-            <div className="text-base font-semibold text-emerald-300">Ghi nhận đã chi</div>
-            <div className="text-xs text-[#8b95b7]">
-              {openPay.code} — {openPay.category.name} — {money(openPay.amount)}
+            <div className="sticky top-0 -mx-5 -mt-5 flex items-start justify-between gap-3 border-b border-[#2d3249] bg-[#0b0d16] px-5 py-4">
+              <div>
+                <div className="text-lg font-semibold text-emerald-300">Ghi nhận đã chi</div>
+                <div className="font-mono text-[11px] tracking-wider text-[#6b7299]">{openPay.code}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenPay(null)}
+                className="rounded-lg border border-[#2d3249] px-2.5 py-1 text-sm text-[#8b95b7]"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
             </div>
+
+            {/* Thông tin đầy đủ lệnh chi */}
+            <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-4">
+              <div className="text-2xl font-extrabold tracking-tight text-[#f5f7ff]">
+                {money(openPay.amount)} <span className="text-base text-[#8b95b7]">₫</span>
+              </div>
+              <dl className="mt-3 grid grid-cols-1 gap-y-2 text-sm">
+                <InfoRow k="Danh mục" v={openPay.category.name} />
+                {openPay.payee && <InfoRow k="Người nhận" v={openPay.payee} />}
+                {openPay.payeePhone && <InfoRow k="SĐT người nhận" v={openPay.payeePhone} />}
+                <InfoRow
+                  k="Dự án"
+                  v={openPay.project ? `${openPay.project.code} — ${openPay.project.name}` : "Chi chung công ty"}
+                />
+                <InfoRow k="Phương thức" v={openPay.paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản"} />
+                {(() => {
+                  const b = openPay.payeeBankBin ? findBankByBin(openPay.payeeBankBin) : null;
+                  if (!b || !openPay.payeeAccountNumber) return null;
+                  return (
+                    <InfoRow
+                      k="Ngân hàng"
+                      v={`${b.shortName} · ${openPay.payeeAccountNumber}${openPay.payeeAccountName ? " · " + openPay.payeeAccountName : ""}`}
+                    />
+                  );
+                })()}
+                {openPay.note && <InfoRow k="Nội dung" v={openPay.note} />}
+                <InfoRow k="Ngày tạo" v={`${fmtDate(openPay.createdAt)} · ${openPay.creator.fullName}`} />
+              </dl>
+            </div>
+            <div className="pt-1 text-sm font-semibold text-[#cfd4e8]">Xác nhận đã chi</div>
             <label className="block">
               <span className="text-xs text-[#8b95b7]">Số tiền thực chi (₫) *</span>
               <MoneyInput
@@ -1772,6 +1812,15 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
           {uploading ? "Đang tải…" : value.length ? "📷 Thêm ảnh" : "📷 Chọn ảnh (nhiều)"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function InfoRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-[#2d3249]/40 pb-1.5">
+      <dt className="shrink-0 text-[#8b95b7]">{k}</dt>
+      <dd className="break-words text-right font-medium text-[#e5e7f5]">{v}</dd>
     </div>
   );
 }
