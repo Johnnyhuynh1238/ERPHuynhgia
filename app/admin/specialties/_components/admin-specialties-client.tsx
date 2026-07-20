@@ -207,7 +207,7 @@ export function AdminSpecialtiesClient({ canWrite }: { canWrite: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-bold text-[#f0f2ff]">Quản lý chuyên môn thầu phụ</h1>

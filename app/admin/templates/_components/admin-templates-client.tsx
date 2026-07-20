@@ -236,7 +236,7 @@ export function AdminTemplatesClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-[#f0f2ff]">📚 Thư viện Task Template</h1>
         <Link href="/admin/templates/new">

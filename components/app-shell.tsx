@@ -321,7 +321,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
         </div>
 
         <div className="min-h-[calc(100vh-56px)] px-4 pb-24 pt-4 md:p-6 md:pb-6 md:pt-6">
-          <div key={pathname} className="slide-up">
+          <div key={pathname} className="slide-up mx-auto w-full max-w-7xl">
             {children}
           </div>
         </div>

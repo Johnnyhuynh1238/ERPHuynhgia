@@ -204,7 +204,7 @@ export function TemplateEditorClient({ templateId }: { templateId: string }) {
   const photoRequired = qcItems.filter((item) => item.requirePhoto).length;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-[#f0f2ff]">
           {isCreate ? "← Tạo Task Template" : `← Sửa ${template?.code || ""} ${template?.name || ""}`}

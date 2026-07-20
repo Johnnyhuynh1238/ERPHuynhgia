@@ -336,7 +336,7 @@ export function AnalyticsClient({ hdtkPassword, hdtkRotateAt }: AnalyticsClientP
   ] : [];
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-white">Analytics — Homepage huynhgia6.com</h1>

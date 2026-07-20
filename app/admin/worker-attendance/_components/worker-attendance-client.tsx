@@ -176,7 +176,7 @@ export function WorkerAttendanceAdminClient({
       : null;
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="mx-auto max-w-6xl space-y-4 md:space-y-6">
       <header className="space-y-1">
         <h1 className="text-xl md:text-2xl font-semibold text-white">Bảng công thợ theo tuần</h1>
         <p className="text-xs md:text-sm text-white/60">

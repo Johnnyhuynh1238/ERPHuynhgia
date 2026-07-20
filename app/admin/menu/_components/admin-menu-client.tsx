@@ -163,7 +163,7 @@ function MenuCard({ item, badge }: { item: MenuItem; badge?: number }) {
 function SectionBlock({ section, badges = {} }: { section: MenuSection; badges?: Record<string, number> }) {
   const SectionIcon = section.icon;
   return (
-    <section className="space-y-3">
+    <section className="mx-auto max-w-6xl space-y-3">
       <div className="flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#252840] text-[#fb923c]">
           <SectionIcon className="h-4 w-4" />

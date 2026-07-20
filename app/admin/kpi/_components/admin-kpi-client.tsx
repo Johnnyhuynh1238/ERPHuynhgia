@@ -156,7 +156,7 @@ export function AdminKpiClient({ initialData, canSeeDetail }: { initialData: Adm
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h1 className="text-xl font-bold text-[#f0f2ff]">KPI toàn công ty</h1>

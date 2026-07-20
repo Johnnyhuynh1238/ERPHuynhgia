@@ -161,7 +161,7 @@ export function AdminEngineerSalaryClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="rounded-2xl border border-[#2f3555] bg-[#171c2f] p-4">
         <div className="text-sm font-semibold text-[#d9def3]">Tổng quan quỹ lương kỹ sư</div>
         {payload ? (

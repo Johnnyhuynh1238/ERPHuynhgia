@@ -243,7 +243,7 @@ export function AdminDashboardClient() {
         `,
       }}
     >
-      <div className="relative space-y-7">
+      <div className="relative space-y-7 md:mx-auto md:max-w-5xl lg:max-w-6xl">
         <Headline
           data={data}
           loading={loading}
@@ -266,7 +266,7 @@ export function AdminDashboardClient() {
               }}
             />
           </div>
-          <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6">
+          <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6 lg:grid-cols-8">
             {APPS.map((app, idx) => {
               const badge = data
                 ? APP_BADGE_KEYS[app.key].reduce(
@@ -421,7 +421,7 @@ function WorkQueue({
           Không còn việc nào chờ xử lý — êm đẹp 👌
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {rows.map((r) => (
             <TodoCard key={r.key} row={r} />
           ))}

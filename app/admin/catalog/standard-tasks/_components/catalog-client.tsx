@@ -174,7 +174,7 @@ export function CatalogClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-[#f0f2ff]">📖 Danh mục công tác chuẩn — Nhà phố</h1>

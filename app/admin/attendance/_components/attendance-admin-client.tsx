@@ -117,7 +117,7 @@ export function AttendanceAdminClient({
   }, [month, userFilter]);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-white">Chấm công nhân viên</h1>
         <p className="text-sm text-white/60">

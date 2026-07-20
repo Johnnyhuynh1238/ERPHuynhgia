@@ -277,7 +277,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-[#f0f2ff]">Quản lý user</h1>
         <Button type="button" className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={() => setShowAddModal(true)}>
