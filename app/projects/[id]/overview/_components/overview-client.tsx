@@ -161,7 +161,7 @@ export function OverviewClient({
     { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
     { href: `${base}/mua-hang`, emoji: "🛒", name: "Mua hàng", sub: `${data.tiles.muaHang.count} đơn · ${fmt(data.tiles.muaHang.total)}`, badge: data.tiles.muaHang.received ? { cls: "info", text: `${data.tiles.muaHang.received} đã nhận` } : undefined },
     { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },
-    { href: `${base}/cong-no`, emoji: "💰", name: "Công nợ NCC", sub: `Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
+    { href: `${base}/cong-no`, emoji: "💰", name: "Quản lý NCC", sub: `Công nợ · thầu phụ · Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
     { href: `${base}/material-proposals`, emoji: "📦", name: "Đề xuất vật tư", sub: "VT cần mua" },
     { href: `${base}/work-orders`, emoji: "👷", name: "Giao việc", sub: "Phiếu hàng ngày", show: isSelf },
     { href: `${base}/eod`, emoji: "🌇", name: "Cuối ngày", sub: "Chấm công · sản lượng", show: isSelf },
@@ -172,7 +172,6 @@ export function OverviewClient({
     { href: `${base}/diary-approval`, emoji: "📝", name: "Duyệt nhật ký", sub: "Nhật ký KS QL", badge: pendingDiaries ? { cls: "warn", text: `${pendingDiaries} chờ` } : undefined },
     { href: `${base}/documents`, emoji: "📁", name: "Hồ sơ", sub: "File · ảnh · HĐ" },
     { href: `${base}/members`, emoji: "👥", name: "Thành viên", sub: "Đội thi công" },
-    { href: `${base}/sub-contracts`, emoji: "🤝", name: "Thầu phụ", sub: "Hợp đồng phụ", show: !isSelf },
     { href: `${base}/edit`, emoji: "✏️", name: "Sửa dự án", sub: "Thông tin chung" },
     { href: `${base}/log`, emoji: "🕘", name: "Log dự án", sub: "Activity log" },
   ].filter((t) => t.show !== false);

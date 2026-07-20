@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { CongNoClient } from "./_components/cong-no-client";
 
-export const metadata = { title: "Công nợ NCC" };
+export const metadata = { title: "Quản lý NCC" };
 
 // Công nợ NCC — icon trong màn dự án. Admin + kế toán (đi kèm flow mua-hang mới).
 // Nợ suy từ đơn mh_orders đã ghi công nợ; thanh toán gộp theo NCC.
@@ -19,5 +19,12 @@ export default async function CongNoPage({ params }: { params: { id: string } })
   });
   if (!project) notFound();
 
-  return <CongNoClient projectId={project.id} projectCode={project.code} projectName={project.name} />;
+  return (
+    <CongNoClient
+      projectId={project.id}
+      projectCode={project.code}
+      projectName={project.name}
+      canManageSub={user.role === "admin"}
+    />
+  );
 }

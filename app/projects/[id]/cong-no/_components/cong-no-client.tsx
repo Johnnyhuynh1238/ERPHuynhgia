@@ -4,6 +4,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { SubContractsTab } from "./sub-tab";
 import "./cong-no.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -61,11 +62,14 @@ export function CongNoClient({
   projectId,
   projectCode,
   projectName,
+  canManageSub = false,
 }: {
   projectId: string;
   projectCode: string;
   projectName: string;
+  canManageSub?: boolean;
 }) {
+  const [tab, setTab] = useState<"ncc" | "sub">("ncc");
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -178,7 +182,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
             <div className="mark">H6</div>
             <div>
               <b>HUỲNH GIA</b>
-              <span>Công nợ NCC</span>
+              <span>Quản lý NCC</span>
             </div>
           </div>
           <div className="topacts">
@@ -194,8 +198,23 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
           </div>
         </div>
 
-        <div className="eyebrow">Công nợ nhà cung cấp · {projectCode}</div>
+        <div className="eyebrow">Quản lý NCC · {projectCode}</div>
         <h1>{projectName}</h1>
+
+        {/* tab menu ngang: Công nợ NCC | Thầu phụ */}
+        <div className="cntabs" role="tablist">
+          <button type="button" role="tab" className={`cntab${tab === "ncc" ? " on" : ""}`} onClick={() => setTab("ncc")}>
+            Công nợ NCC
+          </button>
+          <button type="button" role="tab" className={`cntab${tab === "sub" ? " on" : ""}`} onClick={() => setTab("sub")}>
+            Thầu phụ
+          </button>
+        </div>
+
+        {tab === "sub" ? (
+          <SubContractsTab projectId={projectId} canManage={canManageSub} />
+        ) : (
+        <>
         <div className="meta">
           <span>{loading ? "…" : `${suppliers.length} NCC`}</span>
           <span className="d">·</span>
@@ -261,6 +280,8 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         )}
 
         <div className="foot">Công nợ bám đơn mua hàng · Đúng — Đẹp — Bền</div>
+        </>
+        )}
       </div>
 
       {/* popup NCC giữa màn */}

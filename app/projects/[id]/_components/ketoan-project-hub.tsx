@@ -110,9 +110,9 @@ export function KetoanProjectHub({
               </svg>
             </span>
             <span className="kph-nb">
-              <span className="nt">Công nợ NCC</span>
+              <span className="nt">Quản lý NCC</span>
               <span className="ns">
-                {nccCount} NCC · còn nợ <b>{fmt(conLai)}đ</b> — nợ · trả · còn lại
+                {nccCount} NCC · còn nợ <b>{fmt(conLai)}đ</b> — công nợ · thầu phụ
               </span>
             </span>
             <span className="kph-chev">›</span>
