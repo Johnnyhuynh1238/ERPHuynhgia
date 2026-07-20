@@ -267,3 +267,63 @@
 /* Preview WYSIWYG: tờ A4 794px cố định, JS scale nhỏ vừa modal; .po-fit giữ chỗ theo kích thước đã thu nhỏ */
 .po-fit { position: relative; overflow: hidden; align-self: flex-start; }
 .po-sheet.po-a4 { width: 794px; max-width: none; min-height: 1123px; }
+
+/* ==== Mua hàng KT: 3 siêu nhóm accordion + popup VT + tab giỏ ==== */
+.mhdoc .buys { padding-bottom: 4px; }
+.mhdoc .sup { margin-bottom: 2px; }
+.mhdoc .suphd { width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none; font-family: inherit; color: var(--text); padding: 14px 2px; border-bottom: 1.5px solid var(--line2); cursor: pointer; position: sticky; top: 56px; background: var(--bg); z-index: 6; }
+.mhdoc .suphd .sc { font-size: 12px; color: var(--mut2); transition: transform 0.18s; flex: none; }
+.mhdoc .suphd .sc.open { transform: rotate(90deg); }
+.mhdoc .suphd .sl { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; flex: none; }
+.mhdoc .suphd .sm { flex: 1; font-size: 11px; color: var(--mut2); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
+.mhdoc .suphd .sv { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; flex: none; }
+
+.mhdoc .vtrow { width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: none; border-bottom: 1px solid var(--line); padding: 12px 4px; font-family: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.mhdoc .vtrow:active { background: var(--card); }
+.mhdoc .vtrow .rn { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.012em; line-height: 1.28; }
+.mhdoc .vtrow .nums { display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--mut); text-align: right; flex: none; white-space: nowrap; }
+.mhdoc .vtrow .nums b { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+.mhdoc .vtrow .nums .done b { color: var(--ok); }
+.mhdoc .vtrow .cbadge { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 7px; padding: 3px 7px; flex: none; }
+.mhdoc .vtrow.incart { background: rgba(227, 97, 34, 0.05); }
+.mhdoc .vtrow .chev { color: var(--mut2); font-size: 16px; flex: none; }
+
+/* popup vật tư */
+.mhdoc + .vt-scrim, .vt-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(20, 8, 3, 0.5); display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.vt-box { width: 100%; max-width: 460px; background: var(--card, #fbf7ec); color: var(--text, #2e140a); border-radius: 18px 18px 0 0; padding: 18px clamp(14px, 4.5vw, 20px) calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 30px rgba(20, 8, 3, 0.25); max-height: 90dvh; overflow-y: auto; }
+@media (min-width: 560px) { .vt-scrim { align-items: center; } .vt-box { border-radius: 18px; } }
+.vt-box .vt-hd { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.vt-box .vt-nm { flex: 1; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; }
+.vt-box .vt-hd .x { width: 30px; height: 30px; border-radius: 8px; border: none; background: rgba(46,20,10,0.08); color: inherit; cursor: pointer; font-size: 14px; flex: none; }
+.vt-box .vt-info { display: grid; gap: 0; border: 1px solid var(--line2, rgba(46,20,10,0.16)); border-radius: 12px; padding: 4px 12px; margin-bottom: 14px; }
+.vt-box .vt-info .kv { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--line, rgba(46,20,10,0.09)); }
+.vt-box .vt-info .kv:first-child { border-top: none; }
+.vt-box .vt-info .kv span { color: var(--mut, #7a6a58); }
+.vt-box .vt-info .kv b { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.vt-box .vt-info .kv b.tsk { font-weight: 500; font-size: 11.5px; color: var(--mut2, #9a8b78); }
+.vt-box .vt-form { display: flex; gap: 12px; margin-bottom: 12px; }
+.vt-box .vt-form .fld { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.vt-box .vt-form .fld > span { font-size: 11.5px; font-weight: 700; color: var(--mut, #7a6a58); }
+.vt-box .vt-form .inrow { display: flex; align-items: center; gap: 4px; background: var(--bg, #f5efe1); border: 1.5px solid var(--line2, rgba(46,20,10,0.16)); border-radius: 10px; padding: 8px 10px; }
+.vt-box .vt-form .inrow:focus-within { border-color: var(--orange, #e36122); }
+.vt-box .vt-form .inrow input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-family: inherit; font-size: 16px; font-weight: 700; color: inherit; -webkit-appearance: none; }
+.vt-box .vt-form .inrow .u { font-size: 12px; color: var(--mut2, #9a8b78); }
+.vt-box .vt-form .fill { align-self: flex-start; font-size: 10px; color: var(--gold, #b8934a); background: none; border: none; cursor: pointer; font-family: inherit; padding: 1px; }
+.vt-box .vt-tt { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--mut, #7a6a58); margin-bottom: 14px; }
+.vt-box .vt-tt b { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 800; color: var(--orange, #e36122); }
+.vt-box .vt-acts { display: flex; gap: 10px; }
+.vt-box .vt-acts .btn { flex: 1; justify-content: center; text-align: center; }
+
+/* tab giỏ hàng */
+.mhdoc .cartpanel { padding-bottom: 4px; }
+.mhdoc .crow { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 12px 2px; }
+.mhdoc .crow .cmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; background: none; border: none; text-align: left; font-family: inherit; color: var(--text); cursor: pointer; padding: 0; }
+.mhdoc .crow .cmain .nm { font-size: 14px; font-weight: 600; letter-spacing: -0.012em; }
+.mhdoc .crow .cmain .sub { font-size: 11.5px; color: var(--mut); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
+.mhdoc .crow .ct { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 700; white-space: nowrap; flex: none; }
+.mhdoc .crow .crm { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--mut2); cursor: pointer; font-size: 13px; flex: none; }
+.mhdoc .ctot { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 2.5px solid var(--orange); }
+.mhdoc .ctot span { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.mhdoc .ctot b { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 800; color: var(--orange); }
+.mhdoc .cacts { display: flex; gap: 10px; margin-top: 16px; }
+.mhdoc .cacts .btn { flex: 1; justify-content: center; text-align: center; }

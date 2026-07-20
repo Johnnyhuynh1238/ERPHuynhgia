@@ -4,7 +4,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { buildVtGroups, type VtGroup, type VtItem } from "@/lib/estimate-vt-groups";
+import { buildVtGroups, buildSuperGroups, type VtGroup, type VtItem, type SuperGroup } from "@/lib/estimate-vt-groups";
 import "./mua-hang.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -238,9 +238,14 @@ export function MuaHangClient({
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<"buy" | "orders" | "received" | "blocks">("buy");
+  const [tab, setTab] = useState<"buy" | "cart" | "orders" | "received" | "blocks">("buy");
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [pending, setPending] = useState<Record<string, number>>({});
+  // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi }.
+  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number }>>({});
+  // VT đang mở popup để nhập SL + giá.
+  const [picked, setPicked] = useState<VtItem<Material> | null>(null);
+  // Trạng thái xổ 3 siêu nhóm (mặc định thu gọn hết).
+  const [openSup, setOpenSup] = useState<Record<string, boolean>>({});
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [editing, setEditing] = useState<Order | null>(null);
   const [poOrder, setPoOrder] = useState<Order | null>(null);
@@ -392,29 +397,32 @@ export function MuaHangClient({
   const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
   const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
 
-  // Kế toán: SL không vượt "còn lại" dự toán (max). Admin: max undefined = tự do.
-  const setQty = (key: string, v: string, max?: number) => {
-    let n = parseFloat(v);
-    if (isNaN(n) || n <= 0) n = 0;
-    if (max != null && n > max) {
-      n = max > 0 ? Math.round(max * 1000) / 1000 : 0;
-      toast("Vượt dự toán — đã chỉnh về SL còn lại. Cần thêm: gọi admin.");
-    }
-    setPending((p) => ({ ...p, [key]: n }));
-  };
+  // 3 siêu nhóm Thô/ME/Hoàn thiện (nguồn chung dự toán) cho tab Mua hàng.
+  const supers = useMemo<SuperGroup<Material>[]>(() => buildSuperGroups(cats), [cats]);
 
-  const cart = useMemo(() => {
-    let cnt = 0;
-    let sum = 0;
-    allItems.forEach((it) => {
-      const q = pending[it.key] || 0;
-      if (q > 0) {
-        cnt++;
-        sum += q * upriceOf(it);
-      }
+  // Giỏ hàng đã chọn: VT + SL + đơn giá (KT tự ghi).
+  const cartEntries = useMemo(
+    () =>
+      allItems
+        .filter((it) => (cartMap[it.key]?.qty || 0) > 0)
+        .map((it) => ({ it, qty: cartMap[it.key].qty, price: cartMap[it.key].price })),
+    [allItems, cartMap],
+  );
+  const cart = useMemo(
+    () => ({ cnt: cartEntries.length, sum: cartEntries.reduce((s, e) => s + e.qty * e.price, 0) }),
+    [cartEntries],
+  );
+
+  const addToCart = (it: VtItem<Material>, qty: number, price: number) => {
+    if (!(qty > 0)) return;
+    setCartMap((c) => ({ ...c, [it.key]: { qty, price: Math.max(0, Math.round(price)) } }));
+  };
+  const removeFromCart = (key: string) =>
+    setCartMap((c) => {
+      const n = { ...c };
+      delete n[key];
+      return n;
     });
-    return { cnt, sum };
-  }, [allItems, pending]);
 
   const summary = useMemo(() => {
     let tot = 0;
@@ -427,11 +435,13 @@ export function MuaHangClient({
   }, [allItems, placed]);
 
   const createOrder = async () => {
-    const items: OrderItem[] = [];
-    allItems.forEach((it) => {
-      const q = pending[it.key] || 0;
-      if (q > 0) items.push({ key: it.key, name: it.name, unit: it.unit, qty: q, price: Math.round(upriceOf(it)) });
-    });
+    const items: OrderItem[] = cartEntries.map((e) => ({
+      key: e.it.key,
+      name: e.it.name,
+      unit: e.it.unit,
+      qty: e.qty,
+      price: Math.round(e.price),
+    }));
     if (!items.length) return;
     // NCC chọn ở bước sửa đơn (tab Đơn hàng), không chọn ở màn mua.
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, {
@@ -444,8 +454,9 @@ export function MuaHangClient({
       toast(j.message || "Tạo đơn lỗi");
       return;
     }
-    setPending({});
+    setCartMap({});
     await loadOrders();
+    setTab("orders"); // nhảy qua tab Đơn hàng để tải PO
     toast(`Đã tạo đơn #${j.seq} · ${items.length} vật tư`);
   };
 
@@ -696,6 +707,10 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           <button type="button" className={`tab${tab === "buy" ? " on" : ""}`} onClick={() => setTab("buy")}>
             <span>Mua hàng</span>
           </button>
+          <button type="button" className={`tab${tab === "cart" ? " on" : ""}`} onClick={() => setTab("cart")}>
+            <span>🛒 Giỏ hàng</span>
+            {cart.cnt > 0 && <span className="cnt">{cart.cnt}</span>}
+          </button>
           <button type="button" className={`tab${tab === "orders" ? " on" : ""}`} onClick={() => setTab("orders")}>
             <span>Đơn hàng</span>
             <span className="cnt">{ordersPending.length}</span>
@@ -730,18 +745,24 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           ) : tab === "buy" ? (
             <>
               <BuyList
-                cats={cats}
+                supers={supers}
                 placed={placed}
-                pending={pending}
-                setQty={setQty}
-                isKeToan={isKeToan}
+                cartMap={cartMap}
+                onPick={setPicked}
+                openSup={openSup}
+                toggleSup={(k) => setOpenSup((o) => ({ ...o, [k]: !(o[k] ?? false) }))}
               />
-              <div className="foot">
-                {isKeToan
-                  ? "Nhập SL trong dự toán → Tạo đơn · Giá & định mức do admin quy định"
-                  : "Nhập SL cần mua → Tạo đơn · Đúng — Đẹp — Bền"}
-              </div>
+              <div className="foot">Bấm vật tư để xem chi tiết + thêm vào giỏ · KT tự ghi giá</div>
             </>
+          ) : tab === "cart" ? (
+            <CartPanel
+              entries={cartEntries}
+              total={cart.sum}
+              onEdit={setPicked}
+              onRemove={removeFromCart}
+              onClear={() => setCartMap({})}
+              onOrder={createOrder}
+            />
           ) : tab === "orders" ? (
             <OrdersList
               orders={ordersPending}
@@ -766,24 +787,50 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
         </div>
       </div>
 
-      {/* cart nổi */}
+      {/* cart nổi — mở tab Giỏ hàng để kiểm rồi đặt */}
       <div className={`cart${cartOn ? " show" : ""}`}>
         <div className="in">
-          <button type="button" className="btn ghost sm" onClick={() => setPending({})}>
+          <button type="button" className="btn ghost sm" onClick={() => setCartMap({})}>
             Xoá
           </button>
           <div className="info">
-            <div className="l1">{cart.cnt} vật tư trong đơn</div>
+            <div className="l1">{cart.cnt} vật tư trong giỏ</div>
             <div className="l2 num">
               {fmt(cart.sum)}
               <span className="u">đ</span>
             </div>
           </div>
-          <button type="button" className="btn" onClick={createOrder}>
-            Tạo đơn
+          <button type="button" className="btn" onClick={() => setTab("cart")}>
+            🛒 Xem giỏ
           </button>
         </div>
       </div>
+
+      {/* popup vật tư: thông tin đủ + ô SL mua + đơn giá (KT tự ghi) + thêm giỏ */}
+      {picked &&
+        mounted &&
+        createPortal(
+          <VtPopup
+            item={picked}
+            placed={placed[picked.key] || 0}
+            existing={cartMap[picked.key]}
+            onClose={() => setPicked(null)}
+            onAdd={(qty, price) => {
+              addToCart(picked, qty, price);
+              setPicked(null);
+              toast(`Đã thêm ${picked.name} vào giỏ`);
+            }}
+            onRemove={
+              cartMap[picked.key]
+                ? () => {
+                    removeFromCart(picked.key);
+                    setPicked(null);
+                  }
+                : undefined
+            }
+          />,
+          document.body,
+        )}
 
       {/* sửa đơn */}
       {editing && (
@@ -860,20 +907,23 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
   );
 }
 
+// Tab Mua hàng: 3 siêu nhóm (thu gọn), xổ ra → chọn VT → popup. Ngoài chỉ SL dự toán + đã mua.
 function BuyList({
-  cats,
+  supers,
   placed,
-  pending,
-  setQty,
-  isKeToan,
+  cartMap,
+  onPick,
+  openSup,
+  toggleSup,
 }: {
-  cats: VtGroup<Material>[];
+  supers: SuperGroup<Material>[];
   placed: Record<string, number>;
-  pending: Record<string, number>;
-  setQty: (key: string, v: string, max?: number) => void;
-  isKeToan: boolean;
+  cartMap: Record<string, { qty: number; price: number }>;
+  onPick: (it: VtItem<Material>) => void;
+  openSup: Record<string, boolean>;
+  toggleSup: (key: string) => void;
 }) {
-  if (!cats.length)
+  if (!supers.length)
     return (
       <div className="empty">
         <div className="ic">📦</div>
@@ -881,67 +931,206 @@ function BuyList({
       </div>
     );
   return (
-    <div>
-      {cats.map((c) => (
-        <div key={c.key} className="catgrp">
-          <div className="cathd">
-            <span className="cn">{c.categoryName ?? "Chưa phân loại"}</span>
-            <span className="ca">{fmt(c.amount)} đ</span>
-          </div>
-          {c.items.map((it) => {
-            const pl = placed[it.key] || 0;
-            const rem = it.qty - pl;
-            const done = rem <= 0.0001;
-            const uv = pending[it.key];
-            const has = !!uv && uv > 0;
-            return (
-              <div key={it.key} className="mc">
-                <div className="top">
-                  <div className="tapzone">
-                    <div className="rn">
-                      <span className="nm">{it.name}</span>
-                    </div>
-                    <div className="nums">
-                      <span>
-                        DT <b>{fmtQ(it.qty)}</b> {it.unit}
-                      </span>
-                      {pl > 0 && (
-                        <span className="done">
-                          Đặt <b>{fmtQ(pl)}</b>
+    <div className="buys">
+      {supers.map((sg) => {
+        const isOpen = openSup[sg.key] ?? false; // mặc định thu gọn
+        const vtCount = sg.groups.reduce((s, g) => s + g.items.length, 0);
+        return (
+          <div className="sup" key={sg.key}>
+            <button type="button" className="suphd" onClick={() => toggleSup(sg.key)} aria-expanded={isOpen}>
+              <span className={"sc" + (isOpen ? " open" : "")}>▸</span>
+              <span className="sl">{sg.label}</span>
+              <span className="sm">{vtCount} vật tư</span>
+              <span className="sv num">{fmt(sg.amount)} đ</span>
+            </button>
+            {isOpen &&
+              sg.groups.map((g) => (
+                <div key={g.key} className="catgrp">
+                  <div className="cathd">
+                    <span className="cn">{g.categoryName ?? "Chưa phân loại"}</span>
+                  </div>
+                  {g.items.map((it) => {
+                    const pl = placed[it.key] || 0;
+                    const inCart = cartMap[it.key]?.qty || 0;
+                    return (
+                      <button
+                        type="button"
+                        key={it.key}
+                        className={"vtrow" + (inCart > 0 ? " incart" : "")}
+                        onClick={() => onPick(it)}
+                      >
+                        <span className="rn">{it.name}</span>
+                        <span className="nums">
+                          <span>
+                            DT <b>{fmtQ(it.qty)}</b> {it.unit}
+                          </span>
+                          <span className="done">
+                            Đã mua <b>{fmtQ(pl)}</b>
+                          </span>
                         </span>
-                      )}
-                      <span className={done ? "done" : "rem"}>
-                        Còn <b>{fmtQ(rem > 0 ? rem : 0)}</b>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="ord">
-                    <label>Mua</label>
-                    <div className={`inrow${has ? " has" : ""}`}>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        max={isKeToan ? (rem > 0 ? rem : 0) : undefined}
-                        placeholder="0"
-                        value={uv || ""}
-                        onChange={(e) => setQty(it.key, e.target.value, isKeToan ? rem : undefined)}
-                      />
-                      <span className="u">{it.unit}</span>
-                    </div>
-                    {rem > 0.0001 && (
-                      <button type="button" className="fill" onClick={() => setQty(it.key, String(Math.round(rem * 1000) / 1000))}>
-                        = còn {fmtQ(rem)}
+                        {inCart > 0 && <span className="cbadge">Giỏ {fmtQ(inCart)}</span>}
+                        <span className="chev">›</span>
                       </button>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
+              ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Popup 1 vật tư: thông tin đủ + ô SL mua + đơn giá (KT tự ghi) + thêm giỏ.
+function VtPopup({
+  item,
+  placed,
+  existing,
+  onClose,
+  onAdd,
+  onRemove,
+}: {
+  item: VtItem<Material>;
+  placed: number;
+  existing?: { qty: number; price: number };
+  onClose: () => void;
+  onAdd: (qty: number, price: number) => void;
+  onRemove?: () => void;
+}) {
+  const suggest = Math.round(upriceOf(item));
+  const [qty, setQtyS] = useState<string>(existing ? String(existing.qty) : "");
+  const [price, setPriceS] = useState<string>(String(existing ? existing.price : suggest));
+  const rem = item.qty - placed;
+  const q = parseFloat(qty) || 0;
+  const p = parseFloat(price) || 0;
+  const tasks = Array.from(new Set(item.members.map((m) => m.taskName).filter(Boolean)));
+  return (
+    <div className="vt-scrim" onClick={onClose}>
+      <div className="vt-box" onClick={(e) => e.stopPropagation()}>
+        <div className="vt-hd">
+          <div className="vt-nm">{item.name}</div>
+          <button type="button" className="x" onClick={onClose} aria-label="Đóng">
+            ✕
+          </button>
+        </div>
+        <div className="vt-info">
+          <div className="kv"><span>Đơn vị</span><b>{item.unit}</b></div>
+          <div className="kv"><span>SL dự toán</span><b>{fmtQ(item.qty)} {item.unit}</b></div>
+          <div className="kv"><span>Đã mua</span><b>{fmtQ(placed)} {item.unit}</b></div>
+          <div className="kv"><span>Còn lại dự toán</span><b>{fmtQ(rem > 0 ? rem : 0)} {item.unit}</b></div>
+          <div className="kv"><span>Đơn giá dự toán</span><b>{fmt(suggest)} đ</b></div>
+          {tasks.length > 0 && (
+            <div className="kv"><span>Công tác</span><b className="tsk">{tasks.join(", ")}</b></div>
+          )}
+        </div>
+        <div className="vt-form">
+          <label className="fld">
+            <span>SL mua</span>
+            <div className="inrow">
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min="0"
+                value={qty}
+                placeholder="0"
+                autoFocus
+                onChange={(e) => setQtyS(e.target.value)}
+              />
+              <span className="u">{item.unit}</span>
+            </div>
+            {rem > 0.0001 && (
+              <button type="button" className="fill" onClick={() => setQtyS(String(Math.round(rem * 1000) / 1000))}>
+                = còn {fmtQ(rem)}
+              </button>
+            )}
+          </label>
+          <label className="fld">
+            <span>Đơn giá (tự ghi)</span>
+            <div className="inrow">
+              <input
+                type="number"
+                inputMode="numeric"
+                step="any"
+                min="0"
+                value={price}
+                placeholder="0"
+                onChange={(e) => setPriceS(e.target.value)}
+              />
+              <span className="u">đ</span>
+            </div>
+          </label>
+        </div>
+        <div className="vt-tt">
+          Thành tiền <b className="num">{fmt(q * p)} đ</b>
+        </div>
+        <div className="vt-acts">
+          {onRemove && (
+            <button type="button" className="btn ghost" onClick={onRemove}>
+              Xoá khỏi giỏ
+            </button>
+          )}
+          <button type="button" className="btn" disabled={!(q > 0)} onClick={() => onAdd(q, p)}>
+            {existing ? "Cập nhật giỏ" : "🛒 Thêm vào giỏ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tab Giỏ hàng: kiểm lại rồi Đặt hàng → tạo 1 đơn.
+function CartPanel({
+  entries,
+  total,
+  onEdit,
+  onRemove,
+  onClear,
+  onOrder,
+}: {
+  entries: { it: VtItem<Material>; qty: number; price: number }[];
+  total: number;
+  onEdit: (it: VtItem<Material>) => void;
+  onRemove: (key: string) => void;
+  onClear: () => void;
+  onOrder: () => void;
+}) {
+  if (!entries.length)
+    return (
+      <div className="empty">
+        <div className="ic">🛒</div>
+        Giỏ trống. Qua tab Mua hàng chọn vật tư.
+      </div>
+    );
+  return (
+    <div className="cartpanel">
+      {entries.map((e) => (
+        <div key={e.it.key} className="crow">
+          <button type="button" className="cmain" onClick={() => onEdit(e.it)}>
+            <span className="nm">{e.it.name}</span>
+            <span className="sub">
+              {fmtQ(e.qty)} {e.it.unit} × {fmt(e.price)} đ
+            </span>
+          </button>
+          <span className="ct num">{fmt(e.qty * e.price)} đ</span>
+          <button type="button" className="crm" onClick={() => onRemove(e.it.key)} aria-label="Xoá">
+            ✕
+          </button>
         </div>
       ))}
+      <div className="ctot">
+        <span>Tổng {entries.length} vật tư</span>
+        <b className="num">{fmt(total)} đ</b>
+      </div>
+      <div className="cacts">
+        <button type="button" className="btn ghost" onClick={onClear}>
+          Xoá giỏ
+        </button>
+        <button type="button" className="btn" onClick={onOrder}>
+          Đặt hàng →
+        </button>
+      </div>
     </div>
   );
 }
