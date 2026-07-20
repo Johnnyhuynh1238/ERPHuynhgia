@@ -15,6 +15,7 @@ function isStaticAsset(pathname: string) {
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/manifest") ||
     pathname.startsWith("/cn-manifest") ||
+    pathname === "/pay-logo.png" ||
     pathname === "/sw-push.js"
   );
 }

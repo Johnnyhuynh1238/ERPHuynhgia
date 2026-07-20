@@ -516,7 +516,7 @@ export function ExpensesClient({
   }
 
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
-  // Lấy (lazy-tạo) link theo dõi công khai rồi copy để gửi NCC.
+  // Lấy (lazy-tạo) link theo dõi công khai rồi mở share (Zalo/SMS…) để gửi NCC.
   async function sendPublicLink(e: Expense) {
     setLinkBusyId(e.id);
     try {
@@ -527,6 +527,18 @@ export function ExpensesClient({
         return;
       }
       const url = `${window.location.origin}${j.path}`;
+      const shareText = `Phiếu chi ${e.code}${e.payee ? ` — ${e.payee}` : ""}. Theo dõi thanh toán:`;
+      // Bấm là bật khay chia sẻ (Zalo/SMS/Messenger…), không copy thủ công.
+      if (typeof navigator !== "undefined" && navigator.share) {
+        try {
+          await navigator.share({ title: `Phiếu chi ${e.code}`, text: shareText, url });
+          return;
+        } catch (err) {
+          // User huỷ khay share -> thôi, không báo lỗi.
+          if (err instanceof DOMException && err.name === "AbortError") return;
+        }
+      }
+      // Máy không hỗ trợ share -> fallback copy.
       try {
         await navigator.clipboard.writeText(url);
         toast.success("Đã copy link theo dõi — gửi cho NCC");
