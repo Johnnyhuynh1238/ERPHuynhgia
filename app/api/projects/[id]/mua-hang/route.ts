@@ -43,6 +43,20 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     orderBy: { seq: "desc" },
   });
 
+  // Đơn nào đã có lệnh chi đang chờ (KT gửi/ chờ admin duyệt) -> khoá nút "Gửi lệnh chi"
+  // tránh gửi trùng. Lệnh bị từ chối/huỷ = cancelled nên không khoá (cho gửi lại).
+  const inflight = orders.length
+    ? await prisma.expense.findMany({
+        where: {
+          sourceType: "mua_hang_order",
+          sourceId: { in: orders.map((o) => o.id) },
+          status: { in: ["tptc_pending", "pending"] },
+        },
+        select: { sourceId: true },
+      })
+    : [];
+  const inflightSet = new Set(inflight.map((e) => e.sourceId));
+
   return NextResponse.json({
     items: orders.map((o) => ({
       id: o.id,
@@ -55,6 +69,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       note: o.note,
       total: Number(o.total),
       items: o.items,
+      hasInflightExpense: inflightSet.has(o.id),
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
     })),

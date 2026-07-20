@@ -33,6 +33,7 @@ type Order = {
   note: string | null;
   total: number;
   items: OrderItem[];
+  hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
 };
 
 type Supplier = { id: string; name: string };
@@ -1015,11 +1016,16 @@ function OrdersList({
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>
-            {canPayNow(o) && (
-              <button type="button" className="linkbtn pay" onClick={() => goLenhChi(projectId, o)}>
-                🧾 Gửi lệnh chi
-              </button>
-            )}
+            {canPayNow(o) &&
+              (o.hasInflightExpense ? (
+                <span className="linkbtn sent" title="Đã có lệnh chi đang chờ kế toán/admin xử lý">
+                  ⏳ Đã gửi lệnh chi
+                </span>
+              ) : (
+                <button type="button" className="linkbtn pay" onClick={() => goLenhChi(projectId, o)}>
+                  🧾 Gửi lệnh chi
+                </button>
+              ))}
             {!hideDel?.(o) && (
               <button type="button" className="del" onClick={() => onDel(o)}>
                 Xoá

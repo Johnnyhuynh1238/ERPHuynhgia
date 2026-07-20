@@ -48,6 +48,20 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const supMap = new Map(suppliers.map((s) => [s.id, s]));
 
+  // NCC nào đã có lệnh chi đang chờ (KT gửi/ chờ admin duyệt) -> khoá nút "Gửi lệnh chi".
+  // Lệnh bị từ chối/huỷ = cancelled nên không khoá (cho gửi lại).
+  const inflight = supplierIds.length
+    ? await prisma.expense.findMany({
+        where: {
+          sourceType: "ncc_congno",
+          sourceId: { in: supplierIds },
+          status: { in: ["tptc_pending", "pending"] },
+        },
+        select: { sourceId: true },
+      })
+    : [];
+  const inflightSet = new Set(inflight.map((e) => e.sourceId));
+
   // gộp
   const groups = new Map<
     string,
@@ -105,7 +119,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
 
   const list = Array.from(groups.values())
-    .map((g) => ({ ...g, conLai: Math.max(g.tongNo - g.daTra, 0), orderCount: g.orders.length }))
+    .map((g) => ({
+      ...g,
+      conLai: Math.max(g.tongNo - g.daTra, 0),
+      orderCount: g.orders.length,
+      hasInflightExpense: inflightSet.has(g.supplierId),
+    }))
     .sort((a, b) => b.conLai - a.conLai || b.tongNo - a.tongNo);
 
   const summary = list.reduce(

@@ -36,6 +36,7 @@ type Supplier = {
   orderCount: number;
   orders: Order[];
   payments: Payment[];
+  hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
 };
 type Account = { id: string; code: string; name: string; kind: string; currentBalance: number };
 type Data = { summary: { tongNo: number; daTra: number; conLai: number }; suppliers: Supplier[]; accounts: Account[] };
@@ -374,9 +375,15 @@ function NccPopup({
 
         {!off && (
           <div className="npay">
-            <button type="button" className="btn pay" onClick={goLenhChi}>
-              🧾 Gửi lệnh chi trả NCC
-            </button>
+            {sup.hasInflightExpense ? (
+              <div className="sent" title="Đã có lệnh chi đang chờ kế toán/admin xử lý">
+                ⏳ Đã gửi lệnh chi — chờ xử lý
+              </div>
+            ) : (
+              <button type="button" className="btn pay" onClick={goLenhChi}>
+                🧾 Gửi lệnh chi trả NCC
+              </button>
+            )}
           </div>
         )}
 
