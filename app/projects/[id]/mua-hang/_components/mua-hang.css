@@ -228,8 +228,10 @@
 /* input[type=date]: color-scheme phải đặt thẳng trên input. Sheet portal ra body qua
    .mhp{display:contents} không sinh box nên KHÔNG truyền color-scheme tới UA của date picker;
    ở tone sáng chữ ngày bị trắng (theo color-scheme dark của app shell) → mất chữ. */
-.mhdoc .fld input[type="date"] { color-scheme: light; }
+.mhdoc .fld input[type="date"] { color-scheme: light; color: var(--text); -webkit-text-fill-color: var(--text); }
 .mhdoc[data-theme="dark"] .fld input[type="date"] { color-scheme: dark; }
+/* iOS Safari render giá trị date qua pseudo này; color thường không ăn, phải -webkit-text-fill-color. */
+.mhdoc .fld input[type="date"]::-webkit-date-and-time-value { color: var(--text); -webkit-text-fill-color: var(--text); text-align: left; }
 .mhdoc .fld textarea { resize: vertical; min-height: 58px; line-height: 1.5; }
 .mhdoc .segs { display: flex; flex-wrap: wrap; gap: 6px; }
 .mhdoc .seg { flex: 1; min-width: calc(50% - 3px); text-align: center; font-family: inherit; font-size: 12px; font-weight: 600; padding: 9px 6px; border-radius: 9px; border: 1.5px solid var(--line2); background: none; color: var(--mut); cursor: pointer; }
