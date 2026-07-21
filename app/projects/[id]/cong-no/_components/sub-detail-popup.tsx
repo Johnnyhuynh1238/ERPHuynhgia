@@ -142,7 +142,7 @@ export function SubDetailPopup({
 
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabValue>("info");
+  const [tab, setTab] = useState<TabValue>("payment");
   const [contract, setContract] = useState<ContractDetail | null>(null);
 
   const [payments, setPayments] = useState<SubPayment[]>([]);

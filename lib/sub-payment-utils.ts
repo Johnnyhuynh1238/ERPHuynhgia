@@ -25,7 +25,11 @@ export async function generateNextSubPaymentCode(tx: Prisma.TransactionClient, d
 }
 
 export function canCreateOrRequestSubPayment(role: UserRole | string) {
-  return role === UserRole.admin || role === UserRole.construction_manager;
+  return (
+    role === UserRole.admin ||
+    role === UserRole.construction_manager ||
+    role === UserRole.accountant
+  );
 }
 
 export function canApproveSubPayment(role: UserRole | string) {
