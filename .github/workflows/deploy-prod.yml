@@ -55,6 +55,7 @@ jobs:
           NEXT_PUBLIC_VAPID_PUBLIC_KEY=BBdD-RFMIYmCmtJS7hA82w5JAdHa6SaUbhOpwFTU9Au9anp1rVEvodGf6p12wzQuNJgu0Msnfa6DyE8UsVqbIkA
           PUSH_CRON_KEY=build
           HDTK_PDF_SECRET=build
+          CLAUDE_WEB_SECRET=build-placeholder-runtime-real
           ENVEOF
           echo "wrote build-time .env.production ($(wc -l < .env.production) lines)"
 
