@@ -1563,7 +1563,7 @@ function EditSheet({
               <>
                 <div className="spill-scrim" onClick={() => setStatusOpen(false)} />
                 <div className="spill-menu">
-                  {STATUS.map((s) => (
+                  {STATUS.filter((s) => s.k !== "paid").map((s) => (
                     <button
                       type="button"
                       key={s.k}
