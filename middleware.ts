@@ -115,6 +115,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // Dữ liệu dự toán CÔNG KHAI cho trang tĩnh /du-toan-ngan (chỉ đọc).
+  // projectId trên URL = khoá chia sẻ; route tự giới hạn field trả về.
+  if (pathname.startsWith("/api/public/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Trang theo dõi thanh toán công khai cho NCC (lệnh chi). Tự auth bằng
   // publicToken random trên URL — không gắn user, không đi qua NextAuth.
   // Gồm trang /pay/[token] và proxy ảnh CK /pay/[token]/receipt.
