@@ -62,11 +62,15 @@ export function CongNoClient({
   projectCode,
   projectName,
   canManageSub = false,
+  currentRole,
+  currentUserId,
 }: {
   projectId: string;
   projectCode: string;
   projectName: string;
   canManageSub?: boolean;
+  currentRole: string;
+  currentUserId: string;
 }) {
   const [tab, setTab] = useState<"ncc" | "sub">("ncc");
   const [data, setData] = useState<Data | null>(null);
@@ -211,7 +215,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         </div>
 
         {tab === "sub" ? (
-          <SubContractsTab projectId={projectId} canManage={canManageSub} />
+          <SubContractsTab projectId={projectId} canManage={canManageSub} currentRole={currentRole} currentUserId={currentUserId} />
         ) : (
         <>
         <div className="meta">

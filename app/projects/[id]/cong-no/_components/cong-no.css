@@ -218,6 +218,89 @@
 .cndoc .sactions { display: flex; gap: 9px; margin-top: 18px; }
 .cndoc .sactions .btn { flex: 1; justify-content: center; }
 
+/* ============================================================
+   Popup CHI TIẾT HỢP ĐỒNG THẦU PHỤ — full màn, tông ngà.
+   ============================================================ */
+.cndoc .subpop-scrim { position: fixed; inset: 0; background: rgba(20, 8, 3, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.22s; z-index: 45; display: flex; align-items: stretch; justify-content: center; }
+.cndoc .subpop-scrim.show { opacity: 1; pointer-events: auto; }
+.cndoc .subpop { width: 100%; max-width: 560px; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 80px rgba(20, 8, 3, 0.5); transform: translateY(14px) scale(0.98); opacity: 0; transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s; }
+@media (min-width: 600px) { .cndoc .subpop { margin: 18px 0; border-radius: 20px; max-height: calc(100dvh - 36px); } }
+.cndoc .subpop-scrim.show .subpop { transform: translateY(0) scale(1); opacity: 1; }
+
+.cndoc .subtop { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 13px clamp(14px, 4.5vw, 20px); border-bottom: 1px solid var(--line); }
+.cndoc .subbody { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px clamp(14px, 4.5vw, 20px) calc(24px + env(safe-area-inset-bottom)); }
+.cndoc .subbody > h1 { margin-top: 8px; }
+
+/* chips dưới tiêu đề */
+.cndoc .hchips { display: flex; gap: 7px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+.cndoc .chip.code { color: var(--mut); border-color: var(--line2); }
+.cndoc .chip.code::before { display: none; }
+
+/* thanh tiến độ */
+.cndoc .prog { margin-top: 12px; }
+.cndoc .prog .pl { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--mut); font-weight: 600; margin-bottom: 5px; }
+.cndoc .prog .bar { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.cndoc .prog .fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--orange)); transition: width 0.4s ease; }
+
+/* nút action HĐ */
+.cndoc .subacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.cndoc .btn.ghost.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+
+/* tab menu popup */
+.cndoc .subtabs { display: flex; gap: 5px; margin-top: 16px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 13px; overflow-x: auto; }
+.cndoc .subtab { flex: 1; white-space: nowrap; text-align: center; font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 9px 11px; border-radius: 10px; border: none; background: none; color: var(--mut); cursor: pointer; }
+.cndoc .subtab:active { transform: scale(0.98); }
+.cndoc .subtab.on { background: var(--text); color: var(--bg); }
+
+/* info grid */
+.cndoc .info { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px 15px; }
+.cndoc .info .irow { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.cndoc .info .irow:last-child { border-bottom: none; }
+.cndoc .info .ik { color: var(--mut); font-weight: 500; flex: none; }
+.cndoc .info .iv { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.cndoc .info .iv.num { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+
+.cndoc .proseblk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* pay card */
+.cndoc .paycard { background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 13px 15px; margin-top: 10px; }
+.cndoc .paycard .ph { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; }
+.cndoc .paycard .pe { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--terra); }
+.cndoc .paycard .pn { font-size: 14px; font-weight: 600; margin-top: 3px; line-height: 1.25; overflow-wrap: anywhere; }
+.cndoc .paycard .psub { font-size: 11px; color: var(--mut); margin-top: 4px; }
+.cndoc .paycard .pvline { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 9px; }
+.cndoc .paycard .pv { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: var(--terra); }
+.cndoc .paycard .paidnote { font-size: 11.5px; color: var(--ok); font-weight: 600; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
+.cndoc .prow-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.cndoc .linkbtn.strong { background: var(--orange); color: #fff; border-color: var(--orange); }
+.cndoc .linkbtn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+
+/* draft schedule */
+.cndoc .draftbox { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-top: 8px; }
+.cndoc .draftrow { border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; margin-bottom: 10px; }
+.cndoc .draftrow .drhead { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--terra); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.cndoc .draftrow .fld { margin-bottom: 8px; }
+.cndoc .drtot { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+
+/* task/file card */
+.cndoc .tcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 9px; }
+.cndoc .tcard .tn { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cndoc .tcard .tsub { font-size: 11px; color: var(--mut); margin-top: 3px; }
+
+/* evaluation */
+.cndoc .evalbox { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.cndoc .evrow { border-bottom: 1px solid var(--line); padding: 9px 0; }
+.cndoc .evrow .evk { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
+.cndoc .evrow .evw { font-size: 10px; color: var(--mut2); }
+.cndoc .stars { display: flex; gap: 4px; margin-top: 5px; }
+.cndoc .star { font-size: 22px; line-height: 1; background: none; border: none; cursor: pointer; color: var(--line2); padding: 0; }
+.cndoc .star.on { color: var(--gold); }
+.cndoc .chkline { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--mut); margin-top: 4px; }
+.cndoc .evalcard { background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 13px 15px; margin-top: 10px; }
+.cndoc .evscores { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.cndoc .evscore { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; }
+.cndoc .hidden-in { display: none; }
+
 /* ---- AI drawer (portal ra body — KHÔNG scope .cndoc) ---- */
 .cn-ai-scrim { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.4); }
 .cn-ai-box { display: flex; flex-direction: column; overflow: hidden; border-radius: 16px 16px 0 0; border: 1px solid #334; background: #0b0d16; box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5); width: 100%; max-width: 480px; height: calc(100dvh - 8px); max-height: 100dvh; }

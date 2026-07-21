@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SubContractStatus, SubContractUnit } from "@prisma/client";
 import { toast } from "sonner";
 import { subContractUnitLabel } from "@/lib/sub-contract-view";
+import { SubDetailPopup } from "./sub-detail-popup";
 
 // Tab "Thầu phụ" trong màn Quản Lý NCC — dùng UI ngà (.cndoc) như tab công nợ.
 // Chỉ liệt kê + xem (link chi tiết) + tạo HĐ nháp (admin/CM).
@@ -74,10 +74,21 @@ const DEFAULT_FORM: Form = {
   notes: "",
 };
 
-export function SubContractsTab({ projectId, canManage }: { projectId: string; canManage: boolean }) {
+export function SubContractsTab({
+  projectId,
+  canManage,
+  currentRole,
+  currentUserId,
+}: {
+  projectId: string;
+  canManage: boolean;
+  currentRole: string;
+  currentUserId: string;
+}) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ContractItem[]>([]);
   const [search, setSearch] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const [openSheet, setOpenSheet] = useState(false);
   const [show, setShow] = useState(false);
@@ -246,7 +257,7 @@ export function SubContractsTab({ projectId, canManage }: { projectId: string; c
       ) : (
         <div className="nlist">
           {rows.map((r) => (
-            <Link key={r.id} href={`/sub-contracts/${r.id}`} className="nccrow">
+            <button key={r.id} type="button" className="nccrow" onClick={() => setOpenId(r.id)}>
               <div className="nl">
                 <div className="nn">{r.subcontractor.name}</div>
                 <div className="nsub">
@@ -262,7 +273,7 @@ export function SubContractsTab({ projectId, canManage }: { projectId: string; c
                 </div>
               </div>
               <span className="chev">›</span>
-            </Link>
+            </button>
           ))}
         </div>
       )}
@@ -406,6 +417,18 @@ export function SubContractsTab({ projectId, canManage }: { projectId: string; c
             </div>
           </div>
         </>
+      )}
+
+      {/* popup chi tiết HĐ thầu phụ — full màn ngà */}
+      {openId && (
+        <SubDetailPopup
+          key={openId}
+          contractId={openId}
+          currentRole={currentRole}
+          currentUserId={currentUserId}
+          onClose={() => setOpenId(null)}
+          onChanged={loadContracts}
+        />
       )}
     </>
   );
