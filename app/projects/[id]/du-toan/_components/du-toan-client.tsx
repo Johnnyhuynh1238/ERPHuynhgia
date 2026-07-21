@@ -161,7 +161,10 @@ export function DuToanClient({
   }, [materials, phaseByCatalog]);
 
   // gộp theo vật tư (tên + đvt) — nguồn chung với màn Mua hàng (lib/estimate-vt-groups)
-  const vtGroups = useMemo<VtGroup<Material>[]>(() => buildVtGroups(materials), [materials]);
+  const vtGroups = useMemo<VtGroup<Material>[]>(
+    () => buildVtGroups(materials, { priorityCats: ["Cát", "Đá 4x6", "Đá 1x2", "Xi măng", "Bê tông", "Thép", "Gạch ống", "Gạch đinh"] }),
+    [materials],
+  );
   const vtSuperGroups = useMemo<SuperGroup<Material>[]>(() => buildSuperGroups(vtGroups), [vtGroups]);
 
   const selectTab = (key: TabKey) => {

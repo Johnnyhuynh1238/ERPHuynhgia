@@ -42,11 +42,18 @@ export const baseName = (n: string) => {
 };
 
 // Gộp 2 tầng: chủng loại → vật tư (tên + đvt). `collapseBase` = gộp theo baseName (tổng SL).
+// `priorityCats` = tên chủng loại (thường/không dấu tuỳ hoa) ghim lên đầu theo đúng thứ tự truyền vào;
+//   các chủng loại còn lại vẫn xếp tiền giảm dần phía sau. Ghim áp trong từng siêu nhóm (bucket giữ thứ tự).
 export function buildVtGroups<M extends MaterialLike>(
   materials: M[],
-  opts?: { collapseBase?: boolean },
+  opts?: { collapseBase?: boolean; priorityCats?: string[] },
 ): VtGroup<M>[] {
   const collapse = !!opts?.collapseBase;
+  const prio = (opts?.priorityCats ?? []).map((s) => s.toLowerCase().trim());
+  const rankOf = (name: string | null) => {
+    const i = prio.indexOf((name ?? "").toLowerCase().trim());
+    return i < 0 ? prio.length : i;
+  };
   const cats = new Map<string, VtGroup<M>>();
   const itemMaps = new Map<string, Map<string, VtItem<M>>>();
   for (const m of materials) {
@@ -80,7 +87,11 @@ export function buildVtGroups<M extends MaterialLike>(
     }
     cg.items.sort((a, b) => b.amount - a.amount);
   }
-  return arr.sort((a, b) => b.amount - a.amount);
+  return arr.sort((a, b) => {
+    const ra = rankOf(a.categoryName);
+    const rb = rankOf(b.categoryName);
+    return ra !== rb ? ra - rb : b.amount - a.amount;
+  });
 }
 
 // ── Siêu nhóm: gộp chủng loại → 3 nhóm Thô / ME / Hoàn thiện theo giai đoạn (phaseCode) ──
