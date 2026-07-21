@@ -414,7 +414,7 @@
 .mhp .etr.edit { padding: 11px 0; border-bottom: 1px solid var(--line); }
 .mhp .etr.edit .ein-name { background: transparent !important; border: none !important; border-bottom: 1px solid var(--line2) !important; border-radius: 0 !important; padding: 5px 0; text-align: left; font-size: 13.5px; width: 100%; box-shadow: none !important; }
 .mhp .etr.edit .ein-row { display: grid; grid-template-columns: 1fr 12px 1fr 86px; align-items: center; gap: 6px; margin-top: 7px; }
-.mhp .etr.edit .ein-qty, .mhp .etr.edit .ein-price { display: flex; align-items: center; gap: 4px; background: transparent; border: 1px solid var(--line2); border-radius: 7px; padding: 5px 8px; min-width: 0; }
+.mhp .etr.edit .ein-qty, .mhp .etr.edit .ein-price { display: flex; align-items: center; gap: 4px; background: transparent; border: none; border-bottom: 1px solid var(--line2); border-radius: 0; padding: 4px 0; min-width: 0; }
 .mhp .etr.edit .ein-row input { border: none !important; padding: 0 !important; width: 100%; min-width: 0; text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; }
 .mhp .etr.edit .ein-x { color: var(--mut2); text-align: center; }
 .mhp .etr.edit .ein-sum { text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
