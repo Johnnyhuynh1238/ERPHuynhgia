@@ -385,8 +385,8 @@
 .mhp .fld { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 12px 0; border-top: 1px solid var(--line); }
 .mhp .esh + .fld, .mhp .esh + .row2 > .fld:first-child { border-top: none; }
 .mhp .fld > label { margin: 0; font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--mut); flex: none; }
-.mhp .fld input, .mhp .fld textarea { background: transparent; border: none; border-bottom: 1.5px solid transparent; border-radius: 0; padding: 2px 0; font-size: 14px; font-weight: 600; text-align: right; flex: 1; min-width: 0; width: auto; }
-.mhp .fld input:focus, .mhp .fld textarea:focus { border-bottom-color: var(--orange); box-shadow: none; }
+.mhp .fld input, .mhp .fld textarea { background: transparent !important; border: none !important; border-bottom: 1.5px solid transparent !important; border-radius: 0 !important; padding: 2px 0; font-size: 14px; font-weight: 600; text-align: right; flex: 1; min-width: 0; width: auto; box-shadow: none !important; }
+.mhp .fld input:focus, .mhp .fld textarea:focus { border-bottom-color: var(--orange) !important; box-shadow: none !important; }
 .mhp .fld input::placeholder { color: var(--mut2); font-weight: 400; }
 
 /* trạng thái: nút phẳng liền khối, nằm bên phải */
@@ -399,7 +399,7 @@
 /* ghi chú full width */
 .mhp .fld.fldw { display: block; padding: 12px 0; border-top: 1px solid var(--line); }
 .mhp .fld.fldw > label { display: block; margin-bottom: 8px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--terra); font-weight: 700; }
-.mhp .fld.fldw textarea { text-align: left; font-weight: 400; min-height: 46px; border-bottom: 1.5px solid var(--line2); width: 100%; }
+.mhp .fld.fldw textarea { text-align: left !important; font-weight: 400; min-height: 46px; background: transparent !important; border: none !important; border-bottom: 1.5px solid var(--line2) !important; border-radius: 0 !important; width: 100%; box-shadow: none !important; }
 
 /* vật tư: bảng cột thẳng lối */
 .mhp .fld.vt { border-top: none; padding-top: 2px; }
@@ -412,10 +412,10 @@
 .mhp .etr.view .c-p { text-align: right; }
 .mhp .etr.view .c-s { text-align: right; font-weight: 700; }
 .mhp .etr.edit { padding: 11px 0; border-bottom: 1px solid var(--line); }
-.mhp .etr.edit .ein-name { background: transparent; border: none; border-bottom: 1px solid var(--line2); border-radius: 0; padding: 5px 0; text-align: left; font-size: 13.5px; width: 100%; }
+.mhp .etr.edit .ein-name { background: transparent !important; border: none !important; border-bottom: 1px solid var(--line2) !important; border-radius: 0 !important; padding: 5px 0; text-align: left; font-size: 13.5px; width: 100%; box-shadow: none !important; }
 .mhp .etr.edit .ein-row { display: grid; grid-template-columns: 1fr 12px 1fr 86px; align-items: center; gap: 6px; margin-top: 7px; }
 .mhp .etr.edit .ein-qty, .mhp .etr.edit .ein-price { display: flex; align-items: center; gap: 4px; background: transparent; border: 1px solid var(--line2); border-radius: 7px; padding: 5px 8px; min-width: 0; }
-.mhp .etr.edit .ein-row input { border: none; padding: 0; width: 100%; min-width: 0; text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; background: transparent; }
+.mhp .etr.edit .ein-row input { border: none !important; padding: 0 !important; width: 100%; min-width: 0; text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; }
 .mhp .etr.edit .ein-x { color: var(--mut2); text-align: center; }
 .mhp .etr.edit .ein-sum { text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
 .mhp .etr.edit .u { flex: none; font-size: 11px; color: var(--mut2); }
