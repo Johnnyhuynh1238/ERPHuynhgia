@@ -1588,7 +1588,7 @@ function EditSheet({
               ))}
             </div>
           </div>
-          <div className="fld">
+          <div className="fld fldw">
             <label>Ghi chú</label>
             <textarea
               value={note}
@@ -1597,7 +1597,7 @@ function EditSheet({
               rows={2}
             />
           </div>
-          <div className="fld">
+          <div className="fld fldw">
             <label>Vật tư — tên · SL · đơn giá (sửa theo thực tế mua)</label>
             <datalist id="mh-hang-ncc">
               {nccPrices.map((p) => (
