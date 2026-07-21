@@ -361,6 +361,17 @@ export function MuaHangClient({
     if (tab === "cart") loadCart();
   }, [tab, loadCart]);
 
+  // AI (popup) ghi giỏ ở server → đóng popup thì nạp lại giỏ để thấy hàng AI vừa thêm.
+  // Đang mở AI thì poll nhẹ để giỏ cập nhật gần realtime.
+  useEffect(() => {
+    if (!aiOpen) {
+      loadCart();
+      return;
+    }
+    const t = setInterval(loadCart, 3000);
+    return () => clearInterval(t);
+  }, [aiOpen, loadCart]);
+
   // Danh mục NCC (admin+kế toán đều xem được) → combobox chọn NCC. Lỗi thì im, gõ tay như cũ.
   useEffect(() => {
     (async () => {
