@@ -869,6 +869,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
             item={picked}
             placed={placed[picked.key] || 0}
             existing={cartMap[picked.key]}
+            theme={theme}
             onClose={() => setPicked(null)}
             onAdd={(qty, price) => {
               addToCart(picked, qty, price);
@@ -1042,6 +1043,7 @@ function VtPopup({
   item,
   placed,
   existing,
+  theme,
   onClose,
   onAdd,
   onRemove,
@@ -1049,6 +1051,7 @@ function VtPopup({
   item: VtItem<Material>;
   placed: number;
   existing?: { qty: number; price: number };
+  theme: "light" | "dark";
   onClose: () => void;
   onAdd: (qty: number, price: number) => void;
   onRemove?: () => void;
@@ -1061,7 +1064,7 @@ function VtPopup({
   const p = parseFloat(price) || 0;
   const tasks = Array.from(new Set(item.members.map((m) => m.taskName).filter(Boolean)));
   return (
-    <div className="vt-scrim" onClick={onClose}>
+    <div className="vt-scrim" data-theme={theme} onClick={onClose}>
       <div className="vt-box" onClick={(e) => e.stopPropagation()}>
         <div className="vt-hd">
           <div className="vt-nm">{item.name}</div>
@@ -1081,7 +1084,14 @@ function VtPopup({
         </div>
         <div className="vt-form">
           <label className="fld">
-            <span>SL mua</span>
+            <div className="fld-hd">
+              <span>SL mua</span>
+              {rem > 0.0001 && (
+                <button type="button" className="fill" onClick={() => setQtyS(String(Math.round(rem * 1000) / 1000))}>
+                  = còn {fmtQ(rem)}
+                </button>
+              )}
+            </div>
             <div className="inrow">
               <input
                 type="number"
@@ -1095,14 +1105,11 @@ function VtPopup({
               />
               <span className="u">{item.unit}</span>
             </div>
-            {rem > 0.0001 && (
-              <button type="button" className="fill" onClick={() => setQtyS(String(Math.round(rem * 1000) / 1000))}>
-                = còn {fmtQ(rem)}
-              </button>
-            )}
           </label>
           <label className="fld">
-            <span>Đơn giá (tự ghi)</span>
+            <div className="fld-hd">
+              <span>Đơn giá</span>
+            </div>
             <div className="inrow">
               <input
                 type="number"
