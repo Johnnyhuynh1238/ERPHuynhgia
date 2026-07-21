@@ -26,9 +26,9 @@ disk_pct() { df / --output=pcent | tail -1 | tr -dc '0-9'; }
 
 DISK_USE_PCT=$(disk_pct)
 if [ "${DISK_USE_PCT:-0}" -ge 85 ]; then
-  echo "[Deploy] Disk at ${DISK_USE_PCT}% (>=85%). Auto-pruning Docker build cache + dangling images..."
+  echo "[Deploy] Disk at ${DISK_USE_PCT}% (>=85%). Auto-pruning Docker build cache + unused images..."
   docker builder prune -af >/dev/null 2>&1 || true
-  docker image prune -f >/dev/null 2>&1 || true
+  docker image prune -af >/dev/null 2>&1 || true
   DISK_USE_PCT=$(disk_pct)
   echo "[Deploy] Disk after prune: ${DISK_USE_PCT}%"
 fi
@@ -87,8 +87,8 @@ if [ "$HEALTHY" -ne 1 ]; then
   exit 1
 fi
 
-echo "[Deploy] Pruning Docker build cache older than 24h + dangling images..."
+echo "[Deploy] Dọn build cache >24h + image cũ không dùng (image container mới vẫn giữ)..."
 docker builder prune -f --filter "until=24h" >/dev/null 2>&1 || true
-docker image prune -f >/dev/null 2>&1 || true
+docker image prune -af >/dev/null 2>&1 || true
 echo "[Deploy] Done."
 exit 0
