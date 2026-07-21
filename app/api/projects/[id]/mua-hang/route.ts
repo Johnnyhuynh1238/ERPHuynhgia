@@ -145,6 +145,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
+    // Cho phép KT đặt VƯỢT dự toán (không chặn nữa) — chỉ GHI LOG để admin thấy đơn nào vượt.
     if (blocks.length) {
       await prisma.mhOrderBlock.createMany({
         data: blocks.map((b) => ({
@@ -158,12 +159,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           budget: b.budget,
         })),
       });
-      const msg = `Vượt dự toán: ${blocks
-        .map((b) => `${b.materialName} (cần ${b.need}, còn ${b.have})`)
-        .join("; ")} — gọi admin.`;
-      return NextResponse.json({ message: msg, blocks }, { status: 422 });
     }
-    // Giá do KT tự ghi (client gửi) — chỉ chặn SL vượt dự toán ở trên.
+    // Giá do KT tự ghi (client gửi). SL vượt dự toán vẫn cho qua (đã log ở trên).
   }
 
   const last = await prisma.mhOrder.findFirst({
@@ -186,6 +183,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       createdBy: user!.id,
     },
   });
+
+  // Đặt hàng xong → dọn giỏ server của người dùng.
+  await prisma.mhCartItem.deleteMany({ where: { projectId: params.id, userId: user!.id } });
 
   return NextResponse.json({ id: order.id, seq: order.seq });
 }

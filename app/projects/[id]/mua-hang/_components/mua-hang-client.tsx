@@ -331,6 +331,30 @@ export function MuaHangClient({
     if (tab === "blocks" && !isKeToan) loadBlocks();
   }, [tab, isKeToan, loadBlocks]);
 
+  // Giỏ hàng lưu server (AI + UI chung 1 giỏ). Nạp lúc vào màn + mỗi lần mở tab Giỏ
+  // để thấy hàng AI vừa bỏ vào (KT reload / chuyển tab là cập nhật).
+  const loadCart = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/projects/${projectId}/mua-hang/cart`, { cache: "no-store" });
+      if (!r.ok) return;
+      const j = await r.json();
+      const m: Record<string, { qty: number; price: number }> = {};
+      for (const it of Array.isArray(j.items) ? j.items : [])
+        m[it.key] = { qty: Number(it.qty), price: Number(it.price) };
+      setCartMap(m);
+    } catch {
+      /* giỏ lỗi → giữ giỏ hiện tại */
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    loadCart();
+  }, [loadCart]);
+
+  useEffect(() => {
+    if (tab === "cart") loadCart();
+  }, [tab, loadCart]);
+
   // Danh mục NCC (admin+kế toán đều xem được) → combobox chọn NCC. Lỗi thì im, gõ tay như cũ.
   useEffect(() => {
     (async () => {
@@ -415,14 +439,28 @@ export function MuaHangClient({
 
   const addToCart = (it: VtItem<Material>, qty: number, price: number) => {
     if (!(qty > 0)) return;
-    setCartMap((c) => ({ ...c, [it.key]: { qty, price: Math.max(0, Math.round(price)) } }));
+    const p = Math.max(0, Math.round(price));
+    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p } }));
+    fetch(`/api/projects/${projectId}/mua-hang/cart`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p }),
+    }).catch(() => {});
   };
-  const removeFromCart = (key: string) =>
+  const removeFromCart = (key: string) => {
     setCartMap((c) => {
       const n = { ...c };
       delete n[key];
       return n;
     });
+    fetch(`/api/projects/${projectId}/mua-hang/cart?key=${encodeURIComponent(key)}`, {
+      method: "DELETE",
+    }).catch(() => {});
+  };
+  const clearCart = () => {
+    setCartMap({});
+    fetch(`/api/projects/${projectId}/mua-hang/cart`, { method: "DELETE" }).catch(() => {});
+  };
 
   const summary = useMemo(() => {
     let tot = 0;
@@ -760,7 +798,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
               total={cart.sum}
               onEdit={setPicked}
               onRemove={removeFromCart}
-              onClear={() => setCartMap({})}
+              onClear={clearCart}
               onOrder={createOrder}
             />
           ) : tab === "orders" ? (
@@ -790,7 +828,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
       {/* cart nổi — mở tab Giỏ hàng để kiểm rồi đặt */}
       <div className={`cart${cartOn ? " show" : ""}`}>
         <div className="in">
-          <button type="button" className="btn ghost sm" onClick={() => setCartMap({})}>
+          <button type="button" className="btn ghost sm" onClick={clearCart}>
             Xoá
           </button>
           <div className="info">
@@ -857,14 +895,14 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           <div className="mh-ai-scrim" onClick={() => setAiOpen(false)}>
             <div className="mh-ai-box" onClick={(e) => e.stopPropagation()}>
               <div className="mh-ai-head">
-                <b>🤖 AI đơn mua hàng — {projectCode}</b>
+                <b>🤖 {isKeToan ? "AI mua hàng (kế toán)" : "AI đơn mua hàng"} — {projectCode}</b>
                 <button type="button" className="x" onClick={() => setAiOpen(false)} aria-label="Đóng">
                   ✕
                 </button>
               </div>
               <iframe
-                src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
-                title="AI đơn mua hàng"
+                src={`https://huynhgia6.com/claude/chat?arg=${isKeToan ? "muahangkt" : "muahang"}-${encodeURIComponent(projectCode)}`}
+                title="AI mua hàng"
               />
             </div>
           </div>,

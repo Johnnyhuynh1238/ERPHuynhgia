@@ -4244,3 +4244,23 @@ model MhOrderBlock {
   @@index([projectId, createdAt(sort: Desc)])
   @@map("mh_order_blocks")
 }
+
+// Giỏ hàng mua sắm — lưu server (thay state trình duyệt) để AI + UI dùng chung 1 giỏ.
+// 1 dòng = 1 vật tư trong giỏ của (dự án, người dùng). key canonical = matKey(name,unit).
+// projectId/userId để scalar (không @relation), FK thật gắn ở migration SQL.
+model MhCartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  key       String // matKey = <tên bỏ phần từ " (" trở đi>|<unit>
+  name      String
+  unit      String   @db.VarChar(20)
+  qty       Decimal  @default(0) @db.Decimal(14, 3)
+  price     Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, userId, key])
+  @@index([projectId, userId])
+  @@map("mh_cart_items")
+}
