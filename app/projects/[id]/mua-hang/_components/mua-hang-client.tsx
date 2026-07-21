@@ -1545,15 +1545,17 @@ function EditSheet({
         <div className="grip" />
         <div className="shead">
           <div>
-            <div className="se">Đơn đặt hàng</div>
+            <div className="se">Đơn mua hàng</div>
             <div className="st">Đơn #{order.seq}</div>
           </div>
+          <span className="spill">{STATUS.find((s) => s.k === status)?.l ?? status}</span>
           <button type="button" className="xclose" onClick={onClose} aria-label="Đóng">
             ✕
           </button>
         </div>
         <div className="sbody">
           <fieldset className="efs" disabled={readOnly}>
+          <div className="esh">Thông tin đơn</div>
           <div className="fld">
             <label>Nhà cung cấp (NCC)</label>
             <input
@@ -1578,16 +1580,23 @@ function EditSheet({
               <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
             </div>
           </div>
-          <div className="fld">
-            <label>Trạng thái</label>
-            <div className="segs">
-              {STATUS.map((s) => (
-                <button key={s.k} type="button" className={`seg${status === s.k ? " on" : ""}`} onClick={() => setStatus(s.k)}>
-                  {s.l}
-                </button>
-              ))}
+          {!readOnly && (
+            <div className="fld">
+              <label>Trạng thái</label>
+              <div className="segs">
+                {STATUS.map((s) => (
+                  <button
+                    key={s.k}
+                    type="button"
+                    className={`seg${status === s.k ? " on" : ""}`}
+                    onClick={() => setStatus(s.k)}
+                  >
+                    {s.l}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div className="fld fldw">
             <label>Ghi chú</label>
             <textarea
@@ -1597,8 +1606,8 @@ function EditSheet({
               rows={2}
             />
           </div>
-          <div className="fld fldw">
-            <label>Vật tư — tên · SL · đơn giá (sửa theo thực tế mua)</label>
+          <div className="fld fldw vt">
+            <label>Vật tư{readOnly ? "" : " — sửa theo thực tế mua"}</label>
             <datalist id="mh-hang-ncc">
               {nccPrices.map((p) => (
                 <option key={p.id} value={p.materialName}>
@@ -1606,44 +1615,61 @@ function EditSheet({
                 </option>
               ))}
             </datalist>
+            <div className="ethead">
+              <span className="c-nm">Tên hàng</span>
+              <span>SL</span>
+              <span>Đơn giá</span>
+              <span>Thành tiền</span>
+            </div>
             <div className="eitems">
-              {items.map((it, i) => (
-                <div key={it.key || i} className="eitr">
-                  <input
-                    className="ein-name"
-                    list="mh-hang-ncc"
-                    value={it.name}
-                    onChange={(e) => patchItem(i, { name: e.target.value })}
-                    placeholder="Tên hàng (chọn theo NCC hoặc gõ tay)"
-                  />
-                  <div className="ein-row">
-                    <div className="ein-qty">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        value={it.qty || ""}
-                        onChange={(e) => patchItem(i, { qty: parseFloat(e.target.value) || 0 })}
-                      />
-                      <span className="u">{it.unit}</span>
-                    </div>
-                    <span className="ein-x">×</span>
-                    <div className="ein-price">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        step="any"
-                        min="0"
-                        value={it.price || ""}
-                        onChange={(e) => patchItem(i, { price: Math.round(parseFloat(e.target.value) || 0) })}
-                      />
-                      <span className="u">đ</span>
-                    </div>
-                    <span className="ein-sum num">{fmt(it.qty * (it.price || 0))}</span>
+              {items.map((it, i) =>
+                readOnly ? (
+                  <div key={it.key || i} className="etr view">
+                    <span className="c-nm">{it.name}</span>
+                    <span className="c-q num">
+                      {fmtQ(it.qty)} {it.unit}
+                    </span>
+                    <span className="c-p num">{fmt(it.price || 0)}</span>
+                    <span className="c-s num">{fmt(it.qty * (it.price || 0))}</span>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div key={it.key || i} className="etr edit">
+                    <input
+                      className="ein-name"
+                      list="mh-hang-ncc"
+                      value={it.name}
+                      onChange={(e) => patchItem(i, { name: e.target.value })}
+                      placeholder="Tên hàng (chọn theo NCC hoặc gõ tay)"
+                    />
+                    <div className="ein-row">
+                      <div className="ein-qty">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          value={it.qty || ""}
+                          onChange={(e) => patchItem(i, { qty: parseFloat(e.target.value) || 0 })}
+                        />
+                        <span className="u">{it.unit}</span>
+                      </div>
+                      <span className="ein-x">×</span>
+                      <div className="ein-price">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          step="any"
+                          min="0"
+                          value={it.price || ""}
+                          onChange={(e) => patchItem(i, { price: Math.round(parseFloat(e.target.value) || 0) })}
+                        />
+                        <span className="u">đ</span>
+                      </div>
+                      <span className="ein-sum num">{fmt(it.qty * (it.price || 0))}</span>
+                    </div>
+                  </div>
+                ),
+              )}
             </div>
             <div className="etot">
               <span className="k">Tổng đơn</span>
