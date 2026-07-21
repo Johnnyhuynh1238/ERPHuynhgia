@@ -3,9 +3,31 @@ import { getToken } from "next-auth/jwt";
 
 type SessionToken = {
   userId?: string;
+  role?: string;
   mustChangePassword?: boolean;
   iat?: number;
 };
+
+// SSO webterminal: mint cookie claude_code_session (đồng dạng /usr/local/bin/claude-web-auth:
+// value = `${expiry}.${hmac_sha256_hex(SECRET, expiry)}`) cho parent domain .huynhgia6.com
+// để iframe AI (huynhgia6.com/claude) nhận diện admin/accountant đã đăng nhập ERP — khỏi mật khẩu riêng.
+const CLAUDE_COOKIE = "claude_code_session";
+const CLAUDE_COOKIE_TTL = 30 * 24 * 60 * 60;
+
+async function hmacHex(secret: string, msg: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(msg));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 function isStaticAsset(pathname: string) {
   return (
@@ -155,7 +177,32 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/change-password", nextUrl.origin));
   }
 
-  return applySecurityHeaders(NextResponse.next(), false);
+  const res = applySecurityHeaders(NextResponse.next(), false);
+
+  // SSO cho iframe AI: admin/accountant đã đăng nhập ERP → tự có cookie webterminal
+  // (same-site .huynhgia6.com). Chỉ set khi thiếu + đúng domain prod + có secret.
+  const secret = process.env.CLAUDE_WEB_SECRET;
+  if (
+    secret &&
+    (token?.role === "admin" || token?.role === "accountant") &&
+    !req.cookies.get(CLAUDE_COOKIE) &&
+    nextUrl.hostname.endsWith("huynhgia6.com")
+  ) {
+    const expiry = Math.floor(Date.now() / 1000) + CLAUDE_COOKIE_TTL;
+    const value = `${expiry}.${await hmacHex(secret, String(expiry))}`;
+    res.cookies.set({
+      name: CLAUDE_COOKIE,
+      value,
+      domain: ".huynhgia6.com",
+      path: "/",
+      maxAge: CLAUDE_COOKIE_TTL,
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
+
+  return res;
 }
 
 export const config = {
