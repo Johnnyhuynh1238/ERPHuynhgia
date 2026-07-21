@@ -72,6 +72,7 @@ type SubPayment = {
   actualPaidDate: string | null;
   status: SubPaymentStatus;
   receiptUrl: string | null;
+  linkedExpense: { id: string; code: string; status: string } | null;
 };
 
 type PaymentMeta = {
@@ -354,6 +355,21 @@ export function SubDetailPopup({
     if (!res.ok) return toast.error(json.message || "Thao tác thất bại");
     toast.success(json.message || "Đã cập nhật trạng thái");
     await loadPayments();
+  }
+
+  const [sendingExpense, setSendingExpense] = useState<string | null>(null);
+  async function sendExpense(paymentId: string) {
+    if (!(await confirmDialog("Gửi lệnh chi cho đợt này? Lệnh sẽ qua admin duyệt rồi kế toán chi."))) return;
+    setSendingExpense(paymentId);
+    try {
+      const res = await fetch(`/api/sub-payments/${paymentId}/expense`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(json.message || "Không gửi được lệnh chi");
+      toast.success(json.message || "Đã gửi lệnh chi");
+      await loadPayments();
+    } finally {
+      setSendingExpense(null);
+    }
   }
 
   async function removePayment(paymentId: string) {
@@ -665,17 +681,26 @@ export function SubDetailPopup({
                             )}
                           </div>
                         )}
+                        {/* Trạng thái lệnh chi đang gắn với đợt */}
+                        {p.linkedExpense && p.status !== "paid" && (
+                          <div className="lc-status">
+                            🧾 {p.linkedExpense.status === "tptc_pending"
+                              ? "Lệnh chi chờ admin duyệt"
+                              : p.linkedExpense.status === "pending"
+                                ? "Đã duyệt · chờ kế toán chi"
+                                : "Lệnh chi đang xử lý"}
+                            <span className="lc-code"> · {p.linkedExpense.code}</span>
+                          </div>
+                        )}
                         <div className="prow-acts">
-                          {(currentRole === "admin" || currentRole === "construction_manager") && p.status === "pending" && (
-                            <button type="button" className="linkbtn" onClick={() => changeStatus(p.id, "request")}>Đề xuất chi</button>
+                          {/* Gửi lệnh chi: KT/admin, đợt chưa chi & chưa có lệnh chi */}
+                          {(currentRole === "admin" || currentRole === "accountant") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
+                            <button type="button" className="linkbtn lenhchi" disabled={sendingExpense === p.id} onClick={() => sendExpense(p.id)}>
+                              🧾 {sendingExpense === p.id ? "Đang gửi…" : "Gửi lệnh chi"}
+                            </button>
                           )}
-                          {currentRole === "admin" && p.status === "requested" && (
-                            <button type="button" className="linkbtn" onClick={() => changeStatus(p.id, "approve")}>Duyệt</button>
-                          )}
-                          {(currentRole === "admin" || currentRole === "accountant") && p.status === "approved" && (
-                            <button type="button" className="linkbtn strong" onClick={() => openMarkSheet(p)}>Ghi đã chi</button>
-                          )}
-                          {(currentRole === "admin" || currentRole === "construction_manager") && p.status !== "paid" && p.status !== "cancelled" && (
+                          {/* Xóa/Hủy đợt: chỉ khi chưa có lệnh chi & chưa chi */}
+                          {(currentRole === "admin" || currentRole === "construction_manager") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
                             <button type="button" className="linkbtn danger" onClick={() => removePayment(p.id)}>Xóa/Hủy</button>
                           )}
                         </div>

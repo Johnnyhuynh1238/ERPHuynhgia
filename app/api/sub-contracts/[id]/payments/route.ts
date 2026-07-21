@@ -1,4 +1,4 @@
-import { Prisma, SubPaymentStatus, UserRole } from "@prisma/client";
+import { ExpenseStatus, Prisma, SubPaymentStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -75,6 +75,22 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     orderBy: [{ stage: "asc" }, { createdAt: "asc" }],
   });
 
+  // Lệnh chi đang gắn với từng đợt (bỏ đã huỷ) — để UI hiện trạng thái gửi lệnh chi.
+  const paymentIds = payments.map((p) => p.id);
+  const linkedExpenses = paymentIds.length
+    ? await prisma.expense.findMany({
+        where: { subPaymentId: { in: paymentIds }, status: { not: ExpenseStatus.cancelled } },
+        select: { id: true, code: true, status: true, subPaymentId: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+  const expenseByPayment = new Map<string, { id: string; code: string; status: string }>();
+  for (const e of linkedExpenses) {
+    if (e.subPaymentId && !expenseByPayment.has(e.subPaymentId)) {
+      expenseByPayment.set(e.subPaymentId, { id: e.id, code: e.code, status: e.status });
+    }
+  }
+
   const paidTotal = payments
     .filter((x) => x.status === SubPaymentStatus.paid)
     .reduce((sum, x) => sum + Number(x.actualAmount || 0), 0);
@@ -89,7 +105,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       canViewFinancial,
     },
     linkedTasks: contract.linkedTasks.map((x) => x.task),
-    payments: payments.map((row) => serializeSubPayment(row, canViewFinancial)),
+    payments: payments.map((row) => ({
+      ...serializeSubPayment(row, canViewFinancial),
+      linkedExpense: expenseByPayment.get(row.id) ?? null,
+    })),
     totals: {
       percentTotal: canViewFinancial ? Math.round(percentTotal * 100) / 100 : null,
       paidTotal: canViewFinancial ? Math.round(paidTotal * 100) / 100 : null,

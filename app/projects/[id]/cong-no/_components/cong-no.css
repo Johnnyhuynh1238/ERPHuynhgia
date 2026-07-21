@@ -281,6 +281,10 @@
 .cndoc .prow-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; justify-content: flex-end; }
 .cndoc .linkbtn.strong { background: var(--orange); color: #fff; border-color: var(--orange); }
 .cndoc .linkbtn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+.cndoc .linkbtn.lenhchi { color: var(--terra); border-color: color-mix(in srgb, var(--terra) 45%, transparent); }
+.cndoc .linkbtn:disabled { opacity: 0.55; cursor: default; }
+.cndoc .lc-status { margin-top: 9px; font-size: 11.5px; font-weight: 600; color: var(--terra); }
+.cndoc .lc-status .lc-code { color: var(--mut); }
 
 /* draft schedule */
 .cndoc .draftbox { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-top: 8px; }

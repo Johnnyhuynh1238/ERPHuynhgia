@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ExpenseStatus, UserRole } from "@prisma/client";
+import { ExpenseStatus, SubPaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const current = await prisma.expense.findUnique({
     where: { id: params.id },
-    select: { id: true, code: true, status: true, createdBy: true, creator: { select: { role: true } } },
+    select: { id: true, code: true, status: true, createdBy: true, subPaymentId: true, creator: { select: { role: true } } },
   });
   if (!current) return NextResponse.json({ message: "Lệnh chi không tồn tại" }, { status: 404 });
   if (current.status !== ExpenseStatus.tptc_pending) {
@@ -49,6 +49,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
       nextReminderAt: null,
     },
   });
+
+  // Trả đợt thanh toán thầu phụ về "chờ" để KT gửi lại lệnh chi.
+  if (current.subPaymentId) {
+    await prisma.subPayment.update({
+      where: { id: current.subPaymentId },
+      data: { status: SubPaymentStatus.pending },
+    });
+  }
 
   fireAndForget(
     notifyExpenseKtRejected({

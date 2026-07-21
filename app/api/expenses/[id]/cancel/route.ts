@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ExpenseStatus, UserRole } from "@prisma/client";
+import { ExpenseStatus, SubPaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const row = await prisma.expense.findUnique({ where: { id: params.id }, select: { id: true, status: true, code: true } });
+  const row = await prisma.expense.findUnique({ where: { id: params.id }, select: { id: true, status: true, code: true, subPaymentId: true } });
   if (!row) return NextResponse.json({ message: "Không tìm thấy lệnh chi" }, { status: 404 });
   if (row.status !== ExpenseStatus.pending) {
     return NextResponse.json({ message: "Chỉ huỷ được lệnh đang chờ chi" }, { status: 400 });
@@ -38,6 +38,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
       nextReminderAt: null,
     },
   });
+
+  // Trả đợt thanh toán thầu phụ về "chờ" để KT gửi lại lệnh chi.
+  if (row.subPaymentId) {
+    await prisma.subPayment.update({
+      where: { id: row.subPaymentId },
+      data: { status: SubPaymentStatus.pending },
+    });
+  }
 
   fireAndForget(
     notifyExpenseCancelled({

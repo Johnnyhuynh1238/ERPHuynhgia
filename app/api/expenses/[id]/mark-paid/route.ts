@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ExpenseStatus, Prisma, UserRole } from "@prisma/client";
+import { ExpenseStatus, Prisma, SubPaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -98,6 +98,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
           }, ${user.id}::uuid, ${expense.projectId}::uuid)`;
       }
 
+      // Lệnh chi gắn với đợt thanh toán thầu phụ → tự đánh dấu đợt đã chi.
+      if (expense.subPaymentId) {
+        await tx.subPayment.update({
+          where: { id: expense.subPaymentId },
+          data: {
+            status: SubPaymentStatus.paid,
+            actualAmount: new Prisma.Decimal(data.paidAmount),
+            actualPaidDate: paidAt,
+            paidBy: user.id,
+            paidAt,
+          },
+        });
+      }
       return upd;
     });
 
