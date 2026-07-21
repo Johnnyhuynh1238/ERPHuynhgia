@@ -20,7 +20,7 @@ export async function GET() {
   }).format(new Date());
   const startOfTodayVn = new Date(`${vnDateStr}T00:00:00+07:00`);
 
-  const [accounts, expensePending, receiptPending, todayFlowRows] = await Promise.all([
+  const [accounts, expensePending, receiptPending, todayFlowRows, pendingOrderGroups] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
@@ -34,7 +34,31 @@ export async function GET() {
       where: { occurredAt: { gte: startOfTodayVn }, counterAccountId: null },
       _sum: { amount: true },
     }),
+    // Đơn hàng đã đặt NCC nhưng CHƯA nhận (status=ordered) — gộp theo dự án để link trực tiếp.
+    prisma.mhOrder.groupBy({
+      by: ["projectId"],
+      where: { status: "ordered" },
+      _count: { _all: true },
+    }),
   ]);
+
+  // Gắn tên dự án cho từng nhóm đơn chưa nhận.
+  const pendingProjIds = pendingOrderGroups.map((g) => g.projectId);
+  const pendingProjects = pendingProjIds.length
+    ? await prisma.project.findMany({
+        where: { id: { in: pendingProjIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const projNameById = new Map(pendingProjects.map((p) => [p.id, p.name]));
+  const pendingOrders = pendingOrderGroups
+    .map((g) => ({
+      projectId: g.projectId,
+      projectName: projNameById.get(g.projectId) || "Dự án",
+      count: g._count._all,
+    }))
+    .sort((a, b) => b.count - a.count);
+  const donHangChuaNhan = pendingOrders.reduce((s, o) => s + o.count, 0);
   const todayIn = Number(todayFlowRows.find((r) => r.direction === "in")?._sum.amount ?? 0);
   const todayOut = Number(todayFlowRows.find((r) => r.direction === "out")?._sum.amount ?? 0);
   // Công nợ KH "ping": lệnh thu do admin tạo — pending (KT chưa nhận). Dùng lại count đã có.
@@ -68,7 +92,7 @@ export async function GET() {
       process: processTotal,
       journal: 0,
       congNo: congNoPing,
-      donHang: 0,
+      donHang: donHangChuaNhan,
     },
     processBreakdown: {
       expense: expensePending,
@@ -80,6 +104,7 @@ export async function GET() {
     todos: {
       expensePending,
       receiptPending,
+      pendingOrders,
     },
   });
 }

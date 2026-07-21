@@ -63,6 +63,7 @@ export async function POST(request: Request) {
     eod: { fired: 0, dedup: 0 },
     worker_attendance_pm: { fired: 0, dedup: 0 },
     diary: { fired: 0, dedup: 0 },
+    accountant_orders: { fired: 0, dedup: 0 },
   };
 
   const isSundayDefaultRest = isDefaultRestDay(today);
@@ -349,6 +350,42 @@ export async function POST(request: Request) {
         });
         if (r.dedup) results.diary.dedup += 1;
         else results.diary.fired += 1;
+      }
+    }
+  }
+
+  // N) 17:00 VN — nhắc kế toán 1 lần/ngày về đơn hàng đã đặt NCC nhưng chưa nhận.
+  // Cron chạy mỗi phút; gate phút 0–2 để chịu được trễ, dedup theo ngày → chỉ push 1 lần.
+  {
+    const vnParts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(now);
+    const vnHour = Number(vnParts.find((p) => p.type === "hour")?.value ?? "0");
+    const vnMin = Number(vnParts.find((p) => p.type === "minute")?.value ?? "0");
+    if (vnHour === 17 && vnMin <= 2) {
+      const pendingOrders = await prisma.mhOrder.count({ where: { status: "ordered" } });
+      if (pendingOrders > 0) {
+        const accountants = await prisma.user.findMany({
+          where: { role: UserRole.accountant, isActive: true },
+          select: { id: true },
+        });
+        for (const acc of accountants) {
+          const r = await tryDedupAndSend({
+            userId: acc.id,
+            refType: "accountant_pending_orders",
+            refId: refDateStr,
+            stage: "overdue", // dùng như stage cố định để dedup 1 lần/ngày
+            title: `📦 ${pendingOrders} đơn đã đặt chưa nhận`,
+            body: "Có đơn hàng đã đặt NCC nhưng chưa nhận. Vào Kế toán để xử lý.",
+            url: "/ketoan",
+            tag: `acc-pending-${refDateStr}`,
+          });
+          if (r.dedup) results.accountant_orders.dedup += 1;
+          else results.accountant_orders.fired += 1;
+        }
       }
     }
   }

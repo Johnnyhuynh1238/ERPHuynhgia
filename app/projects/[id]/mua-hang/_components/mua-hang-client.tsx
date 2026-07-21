@@ -2,6 +2,7 @@
 
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildVtGroups, buildSuperGroups, type VtGroup, type VtItem, type SuperGroup } from "@/lib/estimate-vt-groups";
@@ -241,7 +242,13 @@ export function MuaHangClient({
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<"buy" | "cart" | "orders" | "received" | "blocks">("buy");
+  const searchParams = useSearchParams();
+  // Deep-link từ dashboard kế toán: ?tab=orders mở thẳng tab Đơn hàng.
+  const initialTab = (() => {
+    const t = searchParams.get("tab");
+    return t === "cart" || t === "orders" || t === "received" || t === "blocks" ? t : "buy";
+  })();
+  const [tab, setTab] = useState<"buy" | "cart" | "orders" | "received" | "blocks">(initialTab);
   const [blocks, setBlocks] = useState<Block[]>([]);
   // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi }.
   const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number }>>({});

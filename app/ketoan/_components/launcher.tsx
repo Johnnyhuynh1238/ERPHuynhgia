@@ -50,6 +50,7 @@ type SummaryDto = {
   todos?: {
     expensePending: number;
     receiptPending: number;
+    pendingOrders?: { projectId: string; projectName: string; count: number }[];
   };
 };
 
@@ -221,7 +222,9 @@ export function KetoanLauncher() {
                     ? data?.counts.congNo ?? 0
                     : app.key === "don-hang"
                       ? data?.counts.donHang ?? 0
-                      : 0;
+                      : app.key === "mua-hang"
+                        ? data?.counts.donHang ?? 0
+                        : 0;
               const onClick = app.buildItems
                 ? () => setOpen(app)
                 : app.href
@@ -279,6 +282,14 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
       count: t.receiptPending,
       Icon: ArrowDownCircle,
     },
+    // Đơn hàng đã đặt NCC nhưng chưa nhận — 1 dòng / dự án, link thẳng tab Đơn hàng.
+    ...(t.pendingOrders ?? []).map((o) => ({
+      key: `orders-pending-${o.projectId}`,
+      label: `Đơn chưa nhận · ${o.projectName}`,
+      href: `/projects/${o.projectId}/mua-hang?tab=orders`,
+      count: o.count,
+      Icon: PackageCheck,
+    })),
   ];
   return raw.filter((r) => r.count > 0);
 }
