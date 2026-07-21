@@ -347,6 +347,12 @@ export function MuaHangClient({
     }
   }, [projectId]);
 
+  // SSO webterminal: xin cookie claude_code_session (nodejs route) lúc vào màn để iframe AI
+  // (huynhgia6.com/claude) nhận diện admin/accountant — khỏi mật khẩu webterminal riêng.
+  useEffect(() => {
+    fetch("/api/webterminal-cookie", { credentials: "include", cache: "no-store" }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     loadCart();
   }, [loadCart]);
