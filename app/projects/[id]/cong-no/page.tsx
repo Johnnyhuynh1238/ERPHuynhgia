@@ -25,6 +25,8 @@ export default async function CongNoPage({ params }: { params: { id: string } })
       projectCode={project.code}
       projectName={project.name}
       canManageSub={user.role === "admin"}
+      currentRole={user.role}
+      currentUserId={user.id}
     />
   );
 }
