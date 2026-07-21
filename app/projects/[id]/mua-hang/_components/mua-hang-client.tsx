@@ -1249,20 +1249,26 @@ function OrdersList({
     <div>
       {orders.map((o) => (
         <div key={o.id} className="ord-card" onClick={() => onEdit(o)}>
-          <div className="oh">
-            <span className="on">Đơn #{o.seq}</span>
+          <div className="r1">
+            <span className="no">Đơn #{o.seq}</span>
             {(() => {
               const b = stBadge(o.status, o.supplierName);
               return <span className={`chip ${b.cls}`}>{b.label}</span>;
             })()}
+            <span className="date">{fmtDate(o.orderDate)}</span>
+            <span className="tot num">{fmt(o.total)} đ</span>
           </div>
-          <div className="sup">
-            {o.supplierName || "Chưa gán NCC"} · {fmtDate(o.orderDate)}
+          <div className="r2">
+            <span className="lft">
+              <span className="it">
+                {o.items[0]?.name || "—"}
+                {o.items.length > 1 ? " …" : ""}
+              </span>{" "}
+              · {o.items.length} vật tư
+            </span>
+            <span className="rgt">{o.supplierName || "Chưa gán NCC"}</span>
           </div>
-          <div className="ov num">
-            {fmt(o.total)} đ<span className="cnt2">{o.items.length} vật tư</span>
-          </div>
-          <div className="oact" onClick={(e) => e.stopPropagation()}>
+          <div className="r3" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>

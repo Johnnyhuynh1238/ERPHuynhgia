@@ -168,15 +168,22 @@
 .mhdoc .btn.sm { font-size: 12px; padding: 8px 13px; }
 
 /* ---- orders panel ---- */
-.mhdoc .ord-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px; margin-top: 12px; cursor: pointer; transition: border-color 0.15s; }
-.mhdoc .ord-card:active { border-color: var(--line2); }
-.mhdoc .ord-card .oh { display: flex; align-items: center; gap: 9px; }
-.mhdoc .ord-card .oh .on { font-size: 14px; font-weight: 600; flex: 1; }
-.mhdoc .ord-card .oh .od { font-size: 11px; color: var(--mut); }
-.mhdoc .ord-card .sup { font-size: 11.5px; color: var(--mut); margin-top: 4px; }
-.mhdoc .ord-card .ov { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--orange); margin-top: 6px; }
-.mhdoc .ord-card .ov .cnt2 { font-family: var(--font-plex-sans), sans-serif; font-size: 11.5px; font-weight: 600; color: var(--mut); margin-left: 8px; }
-.mhdoc .ord-card .oact { margin-top: 11px; display: flex; gap: 8px; justify-content: flex-end; }
+/* Card đơn hàng GỌN 3 hàng cố định */
+.mhdoc .ord-card { background: var(--card); border: 1px solid var(--line2); border-radius: 13px; padding: 11px 13px; margin-top: 9px; cursor: pointer; transition: border-color 0.15s; }
+.mhdoc .ord-card:active { border-color: var(--orange); }
+.mhdoc .ord-card .r1 { display: flex; align-items: center; gap: 8px; }
+.mhdoc .ord-card .r1 .no { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.mhdoc .ord-card .r1 .date { font-size: 11.5px; color: var(--mut); white-space: nowrap; }
+.mhdoc .ord-card .r1 .tot { margin-left: auto; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 800; color: var(--orange); white-space: nowrap; }
+.mhdoc .ord-card .r2 { display: flex; align-items: baseline; gap: 10px; margin-top: 5px; font-size: 12px; color: var(--mut); }
+.mhdoc .ord-card .r2 .lft { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mhdoc .ord-card .r2 .it { color: var(--text); font-weight: 600; }
+.mhdoc .ord-card .r2 .rgt { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mhdoc .ord-card .r3 { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 16px; }
+.mhdoc .ord-card .r3 .linkbtn { border: none; padding: 0; background: none; font-size: 12px; color: var(--terra); }
+.mhdoc .ord-card .r3 .linkbtn.pay { color: var(--orange); border: none; background: none; padding: 0; }
+.mhdoc .ord-card .r3 .linkbtn.sent { border: none; background: none; padding: 0; color: #a85410; }
+.mhdoc .ord-card .r3 .del { margin-left: auto; border: none; padding: 0; background: none; font-size: 12px; color: var(--mut2); }
 .mhdoc .linkbtn { background: none; border: 1.5px solid var(--line2); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
 .mhdoc .linkbtn:active { transform: scale(0.97); }
 .mhdoc .linkbtn.pay { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
