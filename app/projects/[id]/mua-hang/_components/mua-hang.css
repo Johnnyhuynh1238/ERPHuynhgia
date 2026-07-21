@@ -411,14 +411,25 @@
 .mhp .etr.view .c-q { text-align: right; color: var(--mut); font-size: 12px; }
 .mhp .etr.view .c-p { text-align: right; }
 .mhp .etr.view .c-s { text-align: right; font-weight: 700; }
-.mhp .etr.edit { padding: 11px 0; border-bottom: 1px solid var(--line); }
-.mhp .etr.edit .ein-name { background: transparent !important; border: none !important; border-bottom: 1px solid var(--line2) !important; border-radius: 0 !important; padding: 5px 0; text-align: left; font-size: 13.5px; width: 100%; box-shadow: none !important; }
-.mhp .etr.edit .ein-row { display: grid; grid-template-columns: 1fr 12px 1fr 86px; align-items: center; gap: 6px; margin-top: 7px; }
-.mhp .etr.edit .ein-qty, .mhp .etr.edit .ein-price { display: flex; align-items: center; gap: 4px; background: transparent; border: none; border-bottom: 1px solid var(--line2); border-radius: 0; padding: 4px 0; min-width: 0; }
-.mhp .etr.edit .ein-row input { border: none !important; padding: 0 !important; width: 100%; min-width: 0; text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; }
-.mhp .etr.edit .ein-x { color: var(--mut2); text-align: center; }
-.mhp .etr.edit .ein-sum { text-align: right; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
-.mhp .etr.edit .u { flex: none; font-size: 11px; color: var(--mut2); }
+/* edit row: 1 HÀNG khớp cột header (name · SL · đơn giá · thành tiền) */
+.mhp .etr.edit { display: grid; grid-template-columns: 1fr 60px 74px 86px; gap: 8px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.mhp .etr.edit .ein-name { text-align: left !important; font-size: 13.5px; font-weight: 600 !important; color: var(--text) !important; }
+.mhp .c-qi { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; min-width: 0; }
+.mhp .c-qi input { text-align: right !important; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 400 !important; color: var(--mut) !important; }
+.mhp .c-qi .u { flex: none; font-size: 11px; color: var(--mut) !important; }
+.mhp .etr.edit .c-pi { text-align: right !important; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 500 !important; color: var(--text) !important; }
+.mhp .etr.edit .c-s { text-align: right; font-weight: 700; font-size: 13px; color: var(--text); }
+
+/* pill trạng thái bấm ra list chọn */
+.mhp .spillw { position: relative; margin-left: auto; flex: none; }
+.mhp .spill { display: inline-flex; align-items: center; gap: 5px; border: none; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 999px; padding: 6px 12px; }
+.mhp .spill:disabled { cursor: default; }
+.mhp .spill .cv { font-size: 9px; opacity: .85; }
+.mhp .spill-scrim { position: fixed; inset: 0; z-index: 7; }
+.mhp .spill-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 8; min-width: 150px; background: var(--sheet); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 8px 24px rgba(20,8,3,.22); overflow: hidden; padding: 4px; }
+.mhp .spill-menu button { display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13px; color: var(--text); padding: 9px 11px; border-radius: 8px; }
+.mhp .spill-menu button:hover { background: var(--card); }
+.mhp .spill-menu button.on { color: var(--orange); font-weight: 700; }
 
 /* tổng đơn */
 .mhp .etot { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--gold); padding-top: 13px; margin-top: 6px; }
