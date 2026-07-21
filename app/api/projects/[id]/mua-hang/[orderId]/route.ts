@@ -18,7 +18,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { isKeToan, error } = await requireMuaHang();
+  const { user, isKeToan, error } = await requireMuaHang();
   if (error) return error;
 
   const order = await prisma.mhOrder.findFirst({
@@ -85,6 +85,38 @@ export async function PATCH(
     });
     data.items = items;
     data.total = items.reduce((s, it) => s + it.qty * it.price, 0);
+  }
+
+  // Ảnh chứng minh nhận hàng: [{url,kind}] kind=phieu|hang, url phải minio://
+  type RImg = { url: string; kind: "phieu" | "hang" };
+  let finalImages = (order.receiptImages as unknown as RImg[]) || [];
+  if (Array.isArray(body.receiptImages)) {
+    finalImages = (body.receiptImages as unknown[])
+      .map((raw) => {
+        const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const url = String(o.url || "");
+        const kind = String(o.kind || "") === "phieu" ? "phieu" : "hang";
+        return { url, kind } as RImg;
+      })
+      .filter((x) => x.url.startsWith("minio://"));
+    data.receiptImages = finalImages;
+  }
+
+  // Chuyển sang "đã nhận": KẾ TOÁN bắt buộc đủ ≥1 phiếu nhận + ≥1 ảnh hàng (admin miễn).
+  const toReceived = data.status === "received" && order.status !== "received" && order.status !== "paid";
+  if (toReceived) {
+    if (isKeToan) {
+      const hasPhieu = finalImages.some((x) => x.kind === "phieu");
+      const hasHang = finalImages.some((x) => x.kind === "hang");
+      if (!hasPhieu || !hasHang) {
+        return NextResponse.json(
+          { message: "Cần ảnh Phiếu nhận hàng và ảnh Hàng thực tế trước khi xác nhận đã nhận." },
+          { status: 422 },
+        );
+      }
+    }
+    data.receivedAt = new Date();
+    data.receivedBy = user!.id;
   }
 
   const updated = await prisma.mhOrder.update({ where: { id: order.id }, data });

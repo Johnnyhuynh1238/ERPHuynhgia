@@ -344,3 +344,23 @@
 .mhdoc .ctot b { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 800; color: var(--orange); }
 .mhdoc .cacts { display: flex; gap: 10px; margin-top: 16px; }
 .mhdoc .cacts .btn { flex: 1; justify-content: center; text-align: center; }
+
+/* ── Nhận hàng: ảnh chứng minh (phiếu + hàng) trong EditSheet ── */
+.mhp .efs { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+.mhp .efs:disabled { opacity: 0.72; }
+.mhp .rcpt { margin-top: 4px; margin-bottom: 14px; background: var(--card); border: 1px solid var(--line2); border-radius: 14px; padding: 12px 14px; }
+.mhp .rcpt-hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+.mhp .rcpt-hd .rq { font-size: 10.5px; font-weight: 700; color: var(--orange); background: rgba(227,97,34,0.1); border-radius: 999px; padding: 2px 8px; text-transform: none; }
+.mhp .rcpt-grp { display: flex; gap: 12px; }
+.mhp .rg { flex: 1 1 0; min-width: 0; border: 1.5px dashed var(--line2); border-radius: 12px; padding: 9px; }
+.mhp .rg.miss { border-color: var(--orange); background: rgba(227,97,34,0.05); }
+.mhp .rg.done { border-style: solid; border-color: #4c9a5a; }
+.mhp .rg-hd { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-weight: 700; color: var(--mut); margin-bottom: 8px; }
+.mhp .rg-ok { color: #4c9a5a; font-weight: 900; }
+.mhp .rg-imgs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mhp .rg-im { position: relative; width: 56px; height: 56px; flex: 0 0 auto; }
+.mhp .rg-im img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; border: 1px solid var(--line2); }
+.mhp .rg-rm { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #1a1109; color: #ff8f8f; border: 1px solid var(--line2); font-size: 10px; line-height: 1; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; }
+.mhp .rg-add { width: 56px; height: 56px; flex: 0 0 auto; border: 1.5px dashed var(--line2); background: var(--bg); color: var(--orange); border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.mhp .rg-add:disabled { opacity: 0.5; }
+.mhp .rg-empty { color: var(--mut2); font-size: 12px; }

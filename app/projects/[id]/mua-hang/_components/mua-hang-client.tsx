@@ -33,8 +33,11 @@ type Order = {
   note: string | null;
   total: number;
   items: OrderItem[];
+  receiptImages?: ReceiptImg[]; // ảnh chứng minh nhận hàng
+  receivedAt?: string | null;
   hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
 };
+type ReceiptImg = { url: string; kind: "phieu" | "hang" };
 
 type Supplier = { id: string; name: string };
 type NccPrice = { id: string; materialName: string; unit: string; unitPrice: number; supplierItemCode: string | null };
@@ -516,13 +519,8 @@ export function MuaHangClient({
   };
 
   // Kế toán không được SỬA đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
-  const openEdit = (o: Order) => {
-    if (isKeToan && isReceived(o.status)) {
-      toast("Đơn đã nhận — kế toán không được sửa. Liên hệ admin.");
-      return;
-    }
-    setEditing(o);
-  };
+  // KT mở đơn đã nhận = XEM (read-only, EditSheet tự khoá); đơn chưa nhận = sửa/nhận hàng.
+  const openEdit = (o: Order) => setEditing(o);
 
   const delOrder = async (o: Order) => {
     // Kế toán không được xoá đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
@@ -895,6 +893,7 @@ ${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;paddi
           projectId={projectId}
           suppliers={suppliers}
           theme={theme}
+          isKeToan={isKeToan}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -1333,6 +1332,79 @@ function BlocksList({ blocks }: { blocks: Block[] }) {
   );
 }
 
+// 1 nhóm ảnh nhận hàng (phiếu / hàng). Ảnh mới có preview; ảnh đã lưu hiện qua serve route theo index.
+function ReceiptGroup({
+  label,
+  kind,
+  ok,
+  need,
+  readOnly,
+  busy,
+  items,
+  projectId,
+  orderId,
+  onUpload,
+  onRemove,
+}: {
+  label: string;
+  kind: "phieu" | "hang";
+  ok: boolean;
+  need: boolean;
+  readOnly: boolean;
+  busy: boolean;
+  items: { url: string; kind: "phieu" | "hang"; preview?: string }[];
+  projectId: string;
+  orderId: string;
+  onUpload: (f: File) => void;
+  onRemove: (idx: number) => void;
+}) {
+  const inpRef = useRef<HTMLInputElement>(null);
+  const mine = items.map((r, i) => ({ r, i })).filter((x) => x.r.kind === kind);
+  const srcOf = (r: { preview?: string }, i: number) =>
+    r.preview || `/api/projects/${projectId}/mua-hang/${orderId}/receipt/${i}/file`;
+  return (
+    <div className={`rg${need && !ok ? " miss" : ""}${ok ? " done" : ""}`}>
+      <div className="rg-hd">
+        <span>
+          {label}
+          {need && " *"}
+        </span>
+        {ok && <span className="rg-ok">✓</span>}
+      </div>
+      <div className="rg-imgs">
+        {mine.map(({ r, i }) => (
+          <div className="rg-im" key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={srcOf(r, i)} alt={label} />
+            {!readOnly && (
+              <button type="button" className="rg-rm" onClick={() => onRemove(i)} aria-label="Xoá ảnh">
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        {!readOnly && (
+          <button type="button" className="rg-add" onClick={() => inpRef.current?.click()} disabled={busy}>
+            {busy ? "…" : "+ Ảnh"}
+          </button>
+        )}
+        {readOnly && mine.length === 0 && <span className="rg-empty">—</span>}
+      </div>
+      <input
+        ref={inpRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onUpload(f);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
 function EditSheet({
   order,
   onClose,
@@ -1340,6 +1412,7 @@ function EditSheet({
   projectId,
   suppliers,
   theme,
+  isKeToan,
 }: {
   order: Order;
   onClose: () => void;
@@ -1347,7 +1420,10 @@ function EditSheet({
   projectId: string;
   suppliers: Supplier[];
   theme: "light" | "dark";
+  isKeToan: boolean;
 }) {
+  // KT xem đơn đã nhận = chỉ đọc. Admin luôn sửa được.
+  const readOnly = isKeToan && (order.status === "received" || order.status === "paid");
   const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
   const [orderDate, setOrderDate] = useState(order.orderDate ? order.orderDate.slice(0, 10) : "");
@@ -1359,6 +1435,32 @@ function EditSheet({
   // Bảng giá hàng của NCC đang chọn → droplist "hàng theo NCC" + tự điền đơn giá.
   const [nccPrices, setNccPrices] = useState<NccPrice[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Ảnh chứng minh nhận hàng. Ảnh cũ (đã lưu) hiện qua serve route theo index; ảnh mới có preview.
+  const [receipts, setReceipts] = useState<{ url: string; kind: "phieu" | "hang"; preview?: string }[]>(
+    () => (order.receiptImages || []).map((r) => ({ url: r.url, kind: r.kind })),
+  );
+  const [upBusy, setUpBusy] = useState<"phieu" | "hang" | null>(null);
+
+  const uploadReceipt = async (file: File, kind: "phieu" | "hang") => {
+    setUpBusy(kind);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", kind);
+    const r = await fetch(`/api/projects/${projectId}/mua-hang/${order.id}/receipt-photo`, {
+      method: "POST",
+      body: fd,
+    });
+    setUpBusy(null);
+    if (r.ok) {
+      const j = await r.json();
+      setReceipts((a) => [...a, { url: j.url, kind: j.kind, preview: URL.createObjectURL(file) }]);
+    } else {
+      const j = await r.json().catch(() => ({}));
+      alert(j.message || "Upload ảnh lỗi");
+    }
+  };
+  const removeReceipt = (idx: number) => setReceipts((a) => a.filter((_, i) => i !== idx));
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShow(true));
@@ -1385,6 +1487,13 @@ function EditSheet({
   }, [supplierId]);
 
   const total = items.reduce((s, it) => s + it.qty * (it.price || 0), 0);
+
+  // Đang chuyển sang "đã nhận" (chưa nhận trước đó). KT phải đủ ảnh phiếu + ảnh hàng.
+  const receiving = status === "received" && order.status !== "received" && order.status !== "paid";
+  const needProof = isKeToan && receiving;
+  const hasPhieu = receipts.some((r) => r.kind === "phieu");
+  const hasHang = receipts.some((r) => r.kind === "hang");
+  const proofOk = !needProof || (hasPhieu && hasHang);
 
   // Sửa 1 dòng; nếu đổi "tên" khớp hàng trong bảng giá NCC → tự điền đvt + đơn giá.
   const patchItem = (i: number, patch: Partial<OrderItem>) => {
@@ -1417,10 +1526,15 @@ function EditSheet({
         status,
         note,
         items,
+        receiptImages: receipts.map((r) => ({ url: r.url, kind: r.kind })),
       }),
     });
     setSaving(false);
     if (r.ok) onSaved();
+    else {
+      const j = await r.json().catch(() => ({}));
+      alert(j.message || "Lưu đơn lỗi");
+    }
   };
 
   if (typeof document === "undefined") return null;
@@ -1439,6 +1553,7 @@ function EditSheet({
           </button>
         </div>
         <div className="sbody">
+          <fieldset className="efs" disabled={readOnly}>
           <div className="fld">
             <label>Nhà cung cấp (NCC)</label>
             <input
@@ -1535,13 +1650,54 @@ function EditSheet({
               <span className="v num">{fmt(total)} đ</span>
             </div>
           </div>
+          </fieldset>
+
+          {(receiving || (order.receiptImages && order.receiptImages.length > 0)) && (
+            <div className="rcpt">
+              <div className="rcpt-hd">
+                <span>📸 Ảnh nhận hàng</span>
+                {needProof && <span className="rq">cần đủ phiếu + ảnh hàng</span>}
+              </div>
+              <div className="rcpt-grp">
+                <ReceiptGroup
+                  label="Phiếu nhận hàng"
+                  kind="phieu"
+                  ok={hasPhieu}
+                  need={needProof}
+                  readOnly={readOnly || !receiving}
+                  busy={upBusy === "phieu"}
+                  items={receipts}
+                  projectId={projectId}
+                  orderId={order.id}
+                  onUpload={(f) => uploadReceipt(f, "phieu")}
+                  onRemove={removeReceipt}
+                />
+                <ReceiptGroup
+                  label="Ảnh hàng thực tế"
+                  kind="hang"
+                  ok={hasHang}
+                  need={needProof}
+                  readOnly={readOnly || !receiving}
+                  busy={upBusy === "hang"}
+                  items={receipts}
+                  projectId={projectId}
+                  orderId={order.id}
+                  onUpload={(f) => uploadReceipt(f, "hang")}
+                  onRemove={removeReceipt}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="sactions">
             <button type="button" className="btn ghost" onClick={onClose}>
-              Huỷ
+              {readOnly ? "Đóng" : "Huỷ"}
             </button>
-            <button type="button" className="btn" onClick={save} disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu đơn"}
-            </button>
+            {!readOnly && (
+              <button type="button" className="btn" onClick={save} disabled={saving || !proofOk}>
+                {saving ? "Đang lưu…" : receiving ? "Xác nhận đã nhận" : "Lưu đơn"}
+              </button>
+            )}
           </div>
         </div>
       </div>

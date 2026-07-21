@@ -69,6 +69,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       note: o.note,
       total: Number(o.total),
       items: o.items,
+      receiptImages: o.receiptImages,
+      receivedAt: o.receivedAt,
       hasInflightExpense: inflightSet.has(o.id),
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
