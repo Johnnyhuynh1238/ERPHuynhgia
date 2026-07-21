@@ -225,6 +225,11 @@
 .mhdoc .fld > label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); font-weight: 600; margin-bottom: 6px; }
 .mhdoc .fld input, .mhdoc .fld textarea { width: 100%; font-family: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 10px 12px; outline: none; -webkit-appearance: none; }
 .mhdoc .fld input:focus, .mhdoc .fld textarea:focus { border-color: var(--orange); }
+/* input[type=date]: color-scheme phải đặt thẳng trên input. Sheet portal ra body qua
+   .mhp{display:contents} không sinh box nên KHÔNG truyền color-scheme tới UA của date picker;
+   ở tone sáng chữ ngày bị trắng (theo color-scheme dark của app shell) → mất chữ. */
+.mhdoc .fld input[type="date"] { color-scheme: light; }
+.mhdoc[data-theme="dark"] .fld input[type="date"] { color-scheme: dark; }
 .mhdoc .fld textarea { resize: vertical; min-height: 58px; line-height: 1.5; }
 .mhdoc .segs { display: flex; flex-wrap: wrap; gap: 6px; }
 .mhdoc .seg { flex: 1; min-width: calc(50% - 3px); text-align: center; font-family: inherit; font-size: 12px; font-weight: 600; padding: 9px 6px; border-radius: 9px; border: 1.5px solid var(--line2); background: none; color: var(--mut); cursor: pointer; }
