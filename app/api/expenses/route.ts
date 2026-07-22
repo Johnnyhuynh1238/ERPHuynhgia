@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ExpensePriority, ExpenseStatus, Prisma, UserRole } from "@prisma/client";
+import { ExpensePriority, ExpenseStatus, Prisma, SubPaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -45,6 +45,8 @@ const createSchema = z.object({
   payeeAccountName: z.string().trim().max(200).optional().nullable(),
   sourceType: z.enum(["mua_hang_order", "ncc_congno"]).optional().nullable(),
   sourceId: z.string().uuid().optional().nullable(),
+  // Gắn lệnh chi với 1 đợt thanh toán thầu phụ (mark-paid sẽ tự set đợt = paid).
+  subPaymentId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -126,6 +128,28 @@ export async function POST(request: Request) {
     if (!project) return NextResponse.json({ message: "Dự án không tồn tại" }, { status: 400 });
   }
 
+  // Đợt thanh toán thầu phụ (nếu có): kiểm tra tồn tại, chưa chi, chưa có lệnh chi khác.
+  if (data.subPaymentId) {
+    const sp = await prisma.subPayment.findUnique({
+      where: { id: data.subPaymentId },
+      select: { id: true, status: true },
+    });
+    if (!sp) return NextResponse.json({ message: "Đợt thanh toán không tồn tại" }, { status: 400 });
+    if (sp.status === SubPaymentStatus.paid) {
+      return NextResponse.json({ message: "Đợt này đã chi xong" }, { status: 400 });
+    }
+    const dup = await prisma.expense.findFirst({
+      where: { subPaymentId: sp.id, status: { not: ExpenseStatus.cancelled } },
+      select: { code: true },
+    });
+    if (dup) {
+      return NextResponse.json(
+        { message: `Đợt này đã có lệnh chi ${dup.code} đang xử lý` },
+        { status: 409 },
+      );
+    }
+  }
+
   const code = await nextExpenseCode();
   const priority: ExpensePriority = data.priority === "urgent" ? ExpensePriority.urgent : ExpensePriority.normal;
   const urls = (data.attachmentUrls ?? []).map((u) => u.trim()).filter(Boolean);
@@ -135,32 +159,43 @@ export async function POST(request: Request) {
   const isKtCreated = user.role === UserRole.accountant;
   const initialStatus = isKtCreated ? ExpenseStatus.tptc_pending : ExpenseStatus.pending;
 
-  const expense = await prisma.expense.create({
-    data: {
-      code,
-      projectId: data.projectId || null,
-      categoryId: data.categoryId,
-      amount: new Prisma.Decimal(data.amount),
-      payee: data.payee?.trim() || null,
-      payeePhone: data.payeePhone?.trim() || null,
-      paymentMethod: data.paymentMethod || null,
-      note: data.note?.trim() || null,
-      attachmentUrl: urls[0] ?? null,
-      attachmentUrls: urls,
-      status: initialStatus,
-      priority,
-      nextReminderAt: isKtCreated ? null : nextReminderForPriority(priority),
-      payeeBankBin: data.payeeBankBin?.trim() || null,
-      payeeAccountNumber: data.payeeAccountNumber?.trim() || null,
-      payeeAccountName: data.payeeAccountName?.trim() || null,
-      sourceType: data.sourceType || null,
-      sourceId: data.sourceId || null,
-      createdBy: user.id,
-    },
-    include: {
-      project: { select: { id: true, code: true, name: true } },
-      category: { select: { id: true, code: true, name: true } },
-    },
+  const expense = await prisma.$transaction(async (tx) => {
+    const created = await tx.expense.create({
+      data: {
+        code,
+        projectId: data.projectId || null,
+        categoryId: data.categoryId,
+        amount: new Prisma.Decimal(data.amount),
+        payee: data.payee?.trim() || null,
+        payeePhone: data.payeePhone?.trim() || null,
+        paymentMethod: data.paymentMethod || null,
+        note: data.note?.trim() || null,
+        attachmentUrl: urls[0] ?? null,
+        attachmentUrls: urls,
+        status: initialStatus,
+        priority,
+        nextReminderAt: isKtCreated ? null : nextReminderForPriority(priority),
+        payeeBankBin: data.payeeBankBin?.trim() || null,
+        payeeAccountNumber: data.payeeAccountNumber?.trim() || null,
+        payeeAccountName: data.payeeAccountName?.trim() || null,
+        sourceType: data.sourceType || null,
+        sourceId: data.sourceId || null,
+        subPaymentId: data.subPaymentId || null,
+        createdBy: user.id,
+      },
+      include: {
+        project: { select: { id: true, code: true, name: true } },
+        category: { select: { id: true, code: true, name: true } },
+      },
+    });
+    // Đợt thầu phụ sang "đã đề xuất" — đã có lệnh chi, chờ duyệt + chi.
+    if (data.subPaymentId) {
+      await tx.subPayment.update({
+        where: { id: data.subPaymentId },
+        data: { status: SubPaymentStatus.requested },
+      });
+    }
+    return created;
   });
 
   const projectLabel = expense.project ? `${expense.project.code} — ${expense.project.name}` : null;

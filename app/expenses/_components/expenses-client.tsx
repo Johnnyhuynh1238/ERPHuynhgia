@@ -76,6 +76,7 @@ type CreateForm = {
   payeeAccountName: string;
   sourceType: string;
   sourceId: string;
+  subPaymentId: string;
 };
 
 const emptyCreate: CreateForm = {
@@ -93,6 +94,7 @@ const emptyCreate: CreateForm = {
   payeeAccountName: "",
   sourceType: "",
   sourceId: "",
+  subPaymentId: "",
 };
 
 export function ExpensesClient({
@@ -138,9 +140,15 @@ export function ExpensesClient({
     if (sp.get("create") === "1" && canCreate) {
       const method = sp.get("method") === "cash" ? "cash" : "transfer";
       const st = sp.get("sourceType");
-      // Danh mục điền sẵn theo mã (vd mua hàng -> VATTU); admin đổi được ở dropdown.
+      // Danh mục điền sẵn theo mã (vd mua hàng -> VATTU) hoặc theo tên (vd thầu phụ
+      // -> "Thầu phụ"); admin đổi được ở dropdown.
       const cc = sp.get("categoryCode");
-      const prefillCatId = cc ? categories.find((c) => c.code === cc)?.id || "" : "";
+      const cn = sp.get("categoryName");
+      const prefillCatId = cc
+        ? categories.find((c) => c.code === cc)?.id || ""
+        : cn
+          ? categories.find((c) => c.name === cn)?.id || ""
+          : "";
       setForm({
         ...emptyCreate,
         projectId: sp.get("projectId") || "",
@@ -148,9 +156,13 @@ export function ExpensesClient({
         amount: sp.get("amount") || "",
         note: sp.get("note") || "",
         payee: sp.get("payee") || "",
+        payeePhone: sp.get("payeePhone") || "",
+        payeeAccountNumber: sp.get("payeeAccountNumber") || "",
+        payeeAccountName: sp.get("payeeAccountName") || "",
         paymentMethod: method,
         sourceType: st === "mua_hang_order" || st === "ncc_congno" ? st : "",
         sourceId: sp.get("sourceId") || "",
+        subPaymentId: sp.get("subPaymentId") || "",
       });
       setShowCreate(true);
     }
@@ -426,6 +438,7 @@ export function ExpensesClient({
         payeeAccountName: form.payeeAccountName.trim() || null,
         sourceType: form.sourceType || null,
         sourceId: form.sourceId || null,
+        subPaymentId: form.subPaymentId || null,
       }),
     });
     const j = await res.json().catch(() => ({}));

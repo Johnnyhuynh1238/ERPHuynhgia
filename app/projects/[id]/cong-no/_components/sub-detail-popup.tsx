@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/confirm-dialog";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
@@ -139,6 +140,7 @@ export function SubDetailPopup({
   onChanged?: () => void;
 }) {
   const canWrite = currentRole === "admin" || currentRole === "construction_manager";
+  const router = useRouter();
 
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -357,19 +359,31 @@ export function SubDetailPopup({
     await loadPayments();
   }
 
-  const [sendingExpense, setSendingExpense] = useState<string | null>(null);
-  async function sendExpense(paymentId: string) {
-    if (!(await confirmDialog("Gửi lệnh chi cho đợt này? Lệnh sẽ qua admin duyệt rồi kế toán chi."))) return;
-    setSendingExpense(paymentId);
-    try {
-      const res = await fetch(`/api/sub-payments/${paymentId}/expense`, { method: "POST" });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) return toast.error(json.message || "Không gửi được lệnh chi");
-      toast.success(json.message || "Đã gửi lệnh chi");
-      await loadPayments();
-    } finally {
-      setSendingExpense(null);
+  // Mở màn Lệnh chi. Đã có lệnh chi → deep-link xem lệnh đó; chưa có → mở form
+  // tạo lệnh điền sẵn (số tiền/người nhận/STK/danh mục) để kế toán duyệt & sửa
+  // trước khi gửi. subPaymentId để lệnh chi gắn ngược lại đợt thanh toán.
+  function goToExpense(p: SubPayment) {
+    if (!contract) return;
+    if (p.linkedExpense) {
+      router.push(`/expenses?id=${p.linkedExpense.id}`);
+      return;
     }
+    const sub = contract.subcontractor;
+    const note = `Thanh toán HĐ thầu phụ ${contract.code} · Đợt ${p.stage}${p.description ? ` — ${p.description}` : ""}`;
+    const q = new URLSearchParams({
+      create: "1",
+      subPaymentId: p.id,
+      amount: p.expectedAmount ? String(p.expectedAmount) : "",
+      method: "transfer",
+      categoryName: "Thầu phụ",
+      payee: sub.name || "",
+      note,
+    });
+    if (contract.project?.id) q.set("projectId", contract.project.id);
+    if (sub.phone) q.set("payeePhone", sub.phone);
+    if (sub.bankAccount) q.set("payeeAccountNumber", sub.bankAccount);
+    if (sub.bankAccountName || sub.name) q.set("payeeAccountName", sub.bankAccountName || sub.name);
+    router.push(`/expenses?${q.toString()}`);
   }
 
   async function removePayment(paymentId: string) {
@@ -693,10 +707,10 @@ export function SubDetailPopup({
                           </div>
                         )}
                         <div className="prow-acts">
-                          {/* Gửi lệnh chi: KT/admin, đợt chưa chi & chưa có lệnh chi */}
-                          {(currentRole === "admin" || currentRole === "accountant") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
-                            <button type="button" className="linkbtn lenhchi" disabled={sendingExpense === p.id} onClick={() => sendExpense(p.id)}>
-                              🧾 {sendingExpense === p.id ? "Đang gửi…" : "Gửi lệnh chi"}
+                          {/* Lệnh chi: KT/admin, mọi đợt chưa chi (kể cả đã có lệnh — mở để xem/sửa) */}
+                          {(currentRole === "admin" || currentRole === "accountant") && p.status !== "paid" && p.status !== "cancelled" && (
+                            <button type="button" className="linkbtn lenhchi" onClick={() => goToExpense(p)}>
+                              🧾 {p.linkedExpense ? "Xem lệnh chi" : "Lập lệnh chi"}
                             </button>
                           )}
                           {/* Xóa/Hủy đợt: chỉ khi chưa có lệnh chi & chưa chi */}
