@@ -172,6 +172,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
   const seq = (last?.seq || 0) + 1;
 
+  // NCC chuẩn hoá ở DB trigger trg_mh_orders_fill_supplier (có tên → tự gán supplierId).
   const order = await prisma.mhOrder.create({
     data: {
       projectId: params.id,

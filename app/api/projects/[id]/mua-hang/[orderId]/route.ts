@@ -37,6 +37,7 @@ export async function PATCH(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
 
+  // NCC chuẩn hoá ở DB trigger trg_mh_orders_fill_supplier (đồng bộ id ↔ tên mọi nơi).
   if ("supplierName" in body) data.supplierName = String(body.supplierName || "").trim() || null;
   if ("supplierId" in body) data.supplierId = body.supplierId ? String(body.supplierId) : null;
   if ("note" in body) data.note = String(body.note || "").trim() || null;
