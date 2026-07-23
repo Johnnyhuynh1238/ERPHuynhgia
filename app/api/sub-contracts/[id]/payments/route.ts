@@ -217,7 +217,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         data: {
           code,
           subContractId: params.id,
-          stage: row.stage ?? nextStage,
+          // Luôn đánh số nối tiếp phía server để thêm đợt mới không trùng stage đợt cũ.
+          stage: nextStage,
           description: row.description,
           linkedTaskId: row.linkedTaskId,
           expectedAmount: new Prisma.Decimal(row.expectedAmount),
