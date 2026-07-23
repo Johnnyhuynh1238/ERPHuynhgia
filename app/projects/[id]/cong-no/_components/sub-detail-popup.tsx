@@ -65,6 +65,7 @@ type SubPayment = {
   id: string;
   code: string;
   stage: number;
+  stageLabel?: string;
   description: string;
   expectedAmount: number | null;
   expectedDate: string;
@@ -386,6 +387,33 @@ export function SubDetailPopup({
     router.push(`/expenses?${q.toString()}`);
   }
 
+  // Bù đợt: đợt đã chi nhưng thực chi < dự kiến → tạo đợt bù (chung stage, nhãn N-1).
+  const [toppingUp, setToppingUp] = useState<string | null>(null);
+  async function topUp(p: SubPayment) {
+    const remain = Number(p.expectedAmount || 0) - Number(p.actualAmount || 0);
+    const input = window.prompt(
+      `Số tiền bù cho đợt ${p.stageLabel ?? p.stage} (còn thiếu ${fmt(remain > 0 ? remain : 0)} đ):`,
+      String(remain > 0 ? Math.round(remain) : 0),
+    );
+    if (input == null) return;
+    const amount = Number(input.replace(/[^\d]/g, ""));
+    if (!amount || amount <= 0) return toast.error("Số tiền không hợp lệ");
+    setToppingUp(p.id);
+    try {
+      const res = await fetch(`/api/sub-payments/${p.id}/top-up`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(json.message || "Không tạo được đợt bù");
+      toast.success(json.message || "Đã tạo đợt bù");
+      await loadPayments();
+    } finally {
+      setToppingUp(null);
+    }
+  }
+
   async function removePayment(paymentId: string) {
     if (!(await confirmDialog("Xóa/Hủy đợt thanh toán này?"))) return;
     const res = await fetch(`/api/sub-payments/${paymentId}`, { method: "DELETE" });
@@ -681,7 +709,7 @@ export function SubDetailPopup({
                       <div key={p.id} className="paycard">
                         <div className="ph">
                           <div>
-                            <div className="pe">Đợt {p.stage} · {p.code}</div>
+                            <div className="pe">Đợt {p.stageLabel ?? p.stage} · {p.code}</div>
                             <div className="pn">{p.description}</div>
                             <div className="psub">Dự kiến {formatDate(p.expectedDate)}{canFin && p.percentage != null ? ` · ${p.percentage}%` : ""}</div>
                           </div>
@@ -716,6 +744,12 @@ export function SubDetailPopup({
                           {/* Xóa/Hủy đợt: chỉ khi chưa có lệnh chi & chưa chi */}
                           {(currentRole === "admin" || currentRole === "construction_manager") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
                             <button type="button" className="linkbtn danger" onClick={() => removePayment(p.id)}>Xóa/Hủy</button>
+                          )}
+                          {/* Bù đợt: admin/QLTC, đợt đã chi nhưng thực chi chưa đủ dự kiến */}
+                          {(currentRole === "admin" || currentRole === "construction_manager") && canFin && p.status === "paid" && Number(p.actualAmount || 0) < Number(p.expectedAmount || 0) && (
+                            <button type="button" className="linkbtn" disabled={toppingUp === p.id} onClick={() => topUp(p)}>
+                              ＋ {toppingUp === p.id ? "Đang tạo…" : "Bù đợt"}
+                            </button>
                           )}
                         </div>
                       </div>

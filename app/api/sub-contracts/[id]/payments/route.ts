@@ -97,6 +97,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const percentTotal = payments.reduce((sum, x) => sum + Number(x.percentage || 0), 0);
 
+  // Nhãn đợt: đợt đầu của mỗi stage = "N", các đợt bù sau (chung stage) = "N-1", "N-2"…
+  // payments đã sắp theo stage asc, createdAt asc nên thứ tự bù ổn định.
+  const stageSeen = new Map<number, number>();
+  const stageLabelById = new Map<string, string>();
+  for (const p of payments) {
+    const n = stageSeen.get(p.stage) ?? 0;
+    stageLabelById.set(p.id, n === 0 ? `${p.stage}` : `${p.stage}-${n}`);
+    stageSeen.set(p.stage, n + 1);
+  }
+
   return NextResponse.json({
     contract: {
       id: contract.id,
@@ -107,6 +117,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     linkedTasks: contract.linkedTasks.map((x) => x.task),
     payments: payments.map((row) => ({
       ...serializeSubPayment(row, canViewFinancial),
+      stageLabel: stageLabelById.get(row.id) ?? `${row.stage}`,
       linkedExpense: expenseByPayment.get(row.id) ?? null,
     })),
     totals: {
