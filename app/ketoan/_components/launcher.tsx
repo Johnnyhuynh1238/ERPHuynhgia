@@ -51,6 +51,7 @@ type SummaryDto = {
     expensePending: number;
     receiptPending: number;
     pendingOrders?: { projectId: string; projectName: string; count: number }[];
+    payNowOrders?: { projectId: string; projectName: string; count: number }[];
   };
 };
 
@@ -289,6 +290,14 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
       href: `/projects/${o.projectId}/mua-hang?tab=orders`,
       count: o.count,
       Icon: PackageCheck,
+    })),
+    // Đơn "thanh toán ngay" (không NCC) đã nhận → KT cần gửi lệnh chi ngay.
+    ...(t.payNowOrders ?? []).map((o) => ({
+      key: `orders-paynow-${o.projectId}`,
+      label: `Cần thanh toán ngay · ${o.projectName}`,
+      href: `/projects/${o.projectId}/mua-hang?tab=received`,
+      count: o.count,
+      Icon: Wallet,
     })),
   ];
   return raw.filter((r) => r.count > 0);

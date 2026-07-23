@@ -20,7 +20,7 @@ export async function GET() {
   }).format(new Date());
   const startOfTodayVn = new Date(`${vnDateStr}T00:00:00+07:00`);
 
-  const [accounts, expensePending, receiptPending, todayFlowRows, pendingOrderGroups] = await Promise.all([
+  const [accounts, expensePending, receiptPending, todayFlowRows, pendingOrderGroups, payNowRaw] = await Promise.all([
     prisma.cashAccount.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
@@ -40,22 +40,55 @@ export async function GET() {
       where: { status: "ordered" },
       _count: { _all: true },
     }),
+    // Đơn "thanh toán ngay" (không NCC) ĐÃ NHẬN → KT cần gửi lệnh chi. Lọc đơn đã gửi ở dưới.
+    prisma.mhOrder.findMany({
+      where: { status: "received", supplierId: null },
+      select: { id: true, projectId: true },
+    }),
   ]);
 
-  // Gắn tên dự án cho từng nhóm đơn chưa nhận.
-  const pendingProjIds = pendingOrderGroups.map((g) => g.projectId);
-  const pendingProjects = pendingProjIds.length
+  // Loại đơn trả ngay đã có lệnh chi đang chờ (nằm ở todo "Lệnh chi chờ chuyển") → tránh đếm trùng.
+  const payNowIds = payNowRaw.map((o) => o.id);
+  const payNowInflight = payNowIds.length
+    ? await prisma.expense.findMany({
+        where: {
+          sourceType: "mua_hang_order",
+          sourceId: { in: payNowIds },
+          status: { in: ["tptc_pending", "pending"] },
+        },
+        select: { sourceId: true },
+      })
+    : [];
+  const payNowInflightSet = new Set(payNowInflight.map((e) => e.sourceId));
+  const payNowByProj = new Map<string, number>();
+  for (const o of payNowRaw) {
+    if (payNowInflightSet.has(o.id)) continue;
+    payNowByProj.set(o.projectId, (payNowByProj.get(o.projectId) || 0) + 1);
+  }
+
+  // Gắn tên dự án cho các nhóm đơn (chưa nhận + trả ngay cần chi) — fetch tên 1 lần.
+  const allProjIds = Array.from(
+    new Set([...pendingOrderGroups.map((g) => g.projectId), ...payNowByProj.keys()]),
+  );
+  const namedProjects = allProjIds.length
     ? await prisma.project.findMany({
-        where: { id: { in: pendingProjIds } },
+        where: { id: { in: allProjIds } },
         select: { id: true, name: true },
       })
     : [];
-  const projNameById = new Map(pendingProjects.map((p) => [p.id, p.name]));
+  const projNameById = new Map(namedProjects.map((p) => [p.id, p.name]));
   const pendingOrders = pendingOrderGroups
     .map((g) => ({
       projectId: g.projectId,
       projectName: projNameById.get(g.projectId) || "Dự án",
       count: g._count._all,
+    }))
+    .sort((a, b) => b.count - a.count);
+  const payNowOrders = Array.from(payNowByProj.entries())
+    .map(([projectId, count]) => ({
+      projectId,
+      projectName: projNameById.get(projectId) || "Dự án",
+      count,
     }))
     .sort((a, b) => b.count - a.count);
   const donHangChuaNhan = pendingOrders.reduce((s, o) => s + o.count, 0);
@@ -105,6 +138,7 @@ export async function GET() {
       expensePending,
       receiptPending,
       pendingOrders,
+      payNowOrders,
     },
   });
 }
