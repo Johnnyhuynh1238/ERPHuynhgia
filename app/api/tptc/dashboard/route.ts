@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BudgetCategory, DailyAssignmentStatus, ExpenseStatus, MaterialProposalStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkerStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
+import { BudgetCategory, DailyAssignmentStatus, ExpenseStatus, ProjectStatus, TimesheetAbsentReason, UserRole, WeeklyPayrollStatus, WorkerStatus, WorkOrderOutputQcStatus, WorkOrderStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
@@ -58,9 +58,6 @@ type ProjectMetrics = {
     total: number;
   };
 
-  materialProposals: {
-    pendingToday: number; // đề xuất hôm nay chưa duyệt
-  };
 
   ksOps: {
     ksId: string | null;
@@ -171,7 +168,7 @@ export async function GET() {
 
   const ksIds = Array.from(new Set(projects.map((p) => p.mainEngineer?.id).filter((v): v is string => !!v)));
 
-  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed, attendanceTodayRows, materialProposalsPending, ksAttendanceToday, morningCheckinsToday, workerTimesheetsByKs, workersActiveByProject, taskAssignmentsToday, eveningReportsToday] = await Promise.all([
+  const [budgets, budgetItems, workOrdersToday, workOrdersCarried, workOrdersYesterdayOpen, outputsPending, outputsFailedWeek, eodTimesheetsToday, eodTimesheets3d, payrolls, woOutputsForLaborUsed, attendanceTodayRows, ksAttendanceToday, morningCheckinsToday, workerTimesheetsByKs, workersActiveByProject, taskAssignmentsToday, eveningReportsToday] = await Promise.all([
     prisma.projectBudget.findMany({
       where: { projectId: { in: projectIds } },
       select: { projectId: true, totalLabor: true, totalMaterial: true, totalEquipment: true, totalAmount: true },
@@ -235,16 +232,6 @@ export async function GET() {
     prisma.workerTimesheet.findMany({
       where: { projectId: { in: projectIds }, date: today },
       select: { projectId: true, dayValue: true, absentReason: true },
-    }),
-    // Đề xuất vật tư hôm nay chưa duyệt
-    prisma.materialProposal.groupBy({
-      by: ["projectId"],
-      where: {
-        projectId: { in: projectIds },
-        status: MaterialProposalStatus.pending,
-        createdAt: { gte: today, lte: new Date(today.getTime() + 24 * 3600 * 1000 - 1) },
-      },
-      _count: { _all: true },
     }),
     // KS chấm công vào/ra hôm nay
     ksIds.length > 0
@@ -365,7 +352,6 @@ export async function GET() {
     attendanceMap.set(t.projectId, agg);
   }
 
-  const materialProposalsMap = new Map(materialProposalsPending.map((r) => [r.projectId, r._count._all]));
 
   const ksAttendanceMap = new Map(ksAttendanceToday.map((r) => [r.userId, r]));
   const morningCheckinKey = (ksId: string, projectId: string) => `${ksId}|${projectId}`;
@@ -452,7 +438,6 @@ export async function GET() {
         failedThisWeek: qcFailedWeekMap.get(p.id) ?? 0,
       },
       attendance: attendanceMap.get(p.id) ?? { present: 0, absentP: 0, absentKP: 0, absentMUA: 0, absentCHO: 0, total: 0 },
-      materialProposals: { pendingToday: materialProposalsMap.get(p.id) ?? 0 },
       ksOps: (() => {
         const ksId = p.mainEngineer?.id ?? null;
         const ksName = p.mainEngineer?.fullName ?? null;

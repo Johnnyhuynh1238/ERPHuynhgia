@@ -748,8 +748,6 @@ export async function GET() {
     const [
       payrollReady,
       subApproved,
-      materialReceivedUnpaid,
-      materialPending,
       workersMissingInfo,
       pendingExpense,
       urgentExpenseCount,
@@ -757,8 +755,6 @@ export async function GET() {
     ] = await Promise.all([
       prisma.weeklyPayroll.count({ where: { status: "ready_to_pay", project: projectAccess } }),
       prisma.subPayment.count({ where: { status: "approved", subContract: { project: projectAccess } } }),
-      prisma.materialProposal.count({ where: { orderStatus: "received", project: projectAccess } }),
-      prisma.materialProposal.count({ where: { status: "pending", project: projectAccess } }),
       prisma.worker.count({
         where: {
           workerStatus: "active",
@@ -779,13 +775,11 @@ export async function GET() {
       cards: [],
       accountant: {
         expensePayment: {
-          total: payrollReady + subApproved + materialReceivedUnpaid,
+          total: payrollReady + subApproved,
           payroll: payrollReady,
           subPayment: subApproved,
-          materialReceived: materialReceivedUnpaid,
         },
         newWorker: { missingInfo: workersMissingInfo },
-        proposalPending: materialPending,
         expensePending: {
           count: pendingExpense._count._all,
           total: Number(pendingExpense._sum.amount ?? 0),

@@ -95,9 +95,6 @@ export function ProjectHubGrid({
     ...(caps.canViewPayments
       ? [{ href: `${base}/payments`, label: "Lịch thanh toán", icon: CreditCard, desc: "Đợt thu HĐ" } as HubItem]
       : []),
-    ...(caps.canProposeMaterials
-      ? [{ href: `${base}/material-proposals`, label: "Đề xuất vật tư", icon: Package, desc: "VT cần mua" } as HubItem]
-      : []),
     ...(caps.canMuaHang
       ? [{ href: `${base}/mua-hang`, label: "Mua hàng", icon: ShoppingCart, desc: "Đặt VT bám dự toán" } as HubItem]
       : []),

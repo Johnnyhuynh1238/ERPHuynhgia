@@ -15,11 +15,9 @@ import {
   Package,
   Receipt,
   Sparkles,
-  Truck,
   UserCircle,
   Wrench,
 } from "lucide-react";
-import { PopupOrderMaterial } from "./popup-order-material";
 import { PopupPettyCash } from "./popup-petty-cash";
 
 type Project = {
@@ -35,18 +33,15 @@ type TodayData = {
   morning: {
     attendanceDone: boolean;
     teamPhotoDone: boolean;
-    materialsIncoming: number;
     machinesWaiting: number;
   };
   midday: {
     qcHoldPoints: number;
-    materialReceiveToday: number;
   };
   evening: {
     workOrdersToday: number;
     workOrderOutputsToday: number;
     assignDone: boolean;
-    materialRequestForTomorrow: boolean;
   };
   kpi: {
     phaseLabel: string | null;
@@ -113,7 +108,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
   const [data, setData] = useState<TodayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hintOpen, setHintOpen] = useState<{ sop: string; anchor: DOMRect } | null>(null);
-  const [showOrderPopup, setShowOrderPopup] = useState(false);
   const [showPettyCashPopup, setShowPettyCashPopup] = useState(false);
 
   useEffect(() => {
@@ -407,46 +401,9 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
             sub="Đặt, nhận, kiểm, mua lẻ"
             Icon={Package}
             accent="green"
-            summary={
-              data.morning.materialsIncoming > 0
-                ? `${data.morning.materialsIncoming} món VT đã duyệt cấp · chờ nhận`
-                : "Chưa có VT về"
-            }
-            badgeTone={data.morning.materialsIncoming > 0 ? "warn" : "ok"}
+            summary="Sổ máy + mua lẻ tại công trình"
+            badgeTone="muted"
             cards={[
-              {
-                Icon: Package,
-                title: "Đặt VT/Máy",
-                status: "Bất cứ lúc nào · KT lên đơn",
-                statusTone: "muted",
-                cta: "Đặt",
-                sop: "6.4",
-                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
-              },
-              {
-                Icon: Truck,
-                title: "Nhận VT/MM",
-                status:
-                  data.morning.materialsIncoming === 0
-                    ? "Chưa có hàng được duyệt cấp"
-                    : `${data.morning.materialsIncoming} món đã duyệt cấp`,
-                statusTone: data.morning.materialsIncoming === 0 ? "muted" : "warn",
-                cta: data.morning.materialsIncoming === 0 ? "Xem" : "Nhận",
-                sop: "6.5",
-                muted: data.morning.materialsIncoming === 0,
-                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
-                count: data.morning.materialsIncoming > 0 ? data.morning.materialsIncoming : undefined,
-                needsAction: data.morning.materialsIncoming > 0,
-              },
-              {
-                Icon: Package,
-                title: "Kiểm VT/MM cho ngày mai",
-                status: "Xem đã đặt đủ cho việc mai chưa",
-                statusTone: "muted",
-                cta: "Mở",
-                sop: "6.4",
-                onClick: selectedProjectId ? () => setShowOrderPopup(true) : undefined,
-              },
               {
                 Icon: Wrench,
                 title: "Sổ máy + trạng thái",
@@ -537,18 +494,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
           Chưa có dữ liệu.
         </div>
       )}
-
-      {showOrderPopup && selectedProjectId && project ? (
-        <PopupOrderMaterial
-          projectId={selectedProjectId}
-          projectName={project.name}
-          currentUserId={user.id}
-          onClose={() => {
-            setShowOrderPopup(false);
-            reloadTodayData();
-          }}
-        />
-      ) : null}
 
       {showPettyCashPopup && selectedProjectId && project ? (
         <PopupPettyCash

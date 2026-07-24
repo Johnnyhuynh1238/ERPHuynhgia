@@ -129,10 +129,8 @@ type DashboardData = {
       total: number;
       payroll: number;
       subPayment: number;
-      materialReceived: number;
     };
     newWorker: { missingInfo: number };
-    proposalPending: number;
     expensePending: { count: number; total: number; urgentCount: number };
     treasury: { initialized: boolean; balance: number };
   };
@@ -844,7 +842,6 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
         <CardContent className="space-y-2">
           <ExpenseSubLink href="/projects" label="Lương tuần chờ chi" value={expense.payroll} />
           <ExpenseSubLink href="/sub-payments" label="Nhà thầu phụ chờ payout" value={expense.subPayment} />
-          <ExpenseSubLink href="/proposals" label="Vật tư đã nhận chờ thanh toán" value={expense.materialReceived} />
         </CardContent>
       </Card>
 
@@ -854,13 +851,6 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
           icon={<Wallet className="h-5 w-5" />}
           title="Công nợ NCC vật tư"
           subtitle="Theo từng dự án (mua hàng)"
-        />
-        <ActionCard
-          href="/proposals"
-          icon={<ShoppingCart className="h-5 w-5" />}
-          title="Yêu cầu mua hàng từ KS"
-          subtitle="Duyệt đề nghị vật tư"
-          badge={{ value: data.proposalPending, tone: data.proposalPending > 0 ? "warn" : "muted" }}
         />
         <ActionCard
           href="/admin/workers"

@@ -42,87 +42,25 @@ export async function GET(
   const entryDate = parseDateParam(req.nextUrl.searchParams.get("date"));
   const nextDay = startOfNextDay(entryDate);
 
-  const [diary, proposals, receivedItems] = await Promise.all([
-    prisma.constructionDiary.findUnique({
-      where: {
-        projectId_ksId_entryDate: {
-          projectId: project.id,
-          ksId: user.id,
-          entryDate,
-        },
-      },
-      include: { approvedBy: { select: { fullName: true } } },
-    }),
-    prisma.materialProposal.findMany({
-      where: {
+  const diary = await prisma.constructionDiary.findUnique({
+    where: {
+      projectId_ksId_entryDate: {
         projectId: project.id,
         ksId: user.id,
-        createdAt: { gte: entryDate, lt: nextDay },
+        entryDate,
       },
-      select: {
-        id: true,
-        description: true,
-        status: true,
-        orderStatus: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.materialProposalItemReceipt.findMany({
-      where: {
-        receivedAt: { gte: entryDate, lt: nextDay },
-        receivedBy: user.id,
-        proposal: { projectId: project.id },
-      },
-      select: {
-        proposalId: true,
-        itemSeq: true,
-        receivedQty: true,
-        receivedAt: true,
-        proposal: { select: { id: true, description: true, parsedItems: true } },
-      },
-      orderBy: { receivedAt: "asc" },
-    }),
-  ]);
+    },
+    include: { approvedBy: { select: { fullName: true } } },
+  });
 
+  // Luồng đề xuất/nhận VT của KS đã gỡ (dùng mua-hàng mới của KT) → không còn hoạt động VT tự động.
   const activities: Array<{
-    kind: "proposal" | "receive";
+    kind: string;
     at: string;
     label: string;
     href: string;
     sub?: string;
   }> = [];
-
-  for (const p of proposals) {
-    activities.push({
-      kind: "proposal",
-      at: p.createdAt.toISOString(),
-      label: `Đề xuất VT: ${p.description.slice(0, 60)}`,
-      sub:
-        p.status === "pending"
-          ? "Chờ TPTC duyệt"
-          : p.status === "declined"
-            ? "Bị từ chối"
-            : p.orderStatus === "received"
-              ? "Đã nhận"
-              : p.orderStatus === "ordered"
-                ? "Đang về"
-                : "Đã duyệt",
-      href: `/ks-ql/sub/${project.id}/material/propose/${p.id}`,
-    });
-  }
-  for (const r of receivedItems) {
-    const items = (r.proposal.parsedItems as unknown as Array<{ name?: string; ten?: string }>) || [];
-    const itemName = items[r.itemSeq]?.name || items[r.itemSeq]?.ten || `Dòng ${r.itemSeq + 1}`;
-    activities.push({
-      kind: "receive",
-      at: (r.receivedAt ?? entryDate).toISOString(),
-      label: `Nhận VT: ${itemName} (${r.receivedQty})`,
-      sub: r.proposal.description.slice(0, 60),
-      href: `/ks-ql/sub/${project.id}/material/receive/${r.proposalId}`,
-    });
-  }
-  activities.sort((a, b) => a.at.localeCompare(b.at));
 
   return NextResponse.json({
     project: { id: project.id, name: project.name },

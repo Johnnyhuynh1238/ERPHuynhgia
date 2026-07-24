@@ -32,8 +32,6 @@ export async function GET(req: NextRequest) {
     attendancePresentCount,
     workOrdersToday,
     workOrderOutputsToday,
-    materialPendingProcess,
-    materialInTransit,
     qcPendingReview,
   ] = await Promise.all([
     prisma.workerAttendance.count({
@@ -44,17 +42,6 @@ export async function GET(req: NextRequest) {
     }),
     prisma.workOrderOutput.count({
       where: { projectId, date: today },
-    }),
-    prisma.materialProposal.count({
-      where: { projectId, status: "pending" },
-    }),
-    prisma.materialProposal.count({
-      where: {
-        projectId,
-        ksId: user.id,
-        status: "accepted",
-        orderStatus: { notIn: ["received", "paid"] },
-      },
     }),
     prisma.qcProgress.count({
       where: {
@@ -71,27 +58,21 @@ export async function GET(req: NextRequest) {
   if (qcPendingReview > 0) {
     alerts.push({ id: "qc", text: `${qcPendingReview} hold-point chưa được TPTC duyệt` });
   }
-  if (materialPendingProcess > 5) {
-    alerts.push({ id: "mat-stack", text: `${materialPendingProcess} đề xuất VT đang chờ xử lý` });
-  }
 
   const data = {
     alerts,
     morning: {
       attendanceDone: attendancePresentCount > 0,
       teamPhotoDone: false,
-      materialsIncoming: materialInTransit,
       machinesWaiting: 0,
     },
     midday: {
       qcHoldPoints: qcPendingReview,
-      materialReceiveToday: materialInTransit,
     },
     evening: {
       workOrdersToday,
       workOrderOutputsToday,
       assignDone: allOrdersDistributed,
-      materialRequestForTomorrow: false,
     },
     kpi: {
       phaseLabel: null,

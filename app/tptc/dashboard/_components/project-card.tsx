@@ -42,9 +42,6 @@ export type ProjectMetrics = {
     absentCHO: number;
     total: number;
   };
-  materialProposals: {
-    pendingToday: number;
-  };
   ksOps: {
     ksId: string | null;
     ksName: string | null;
@@ -237,13 +234,6 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
             value={p.qc.pendingReview}
             sub={p.qc.failedThisWeek > 0 ? `${p.qc.failedThisWeek} fail tuần này` : ""}
             tone={p.qc.pendingReview > 0 ? "warn" : "muted"}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/material-proposals`}
-            label="Vật tư mua bất thường"
-            value={p.materialProposals.pendingToday}
-            sub={p.materialProposals.pendingToday > 0 ? "đề xuất hôm nay" : ""}
-            tone={p.materialProposals.pendingToday > 0 ? "warn" : "muted"}
           />
         </Section>
 

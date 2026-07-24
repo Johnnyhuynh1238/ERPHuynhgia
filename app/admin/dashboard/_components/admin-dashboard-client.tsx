@@ -47,7 +47,6 @@ type SummaryDto = {
   };
   todos: {
     leadsNew: number;
-    proposalPending: number;
     expensePending: number;
     receiptAwaitingApproval: number;
     paymentDue7d: number;
@@ -128,7 +127,6 @@ const APPS: AppDef[] = [
       { label: "Việc TPTC", href: "/tptc/assignments" },
       { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
       "divider",
-      { label: "Đề xuất vật tư", href: "/proposals", badge: data?.todos.proposalPending ?? 0 },
       { label: "NCC vật tư", href: "/admin/suppliers" },
       "divider",
       { label: "Thầu phụ", href: "/subcontractors" },
@@ -195,7 +193,7 @@ const APPS: AppDef[] = [
 const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "kinh-doanh": ["leadsNew"],
   "hop-dong": [],
-  "du-an": ["proposalPending"],
+  "du-an": [],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
   "nhan-su": [],
   "kpi": [],
@@ -318,13 +316,6 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
       href: "/leads",
       count: t.leadsNew,
       Icon: UserPlus,
-    },
-    {
-      key: "proposal-pending",
-      label: "Đề xuất vật tư — chờ duyệt",
-      href: "/proposals?status=pending",
-      count: t.proposalPending,
-      Icon: ShoppingCart,
     },
     {
       key: "expense-pending",

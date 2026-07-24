@@ -20,7 +20,6 @@ export async function GET() {
     schedulesCollected,
     receiptsOffSchedule,
     cashOutByProject,
-    debtsPaid,
     payrollPaid,
     generalExpenseRows,
     subContracts,
@@ -45,10 +44,6 @@ export async function GET() {
       by: ["projectId"],
       where: { direction: "out", projectId: { not: null } },
       _sum: { amount: true },
-    }),
-    prisma.materialProposalItemDebt.findMany({
-      where: { paidAt: { not: null } },
-      select: { totalAmount: true, proposal: { select: { projectId: true } } },
     }),
     prisma.weeklyPayroll.groupBy({
       by: ["projectId"],
@@ -94,8 +89,6 @@ export async function GET() {
 
   const spentByProject = new Map<string, number>();
   for (const row of cashOutByProject) add(spentByProject, row.projectId, Number(row._sum.amount ?? 0));
-  const materialPaidByProject = new Map<string, number>();
-  for (const d of debtsPaid) add(materialPaidByProject, d.proposal.projectId, Number(d.totalAmount));
   const payrollByProject = new Map<string, number>();
   for (const row of payrollPaid) add(payrollByProject, row.projectId, Number(row._sum.totalPayable ?? 0));
 
@@ -126,7 +119,6 @@ export async function GET() {
     const collected = collectedByProject.get(p.id) ?? 0;
     const spent =
       (spentByProject.get(p.id) ?? 0) +
-      (materialPaidByProject.get(p.id) ?? 0) +
       (payrollByProject.get(p.id) ?? 0);
     const subDebt = Math.max(0, subDebtByProject.get(p.id) ?? 0);
     return {

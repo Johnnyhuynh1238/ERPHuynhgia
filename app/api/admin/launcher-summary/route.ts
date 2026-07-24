@@ -22,7 +22,6 @@ export async function GET() {
     receivedThisMonth,
     activeProjects,
     leadsNew,
-    proposalPending,
     expensePending,
     receiptAwaitingApproval,
     paymentDue7d,
@@ -44,7 +43,6 @@ export async function GET() {
     prisma.baogiaLead.count({
       where: { status: "new", contactedAt: null },
     }),
-    prisma.materialProposal.count({ where: { status: "pending" } }),
     prisma.expense.count({ where: { status: "pending" } }),
     prisma.receipt.count({ where: { status: "awaiting_approval" } }),
     prisma.paymentSchedule.count({
@@ -70,7 +68,6 @@ export async function GET() {
     },
     todos: {
       leadsNew,
-      proposalPending,
       expensePending,
       receiptAwaitingApproval,
       paymentDue7d,
