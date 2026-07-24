@@ -12,7 +12,7 @@ export default async function ExpensesPage() {
     redirect("/?denied=expenses");
   }
 
-  const [projects, categories] = await Promise.all([
+  const [projects, categories, designContracts] = await Promise.all([
     prisma.project.findMany({
       orderBy: [{ status: "asc" }, { code: "asc" }],
       select: { id: true, code: true, name: true },
@@ -21,6 +21,10 @@ export default async function ExpensesPage() {
       where: { active: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, code: true, name: true },
+    }),
+    prisma.designContract.findMany({
+      orderBy: [{ status: "asc" }, { signedAt: "desc" }],
+      select: { id: true, customerName: true, signedAt: true },
     }),
   ]);
 
@@ -39,6 +43,11 @@ export default async function ExpensesPage() {
           role={user.role}
           projects={projects}
           categories={categories}
+          designContracts={designContracts.map((c) => ({
+            id: c.id,
+            customerName: c.customerName,
+            signedAt: c.signedAt.toISOString().slice(0, 10),
+          }))}
         />
       </div>
     </ProtectedLayout>

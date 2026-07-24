@@ -1435,14 +1435,23 @@ function EditSheet({
   theme: "light" | "dark";
   isKeToan: boolean;
 }) {
-  // KT xem đơn đã nhận = chỉ đọc. Admin luôn sửa được.
-  const readOnly = isKeToan && (order.status === "received" || order.status === "paid");
+  // Đơn ĐÃ TRẢ (paid — gắn sổ quỹ) → khoá chặt mọi người, không sửa được kể cả NCC.
+  const lockedPaid = order.status === "paid";
+  // Đơn ĐÃ NHẬN (received — công nợ / chờ thanh toán): NCC quyết định ghi công nợ hay TT ngay.
+  const isReceivedOrder = order.status === "received";
+  // KT xem đơn đã nhận = khoá vật tư/giá/ngày (nhưng vẫn sửa NCC ở dưới). Đơn đã trả = khoá hết.
+  const readOnly = lockedPaid || (isKeToan && isReceivedOrder);
   const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
   const [orderDate, setOrderDate] = useState(order.orderDate ? order.orderDate.slice(0, 10) : "");
   const [deliveryDate, setDeliveryDate] = useState(order.deliveryDate ? order.deliveryDate.slice(0, 10) : "");
   const [status, setStatus] = useState<Order["status"]>(order.status);
   const [note, setNote] = useState(order.note || "");
+  // Đổi NCC trên đơn đã nhận: có NCC → ghi công nợ (received); bỏ NCC → thanh toán ngay (paid).
+  const onNccChange = (v: string) => {
+    setSupplierName(v);
+    if (isReceivedOrder) setStatus(v.trim() ? "received" : "paid");
+  };
   // Bản sao vật tư để sửa tên/đvt/SL/đơn giá (KT + admin đều được, không thêm/bớt dòng).
   const [items, setItems] = useState<OrderItem[]>(order.items.map((it) => ({ ...it })));
   // Bảng giá hàng của NCC đang chọn → droplist "hàng theo NCC" + tự điền đơn giá.
@@ -1598,22 +1607,59 @@ function EditSheet({
           </button>
         </div>
         <div className="sbody">
-          <fieldset className="efs" disabled={readOnly}>
           <div className="esh">Thông tin đơn</div>
+          {/* NCC nằm NGOÀI fieldset khoá → KT vẫn sửa được NCC trên đơn đã nhận. */}
           <div className="fld">
             <label>Nhà cung cấp (NCC)</label>
             <input
               list="mh-ncc-edit"
               value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
+              onChange={(e) => onNccChange(e.target.value)}
               placeholder="Chọn hoặc gõ tên NCC / cửa hàng"
+              disabled={lockedPaid}
             />
             <datalist id="mh-ncc-edit">
               {suppliers.map((s) => (
                 <option key={s.id} value={s.name} />
               ))}
             </datalist>
+            {lockedPaid && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  border: "1px solid #7a8199",
+                  background: "rgba(122,129,153,.12)",
+                  color: "#5b6178",
+                }}
+              >
+                🔒 Đơn đã thanh toán (gắn sổ quỹ) — khoá, không sửa được.
+              </div>
+            )}
+            {isReceivedOrder && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  border: "1px solid",
+                  borderColor: supplierName.trim() ? "#c99a2e" : "#2e9e6b",
+                  background: supplierName.trim() ? "rgba(201,154,46,.12)" : "rgba(46,158,107,.12)",
+                  color: supplierName.trim() ? "#a8791a" : "#1f7d52",
+                }}
+              >
+                {supplierName.trim()
+                  ? "⚠ Có NCC → đơn ghi vào CÔNG NỢ nhà cung cấp."
+                  : "⚠ Bỏ trống NCC → đơn thành THANH TOÁN NGAY (trừ thẳng, không ghi công nợ). Sau khi lưu sẽ KHOÁ, không sửa lại được."}
+              </div>
+            )}
           </div>
+          <fieldset className="efs" disabled={readOnly}>
           <div className="row2">
             <div className="fld">
               <label>Ngày đặt</label>
@@ -1742,9 +1788,9 @@ function EditSheet({
             <button type="button" className="btn ghost" onClick={onClose}>
               {readOnly ? "Đóng" : "Huỷ"}
             </button>
-            {!readOnly && (
+            {!lockedPaid && (
               <button type="button" className="btn" onClick={save} disabled={saving || !proofOk}>
-                {saving ? "Đang lưu…" : receiving ? "Xác nhận đã nhận" : "Lưu đơn"}
+                {saving ? "Đang lưu…" : readOnly ? "Lưu NCC" : receiving ? "Xác nhận đã nhận" : "Lưu đơn"}
               </button>
             )}
           </div>

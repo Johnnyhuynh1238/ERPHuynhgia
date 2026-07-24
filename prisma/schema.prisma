@@ -3028,6 +3028,7 @@ model DesignContract {
   project          Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps            DesignContractStep[]
   cashTransactions CashTransaction[]
+  expenses         Expense[]
 
   @@index([status, signedAt(sort: Desc)])
   @@index([customerPhone])
@@ -3744,6 +3745,7 @@ model Expense {
   id                 String          @id @default(uuid()) @db.Uuid
   code               String          @unique
   projectId          String?         @map("project_id") @db.Uuid
+  designContractId   String?         @map("design_contract_id") @db.Uuid
   categoryId         String          @map("category_id") @db.Uuid
   amount             Decimal         @db.Decimal(18, 2)
   payee              String?
@@ -3785,7 +3787,8 @@ model Expense {
   // Scalar (không @relation) để khỏi thêm back-relation vào SubPayment; FK gắn ở migration.
   subPaymentId       String?   @map("sub_payment_id") @db.Uuid
 
-  project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  designContract DesignContract? @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   category     ExpenseCategory @relation(fields: [categoryId], references: [id])
   creator      User            @relation("ExpenseCreator", fields: [createdBy], references: [id])
   payer        User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
@@ -3797,6 +3800,7 @@ model Expense {
   @@index([categoryId, createdAt(sort: Desc)])
   @@index([nextReminderAt])
   @@index([subPaymentId])
+  @@index([designContractId])
   @@map("expenses")
 }
 

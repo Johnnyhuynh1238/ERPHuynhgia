@@ -31,6 +31,7 @@ async function nextExpenseCode() {
 
 const createSchema = z.object({
   projectId: z.string().uuid().nullable().optional(),
+  designContractId: z.string().uuid().nullable().optional(),
   categoryId: z.string().uuid("Danh mục không hợp lệ"),
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   payee: z.string().trim().max(255).optional().nullable(),
@@ -90,6 +91,7 @@ export async function GET(request: Request) {
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
       project: { select: { id: true, code: true, name: true } },
+      designContract: { select: { id: true, customerName: true } },
       category: { select: { id: true, code: true, name: true } },
       creator: { select: { id: true, fullName: true } },
       payer: { select: { id: true, fullName: true } },
@@ -126,6 +128,10 @@ export async function POST(request: Request) {
   if (data.projectId) {
     const project = await prisma.project.findUnique({ where: { id: data.projectId }, select: { id: true } });
     if (!project) return NextResponse.json({ message: "Dự án không tồn tại" }, { status: 400 });
+  }
+  if (data.designContractId) {
+    const dc = await prisma.designContract.findUnique({ where: { id: data.designContractId }, select: { id: true } });
+    if (!dc) return NextResponse.json({ message: "Hợp đồng thiết kế không tồn tại" }, { status: 400 });
   }
 
   // Đợt thanh toán thầu phụ (nếu có): kiểm tra tồn tại, chưa chi, chưa có lệnh chi khác.
@@ -164,6 +170,7 @@ export async function POST(request: Request) {
       data: {
         code,
         projectId: data.projectId || null,
+        designContractId: data.designContractId || null,
         categoryId: data.categoryId,
         amount: new Prisma.Decimal(data.amount),
         payee: data.payee?.trim() || null,
@@ -185,6 +192,7 @@ export async function POST(request: Request) {
       },
       include: {
         project: { select: { id: true, code: true, name: true } },
+        designContract: { select: { id: true, customerName: true } },
         category: { select: { id: true, code: true, name: true } },
       },
     });
@@ -198,7 +206,11 @@ export async function POST(request: Request) {
     return created;
   });
 
-  const projectLabel = expense.project ? `${expense.project.code} — ${expense.project.name}` : null;
+  const projectLabel = expense.project
+    ? `${expense.project.code} — ${expense.project.name}`
+    : expense.designContract
+      ? `TK — ${expense.designContract.customerName}`
+      : null;
   const actorName = user.name || user.email || (isKtCreated ? "KT" : "Admin");
 
   if (isKtCreated) {

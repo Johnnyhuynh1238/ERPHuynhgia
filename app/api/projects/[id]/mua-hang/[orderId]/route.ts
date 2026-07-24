@@ -26,13 +26,17 @@ export async function PATCH(
   });
   if (!order) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
 
-  // Kế toán KHÔNG được sửa đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
-  if (isKeToan && (order.status === "received" || order.status === "paid")) {
+  // Đơn ĐÃ TRẢ (paid — đã gắn sổ quỹ) → khoá chặt, không ai sửa (kể cả admin).
+  if (order.status === "paid") {
     return NextResponse.json(
-      { message: "Đơn đã nhận — kế toán không được sửa. Liên hệ admin." },
+      { message: "Đơn đã thanh toán (gắn sổ quỹ) — không sửa được." },
       { status: 403 },
     );
   }
+
+  // Kế toán với đơn đã nhận (received — công nợ / chờ thanh toán): CHỈ được sửa NCC
+  // (đổi ghi công nợ ↔ thanh toán ngay), không được đụng vật tư / giá / ngày. Admin sửa mọi thứ.
+  const ktNccOnly = isKeToan && order.status === "received";
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
@@ -104,7 +108,8 @@ export async function PATCH(
   }
 
   // Chuyển sang "đã nhận": KẾ TOÁN bắt buộc đủ ≥1 phiếu nhận + ≥1 ảnh hàng (admin miễn).
-  const toReceived = data.status === "received" && order.status !== "received" && order.status !== "paid";
+  // (Đơn "paid" đã return sớm ở trên nên order.status không còn là "paid".)
+  const toReceived = data.status === "received" && order.status !== "received";
   if (toReceived) {
     if (isKeToan) {
       const hasPhieu = finalImages.some((x) => x.kind === "phieu");
@@ -118,6 +123,16 @@ export async function PATCH(
     }
     data.receivedAt = new Date();
     data.receivedBy = user!.id;
+  }
+
+  // KT + đơn đã nhận: chỉ giữ lại thay đổi NCC + status (received/paid), bỏ mọi field khác.
+  if (ktNccOnly) {
+    const allowed: Record<string, unknown> = {};
+    if ("supplierName" in data) allowed.supplierName = data.supplierName;
+    if ("supplierId" in data) allowed.supplierId = data.supplierId;
+    if (data.status === "received" || data.status === "paid") allowed.status = data.status;
+    for (const k of Object.keys(data)) delete data[k];
+    Object.assign(data, allowed);
   }
 
   const updated = await prisma.mhOrder.update({ where: { id: order.id }, data });

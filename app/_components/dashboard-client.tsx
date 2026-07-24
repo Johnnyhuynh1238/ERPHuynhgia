@@ -740,14 +740,15 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
   const [opts, setOpts] = useState<{
     projects: { id: string; code: string; name: string }[];
     categories: { id: string; code: string; name: string }[];
+    designContracts: { id: string; customerName: string; signedAt: string }[];
   } | null>(null);
 
   useEffect(() => {
     if ((!showTreasury && !showExpenses) || opts) return;
     fetch("/api/treasury/options", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setOpts({ projects: j.projects || [], categories: j.categories || [] }))
-      .catch(() => setOpts({ projects: [], categories: [] }));
+      .then((j) => setOpts({ projects: j.projects || [], categories: j.categories || [], designContracts: j.designContracts || [] }))
+      .catch(() => setOpts({ projects: [], categories: [], designContracts: [] }));
   }, [showTreasury, showExpenses, opts]);
 
   return (
@@ -889,7 +890,7 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
             </div>
             <div className="p-3">
               {opts ? (
-                <ExpensesClient role="accountant" projects={opts.projects} categories={opts.categories} />
+                <ExpensesClient role="accountant" projects={opts.projects} categories={opts.categories} designContracts={opts.designContracts} />
               ) : (
                 <div className="p-6 text-center text-sm text-[#8b95b7]">Đang tải lệnh chi…</div>
               )}

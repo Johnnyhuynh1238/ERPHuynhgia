@@ -13,6 +13,7 @@ import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string };
+type DesignContractOption = { id: string; customerName: string; signedAt: string };
 
 type Expense = {
   id: string;
@@ -42,6 +43,8 @@ type Expense = {
   payeeAccountName: string | null;
   payeeQrUrl: string | null;
   project: ProjectOption | null;
+  designContractId: string | null;
+  designContract: { id: string; customerName: string } | null;
   category: CategoryOption;
   creator: { id: string; fullName: string };
   payer: { id: string; fullName: string } | null;
@@ -63,6 +66,7 @@ function statusMeta(s: Expense["status"]) {
 
 type CreateForm = {
   projectId: string;
+  designContractId: string;
   categoryId: string;
   amount: string;
   payee: string;
@@ -81,6 +85,7 @@ type CreateForm = {
 
 const emptyCreate: CreateForm = {
   projectId: "",
+  designContractId: "",
   categoryId: "",
   amount: "",
   payee: "",
@@ -101,10 +106,12 @@ export function ExpensesClient({
   role,
   projects,
   categories,
+  designContracts,
 }: {
   role: string;
   projects: ProjectOption[];
   categories: CategoryOption[];
+  designContracts: DesignContractOption[];
 }) {
   const isAdmin = role === "admin";
   const isKt = role === "accountant";
@@ -425,6 +432,7 @@ export function ExpensesClient({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         projectId: form.projectId || null,
+        designContractId: form.designContractId || null,
         categoryId: form.categoryId,
         amount: amt,
         payee: form.payee.trim() || null,
@@ -746,18 +754,32 @@ export function ExpensesClient({
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="text-xs text-[#8b95b7]">Chi cho dự án</span>
+              <span className="text-xs text-[#8b95b7]">Chi cho hợp đồng</span>
               <select
-                value={form.projectId}
-                onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+                value={form.projectId ? `p:${form.projectId}` : form.designContractId ? `d:${form.designContractId}` : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.startsWith("p:")) setForm({ ...form, projectId: v.slice(2), designContractId: "" });
+                  else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2) });
+                  else setForm({ ...form, projectId: "", designContractId: "" });
+                }}
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               >
                 <option value="">Chi chung công ty</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code} — {p.name}
-                  </option>
-                ))}
+                <optgroup label="HĐ thi công">
+                  {projects.map((p) => (
+                    <option key={p.id} value={`p:${p.id}`}>
+                      {p.code} — {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="HĐ thiết kế">
+                  {designContracts.map((c) => (
+                    <option key={c.id} value={`d:${c.id}`}>
+                      TK {c.signedAt} — {c.customerName}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </label>
             <label className="block">
@@ -1126,6 +1148,10 @@ export function ExpensesClient({
                     {r.project ? (
                       <span className="truncate">
                         <span className="font-mono text-[#a1a8c8]">{r.project.code}</span> — {r.project.name}
+                      </span>
+                    ) : r.designContract ? (
+                      <span className="truncate">
+                        <span className="font-mono text-[#a1a8c8]">TK</span> — {r.designContract.customerName}
                       </span>
                     ) : (
                       <span>Chi chung công ty</span>
