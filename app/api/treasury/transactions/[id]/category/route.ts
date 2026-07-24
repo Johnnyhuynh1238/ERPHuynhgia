@@ -31,7 +31,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const cat = await prisma.expenseCategory.findUnique({
     where: { id: categoryId },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, scope: true },
   });
   if (!cat) return NextResponse.json({ message: "Danh mục không tồn tại" }, { status: 400 });
 

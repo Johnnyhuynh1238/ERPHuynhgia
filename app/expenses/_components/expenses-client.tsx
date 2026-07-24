@@ -12,7 +12,7 @@ import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ProjectOption = { id: string; code: string; name: string };
-type CategoryOption = { id: string; code: string; name: string };
+type CategoryOption = { id: string; code: string; name: string; scope: string | null };
 type DesignContractOption = { id: string; customerName: string; signedAt: string };
 
 type Expense = {
@@ -284,6 +284,17 @@ export function ExpensesClient({
     if (!Number.isFinite(amt) || balance == null) return null;
     return balance - amt;
   }, [form.amount, balance]);
+
+  // Danh mục theo ngữ cảnh "Chi cho": có HĐ (thi công/thiết kế) → scope "project";
+  // Chi chung công ty → scope "company". Giữ thêm danh mục đang chọn nếu ngoài scope
+  // (vd lệnh chi thầu phụ prefill "Thầu phụ") để hiển thị đúng.
+  const chiScope: "project" | "company" =
+    form.projectId || form.designContractId ? "project" : "company";
+  const visibleCategories = useMemo(() => {
+    const inScope = categories.filter((c) => c.scope === chiScope);
+    const sel = categories.find((c) => c.id === form.categoryId);
+    return sel && !inScope.some((c) => c.id === sel.id) ? [sel, ...inScope] : inScope;
+  }, [categories, chiScope, form.categoryId]);
 
   async function uploadOne(file: File): Promise<string | null> {
     if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
@@ -759,9 +770,13 @@ export function ExpensesClient({
                 value={form.projectId ? `p:${form.projectId}` : form.designContractId ? `d:${form.designContractId}` : ""}
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v.startsWith("p:")) setForm({ ...form, projectId: v.slice(2), designContractId: "" });
-                  else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2) });
-                  else setForm({ ...form, projectId: "", designContractId: "" });
+                  const newScope: "project" | "company" = v.startsWith("p:") || v.startsWith("d:") ? "project" : "company";
+                  // Đổi ngữ cảnh → nếu danh mục đang chọn khác scope mới thì bỏ chọn.
+                  const selCat = categories.find((c) => c.id === form.categoryId);
+                  const keepCat = selCat && selCat.scope === newScope ? form.categoryId : "";
+                  if (v.startsWith("p:")) setForm({ ...form, projectId: v.slice(2), designContractId: "", categoryId: keepCat });
+                  else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2), categoryId: keepCat });
+                  else setForm({ ...form, projectId: "", designContractId: "", categoryId: keepCat });
                 }}
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               >
@@ -791,7 +806,7 @@ export function ExpensesClient({
                 className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
               >
                 <option value="">— Chọn —</option>
-                {categories.map((c) => (
+                {visibleCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>

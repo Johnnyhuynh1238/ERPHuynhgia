@@ -20,7 +20,7 @@ export default async function TreasuryPage() {
     prisma.expenseCategory.findMany({
       where: { active: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, scope: true },
     }),
   ]);
 

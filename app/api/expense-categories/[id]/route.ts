@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
+  scope: z.enum(["project", "company"]).nullable().optional(),
   sortOrder: z.coerce.number().int().min(0).max(9999).optional(),
   active: z.boolean().optional(),
 });

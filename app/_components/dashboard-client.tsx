@@ -739,7 +739,7 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
   const [showExpenses, setShowExpenses] = useState(false);
   const [opts, setOpts] = useState<{
     projects: { id: string; code: string; name: string }[];
-    categories: { id: string; code: string; name: string }[];
+    categories: { id: string; code: string; name: string; scope: string | null }[];
     designContracts: { id: string; customerName: string; signedAt: string }[];
   } | null>(null);
 

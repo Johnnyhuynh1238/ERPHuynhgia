@@ -3727,6 +3727,7 @@ model ExpenseCategory {
   id        String   @id @default(uuid()) @db.Uuid
   code      String   @unique
   name      String
+  scope     String?  // "project" (HĐTK/HĐTC) | "company" (chi chung) | null (ẩn khỏi dropdown tay)
   sortOrder Int      @default(0) @map("sort_order")
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")

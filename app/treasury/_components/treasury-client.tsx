@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 type ProjectOption = { id: string; code: string; name: string };
-type CategoryOption = { id: string; code: string; name: string };
+type CategoryOption = { id: string; code: string; name: string; scope: string | null };
 
 type AccountSummary = {
   id: string;
@@ -145,6 +145,15 @@ export function TreasuryClient({
 
   useEffect(() => setCatValue(selectedTxn?.category?.id ?? ""), [selectedTxn]);
   const imgAtts = selectedTxn ? selectedTxn.attachments.filter((a) => a.isImage) : [];
+
+  // Danh mục sửa trong sổ quỹ lọc theo ngữ cảnh giao dịch: có dự án → scope "project";
+  // chung công ty → scope "company". Giữ thêm danh mục đang gán nếu ngoài scope.
+  const editCatOptions = useMemo(() => {
+    const sc: "project" | "company" = selectedTxn?.project ? "project" : "company";
+    const inScope = categories.filter((c) => c.scope === sc);
+    const cur = categories.find((c) => c.id === selectedTxn?.category?.id);
+    return cur && !inScope.some((c) => c.id === cur.id) ? [cur, ...inScope] : inScope;
+  }, [categories, selectedTxn]);
 
   const [showTransfer, setShowTransfer] = useState(false);
   const [trFrom, setTrFrom] = useState("");
@@ -565,7 +574,7 @@ export function TreasuryClient({
                         <span className="catbox">
                           <select className="sel" value={catValue} onChange={(e) => setCatValue(e.target.value)}>
                             <option value="">— Chọn —</option>
-                            {categories.map((c) => (
+                            {editCatOptions.map((c) => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
                               </option>

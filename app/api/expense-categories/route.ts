@@ -9,6 +9,7 @@ const ROLES_VIEW = new Set<string>([UserRole.admin, UserRole.accountant]);
 const createSchema = z.object({
   code: z.string().trim().min(1).max(40).regex(/^[A-Z0-9_-]+$/i, "Code chỉ chứa A-Z, 0-9, _ -"),
   name: z.string().trim().min(1).max(120),
+  scope: z.enum(["project", "company"]).nullable().optional(),
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
 });
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
       data: {
         code: parsed.data.code.toUpperCase(),
         name: parsed.data.name,
+        scope: parsed.data.scope ?? null,
         sortOrder: parsed.data.sortOrder,
       },
     });
