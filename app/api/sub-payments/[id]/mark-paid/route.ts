@@ -1,9 +1,16 @@
-import { Prisma, SubPaymentStatus } from "@prisma/client";
+import { SubPaymentStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
-import { canMarkPaidSubPayment, getPaidProgressWarning, normalizeSubPaymentDate } from "@/lib/sub-payment-utils";
+import {
+  canMarkPaidSubPayment,
+  getPaidProgressWarning,
+  normalizeSubPaymentDate,
+  settleSubPaymentInstallment,
+  subPaymentRemaining,
+  SubPaymentOverpayError,
+} from "@/lib/sub-payment-utils";
 import { fmtDate, fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 import { recordCashTxn } from "@/lib/treasury";
 
@@ -57,7 +64,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Chỉ đợt approved mới được mark paid" }, { status: 400 });
   }
 
-  const amount = payload.actualAmount ?? Number(row.expectedAmount);
+  // Đã tạm ứng trước đó (cộng dồn) → mặc định chi phần CÒN LẠI của đợt.
+  const prevPaid = Number(row.actualAmount || 0);
+  const remaining = subPaymentRemaining(row);
+  const amount = payload.actualAmount ?? (remaining > 0 ? remaining : Number(row.expectedAmount));
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ message: "Số tiền thực chi không hợp lệ" }, { status: 400 });
   }
@@ -77,7 +87,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   });
 
   const paidBefore = Number(paidAggregate._sum.actualAmount || 0);
-  const paidAfter = paidBefore + amount;
+  // Tổng đã chi HĐ sau lần này = các đợt khác đã paid + tổng cộng dồn của đợt này.
+  const paidAfter = paidBefore + prevPaid + amount;
   const contractValue = Number(row.subContract.contractValue);
 
   const warning = getPaidProgressWarning(paidAfter, contractValue);
@@ -90,41 +101,51 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const receiptUrl = payload.receiptUrl.trim();
-  const { updated } = await prisma.$transaction(async (tx) => {
-    const updated = await tx.subPayment.update({
-      where: { id: row.id },
-      data: {
-        status: SubPaymentStatus.paid,
-        actualAmount: new Prisma.Decimal(amount),
-        actualPaidDate: paidDate,
+  const txRes = await prisma
+    .$transaction(async (tx) => {
+      // Cộng dồn tạm ứng (đủ → paid, thiếu → giữ approved, vượt → ném lỗi).
+      await settleSubPaymentInstallment(tx, {
+        subPaymentId: row.id,
+        paidAmount: amount,
+        paidDate,
+        userId: user.id,
         receiptUrl,
-        paidBy: user.id,
-        paidAt: new Date(),
         payNote: payload.note ? `[${payload.paymentMethod}] ${payload.note}` : `[${payload.paymentMethod}]`,
-      },
-      include: {
-        linkedTask: { select: { id: true, code: true, name: true, status: true } },
-        requester: { select: { id: true, fullName: true } },
-        approver: { select: { id: true, fullName: true } },
-        payer: { select: { id: true, fullName: true } },
-      },
+      });
+      const updated = await tx.subPayment.findUniqueOrThrow({
+        where: { id: row.id },
+        include: {
+          linkedTask: { select: { id: true, code: true, name: true, status: true } },
+          requester: { select: { id: true, fullName: true } },
+          approver: { select: { id: true, fullName: true } },
+          payer: { select: { id: true, fullName: true } },
+        },
+      });
+
+      await recordCashTxn(tx, {
+        direction: "out",
+        amount,
+        occurredAt: paidDate,
+        refType: "sub_payment",
+        refId: row.id,
+        accountId: payload.accountId,
+        projectId: row.subContract.projectId,
+        categoryId: null,
+        note: `TT thầu phụ ${row.code} (HĐ ${row.subContract.code}) [${payload.paymentMethod}]${payload.note ? ` — ${payload.note}` : ""}`,
+        createdBy: user.id,
+      });
+
+      return { updated };
+    })
+    .catch((err: unknown) => {
+      if (err instanceof SubPaymentOverpayError) return { overpay: err } as const;
+      throw err;
     });
 
-    await recordCashTxn(tx, {
-      direction: "out",
-      amount,
-      occurredAt: paidDate,
-      refType: "sub_payment",
-      refId: row.id,
-      accountId: payload.accountId,
-      projectId: row.subContract.projectId,
-      categoryId: null,
-      note: `TT thầu phụ ${row.code} (HĐ ${row.subContract.code}) [${payload.paymentMethod}]${payload.note ? ` — ${payload.note}` : ""}`,
-      createdBy: user.id,
-    });
-
-    return { updated };
-  });
+  if ("overpay" in txRes) {
+    return NextResponse.json({ message: txRes.overpay.message }, { status: 400 });
+  }
+  const { updated } = txRes;
 
   await logProjectActivity(prisma, {
     projectId: row.subContract.projectId,

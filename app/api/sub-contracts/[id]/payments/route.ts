@@ -75,11 +75,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     orderBy: [{ stage: "asc" }, { createdAt: "asc" }],
   });
 
-  // Lệnh chi đang gắn với từng đợt (bỏ đã huỷ) — để UI hiện trạng thái gửi lệnh chi.
+  // Lệnh chi ĐANG CHỜ gắn với từng đợt (bỏ đã huỷ + đã chi) — để UI hiện trạng thái gửi lệnh chi.
+  // Lệnh đã chi (tạm ứng) KHÔNG tính linked → nút "Lập lệnh chi" hiện lại cho phần còn lại.
   const paymentIds = payments.map((p) => p.id);
   const linkedExpenses = paymentIds.length
     ? await prisma.expense.findMany({
-        where: { subPaymentId: { in: paymentIds }, status: { not: ExpenseStatus.cancelled } },
+        where: {
+          subPaymentId: { in: paymentIds },
+          status: { notIn: [ExpenseStatus.cancelled, ExpenseStatus.paid] },
+        },
         select: { id: true, code: true, status: true, subPaymentId: true },
         orderBy: { createdAt: "desc" },
       })
@@ -91,8 +95,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     }
   }
 
+  // Tổng đã chi = mọi đợt chưa huỷ có actualAmount (gồm đợt paid + đợt tạm ứng dở).
   const paidTotal = payments
-    .filter((x) => x.status === SubPaymentStatus.paid)
+    .filter((x) => x.status !== SubPaymentStatus.cancelled)
     .reduce((sum, x) => sum + Number(x.actualAmount || 0), 0);
 
   const percentTotal = payments.reduce((sum, x) => sum + Number(x.percentage || 0), 0);

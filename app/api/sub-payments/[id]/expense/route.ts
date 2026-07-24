@@ -53,9 +53,13 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return NextResponse.json({ message: "Đợt này đã chi xong" }, { status: 400 });
   }
 
-  // Không cho gửi trùng khi đã có lệnh chi đang chờ (chưa huỷ).
+  // Không cho gửi trùng khi đang có lệnh chi CHỜ XỬ LÝ (chưa chi, chưa huỷ).
+  // Lệnh đã chi (tạm ứng đợt trước) KHÔNG chặn → cho gửi tiếp phần còn lại.
   const existing = await prisma.expense.findFirst({
-    where: { subPaymentId: payment.id, status: { not: ExpenseStatus.cancelled } },
+    where: {
+      subPaymentId: payment.id,
+      status: { notIn: [ExpenseStatus.cancelled, ExpenseStatus.paid] },
+    },
     select: { id: true, code: true },
   });
   if (existing) {
@@ -65,9 +69,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
     );
   }
 
-  const amount = Number(payment.expectedAmount || 0);
+  // Số tiền lệnh chi = phần CÒN LẠI của đợt (dự kiến − đã tạm ứng).
+  const amount = Number(payment.expectedAmount || 0) - Number(payment.actualAmount || 0);
   if (amount <= 0) {
-    return NextResponse.json({ message: "Đợt chưa có số tiền để gửi lệnh chi" }, { status: 400 });
+    return NextResponse.json({ message: "Đợt đã tạm ứng đủ, không còn số dư để gửi lệnh chi" }, { status: 400 });
   }
 
   // Danh mục "Thầu phụ" (fallback "Khác" nếu chưa khai báo).

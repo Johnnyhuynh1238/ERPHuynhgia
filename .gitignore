@@ -45,3 +45,4 @@ backups/*.sql.gz
 
 # deploy snapshots
 /.deploy-backups/
+_expense_oldroot_stale/

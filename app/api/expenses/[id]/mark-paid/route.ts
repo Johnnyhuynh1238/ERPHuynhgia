@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { ExpenseStatus, Prisma, SubPaymentStatus, UserRole } from "@prisma/client";
+import { ExpenseStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
 import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
+import { settleSubPaymentInstallment } from "@/lib/sub-payment-utils";
 
 const PAY_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -98,17 +99,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
           }, ${user.id}::uuid, ${expense.projectId}::uuid)`;
       }
 
-      // Lệnh chi gắn với đợt thanh toán thầu phụ → tự đánh dấu đợt đã chi.
+      // Lệnh chi gắn với đợt thanh toán thầu phụ → cộng dồn tạm ứng.
+      // Chi đủ dự kiến → đợt paid; chi thiếu → đợt giữ mở (approved), note tạm ứng,
+      // nút gửi lệnh chi vẫn hiện. Vượt tổng đợt → ném lỗi, rollback cả giao dịch.
       if (expense.subPaymentId) {
-        await tx.subPayment.update({
-          where: { id: expense.subPaymentId },
-          data: {
-            status: SubPaymentStatus.paid,
-            actualAmount: new Prisma.Decimal(data.paidAmount),
-            actualPaidDate: paidAt,
-            paidBy: user.id,
-            paidAt,
-          },
+        await settleSubPaymentInstallment(tx, {
+          subPaymentId: expense.subPaymentId,
+          paidAmount: Number(data.paidAmount),
+          paidDate: paidAt,
+          userId: user.id,
         });
       }
       return upd;

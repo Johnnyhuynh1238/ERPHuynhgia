@@ -126,6 +126,17 @@ function payLabel(s: SubPaymentStatus) {
   if (s === SubPaymentStatus.paid) return "Đã chi";
   return "Đã hủy";
 }
+// Đợt "tạm ứng dở" (cách A — suy từ số): đã chi > 0 nhưng chưa đủ dự kiến & chưa paid/huỷ.
+function isAdvancing(p: { status: SubPaymentStatus; expectedAmount: number | null; actualAmount: number | null }) {
+  if (p.status === SubPaymentStatus.paid || p.status === SubPaymentStatus.cancelled) return false;
+  const a = Number(p.actualAmount || 0);
+  const e = Number(p.expectedAmount || 0);
+  return a > 0 && (e <= 0 || a < e - 1);
+}
+// Phần còn lại của đợt (dự kiến − đã tạm ứng), tối thiểu 0.
+function payRemaining(p: { expectedAmount: number | null; actualAmount: number | null }) {
+  return Math.max(0, Number(p.expectedAmount || 0) - Number(p.actualAmount || 0));
+}
 
 export function SubDetailPopup({
   contractId,
@@ -371,10 +382,12 @@ export function SubDetailPopup({
     }
     const sub = contract.subcontractor;
     const note = `Thanh toán HĐ thầu phụ ${contract.code} · Đợt ${p.stage}${p.description ? ` — ${p.description}` : ""}`;
+    const remaining = payRemaining(p);
     const q = new URLSearchParams({
       create: "1",
       subPaymentId: p.id,
-      amount: p.expectedAmount ? String(p.expectedAmount) : "",
+      // Fill sẵn phần CÒN LẠI (dự kiến − đã tạm ứng); đợt mới thì = dự kiến.
+      amount: remaining > 0 ? String(Math.round(remaining)) : p.expectedAmount ? String(p.expectedAmount) : "",
       method: "transfer",
       categoryName: "Thầu phụ",
       payee: sub.name || "",
@@ -385,33 +398,6 @@ export function SubDetailPopup({
     if (sub.bankAccount) q.set("payeeAccountNumber", sub.bankAccount);
     if (sub.bankAccountName || sub.name) q.set("payeeAccountName", sub.bankAccountName || sub.name);
     router.push(`/expenses?${q.toString()}`);
-  }
-
-  // Bù đợt: đợt đã chi nhưng thực chi < dự kiến → tạo đợt bù (chung stage, nhãn N-1).
-  const [toppingUp, setToppingUp] = useState<string | null>(null);
-  async function topUp(p: SubPayment) {
-    const remain = Number(p.expectedAmount || 0) - Number(p.actualAmount || 0);
-    const input = window.prompt(
-      `Số tiền bù cho đợt ${p.stageLabel ?? p.stage} (còn thiếu ${fmt(remain > 0 ? remain : 0)} đ):`,
-      String(remain > 0 ? Math.round(remain) : 0),
-    );
-    if (input == null) return;
-    const amount = Number(input.replace(/[^\d]/g, ""));
-    if (!amount || amount <= 0) return toast.error("Số tiền không hợp lệ");
-    setToppingUp(p.id);
-    try {
-      const res = await fetch(`/api/sub-payments/${p.id}/top-up`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) return toast.error(json.message || "Không tạo được đợt bù");
-      toast.success(json.message || "Đã tạo đợt bù");
-      await loadPayments();
-    } finally {
-      setToppingUp(null);
-    }
   }
 
   async function removePayment(paymentId: string) {
@@ -425,7 +411,9 @@ export function SubDetailPopup({
 
   function openMarkSheet(p: SubPayment) {
     setOpenMarkPaid(p.id);
-    setActualAmount(p.expectedAmount ? String(p.expectedAmount) : "");
+    // Mặc định chi phần còn lại của đợt (đã trừ tạm ứng trước).
+    const remaining = payRemaining(p);
+    setActualAmount(remaining > 0 ? String(Math.round(remaining)) : p.expectedAmount ? String(p.expectedAmount) : "");
     setActualDate(todayStr());
     setPaymentMethod("chuyển khoản");
     setPayNote("");
@@ -713,13 +701,18 @@ export function SubDetailPopup({
                             <div className="pn">{p.description}</div>
                             <div className="psub">Dự kiến {formatDate(p.expectedDate)}{canFin && p.percentage != null ? ` · ${p.percentage}%` : ""}</div>
                           </div>
-                          <span className={`chip ${payChip(p.status)}`}>{payLabel(p.status)}</span>
+                          <span className={`chip ${isAdvancing(p) ? "await" : payChip(p.status)}`}>
+                            {isAdvancing(p) ? "Tạm ứng" : payLabel(p.status)}
+                          </span>
                         </div>
                         {canFin && (
                           <div className="pvline">
                             <div className="pv num">{fmt(p.expectedAmount || 0)} đ</div>
                             {p.status === "paid" && (
                               <div className="paidnote">✓ Đã chi {fmt(p.actualAmount || 0)} · {formatDate(p.actualPaidDate)}</div>
+                            )}
+                            {isAdvancing(p) && (
+                              <div className="paidnote">↺ Đã tạm ứng {fmt(p.actualAmount || 0)} · còn {fmt(payRemaining(p))} đ</div>
                             )}
                           </div>
                         )}
@@ -744,12 +737,6 @@ export function SubDetailPopup({
                           {/* Xóa/Hủy đợt: chỉ khi chưa có lệnh chi & chưa chi */}
                           {(currentRole === "admin" || currentRole === "construction_manager") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
                             <button type="button" className="linkbtn danger" onClick={() => removePayment(p.id)}>Xóa/Hủy</button>
-                          )}
-                          {/* Bù đợt: admin/QLTC, đợt đã chi nhưng thực chi chưa đủ dự kiến */}
-                          {(currentRole === "admin" || currentRole === "construction_manager") && canFin && p.status === "paid" && Number(p.actualAmount || 0) < Number(p.expectedAmount || 0) && (
-                            <button type="button" className="linkbtn" disabled={toppingUp === p.id} onClick={() => topUp(p)}>
-                              ＋ {toppingUp === p.id ? "Đang tạo…" : "Bù đợt"}
-                            </button>
                           )}
                         </div>
                       </div>
