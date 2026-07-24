@@ -17,6 +17,7 @@ type ContractItem = {
   status: SubContractStatus;
   unit: SubContractUnit | null;
   contractValue: number | null;
+  paidTotal: number | null;
   unitPrice: number | null;
   quantity: number | null;
   subcontractor: { id: string; code: string; name: string; phone: string };
@@ -150,7 +151,9 @@ export function SubContractsTab({
   const summary = useMemo(() => {
     const total = rows.reduce((s, r) => s + (r.contractValue || 0), 0);
     const active = rows.filter((r) => r.status === "active").length;
-    return { count: rows.length, total, active };
+    const daTra = rows.reduce((s, r) => s + (r.paidTotal || 0), 0);
+    const conLai = Math.max(0, total - daTra);
+    return { count: rows.length, total, active, daTra, conLai };
   }, [rows]);
 
   const openCreate = () => {
@@ -208,19 +211,19 @@ export function SubContractsTab({
       {/* summary */}
       <div className="sum">
         <div className="c">
-          <div className="k">Số hợp đồng</div>
-          <div className="v t num">{loading ? "—" : summary.count}</div>
-          <div className="sp">thầu phụ</div>
-        </div>
-        <div className="c">
-          <div className="k">Đang thực hiện</div>
-          <div className="v o num">{loading ? "—" : summary.active}</div>
-          <div className="sp">HĐ active</div>
-        </div>
-        <div className="c">
           <div className="k">Tổng giá trị</div>
-          <div className="v r num">{loading ? "—" : fmt(summary.total)}</div>
-          <div className="sp">giá trị HĐ</div>
+          <div className="v t num">{loading ? "—" : fmt(summary.total)}</div>
+          <div className="sp">{summary.count} HĐ</div>
+        </div>
+        <div className="c">
+          <div className="k">Đã thanh toán</div>
+          <div className="v o num">{loading ? "—" : fmt(summary.daTra)}</div>
+          <div className="sp">gồm tạm ứng</div>
+        </div>
+        <div className="c">
+          <div className="k">Còn lại</div>
+          <div className="v r num">{loading ? "—" : fmt(summary.conLai)}</div>
+          <div className="sp">chưa thanh toán</div>
         </div>
       </div>
 

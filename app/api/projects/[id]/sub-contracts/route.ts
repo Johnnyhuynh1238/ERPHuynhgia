@@ -1,4 +1,4 @@
-import { Prisma, SubContractStatus, SubContractUnit, UserRole } from "@prisma/client";
+import { Prisma, SubContractStatus, SubContractUnit, SubPaymentStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -79,12 +79,28 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   const canViewFinancial = canViewSubContractFinancial(user.role);
 
+  // Đã thanh toán từng HĐ = Σ actualAmount các đợt (gồm đợt paid + tạm ứng dở), bỏ đợt huỷ.
+  const contractIds = rows.map((r) => r.id);
+  const paidAgg = contractIds.length
+    ? await prisma.subPayment.groupBy({
+        by: ["subContractId"],
+        where: {
+          subContractId: { in: contractIds },
+          status: { not: SubPaymentStatus.cancelled },
+          actualAmount: { not: null },
+        },
+        _sum: { actualAmount: true },
+      })
+    : [];
+  const paidByContract = new Map(paidAgg.map((p) => [p.subContractId, Number(p._sum.actualAmount || 0)]));
+
   return NextResponse.json({
     contracts: rows.map((row) => {
       const serialized = serializeSubContract(row, canViewFinancial);
       return {
         ...serialized,
         unit: canViewFinancial ? serialized.unit : null,
+        paidTotal: canViewFinancial ? (paidByContract.get(row.id) || 0) : null,
         subcontractor: row.subcontractor,
         linkedTasks: row.linkedTasks.map((item) => item.task),
         fileCount: row._count.files,
