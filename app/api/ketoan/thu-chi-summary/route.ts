@@ -68,7 +68,7 @@ export async function GET() {
 
   // Gắn tên dự án cho các nhóm đơn (chưa nhận + trả ngay cần chi) — fetch tên 1 lần.
   const allProjIds = Array.from(
-    new Set([...pendingOrderGroups.map((g) => g.projectId), ...payNowByProj.keys()]),
+    new Set([...pendingOrderGroups.map((g) => g.projectId), ...Array.from(payNowByProj.keys())]),
   );
   const namedProjects = allProjIds.length
     ? await prisma.project.findMany({
