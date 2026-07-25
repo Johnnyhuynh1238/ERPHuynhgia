@@ -85,6 +85,12 @@ export function CongNoClient({
 
   useEffect(() => setMounted(true), []);
 
+  // SSO webterminal: xin cookie claude_code_session để iframe AI (huynhgia6.com/claude)
+  // nhận diện admin/kế toán — khỏi mật khẩu webterminal riêng, tránh iframe trắng.
+  useEffect(() => {
+    fetch("/api/webterminal-cookie", { credentials: "include", cache: "no-store" }).catch(() => {});
+  }, []);
+
   // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
   useEffect(() => {
     function onMsg(e: MessageEvent) {
