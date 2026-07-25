@@ -1178,10 +1178,18 @@ export function ExpensesClient({
                   </div>
                 </div>
 
-                {/* Note */}
+                {/* Note admin (lúc gửi lệnh chi) */}
                 {r.note && (
                   <div className="rounded-lg bg-[#0b0d16]/80 border border-[#2d3249]/50 px-3 py-2 text-xs text-[#cfd4e8] italic">
                     &ldquo;{r.note}&rdquo;
+                  </div>
+                )}
+
+                {/* Ghi chú thêm của kế toán lúc thanh toán — hiện ngay dưới lệnh */}
+                {r.paidNote && (
+                  <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/25 px-3 py-2 text-xs text-emerald-200/90">
+                    <span className="font-semibold text-emerald-300">Ghi chú KT:</span>{" "}
+                    <span className="italic">&ldquo;{r.paidNote}&rdquo;</span>
                   </div>
                 )}
 
@@ -1218,7 +1226,6 @@ export function ExpensesClient({
                     <span>
                       Đã chi {fmtDate(r.paidAt)}
                       {r.payer ? ` · KT ${r.payer.fullName}` : ""}
-                      {r.paidNote ? ` · ${r.paidNote}` : ""}
                     </span>
                   </div>
                 )}

@@ -12,7 +12,10 @@ export default async function SubcontractorsPage() {
 
   return (
     <ProtectedLayout>
-      <SubcontractorsClient canWrite={["admin", "construction_manager"].includes(user.role)} />
+      <SubcontractorsClient
+        canWrite={["admin", "construction_manager"].includes(user.role)}
+        canEditPayment={["admin", "construction_manager", "accountant"].includes(user.role)}
+      />
     </ProtectedLayout>
   );
 }

@@ -3864,6 +3864,7 @@ model CashTransaction {
   categoryId       String?          @map("category_id") @db.Uuid
   designContractId String?          @map("design_contract_id") @db.Uuid
   note             String?          @db.Text
+  attachmentUrls   String[]         @default([]) @map("attachment_urls")
   createdBy        String           @map("created_by") @db.Uuid
   createdAt        DateTime         @default(now()) @map("created_at")
 

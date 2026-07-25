@@ -231,7 +231,15 @@ export async function GET(request: Request) {
       ...r,
       amount: Number(r.amount),
       balanceAfter: Number(r.balanceAfter),
-      attachments: r.refId ? attMap.get(keyOf(r.refType, r.refId)) ?? [] : [],
+      attachments: [
+        // Ảnh suy từ nguồn liên kết (expense/receipt/…)
+        ...(r.refId ? attMap.get(keyOf(r.refType, r.refId)) ?? [] : []),
+        // Ảnh bổ sung gắn thẳng vào phiếu sổ quỹ
+        ...(r.attachmentUrls ?? []).map((src, i) => ({
+          url: `/api/treasury/transactions/${r.id}/file?index=${i}`,
+          isImage: isImg(src),
+        })),
+      ],
     })),
     total,
     totals,

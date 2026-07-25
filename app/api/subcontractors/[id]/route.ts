@@ -2,7 +2,12 @@ import { Prisma, SubcontractorStatus, SubcontractorType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSubcontractorRead, requireSubcontractorWrite } from "@/lib/subcontractor-auth";
+import {
+  isFullSubcontractorWrite,
+  requireSubcontractorPaymentWrite,
+  requireSubcontractorRead,
+  requireSubcontractorWrite,
+} from "@/lib/subcontractor-auth";
 import { normalizeSubcontractorState, serializeSubcontractor } from "@/lib/subcontractor-utils";
 
 const phoneRegex = /^(\+?[0-9\s\-().]{8,20})$/;
@@ -68,8 +73,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   });
 }
 
+const BANK_ONLY_FIELDS = ["bankName", "bankAccount", "bankAccountName"] as const;
+
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireSubcontractorWrite();
+  const { user, error } = await requireSubcontractorPaymentWrite();
   if (error) return error;
 
   const body = await request.json().catch(() => null);
@@ -77,6 +84,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (!parsed.success) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ" }, { status: 400 });
+  }
+
+  // Kế toán: chỉ được sửa tài khoản thanh toán. Có field ngoài bank → chặn.
+  const fullWrite = isFullSubcontractorWrite(user!.role);
+  if (!fullWrite) {
+    const sentForbidden = Object.entries(parsed.data).some(
+      ([key, value]) => value !== undefined && !BANK_ONLY_FIELDS.includes(key as (typeof BANK_ONLY_FIELDS)[number]),
+    );
+    if (sentForbidden) {
+      return NextResponse.json({ message: "Kế toán chỉ được sửa tài khoản thanh toán" }, { status: 403 });
+    }
   }
 
   const existed = await prisma.subcontractor.findUnique({

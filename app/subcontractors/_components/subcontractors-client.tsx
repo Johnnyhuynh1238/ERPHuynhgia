@@ -107,7 +107,7 @@ function mapToForm(item: SubcontractorItem): FormState {
   };
 }
 
-export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
+export function SubcontractorsClient({ canWrite, canEditPayment = false }: { canWrite: boolean; canEditPayment?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<SubcontractorItem[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -121,6 +121,11 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
   const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState<SubcontractorItem | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+
+  // Sheet gọn "Sửa TK thanh toán" — kế toán/admin/TPTC đều dùng.
+  const [payItem, setPayItem] = useState<SubcontractorItem | null>(null);
+  const [payForm, setPayForm] = useState({ bankName: "", bankAccount: "", bankAccountName: "" });
+  const [paySubmitting, setPaySubmitting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 250);
@@ -172,6 +177,42 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
     setEditing(item);
     setForm(mapToForm(item));
     setOpenSheet(true);
+  }
+
+  function openPayment(item: SubcontractorItem) {
+    setPayItem(item);
+    setPayForm({
+      bankName: item.bankName || "",
+      bankAccount: item.bankAccount || "",
+      bankAccountName: item.bankAccountName || "",
+    });
+  }
+
+  async function submitPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!payItem || (!canWrite && !canEditPayment)) return;
+
+    setPaySubmitting(true);
+    const res = await fetch(`/api/subcontractors/${payItem.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bankName: payForm.bankName.trim() || null,
+        bankAccount: payForm.bankAccount.trim() || null,
+        bankAccountName: payForm.bankAccountName.trim() || null,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setPaySubmitting(false);
+
+    if (!res.ok) {
+      toast.error(json.message || "Lưu tài khoản thất bại");
+      return;
+    }
+
+    toast.success("Đã lưu tài khoản thanh toán");
+    setPayItem(null);
+    await loadData();
   }
 
   function toggleSpecialty(id: string) {
@@ -355,6 +396,24 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
                 )}
               </div>
 
+              <div className="mt-2 flex items-start justify-between gap-2 rounded-lg border border-[#252840] bg-[#13151f] p-2 text-xs">
+                <div className="min-w-0">
+                  <div className="text-[#8892b0]">🏦 Tài khoản thanh toán</div>
+                  {item.bankAccount || item.bankName || item.bankAccountName ? (
+                    <div className="mt-0.5 text-[#f0f2ff]">
+                      <span className="font-semibold">{item.bankAccount || "—"}</span>
+                      {item.bankName ? <span className="text-[#a4acc8]"> · {item.bankName}</span> : null}
+                      {item.bankAccountName ? <div className="text-[#a4acc8]">{item.bankAccountName}</div> : null}
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 text-[#6b7394]">Chưa có TK</div>
+                  )}
+                </div>
+                {canWrite || canEditPayment ? (
+                  <Button variant="outline" size="sm" className="shrink-0" onClick={() => openPayment(item)}>✏️ Sửa TK</Button>
+                ) : null}
+              </div>
+
               {canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(item)}>Sửa</Button>
@@ -473,6 +532,36 @@ export function SubcontractorsClient({ canWrite }: { canWrite: boolean }) {
                 <Button type="button" variant="outline" onClick={() => setOpenSheet(false)}>Hủy</Button>
                 <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={submitting}>
                   {submitting ? "Đang lưu..." : "Lưu"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {payItem ? (
+        <div className="fixed inset-0 z-50 bg-black/60">
+          <button type="button" className="h-full w-full" aria-label="Đóng" onClick={() => setPayItem(null)} />
+          <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 slide-up">
+            <div className="mb-1 text-lg font-semibold text-[#f0f2ff]">Tài khoản thanh toán</div>
+            <div className="mb-3 text-xs text-[#8892b0]">{payItem.code} • {payItem.name}</div>
+            <form onSubmit={submitPayment} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Ngân hàng</label>
+                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankName} onChange={(e) => setPayForm((p) => ({ ...p, bankName: e.target.value }))} placeholder="VD: Vietcombank" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Số tài khoản</label>
+                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankAccount} onChange={(e) => setPayForm((p) => ({ ...p, bankAccount: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Chủ tài khoản</label>
+                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankAccountName} onChange={(e) => setPayForm((p) => ({ ...p, bankAccountName: e.target.value }))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setPayItem(null)}>Hủy</Button>
+                <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={paySubmitting}>
+                  {paySubmitting ? "Đang lưu..." : "Lưu TK"}
                 </Button>
               </div>
             </form>

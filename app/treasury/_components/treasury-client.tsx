@@ -2,7 +2,7 @@
 
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { SwipeLightbox } from "@/components/swipe-lightbox";
@@ -64,6 +64,7 @@ type Txn = {
   account: TxnAccount | null;
   counterAccount: TxnAccount | null;
   attachments: { url: string; isImage: boolean }[];
+  attachmentUrls: string[];
 };
 
 const fmt = (n: number | null | undefined) => Math.round(n || 0).toLocaleString("vi-VN");
@@ -142,6 +143,8 @@ export function TreasuryClient({
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [catValue, setCatValue] = useState("");
   const [catSaving, setCatSaving] = useState(false);
+  const [attUploading, setAttUploading] = useState(false);
+  const attInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => setCatValue(selectedTxn?.category?.id ?? ""), [selectedTxn]);
   const imgAtts = selectedTxn ? selectedTxn.attachments.filter((a) => a.isImage) : [];
@@ -268,6 +271,67 @@ export function TreasuryClient({
     setRows((prev) => prev.map((r) => (r.id === selectedTxn.id ? { ...r, category: newCat } : r)));
     setSelectedTxn((prev) => (prev ? { ...prev, category: newCat } : prev));
     toast.success("Đã cập nhật danh mục");
+  }
+
+  // Lưu danh sách ảnh bổ sung mới lên phiếu sổ quỹ + đồng bộ state + reload.
+  async function saveTxnAttachments(txnId: string, urls: string[]) {
+    const res = await fetch(`/api/treasury/transactions/${txnId}/attachments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attachmentUrls: urls }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json.message || "Lưu ảnh thất bại");
+      return false;
+    }
+    const saved = (json.attachmentUrls as string[]) ?? urls;
+    setSelectedTxn((prev) => (prev && prev.id === txnId ? { ...prev, attachmentUrls: saved } : prev));
+    await load();
+    return true;
+  }
+
+  async function addTxnAttachments(files: FileList | File[]) {
+    if (!selectedTxn) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    const current = selectedTxn.attachmentUrls ?? [];
+    const room = 20 - current.length;
+    if (room <= 0) {
+      toast.error("Đã đính tối đa 20 ảnh");
+      return;
+    }
+    setAttUploading(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of arr.slice(0, room)) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("kind", "attachment");
+        const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.url) {
+          toast.error(j.message || `${file.name}: Upload thất bại`);
+          continue;
+        }
+        uploaded.push(j.url as string);
+      }
+      if (uploaded.length > 0) {
+        const ok = await saveTxnAttachments(selectedTxn.id, [...current, ...uploaded]);
+        if (ok) toast.success(`Đã thêm ${uploaded.length} ảnh`);
+      }
+    } finally {
+      setAttUploading(false);
+      if (attInputRef.current) attInputRef.current.value = "";
+    }
+  }
+
+  async function removeTxnAttachment(index: number) {
+    if (!selectedTxn) return;
+    const current = selectedTxn.attachmentUrls ?? [];
+    const next = current.filter((_, i) => i !== index);
+    const ok = await saveTxnAttachments(selectedTxn.id, next);
+    if (ok) toast.success("Đã xoá ảnh");
   }
 
   const net = totals.in - totals.out;
@@ -622,6 +686,40 @@ export function TreasuryClient({
                       )}
                     </div>
                   ) : null}
+
+                  {/* Ảnh bổ sung — kế toán/admin đính thẳng vào phiếu sổ quỹ */}
+                  <div className="sh-att-add">
+                    <div className="k">Ảnh bổ sung ({(selectedTxn.attachmentUrls ?? []).length}/20)</div>
+                    {(selectedTxn.attachmentUrls ?? []).length > 0 ? (
+                      <div className="atts">
+                        {(selectedTxn.attachmentUrls ?? []).map((_, i) => (
+                          <div className="att att-mng" key={`extra-${i}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`/api/treasury/transactions/${selectedTxn.id}/file?index=${i}`} alt="Ảnh bổ sung" loading="lazy" />
+                            <button type="button" className="att-del" onClick={() => removeTxnAttachment(i)} aria-label="Xoá ảnh">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <input
+                      ref={attInputRef}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      multiple
+                      hidden
+                      onChange={(e) => {
+                        if (e.target.files) addTxnAttachments(e.target.files);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-att-add"
+                      disabled={attUploading}
+                      onClick={() => attInputRef.current?.click()}
+                    >
+                      {attUploading ? "Đang tải…" : "＋ Thêm ảnh bổ sung"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
