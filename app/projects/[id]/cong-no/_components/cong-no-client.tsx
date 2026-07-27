@@ -365,6 +365,7 @@ function NccPopup({
       method: "transfer",
       payee: sup.supplierName,
       note: `Trả công nợ NCC ${sup.supplierName}${bank}`,
+      categoryCode: "VATTU", // danh mục điền sẵn "Vật tư" (admin đổi được)
       sourceType: "ncc_congno",
       sourceId: sup.supplierId,
     });
