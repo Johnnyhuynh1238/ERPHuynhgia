@@ -1,0 +1,124 @@
+/* ============================================================
+   Hợp đồng — Design system Huỳnh Gia (.cxdoc / .cxportal)
+   Ngà (sáng) / Mahogany (tối). IBM Plex. Phẳng, kẻ mảnh.
+   Trang scope .cxdoc; modal portal ra body .cxportal.
+   ============================================================ */
+.cxdoc, .cxportal {
+  --bg:#f5efe1; --card:#fbf7ec; --card2:#f7f1e3;
+  --text:#2e140a; --mut:rgba(46,20,10,.55); --mut2:rgba(46,20,10,.38);
+  --line:rgba(46,20,10,.1); --line2:rgba(46,20,10,.16);
+  --orange:#e36122; --terra:#8a3d1c; --gold:#b8934a;
+  --ok:#5b7a52; --red:#b5432e; --violet:#6c4a86; --sky:#3f6f86;
+  --track:rgba(46,20,10,.07);
+  font-family:var(--font-plex-sans),"IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+.cxdoc[data-theme="dark"], .cxportal[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#3a1608; --card:#4a1d0c; --card2:#431a0a;
+  --text:#f7f2e4; --mut:rgba(247,242,228,.6); --mut2:rgba(247,242,228,.4);
+  --line:rgba(247,242,228,.12); --line2:rgba(247,242,228,.2);
+  --orange:#f0752f; --terra:#d8996a; --gold:#d8b25e;
+  --ok:#89ab78; --red:#e07a5f; --violet:#b498d0; --sky:#8fc0d8;
+  --track:rgba(247,242,228,.09);
+}
+.cxdoc{background:var(--bg);color:var(--text);min-height:100dvh;line-height:1.4;letter-spacing:-.006em;padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+.cxdoc *, .cxportal *{box-sizing:border-box}
+.cxdoc .num, .cxportal .num{font-family:var(--font-plex-mono),"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.cxwrap{max-width:820px;margin:0 auto;padding:0 clamp(14px,4.5vw,20px)}
+
+.cx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-top:16px}
+.cx-eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--terra)}
+.cx-h1{font-size:clamp(20px,6vw,25px);font-weight:600;letter-spacing:-.022em;margin:6px 0 0;line-height:1.12}
+.cx-iconbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--text);cursor:pointer;font-size:15px;display:grid;place-items:center;line-height:1}
+.cx-btn{border:none;border-radius:10px;font-size:13px;font-weight:600;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap}
+.cx-btn.primary{background:var(--orange);color:#fff}
+.cx-btn.ghost{background:none;border:1px solid var(--line2);color:var(--text)}
+.cx-btn.block{flex:1;justify-content:center}
+.cx-btn:disabled{opacity:.55}
+.cx-btn:active{transform:scale(.97)}
+
+/* view tabs (Hợp đồng / Công nợ) */
+.cx-views{display:flex;gap:8px;margin:16px 0 4px}
+.cx-vtab{flex:1;border:1px solid var(--line2);background:var(--card);color:var(--mut);border-radius:11px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px}
+.cx-vtab.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+.cx-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0 4px}
+.cx-tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;min-width:0}
+.cx-tile .k{font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-tile .v{font-size:clamp(13px,3.6vw,16px);font-weight:600;margin-top:5px;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-tile .v.ok{color:var(--ok)}.cx-tile .v.chi{color:var(--terra)}.cx-tile .v.no{color:var(--red)}.cx-tile .v.dg{color:var(--red)}
+
+.cx-filters{display:flex;gap:6px;overflow-x:auto;margin:14px 0 12px;padding-bottom:3px}
+.cx-pill{flex:0 0 auto;border:1px solid var(--line2);background:none;color:var(--mut);border-radius:999px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.cx-pill.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+.cx-list{display:flex;flex-direction:column;gap:8px}
+.cx-rc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer}
+.cx-r1{display:flex;align-items:baseline;gap:8px}
+.cx-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap;flex:0 0 auto}
+.b-design{background:color-mix(in srgb,var(--sky) 18%,transparent);color:var(--sky)}
+.b-const{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--terra)}
+.cx-ttl{flex:1;min-width:0;font-size:13px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.cx-sub{font-size:11px;color:var(--mut);font-weight:400;margin-top:2px}
+.cx-val{flex:0 0 auto;font-weight:700;white-space:nowrap;font-size:clamp(13px,4vw,14.5px);letter-spacing:-.03em;font-family:var(--font-plex-mono),"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.cx-val.no{color:var(--red)}
+.cx-val .u{font-size:10px;color:var(--mut2);font-weight:600;margin-left:1px}
+.cx-r2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;flex-wrap:wrap}
+.cx-fin{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11.5px;align-items:center}
+.cx-fin .lb{color:var(--mut)}
+.cx-fin .thu{color:var(--ok);font-weight:600}
+.cx-fin .chi{color:var(--terra);font-weight:600}
+.cx-fin .net{font-weight:700}
+.cx-fin .net.pos{color:var(--ok)}.cx-fin .net.neg{color:var(--red)}
+.cx-st{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--track);color:var(--mut);white-space:nowrap}
+.cx-needs{margin-top:6px;font-size:11px;color:var(--red);font-weight:500}
+.cx-chip{font-size:11px;font-weight:600;border:1px solid var(--line2);background:none;color:var(--text);border-radius:8px;padding:5px 10px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.cx-chip.go{color:#fff;background:var(--orange);border-color:var(--orange)}
+
+/* progress (công nợ) */
+.cx-pbar{height:6px;background:var(--track);border-radius:999px;overflow:hidden;margin:9px 0 8px}
+.cx-pbar i{display:block;height:100%;background:var(--ok);border-radius:999px}
+.cx-meta2{font-size:11.5px;color:var(--mut);display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center}
+.cx-meta2 .num{color:var(--text);font-weight:600}
+.cx-meta2 .d{color:var(--line2)}
+
+.cx-empty{text-align:center;padding:44px 16px;color:var(--mut);font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+
+/* modal / drawer (portal) */
+.cx-scrim{position:fixed;inset:0;background:rgba(20,8,3,.5);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:60}
+.cx-sheet{background:var(--card);width:100%;max-width:560px;border:1px solid var(--line2);border-bottom:none;border-radius:20px 20px 0 0;max-height:93dvh;overflow-y:auto;padding:16px 15px calc(18px + env(safe-area-inset-bottom));animation:cx-up .22s ease}
+@keyframes cx-up{from{transform:translateY(24px);opacity:.6}to{transform:translateY(0);opacity:1}}
+@media(min-width:600px){.cx-scrim{align-items:center;padding:20px}.cx-sheet{border-radius:20px;border-bottom:1px solid var(--line2)}}
+.cx-sheet-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.cx-sheet-hd h3{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.cx-sheet-hd .sub{font-size:11px;color:var(--mut);margin-top:2px;font-weight:400}
+
+.cx-warn{border:1px solid color-mix(in srgb,var(--red) 40%,var(--line2));background:color-mix(in srgb,var(--red) 8%,transparent);color:var(--red);border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:12px}
+.cx-fld{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+.cx-lbl{font-size:11px;font-weight:600;color:var(--mut)}
+.cx-lbl .req{color:var(--red)}
+.cx-ctrl{border:1px solid var(--line2);background:var(--card2);color:var(--text);border-radius:10px;padding:10px 11px;font-size:13px;font-family:inherit;width:100%}
+.cx-ctrl:focus{outline:none;border-color:color-mix(in srgb,var(--orange) 50%,transparent)}
+.cx-sech{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut2);margin:16px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cx-finrow{display:flex;gap:14px;font-size:12.5px;margin-bottom:8px}
+.cx-finrow .thu{color:var(--ok);font-weight:600}.cx-finrow .chi{color:var(--terra);font-weight:600}.cx-finrow .net{font-weight:700}
+.cx-cash{display:flex;flex-direction:column;gap:5px}
+.cx-cline{display:flex;align-items:center;gap:8px;font-size:11.5px;border:1px solid var(--line);border-radius:9px;padding:7px 9px;background:var(--card2)}
+.cx-cline .dir{font-weight:600}.cx-cline .dir.in{color:var(--ok)}.cx-cline .dir.out{color:var(--terra)}
+.cx-cline .nt{flex:1;min-width:0;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-cline .dt{color:var(--mut2);flex:0 0 auto}
+.cx-cline .rm{color:var(--red);cursor:pointer;background:none;border:none;font:inherit;font-size:11px;font-weight:600}
+.cx-cline.pick{cursor:pointer;text-align:left;width:100%}
+.cx-cline.pick.on{border-color:var(--orange);background:color-mix(in srgb,var(--orange) 8%,var(--card2))}
+.cx-acts{display:flex;gap:9px;margin-top:16px}
+.cx-link{color:var(--orange);font-size:12.5px;font-weight:600;text-decoration:none}
+.cx-phases{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.cx-ph{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.cx-ph .no{width:18px;height:18px;border-radius:5px;background:var(--track);display:grid;place-items:center;font-size:10px;font-weight:700;color:var(--mut);flex:0 0 auto}
+.cx-ph .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.cx-ph .tn{font-family:var(--font-plex-mono),"IBM Plex Mono",monospace;font-weight:600;flex:0 0 auto}
+.cx-ph .dot{font-size:9px;font-weight:600;padding:1px 6px;border-radius:999px;flex:0 0 auto}
+.cx-ph .dot.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.cx-ph .dot.wait{background:var(--track);color:var(--mut2)}
+.cx-ph .dot.late{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}

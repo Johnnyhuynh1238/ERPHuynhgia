@@ -6,11 +6,11 @@ import { ContractsClient } from "./_components/contracts-client";
 export default async function ContractsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/?denied=1");
+  if (user.role !== "admin" && user.role !== "accountant") redirect("/?denied=1");
 
   return (
     <ProtectedLayout>
-      <ContractsClient />
+      <ContractsClient role={user.role} />
     </ProtectedLayout>
   );
 }

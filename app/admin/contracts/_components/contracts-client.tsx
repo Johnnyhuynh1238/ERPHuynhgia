@@ -1,7 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import "./contracts.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
 
 type ContractItem = {
   id: string;
@@ -48,7 +64,8 @@ function fmtDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-export function ContractsClient() {
+export function ContractsClient({ role }: { role: string }) {
+  const isAdmin = role === "admin";
   const [items, setItems] = useState<ContractItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +73,24 @@ export function ContractsClient() {
   const [sel, setSel] = useState<ContractItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const t = typeof window !== "undefined" ? localStorage.getItem("hg-theme") : null;
+    if (t === "light" || t === "dark") setTheme(t);
+  }, []);
+  const toggleTheme = () =>
+    setTheme((p) => {
+      const n = p === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("hg-theme", n);
+      } catch {
+        /* ignore */
+      }
+      return n;
+    });
 
   const flash = (m: string) => {
     setToast(m);
@@ -102,158 +137,109 @@ export function ContractsClient() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 text-[#e6e8f0]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Hợp đồng</h1>
-          <p className="text-sm text-[#9aa0b5]">HĐ thiết kế + HĐ thi công · thu/chi từ sổ quỹ</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="rounded-lg bg-[#E36122] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-        >
-          + Tạo HĐ thiết kế
-        </button>
-      </div>
-
-      {summary && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Số HĐ" value={String(summary.count)} />
-          <Stat label="Tổng đã thu" value={fmt(summary.thu)} tone="good" />
-          <Stat label="Tổng đã chi" value={fmt(summary.chi)} tone="warn" />
-          <Stat label="Cần bổ sung" value={String(summary.needsInfo)} tone={summary.needsInfo ? "danger" : undefined} />
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3 py-1.5 text-sm ${
-              filter === f.key ? "bg-[#E36122] text-white" : "bg-[#232739] text-[#c3c8dc] hover:bg-[#2c3147]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 overflow-x-auto rounded-xl border border-[#2d3249]">
-        <table className="w-full min-w-[820px] border-collapse text-sm">
-          <thead>
-            <tr className="bg-[#1b1e2c] text-left text-xs uppercase tracking-wide text-[#8990a8]">
-              <th className="px-3 py-2.5">Loại</th>
-              <th className="px-3 py-2.5">Hợp đồng</th>
-              <th className="px-3 py-2.5 text-right">Giá trị</th>
-              <th className="px-3 py-2.5 text-right">Đã thu</th>
-              <th className="px-3 py-2.5 text-right">Đã chi</th>
-              <th className="px-3 py-2.5 text-right">Ròng</th>
-              <th className="px-3 py-2.5">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[#8990a8]">
-                  Đang tải…
-                </td>
-              </tr>
-            ) : shown.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[#8990a8]">
-                  Không có hợp đồng.
-                </td>
-              </tr>
-            ) : (
-              shown.map((it) => (
-                <tr
-                  key={`${it.type}_${it.id}`}
-                  onClick={() => setSel(it)}
-                  className="cursor-pointer border-t border-[#252a3d] hover:bg-[#1e2231]"
-                >
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs ${
-                        it.type === "design" ? "bg-[#2a3550] text-[#9cc0ff]" : "bg-[#3a2f22] text-[#f2b184]"
-                      }`}
-                    >
-                      {it.typeLabel}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="font-medium">{it.title}</div>
-                    <div className="text-xs text-[#8990a8]">{it.subtitle}</div>
-                    {it.needsInfo && (
-                      <div className="mt-0.5 text-xs text-[#ff9d7a]">⚠ Cần bổ sung: {it.needsInfoReasons.join(", ")}</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{fmt(it.value)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-[#7fd6a3]">{fmt(it.thu)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-[#f2b184]">{fmt(it.chi)}</td>
-                  <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${it.net >= 0 ? "text-[#7fd6a3]" : "text-[#ff8f8f]"}`}>
-                    {fmt(it.net)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className="text-xs text-[#c3c8dc]">{STATUS_LABEL[it.status] ?? it.status}</span>
-                  </td>
-                </tr>
-              ))
+    <div className={`cxdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="cxwrap">
+        <div className="cx-head">
+          <div>
+            <div className="cx-eyebrow">Quản lý</div>
+            <h1 className="cx-h1">Hợp đồng</h1>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" className="cx-iconbtn" onClick={toggleTheme} title="Đổi nền">◐</button>
+            {isAdmin && (
+              <button type="button" className="cx-btn primary" onClick={() => setCreating(true)}>＋ Tạo HĐ thiết kế</button>
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {summary && (
+          <div className="cx-stats">
+            <div className="cx-tile"><div className="k">Số HĐ</div><div className="v num">{summary.count}</div></div>
+            <div className="cx-tile"><div className="k">Tổng đã thu</div><div className="v ok num">{fmt(summary.thu)}</div></div>
+            {isAdmin && (
+              <div className="cx-tile"><div className="k">Tổng đã chi</div><div className="v chi num">{fmt(summary.chi)}</div></div>
+            )}
+            <div className="cx-tile"><div className="k">Cần bổ sung</div><div className={`v num ${summary.needsInfo ? "dg" : ""}`}>{summary.needsInfo}</div></div>
+          </div>
+        )}
+
+        <div className="cx-filters">
+          {filters.map((f) => (
+            <button key={f.key} type="button" className={`cx-pill${filter === f.key ? " on" : ""}`} onClick={() => setFilter(f.key)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="cx-empty">Đang tải…</div>
+        ) : shown.length === 0 ? (
+          <div className="cx-empty">Không có hợp đồng.</div>
+        ) : (
+          <div className="cx-list">
+            {shown.map((it) => (
+              <div key={`${it.type}_${it.id}`} className="cx-rc" onClick={() => setSel(it)}>
+                <div className="cx-r1">
+                  <span className={`cx-badge ${it.type === "design" ? "b-design" : "b-const"}`}>{it.typeLabel}</span>
+                  <span className="cx-ttl">
+                    {it.title}
+                    {it.subtitle && <span className="cx-sub"> · {it.subtitle}</span>}
+                  </span>
+                  <span className="cx-val num">{fmt(it.value)}<span className="u">đ</span></span>
+                </div>
+                <div className="cx-r2">
+                  <div className="cx-fin">
+                    <span><span className="lb">Đã thu </span><span className="thu num">{fmt(it.thu)}</span></span>
+                    {isAdmin && <span><span className="lb">Đã chi </span><span className="chi num">{fmt(it.chi)}</span></span>}
+                    {isAdmin && <span><span className="lb">Ròng </span><span className={`net num ${it.net >= 0 ? "pos" : "neg"}`}>{fmt(it.net)}</span></span>}
+                  </div>
+                  <span className="cx-st">{STATUS_LABEL[it.status] ?? it.status}</span>
+                </div>
+                {it.needsInfo && <div className="cx-needs">⚠ Cần bổ sung: {it.needsInfoReasons.join(", ")}</div>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {sel && (
-        <ContractDrawer
-          item={sel}
-          onClose={() => setSel(null)}
-          onSaved={() => {
-            setSel(null);
-            load();
-          }}
-          flash={flash}
-        />
-      )}
-      {creating && (
-        <CreateModal
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false);
-            load();
-            flash("Đã tạo HĐ thiết kế");
-          }}
-        />
-      )}
+      {mounted && sel &&
+        createPortal(
+          <div className={`cxportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+            <ContractDrawer
+              item={sel}
+              isAdmin={isAdmin}
+              onClose={() => setSel(null)}
+              onSaved={() => { setSel(null); load(); }}
+              flash={flash}
+            />
+          </div>,
+          document.body,
+        )}
+      {mounted && creating && isAdmin &&
+        createPortal(
+          <div className={`cxportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+            <CreateModal onClose={() => setCreating(false)} onCreated={() => { setCreating(false); load(); flash("Đã tạo HĐ thiết kế"); }} />
+          </div>,
+          document.body,
+        )}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-[#e6e8f0] px-4 py-2 text-sm font-medium text-[#171a27] shadow-lg">
-          {toast}
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 70 }} className={`${plexSans.variable}`}>
+          <div style={{ background: "var(--text,#2e140a)", color: "var(--bg,#f5efe1)", padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: "var(--font-plex-sans)" }}>{toast}</div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "good" | "warn" | "danger" }) {
-  const c =
-    tone === "good" ? "text-[#7fd6a3]" : tone === "warn" ? "text-[#f2b184]" : tone === "danger" ? "text-[#ff8f8f]" : "text-[#e6e8f0]";
-  return (
-    <div className="rounded-xl border border-[#2d3249] bg-[#1b1e2c] px-3 py-2.5">
-      <div className="text-xs text-[#8990a8]">{label}</div>
-      <div className={`mt-0.5 text-lg font-semibold tabular-nums ${c}`}>{value}</div>
     </div>
   );
 }
 
 function ContractDrawer({
   item,
+  isAdmin,
   onClose,
   onSaved,
   flash,
 }: {
   item: ContractItem;
+  isAdmin: boolean;
   onClose: () => void;
   onSaved: () => void;
   flash: (m: string) => void;
@@ -337,191 +323,106 @@ function ContractDrawer({
   const chi = attached.filter((a) => a.direction === "out").reduce((s, a) => s + a.amount, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
-      <div
-        className="flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-[#2d3249] bg-[#141726] p-4 text-[#e6e8f0]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-2">
+    <div className="cx-scrim" onClick={onClose}>
+      <div className="cx-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="cx-sheet-hd">
           <div>
-            <div className="text-xs text-[#8990a8]">{item.typeLabel}</div>
-            <h2 className="text-lg font-semibold">{item.title}</h2>
+            <h3>{item.title}</h3>
+            <div className="sub">{item.typeLabel}{item.code ? ` · ${item.code}` : ""}</div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg bg-[#232739] px-3 py-1.5 text-sm" aria-label="Đóng">
-            ✕
-          </button>
+          <button type="button" className="cx-iconbtn" onClick={onClose} title="Đóng">✕</button>
         </div>
 
-        {item.needsInfo && (
-          <div className="mt-3 rounded-lg border border-[#5a3a2a] bg-[#2a1d15] px-3 py-2 text-sm text-[#ff9d7a]">
-            ⚠ Cần bổ sung: {item.needsInfoReasons.join(", ")}
-          </div>
-        )}
+        {item.needsInfo && <div className="cx-warn">⚠ Cần bổ sung: {item.needsInfoReasons.join(", ")}</div>}
 
-        {isDesign ? (
-          <div className="mt-4 space-y-3">
-            <Field label="Tên khách">
-              <input className="mh-inp" value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field label="SĐT">
-              <input className="mh-inp" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Chưa có" />
-            </Field>
-            <Field label="Giá trị HĐ (đ)">
-              <input className="mh-inp" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Chưa có" />
-            </Field>
-            <Field label="Ngày ký">
-              <input type="date" className="mh-inp" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} />
-            </Field>
-            <Field label="Ghi chú">
-              <input className="mh-inp" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="VD: Phước Thái" />
-            </Field>
-            <button
-              type="button"
-              onClick={saveDesign}
-              disabled={saving}
-              className="w-full rounded-lg bg-[#E36122] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {saving ? "Đang lưu…" : "Lưu thông tin"}
-            </button>
-          </div>
+        {isDesign && isAdmin ? (
+          <>
+            <div className="cx-fld"><span className="cx-lbl">Tên khách</span><input className="cx-ctrl" value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="cx-fld"><span className="cx-lbl">SĐT</span><input className="cx-ctrl" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Chưa có" /></div>
+            <div className="cx-fld"><span className="cx-lbl">Giá trị HĐ (đ)</span><input className="cx-ctrl num" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Chưa có" /></div>
+            <div className="cx-fld"><span className="cx-lbl">Ngày ký</span><input type="date" className="cx-ctrl" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} /></div>
+            <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="VD: Phước Thái" /></div>
+            <button type="button" className="cx-btn primary block" onClick={saveDesign} disabled={saving}>{saving ? "Đang lưu…" : "Lưu thông tin"}</button>
+          </>
         ) : (
-          <div className="mt-4 rounded-lg border border-[#2d3249] bg-[#1b1e2c] p-3 text-sm">
-            <div className="text-[#9aa0b5]">Khách: {item.customerName}</div>
-            <div className="text-[#9aa0b5]">Mã: {item.code}</div>
-            <Link href={`/projects/${item.id}/finance`} className="mt-2 inline-block text-[#7aa2ff] hover:underline">
-              Xem tài chính dự án →
-            </Link>
-            {item.needsInfo && <div className="mt-1 text-xs text-[#8990a8]">Giá trị HĐ sửa trong màn dự án.</div>}
+          <div style={{ fontSize: 13 }}>
+            <div className="cx-fld" style={{ gap: 3 }}><span className="cx-lbl">Khách</span><div>{item.customerName}</div></div>
+            {item.phone && <div className="cx-fld" style={{ gap: 3 }}><span className="cx-lbl">SĐT</span><div>{item.phone}</div></div>}
+            {item.value != null && <div className="cx-fld" style={{ gap: 3 }}><span className="cx-lbl">Giá trị HĐ</span><div className="num">{fmt(item.value)} đ</div></div>}
+            {!isDesign && (
+              <Link href={`/projects/${item.id}/finance`} className="cx-link">Xem tài chính dự án →</Link>
+            )}
           </div>
         )}
 
         {/* Thu / chi */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Thu / chi từ sổ quỹ</h3>
-            {isDesign && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPicker((s) => !s);
-                  if (!showPicker) loadCash("");
-                }}
-                className="rounded-lg bg-[#232739] px-3 py-1.5 text-xs hover:bg-[#2c3147]"
-              >
-                {showPicker ? "Đóng" : "+ Gắn khoản sổ quỹ"}
-              </button>
-            )}
-          </div>
-
-          {isDesign ? (
-            <>
-              <div className="mt-2 flex gap-4 text-sm">
-                <span className="text-[#7fd6a3]">Thu: {fmt(thu)}</span>
-                <span className="text-[#f2b184]">Chi: {fmt(chi)}</span>
-                <span className={thu - chi >= 0 ? "text-[#7fd6a3]" : "text-[#ff8f8f]"}>Ròng: {fmt(thu - chi)}</span>
-              </div>
-              <div className="mt-2 space-y-1">
-                {attached.length === 0 && <div className="text-xs text-[#8990a8]">Chưa gắn khoản nào.</div>}
-                {attached.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 rounded-lg border border-[#252a3d] bg-[#1b1e2c] px-2.5 py-1.5 text-xs">
-                    <span className={a.direction === "in" ? "text-[#7fd6a3]" : "text-[#f2b184]"}>
-                      {a.direction === "in" ? "Thu" : "Chi"}
-                    </span>
-                    <span className="tabular-nums">{fmt(a.amount)}</span>
-                    <span className="flex-1 truncate text-[#9aa0b5]">{a.note}</span>
-                    <span className="text-[#6b7085]">{fmtDate(a.occurredAt)}</span>
-                    <button type="button" onClick={() => detach(a.id)} className="text-[#ff8f8f] hover:underline">
-                      gỡ
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {showPicker && (
-                <div className="mt-3 rounded-lg border border-[#2d3249] bg-[#12141f] p-2.5">
-                  <input
-                    className="mh-inp mb-2"
-                    placeholder="Tìm theo nội dung… (VD: A Tâm)"
-                    value={q}
-                    onChange={(e) => {
-                      setQ(e.target.value);
-                      loadCash(e.target.value);
-                    }}
-                  />
-                  <div className="max-h-64 space-y-1 overflow-y-auto">
-                    {candidates.length === 0 && <div className="text-xs text-[#8990a8]">Không có khoản trôi nổi phù hợp.</div>}
-                    {candidates.map((c) => {
-                      const on = picked.has(c.id);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() =>
-                            setPicked((prev) => {
-                              const n = new Set(prev);
-                              if (n.has(c.id)) n.delete(c.id);
-                              else n.add(c.id);
-                              return n;
-                            })
-                          }
-                          className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs ${
-                            on ? "border-[#E36122] bg-[#2a1d15]" : "border-[#252a3d] bg-[#1b1e2c]"
-                          }`}
-                        >
-                          <span>{on ? "☑" : "☐"}</span>
-                          <span className={c.direction === "in" ? "text-[#7fd6a3]" : "text-[#f2b184]"}>
-                            {c.direction === "in" ? "Thu" : "Chi"}
-                          </span>
-                          <span className="tabular-nums">{fmt(c.amount)}</span>
-                          <span className="flex-1 truncate text-[#9aa0b5]">{c.note}</span>
-                          <span className="text-[#6b7085]">{fmtDate(c.occurredAt)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={attachPicked}
-                    disabled={picked.size === 0}
-                    className="mt-2 w-full rounded-lg bg-[#E36122] py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    Gắn {picked.size > 0 ? `${picked.size} khoản` : ""}
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="mt-2 flex gap-4 text-sm">
-              <span className="text-[#7fd6a3]">Thu: {fmt(item.thu)}</span>
-              <span className="text-[#f2b184]">Chi: {fmt(item.chi)}</span>
-              <span className={item.net >= 0 ? "text-[#7fd6a3]" : "text-[#ff8f8f]"}>Ròng: {fmt(item.net)}</span>
-            </div>
+        <div className="cx-sech">
+          <span>Thu{isAdmin ? " / chi" : ""} từ sổ quỹ</span>
+          {isDesign && isAdmin && (
+            <button type="button" className="cx-chip" onClick={() => { setShowPicker((s) => !s); if (!showPicker) loadCash(""); }}>
+              {showPicker ? "Đóng" : "＋ Gắn khoản"}
+            </button>
           )}
         </div>
 
-        <style jsx>{`
-          :global(.mh-inp) {
-            width: 100%;
-            border-radius: 9px;
-            border: 1px solid #2d3249;
-            background: #1b1e2c;
-            padding: 9px 11px;
-            font-size: 14px;
-            color: #e6e8f0;
-            color-scheme: dark;
-          }
-        `}</style>
+        {isDesign ? (
+          <>
+            <div className="cx-finrow">
+              <span className="thu">Thu: {fmt(thu)}</span>
+              {isAdmin && <span className="chi">Chi: {fmt(chi)}</span>}
+              {isAdmin && <span className={thu - chi >= 0 ? "net" : "net"} style={{ color: thu - chi >= 0 ? "var(--ok)" : "var(--red)" }}>Ròng: {fmt(thu - chi)}</span>}
+            </div>
+            <div className="cx-cash">
+              {attached.length === 0 && <div style={{ fontSize: 12, color: "var(--mut2)" }}>Chưa gắn khoản nào.</div>}
+              {attached.filter((a) => isAdmin || a.direction === "in").map((a) => (
+                <div key={a.id} className="cx-cline">
+                  <span className={`dir ${a.direction === "in" ? "in" : "out"}`}>{a.direction === "in" ? "Thu" : "Chi"}</span>
+                  <span className="num">{fmt(a.amount)}</span>
+                  <span className="nt">{a.note}</span>
+                  <span className="dt">{fmtDate(a.occurredAt)}</span>
+                  {isAdmin && <button type="button" className="rm" onClick={() => detach(a.id)}>gỡ</button>}
+                </div>
+              ))}
+            </div>
+
+            {isAdmin && showPicker && (
+              <div style={{ marginTop: 12 }}>
+                <input className="cx-ctrl" style={{ marginBottom: 8 }} placeholder="Tìm theo nội dung… (VD: A Tâm)" value={q} onChange={(e) => { setQ(e.target.value); loadCash(e.target.value); }} />
+                <div className="cx-cash" style={{ maxHeight: 260, overflowY: "auto" }}>
+                  {candidates.length === 0 && <div style={{ fontSize: 12, color: "var(--mut2)" }}>Không có khoản trôi nổi phù hợp.</div>}
+                  {candidates.map((c) => {
+                    const on = picked.has(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`cx-cline pick${on ? " on" : ""}`}
+                        onClick={() => setPicked((prev) => { const n = new Set(prev); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })}
+                      >
+                        <span>{on ? "☑" : "☐"}</span>
+                        <span className={`dir ${c.direction === "in" ? "in" : "out"}`}>{c.direction === "in" ? "Thu" : "Chi"}</span>
+                        <span className="num">{fmt(c.amount)}</span>
+                        <span className="nt">{c.note}</span>
+                        <span className="dt">{fmtDate(c.occurredAt)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button type="button" className="cx-btn primary block" style={{ marginTop: 10 }} onClick={attachPicked} disabled={picked.size === 0}>
+                  Gắn {picked.size > 0 ? `${picked.size} khoản` : ""}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="cx-finrow">
+            <span className="thu">Thu: {fmt(item.thu)}</span>
+            {isAdmin && <span className="chi">Chi: {fmt(item.chi)}</span>}
+            {isAdmin && <span className="net" style={{ color: item.net >= 0 ? "var(--ok)" : "var(--red)" }}>Ròng: {fmt(item.net)}</span>}
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-[#8990a8]">{label}</span>
-      {children}
-    </label>
   );
 }
 
@@ -564,56 +465,25 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-xl border border-[#2d3249] bg-[#141726] p-4 text-[#e6e8f0]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold">Tạo HĐ thiết kế</h2>
-        <p className="mt-0.5 text-xs text-[#8990a8]">Thiếu SĐT / giá trị cứ để trống — màn sẽ đánh dấu cần bổ sung.</p>
-        <div className="mt-3 space-y-3">
-          <Field label="Tên khách *">
-            <input className="mh-inp" value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="SĐT">
-            <input className="mh-inp" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </Field>
-          <Field label="Giá trị HĐ (đ)">
-            <input className="mh-inp" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} />
-          </Field>
-          <Field label="Ngày ký">
-            <input type="date" className="mh-inp" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} />
-          </Field>
-          <Field label="Ghi chú">
-            <input className="mh-inp" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </Field>
+    <div className="cx-scrim" onClick={onClose}>
+      <div className="cx-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="cx-sheet-hd">
+          <div>
+            <h3>Tạo HĐ thiết kế</h3>
+            <div className="sub">Thiếu SĐT / giá trị cứ để trống — màn đánh dấu cần bổ sung.</div>
+          </div>
+          <button type="button" className="cx-iconbtn" onClick={onClose} title="Đóng">✕</button>
         </div>
-        {err && <div className="mt-2 text-sm text-[#ff8f8f]">{err}</div>}
-        <div className="mt-4 flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 rounded-lg bg-[#232739] py-2.5 text-sm">
-            Huỷ
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving}
-            className="flex-1 rounded-lg bg-[#E36122] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {saving ? "Đang tạo…" : "Tạo"}
-          </button>
+        <div className="cx-fld"><span className="cx-lbl">Tên khách <span className="req">*</span></span><input className="cx-ctrl" value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="cx-fld"><span className="cx-lbl">SĐT</span><input className="cx-ctrl" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+        <div className="cx-fld"><span className="cx-lbl">Giá trị HĐ (đ)</span><input className="cx-ctrl num" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} /></div>
+        <div className="cx-fld"><span className="cx-lbl">Ngày ký</span><input type="date" className="cx-ctrl" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} /></div>
+        <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+        {err && <div className="cx-warn">{err}</div>}
+        <div className="cx-acts">
+          <button type="button" className="cx-btn ghost" onClick={onClose}>Huỷ</button>
+          <button type="button" className="cx-btn primary block" onClick={submit} disabled={saving}>{saving ? "Đang tạo…" : "Tạo"}</button>
         </div>
-        <style jsx>{`
-          :global(.mh-inp) {
-            width: 100%;
-            border-radius: 9px;
-            border: 1px solid #2d3249;
-            background: #1b1e2c;
-            padding: 9px 11px;
-            font-size: 14px;
-            color: #e6e8f0;
-            color-scheme: dark;
-          }
-        `}</style>
       </div>
     </div>
   );

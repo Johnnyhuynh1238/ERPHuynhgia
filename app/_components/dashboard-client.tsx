@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Clock3,
   DollarSign,
+  FileSignature,
   FolderKanban,
   Hammer,
   ListTodo,
@@ -848,9 +849,15 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ActionCard
+          href="/admin/contracts"
+          icon={<FileSignature className="h-5 w-5" />}
+          title="Hợp đồng & Công nợ KH"
+          subtitle="Giá trị HĐ, đã thu, còn nợ khách"
+        />
+        <ActionCard
           href="/projects"
           icon={<Wallet className="h-5 w-5" />}
-          title="Công nợ NCC vật tư"
+          title="Công nợ NCC"
           subtitle="Theo từng dự án (mua hàng)"
         />
         <ActionCard
