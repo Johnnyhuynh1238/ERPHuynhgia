@@ -1,9 +1,14 @@
 "use client";
 
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import Link from "next/link";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import "./thanh-toan.css";
+
+const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-mono" });
 
 type PaymentStatus = "not_collected" | "request_sent" | "collected" | "customer_late";
 
@@ -38,11 +43,11 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   customer_late: "Khách chậm",
 };
 
-const STATUS_CLASS: Record<PaymentStatus, string> = {
-  not_collected: "bg-slate-100 text-slate-700",
-  request_sent: "bg-amber-100 text-amber-700",
-  collected: "bg-emerald-100 text-emerald-700",
-  customer_late: "bg-red-100 text-red-700",
+const STATUS_BADGE: Record<PaymentStatus, string> = {
+  not_collected: "wait",
+  request_sent: "req",
+  collected: "ok",
+  customer_late: "bad",
 };
 
 function fmtMoney(v: number | null) {
@@ -80,6 +85,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const [editing, setEditing] = useState<PaymentRow | null>(null);
   const [status, setStatus] = useState<PaymentStatus>("not_collected");
@@ -88,6 +94,18 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   const [actualPaidAmount, setActualPaidAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("hg-theme") : null;
+    if (saved === "dark" || saved === "light") setTheme(saved);
+  }, []);
+  function toggleTheme() {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try { window.localStorage.setItem("hg-theme", next); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   async function loadData() {
     setLoading(true);
@@ -148,9 +166,15 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
     const percent = rows.reduce((s, x) => s + Number(x.percent || 0), 0);
     const expected = rows.reduce((s, x) => s + Number(x.amount || 0), 0);
     const actual = rows.reduce((s, x) => s + Number(x.actualPaidAmount || 0), 0);
+    const requested = rows.reduce((s, x) => s + (x.status === "request_sent" ? Number(x.amount || 0) : 0), 0);
     const collectedCount = rows.filter((x) => !!x.actualPaidDate).length;
-    return { percent, expected, actual, collectedCount };
+    return { percent, expected, actual, requested, collectedCount };
   }, [rows]);
+
+  const contractValue = project?.contractValue || totals.expected || 0;
+  const paidPct = contractValue > 0 ? Math.min(100, Math.round((totals.actual / contractValue) * 100)) : 0;
+  const reqPct = contractValue > 0 ? Math.min(100 - paidPct, Math.round((totals.requested / contractValue) * 100)) : 0;
+  const remaining = Math.max(0, contractValue - totals.actual);
 
   function openEdit(row: PaymentRow) {
     setEditing(row);
@@ -207,224 +231,189 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
     setEditing(null);
   }
 
+  // Đợt "sắp đến hạn": chưa thu, có ngày dự kiến gần nhất từ hôm nay trở đi
+  const upcomingId = useMemo(() => {
+    const unpaid = rows
+      .filter((r) => r.status !== "collected" && r.expectedDate)
+      .sort((a, b) => new Date(a.expectedDate as string).getTime() - new Date(b.expectedDate as string).getTime());
+    const future = unpaid.find((r) => {
+      const d = daysDiffFromToday(r.expectedDate);
+      return d !== null && d >= 0;
+    });
+    return (future || unpaid[unpaid.length - 1])?.id || null;
+  }, [rows]);
+
   function paymentHint(row: PaymentRow) {
     const d = daysDiffFromToday(row.expectedDate);
     if (d == null) {
-      if (row.status === "customer_late") {
-        return { icon: "⚠️", className: "bg-red-50", text: "Quá hạn" };
-      }
+      if (row.status === "customer_late") return { className: "bad", text: "⚠️ Khách chậm thanh toán" };
       return null;
     }
     if (row.status === "not_collected" && d >= 0 && d <= 7) {
-      return { icon: "🔔", className: "bg-yellow-50", text: "Sắp đến hạn" };
+      return { className: "warn", text: `🔔 Đến hạn trong ${d} ngày` };
     }
     if (row.status === "customer_late" || (row.status === "not_collected" && d < 0)) {
-      return { icon: "⚠️", className: "bg-red-50", text: "Quá hạn" };
+      return { className: "bad", text: `⚠️ Quá hạn ${Math.abs(d)} ngày` };
     }
     return null;
   }
 
+  const root = `ptdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`;
+
   if (loading) {
-    return <div className="rounded-xl border bg-white p-4 text-sm text-slate-600">Đang tải lịch thanh toán...</div>;
+    return (
+      <div className={root} data-theme={theme}>
+        <div className="wrap"><div className="load">Đang tải lịch thanh toán…</div></div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">Lịch thanh toán ({rows.length} đợt)</h2>
-          <div className="text-sm text-slate-500">{project?.code}</div>
+    <div className={root} data-theme={theme}>
+      <div className="wrap">
+        <div className="topbar">
+          <div className="brand">
+            <div className="mark">HG</div>
+            <div><b>HUỲNH GIA</b><span>Xây dựng · Thi công</span></div>
+          </div>
+          <div className="tbtns">
+            <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+            <Link href={`/projects/${projectId}`} className="iconbtn" aria-label="Về dự án">←</Link>
+          </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map((row) => {
-            const hint = paymentHint(row);
-            return (
-              <div
-                key={row.id}
-                className={`flex flex-col rounded-lg border p-3 ${hint?.className || "bg-white"}`}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-900 px-2 text-xs font-semibold text-white">
-                      Đợt {row.phaseNumber}
-                    </span>
-                    <span className="text-sm font-medium text-slate-600">{Math.round(row.percent)}% HĐ</span>
-                  </div>
-                  <span className={`rounded-full px-2 py-1 text-xs ${STATUS_CLASS[row.status]}`}>
-                    {STATUS_LABEL[row.status]}
-                  </span>
+        <div className="eyebrow">Thanh toán · Lịch thu hợp đồng</div>
+        <h1>{project?.name || "Lịch thanh toán"}</h1>
+        <div className="meta">
+          {project?.code ? <><span className="num">{project.code}</span><span className="d">·</span></> : null}
+          {project?.customerName ? <><span>{project.customerName}</span><span className="d">·</span></> : null}
+          <span>Giá trị HĐ <span className="num">{fmtMoney(contractValue)}</span></span>
+        </div>
+
+        <div className="tot">
+          <div className="tot-top">
+            <div className="tot-n"><span className="num">{fmtMoney(totals.actual)}</span> <span className="tot-den">đã thu / {fmtMoney(contractValue)}</span></div>
+            <div className="tot-pc">{paidPct}%<small>tiến độ thu</small></div>
+          </div>
+          <div className="bar">
+            <i className="ok" style={{ width: `${paidPct}%` }} />
+            <i className="req" style={{ width: `${reqPct}%` }} />
+          </div>
+          <div className="legend">
+            <span><i className="dot ok" /> Đã thu {paidPct}%</span>
+            {reqPct > 0 ? <span><i className="dot req" /> Đang thu {reqPct}%</span> : null}
+            <span><i className="dot rest" /> Còn lại <span className="num">{fmtMoney(remaining)}</span></span>
+          </div>
+        </div>
+
+        <div className="sect">Các đợt thanh toán ({rows.length})</div>
+
+        {rows.length === 0 ? <div className="empty">Chưa có lịch thanh toán.</div> : null}
+
+        {rows.map((row) => {
+          const hint = paymentHint(row);
+          const isPaid = row.status === "collected";
+          const isNow = row.id === upcomingId && !isPaid;
+          return (
+            <div key={row.id} className={`pcard ${isNow ? "now" : ""} ${hint?.className === "bad" ? "bad" : ""}`}>
+              <div className="ptop">
+                <div className="pno">{row.phaseNumber}</div>
+                <div className="pinfo">
+                  <b>{row.milestoneDescription}</b>
+                  <small><span className="num">{Math.round(row.percent)}%</span> HĐ · {isPaid ? "Đã thu" : "Dự kiến"} {fmtDate(isPaid ? row.actualPaidDate : row.expectedDate)}</small>
                 </div>
-
-                <div className="mb-3 text-sm text-slate-800">
-                  {hint ? <span className="mr-1">{hint.icon}</span> : null}
-                  {row.milestoneDescription}
-                  {hint ? (
-                    <span className="ml-1 text-xs font-medium text-slate-500">({hint.text})</span>
-                  ) : null}
+                <div className="pamt">
+                  <div className="n num">{fmtMoney(isPaid ? (row.actualPaidAmount ?? row.amount) : row.amount)}</div>
+                  <span className={`badge ${STATUS_BADGE[row.status]}`}>{STATUS_LABEL[row.status]}</span>
                 </div>
+              </div>
 
-                <dl className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Số tiền dự kiến</dt>
-                    <dd className="font-semibold text-slate-900">{fmtMoney(row.amount)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Ngày dự kiến</dt>
-                    <dd className="text-slate-800">{fmtDate(row.expectedDate)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Số tiền thu thực</dt>
-                    <dd className="font-semibold text-emerald-700">{fmtMoney(row.actualPaidAmount)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Ngày thu thực tế</dt>
-                    <dd className="text-slate-800">{fmtDate(row.actualPaidDate)}</dd>
-                  </div>
-                </dl>
-
-                {row.notes ? (
-                  <div className="mb-3 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600">
-                    Ghi chú: {row.notes}
-                  </div>
-                ) : null}
-
-                {row.activeReceipt ? (
-                  <div className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-                    <div className="font-medium">
-                      {row.activeReceipt.status === "received" ? "Đã thu" : "Đang chờ KT thu"} — {row.activeReceipt.code}
-                    </div>
-                  </div>
-                ) : null}
-
-                {canEdit ? (
-                  <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                    {isAdmin && !row.activeReceipt && row.status !== "collected" ? (
-                      <Button
-                        className="h-8 bg-orange-500 px-3 text-xs hover:bg-orange-600"
-                        onClick={() => requestCollection(row)}
-                        disabled={pendingId === row.id}
-                      >
-                        {pendingId === row.id ? "Đang gửi..." : "Yêu cầu KT thu"}
-                      </Button>
-                    ) : null}
-                    {isAdmin && row.activeReceipt && row.activeReceipt.status !== "received" ? (
-                      <Button
-                        variant="outline"
-                        className="h-8 border-red-200 px-3 text-xs text-red-700 hover:bg-red-50"
-                        onClick={() => cancelCollection(row)}
-                        disabled={pendingId === row.id}
-                      >
-                        Huỷ lệnh thu
-                      </Button>
-                    ) : null}
-                    <Button variant="outline" className="h-8 px-3 text-xs" onClick={() => openEdit(row)}>
-                      Sửa
-                    </Button>
-                  </div>
+              <div className="pmeta">
+                <div className="f"><label>Số tiền dự kiến</label><div className="num">{fmtMoney(row.amount)}</div></div>
+                <div className="f"><label>Ngày dự kiến</label><div>{fmtDate(row.expectedDate)}</div></div>
+                {isPaid ? (
+                  <>
+                    <div className="f"><label>Đã thu</label><div className="paid num">{fmtMoney(row.actualPaidAmount ?? row.amount)}</div></div>
+                    <div className="f"><label>Ngày thu</label><div className="paid">{fmtDate(row.actualPaidDate)}</div></div>
+                  </>
                 ) : null}
               </div>
-            );
-          })}
-        </div>
 
-        <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-4">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Tổng % HĐ</div>
-            <div className="text-base font-semibold">{Math.round(totals.percent)}%</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Tổng dự kiến</div>
-            <div className="text-base font-semibold">{fmtMoney(totals.expected)}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Đã thu</div>
-            <div className="text-base font-semibold text-emerald-700">{fmtMoney(totals.actual)}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Số đợt đã thu</div>
-            <div className="text-base font-semibold">
-              {totals.collectedCount}/{rows.length}
+              {row.notes ? <div className="pnote">Ghi chú: {row.notes}</div> : null}
+              {row.activeReceipt ? (
+                <div className="preceipt">{row.activeReceipt.status === "received" ? "Đã thu" : "Đang chờ KT thu"} — {row.activeReceipt.code}</div>
+              ) : null}
+              {hint ? <div className={`phint ${hint.className === "bad" ? "bad" : "warn"}`}>{hint.text}</div> : null}
+
+              {canEdit ? (
+                <div className="pacts">
+                  {isAdmin && !row.activeReceipt && row.status !== "collected" ? (
+                    <button className="btn primary" onClick={() => requestCollection(row)} disabled={pendingId === row.id}>
+                      {pendingId === row.id ? "Đang gửi…" : "Yêu cầu KT thu"}
+                    </button>
+                  ) : null}
+                  {isAdmin && row.activeReceipt && row.activeReceipt.status !== "received" ? (
+                    <button className="btn danger" onClick={() => cancelCollection(row)} disabled={pendingId === row.id}>
+                      Huỷ lệnh thu
+                    </button>
+                  ) : null}
+                  <button className="btn" onClick={() => openEdit(row)}>Sửa</button>
+                </div>
+              ) : null}
             </div>
-          </div>
+          );
+        })}
+
+        <div className="totals">
+          <div className="t"><label>Tổng % HĐ</label><div>{Math.round(totals.percent)}%</div></div>
+          <div className="t"><label>Tổng dự kiến</label><div className="num">{fmtMoney(totals.expected)}</div></div>
+          <div className="t"><label>Đã thu</label><div className="paid num">{fmtMoney(totals.actual)}</div></div>
+          <div className="t"><label>Số đợt đã thu</label><div>{totals.collectedCount}/{rows.length}</div></div>
         </div>
       </div>
 
       {editing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-4">
-            <h3 className="mb-3 font-semibold">Cập nhật thanh toán - Đợt {editing.phaseNumber}</h3>
+        <div className="modal-bg" onClick={() => !saving && setEditing(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Cập nhật thanh toán — Đợt {editing.phaseNumber}</h3>
 
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm">Trạng thái</label>
-                <select
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as PaymentStatus)}
-                >
-                  <option value="not_collected">Chưa thu</option>
-                  <option value="request_sent">Đã gửi đề nghị</option>
-                  <option value="collected">Đã thu</option>
-                  <option value="customer_late">Khách chậm</option>
-                </select>
+            <div className="fld">
+              <label>Trạng thái</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus)}>
+                <option value="not_collected">Chưa thu</option>
+                <option value="request_sent">Đã gửi đề nghị</option>
+                <option value="collected">Đã thu</option>
+                <option value="customer_late">Khách chậm</option>
+              </select>
+            </div>
+
+            <div className="fld">
+              <label>Ngày dự kiến</label>
+              <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+              <div className="hintline">Để trống nếu chưa có ngày.</div>
+            </div>
+
+            <div className="fld2">
+              <div className="fld">
+                <label>Ngày thu thực tế</label>
+                <input type="date" value={actualPaidDate} onChange={(e) => setActualPaidDate(e.target.value)} required={status === "collected"} />
               </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Ngày dự kiến</label>
-                <input
-                  type="date"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={expectedDate}
-                  onChange={(e) => setExpectedDate(e.target.value)}
-                />
-                <p className="mt-1 text-xs text-slate-500">Để trống nếu chưa có ngày.</p>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm">Ngày thu thực tế</label>
-                  <input
-                    type="date"
-                    className="w-full rounded border px-3 py-2 text-sm"
-                    value={actualPaidDate}
-                    onChange={(e) => setActualPaidDate(e.target.value)}
-                    required={status === "collected"}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm">Số tiền thu thực tế</label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="w-full rounded border px-3 py-2 text-sm"
-                    value={actualPaidAmount}
-                    onChange={(e) => setActualPaidAmount(e.target.value)}
-                    required={status === "collected"}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm">Ghi chú</label>
-                <textarea
-                  rows={3}
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional, đặc biệt khi khách chậm hoặc thu thiếu"
-                />
+              <div className="fld">
+                <label>Số tiền thu thực tế</label>
+                <input type="number" min={0} value={actualPaidAmount} onChange={(e) => setActualPaidAmount(e.target.value)} required={status === "collected"} />
               </div>
             </div>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
-                Hủy
-              </Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={submitEdit} disabled={saving}>
-                {saving ? "Đang lưu..." : "Lưu"}
-              </Button>
+            <div className="fld">
+              <label>Ghi chú</label>
+              <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tuỳ chọn — nhất là khi khách chậm hoặc thu thiếu" />
+            </div>
+
+            <div className="modal-acts">
+              <button className="btn" onClick={() => setEditing(null)} disabled={saving}>Hủy</button>
+              <button className="btn primary" onClick={submitEdit} disabled={saving}>{saving ? "Đang lưu…" : "Lưu"}</button>
             </div>
           </div>
         </div>

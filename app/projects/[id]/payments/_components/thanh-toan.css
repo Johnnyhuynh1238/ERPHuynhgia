@@ -1,0 +1,152 @@
+/* ============================================================
+   Lịch thanh toán hợp đồng (ERP nội bộ) — Design system Huỳnh Gia.
+   Bám brand ngà (sáng) / mahogany (tối). IBM Plex. Card ngà.
+   Scope trong .ptdoc để không đụng app shell.
+   ============================================================ */
+
+.ptdoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --gold-bg: rgba(184, 147, 74, 0.14);
+  --ok: #5b7a52;
+  --ok-bg: rgba(91, 122, 82, 0.14);
+  --bad: #b3492f;
+  --bad-bg: rgba(179, 73, 47, 0.12);
+  --track: rgba(46, 20, 10, 0.07);
+
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  color-scheme: light;
+}
+.ptdoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --gold-bg: rgba(216, 178, 94, 0.16);
+  --ok: #89ab78;
+  --ok-bg: rgba(137, 171, 120, 0.16);
+  --bad: #e08a70;
+  --bad-bg: rgba(224, 138, 112, 0.14);
+  --track: rgba(247, 242, 228, 0.09);
+}
+
+.ptdoc * { box-sizing: border-box; margin: 0; padding: 0; }
+.ptdoc .num { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.ptdoc .wrap { max-width: 620px; margin: 0 auto; padding: 0 clamp(14px, 4.5vw, 20px); }
+
+/* topbar */
+.ptdoc .topbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 12px; }
+.ptdoc .brand { display: flex; align-items: center; gap: 9px; }
+.ptdoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; letter-spacing: -0.02em; }
+.ptdoc .brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.ptdoc .brand span { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.ptdoc .tbtns { display: flex; align-items: center; gap: 8px; }
+.ptdoc .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 15px; display: grid; place-items: center; line-height: 1; text-decoration: none; }
+.ptdoc .iconbtn:active { transform: scale(0.94); }
+
+/* header */
+.ptdoc .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.ptdoc h1 { font-size: clamp(20px, 6vw, 25px); font-weight: 600; letter-spacing: -0.022em; margin: 6px 0 6px; line-height: 1.12; }
+.ptdoc .meta { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 3px 9px; align-items: center; }
+.ptdoc .meta .num { color: var(--terra); font-size: 11px; font-weight: 600; }
+.ptdoc .meta .d { color: var(--line2); }
+
+/* tổng tiến độ thu */
+.ptdoc .tot { margin-top: 16px; padding: 15px 0 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ptdoc .tot-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ptdoc .tot-n { font-size: 22px; font-weight: 600; }
+.ptdoc .tot-n .tot-den { font-size: 12px; color: var(--mut); font-weight: 400; }
+.ptdoc .tot-pc { font-size: 22px; font-weight: 600; color: var(--orange); line-height: 1; text-align: right; }
+.ptdoc .tot-pc small { display: block; font-size: 10px; color: var(--mut); font-weight: 500; letter-spacing: 0.02em; }
+.ptdoc .bar { height: 11px; border-radius: 6px; background: var(--track); overflow: hidden; display: flex; }
+.ptdoc .bar > i { display: block; height: 100%; transition: width 0.2s ease; }
+.ptdoc .bar > i.ok { background: var(--ok); }
+.ptdoc .bar > i.req { background: var(--gold); }
+.ptdoc .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--mut); flex-wrap: wrap; }
+.ptdoc .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ptdoc .legend .dot { width: 9px; height: 9px; border-radius: 3px; }
+.ptdoc .legend .dot.ok { background: var(--ok); }
+.ptdoc .legend .dot.req { background: var(--gold); }
+.ptdoc .legend .dot.rest { background: var(--track); }
+
+/* section */
+.ptdoc .sect { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mut); margin: 24px 0 10px; }
+
+/* card đợt */
+.ptdoc .pcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; margin-bottom: 10px; }
+.ptdoc .pcard.now { border-color: var(--gold); border-width: 1.5px; box-shadow: 0 2px 0 var(--gold-bg); }
+.ptdoc .pcard.bad { border-color: var(--bad); }
+.ptdoc .ptop { display: flex; align-items: center; gap: 12px; }
+.ptdoc .pno { width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--gold-bg); color: var(--terra); font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+.ptdoc .pinfo { flex: 1; min-width: 0; }
+.ptdoc .pinfo b { font-size: 14px; font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptdoc .pinfo small { font-size: 11.5px; color: var(--mut); }
+.ptdoc .pinfo small .num { color: var(--terra); }
+.ptdoc .pamt { text-align: right; flex: none; }
+.ptdoc .pamt .n { font-weight: 700; font-size: 15px; }
+.ptdoc .badge { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 20px; margin-top: 4px; white-space: nowrap; }
+.ptdoc .badge.ok { background: var(--ok-bg); color: var(--ok); }
+.ptdoc .badge.req { background: var(--gold-bg); color: var(--gold); }
+.ptdoc .badge.bad { background: var(--bad-bg); color: var(--bad); }
+.ptdoc .badge.wait { background: var(--track); color: var(--mut); }
+
+.ptdoc .pmeta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ptdoc .pmeta .f label { display: block; font-size: 10px; color: var(--mut2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1px; }
+.ptdoc .pmeta .f div { font-size: 13px; font-weight: 500; }
+.ptdoc .pmeta .f .paid { color: var(--ok); }
+
+.ptdoc .pnote { margin-top: 10px; background: var(--track); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; color: var(--mut); }
+.ptdoc .phint { margin-top: 10px; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; font-weight: 500; }
+.ptdoc .phint.warn { background: var(--gold-bg); color: var(--gold); }
+.ptdoc .phint.bad { background: var(--bad-bg); color: var(--bad); }
+.ptdoc .preceipt { margin-top: 10px; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; font-weight: 500; background: var(--gold-bg); color: var(--terra); }
+
+.ptdoc .pacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ptdoc .btn { border: 1px solid var(--line2); background: none; color: var(--text); font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; letter-spacing: 0.01em; }
+.ptdoc .btn:active { transform: scale(0.96); }
+.ptdoc .btn:disabled { opacity: 0.5; cursor: default; }
+.ptdoc .btn.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+.ptdoc[data-theme="dark"] .btn.primary { color: #3a1608; }
+.ptdoc .btn.danger { border-color: var(--bad); color: var(--bad); }
+
+/* totals strip */
+.ptdoc .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; padding: 15px 0 0; border-top: 1px solid var(--line); }
+.ptdoc .totals .t { text-align: center; }
+.ptdoc .totals .t label { display: block; font-size: 10px; color: var(--mut2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.ptdoc .totals .t div { font-size: 14px; font-weight: 700; }
+.ptdoc .totals .t div.paid { color: var(--ok); }
+
+.ptdoc .load, .ptdoc .empty { text-align: center; color: var(--mut); padding: 44px 16px; font-size: 14px; }
+
+/* modal */
+.ptdoc .modal-bg { position: fixed; inset: 0; z-index: 60; background: rgba(46, 20, 10, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ptdoc .modal { width: 100%; max-width: 460px; background: var(--card); border: 1px solid var(--line2); border-radius: 16px; padding: 20px; max-height: 90dvh; overflow-y: auto; }
+.ptdoc .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+.ptdoc .fld { margin-bottom: 13px; }
+.ptdoc .fld label { display: block; font-size: 11px; font-weight: 600; color: var(--mut); margin-bottom: 5px; letter-spacing: 0.02em; }
+.ptdoc .fld input, .ptdoc .fld select, .ptdoc .fld textarea { width: 100%; background: var(--bg); border: 1px solid var(--line2); border-radius: 9px; padding: 9px 11px; font-family: inherit; font-size: 13.5px; color: var(--text); }
+.ptdoc .fld textarea { resize: vertical; }
+.ptdoc .fld .hintline { font-size: 10.5px; color: var(--mut2); margin-top: 4px; }
+.ptdoc .fld2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ptdoc .modal-acts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
