@@ -10,6 +10,7 @@ import {
   Banknote,
   Package,
   Receipt,
+  FileSignature,
   BarChart3,
   ScrollText,
   Landmark,
@@ -117,17 +118,18 @@ const APPS: AppDef[] = [
     href: "/projects",
   },
   {
+    // Quản lý HĐ thiết kế + thi công + công nợ khách hàng (giá trị, đã thu, còn nợ).
+    key: "hop-dong",
+    label: "Hợp đồng",
+    Icon: FileSignature,
+    href: "/admin/contracts",
+  },
+  {
+    // Công nợ KH đã chuyển vào màn Hợp đồng → app này chỉ còn NCC, bấm thẳng.
     key: "cong-no",
-    label: "Công nợ",
+    label: "Công nợ NCC",
     Icon: Receipt,
-    buildItems: (data) => {
-      const cn = data?.congNoBreakdown;
-      return [
-        { label: "Công nợ KH", href: "/payments", badge: cn?.paymentDueKhActive ?? 0 },
-        // Công nợ NCC flow mới: theo từng dự án (mh_orders → /projects/[id]/cong-no)
-        { label: "Công nợ NCC", href: "/projects" },
-      ];
-    },
+    href: "/projects",
   },
   {
     key: "cham-cong",

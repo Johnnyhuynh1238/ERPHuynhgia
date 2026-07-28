@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Banknote,
   BarChart3,
@@ -94,7 +95,9 @@ type AppDef = {
   key: AppKey;
   label: string;
   Icon: LucideIcon;
-  buildItems: (data: SummaryDto | null) => Array<PopItem | "divider">;
+  // App nhiều mục → popup (buildItems). App 1 đích → bấm thẳng (href).
+  buildItems?: (data: SummaryDto | null) => Array<PopItem | "divider">;
+  href?: string;
 };
 
 const APPS: AppDef[] = [
@@ -112,10 +115,7 @@ const APPS: AppDef[] = [
     key: "hop-dong",
     label: "Hợp đồng",
     Icon: FileSignature,
-    buildItems: () => [
-      { label: "Tất cả hợp đồng", href: "/admin/contracts" },
-      { label: "HĐ thiết kế + thi công", href: "/admin/contracts" },
-    ],
+    href: "/admin/contracts",
   },
   {
     key: "du-an",
@@ -207,6 +207,7 @@ export function AdminDashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [open, setOpen] = useState<AppDef | null>(null);
+  const router = useRouter();
 
   const load = async () => {
     try {
@@ -278,7 +279,7 @@ export function AdminDashboardClient() {
                   app={app}
                   delayClass={`delay-${Math.min(idx + 1, 6)}`}
                   badge={badge}
-                  onClick={() => setOpen(app)}
+                  onClick={() => (app.href ? router.push(app.href) : setOpen(app))}
                 />
               );
             })}
@@ -288,7 +289,7 @@ export function AdminDashboardClient() {
         <WorkQueue data={data} loading={loading} />
       </div>
 
-      {open && (
+      {open && open.buildItems && (
         <AppPopover
           app={open}
           items={open.buildItems(data)}
