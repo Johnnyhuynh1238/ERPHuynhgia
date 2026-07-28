@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { DesignContractStepKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/estimate";
+import { requireAdmin, requireMuaHang } from "@/lib/estimate";
 
 const STEP_KINDS: DesignContractStepKind[] = ["mat_bang", "mat_tien_3d", "noi_that", "shop_drawing"];
 
@@ -48,7 +48,8 @@ export async function POST(request: Request) {
 // Danh sách HĐ gộp: HĐ thiết kế (design_contracts) + HĐ thi công (projects),
 // mỗi HĐ kèm thu/chi tính từ sổ quỹ. Dùng cho màn /admin/contracts.
 export async function GET() {
-  const { error } = await requireAdmin();
+  // Xem danh sách HĐ: admin + kế toán (KT dùng để theo dõi công nợ khách).
+  const { error } = await requireMuaHang();
   if (error) return error;
 
   const [designs, projects, cashByDesign, cashByProject] = await Promise.all([
