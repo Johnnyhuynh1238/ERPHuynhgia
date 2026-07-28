@@ -6,7 +6,21 @@ import { createPortal } from "react-dom";
 import { MoneyInput } from "@/components/money-input";
 import { toast } from "sonner";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./receipts.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
 
 type ProjectOption = { id: string; code: string; name: string };
 
@@ -118,7 +132,7 @@ export function ReceiptsClient({
 
   const [rows, setRows] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string>("pending");
+  const [status, setStatus] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
   const [projectFilter, setProjectFilter] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -368,7 +382,7 @@ export function ReceiptsClient({
   };
 
   return (
-    <div className="rtdoc" data-theme={theme}>
+    <div className={`rtdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
       <div className="rtwrap">
         {/* header */}
         <div className="rt-head">
@@ -566,7 +580,7 @@ export function ReceiptsClient({
       {/* CREATE MODAL */}
       {mounted && showCreate && canCreate &&
         createPortal(
-          <div className="rtportal" data-theme={theme}>
+          <div className={`rtportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
             <ModalShell title="Tạo lệnh thu mới" onClose={() => { setShowCreate(false); setForm(emptyCreate); }}>
               <form onSubmit={submitCreate}>
                 <div className="rt-fld full" style={{ marginBottom: 12 }}>
@@ -659,7 +673,7 @@ export function ReceiptsClient({
       {/* MARK RECEIVED MODAL */}
       {mounted && openReceive &&
         createPortal(
-          <div className="rtportal" data-theme={theme}>
+          <div className={`rtportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
             <ModalShell title="Xác nhận đã thu" subtitle={`${openReceive.code} · ${SOURCE_LABEL[openReceive.source]}${openReceive.payer ? ` · ${openReceive.payer}` : ""}`} onClose={() => setOpenReceive(null)}>
               <form onSubmit={submitReceive}>
                 <div className="rt-fgrid">
@@ -720,7 +734,7 @@ export function ReceiptsClient({
       {/* CANCEL MODAL */}
       {mounted && openCancel &&
         createPortal(
-          <div className="rtportal" data-theme={theme}>
+          <div className={`rtportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
             <ModalShell title="Huỷ lệnh thu" subtitle={openCancel.code} tone="red" onClose={() => setOpenCancel(null)}>
               <div className="rt-fld full">
                 <span className="rt-lbl">Lý do huỷ <span className="req">*</span></span>
