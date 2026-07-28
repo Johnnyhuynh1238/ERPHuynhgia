@@ -250,8 +250,9 @@ export function MuaHangClient({
   })();
   const [tab, setTab] = useState<"buy" | "cart" | "orders" | "received" | "blocks">(initialTab);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi }.
-  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number }>>({});
+  // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi, tên/đvt gốc từ server }.
+  // name/unit giữ để render được cả VT phụ (không có trong danh mục dự toán allItems).
+  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number; name?: string; unit?: string }>>({});
   // VT đang mở popup để nhập SL + giá.
   const [picked, setPicked] = useState<VtItem<Material> | null>(null);
   // Trạng thái xổ 3 siêu nhóm (mặc định thu gọn hết).
@@ -348,9 +349,9 @@ export function MuaHangClient({
       const r = await fetch(`/api/projects/${projectId}/mua-hang/cart`, { cache: "no-store" });
       if (!r.ok) return;
       const j = await r.json();
-      const m: Record<string, { qty: number; price: number }> = {};
+      const m: Record<string, { qty: number; price: number; name?: string; unit?: string }> = {};
       for (const it of Array.isArray(j.items) ? j.items : [])
-        m[it.key] = { qty: Number(it.qty), price: Number(it.price) };
+        m[it.key] = { qty: Number(it.qty), price: Number(it.price), name: it.name, unit: it.unit };
       setCartMap(m);
     } catch {
       /* giỏ lỗi → giữ giỏ hiện tại */
@@ -451,13 +452,35 @@ export function MuaHangClient({
   // 3 siêu nhóm Thô/ME/Hoàn thiện (nguồn chung dự toán) cho tab Mua hàng.
   const supers = useMemo<SuperGroup<Material>[]>(() => buildSuperGroups(cats), [cats]);
 
-  // Giỏ hàng đã chọn: VT + SL + đơn giá (KT tự ghi).
+  // Tra nhanh VT dự toán theo key để dựng giỏ.
+  const itemByKey = useMemo(() => {
+    const m: Record<string, VtItem<Material>> = {};
+    for (const it of allItems) m[it.key] = it;
+    return m;
+  }, [allItems]);
+
+  // Giỏ hàng đã chọn: VT + SL + đơn giá (KT tự ghi). Duyệt theo CHÍNH giỏ (server) chứ
+  // không giao với danh mục dự toán — nếu chỉ lấy allItems thì VT phụ (ngoài dự toán)
+  // sẽ rớt khỏi giỏ dù server đã có. Key không khớp dự toán → dựng VtItem tối thiểu từ
+  // tên/đvt server (trần dự toán = 0, VT phụ vốn không có trần).
   const cartEntries = useMemo(
     () =>
-      allItems
-        .filter((it) => (cartMap[it.key]?.qty || 0) > 0)
-        .map((it) => ({ it, qty: cartMap[it.key].qty, price: cartMap[it.key].price })),
-    [allItems, cartMap],
+      Object.entries(cartMap)
+        .filter(([, v]) => (v.qty || 0) > 0)
+        .map(([key, v]) => {
+          const it: VtItem<Material> =
+            itemByKey[key] ?? {
+              key,
+              name: v.name ?? key,
+              unit: v.unit ?? "",
+              qty: 0,
+              amount: 0,
+              members: [],
+              uniformPrice: v.price,
+            };
+          return { it, qty: v.qty, price: v.price };
+        }),
+    [cartMap, itemByKey],
   );
   const cart = useMemo(
     () => ({ cnt: cartEntries.length, sum: cartEntries.reduce((s, e) => s + e.qty * e.price, 0) }),
@@ -467,7 +490,7 @@ export function MuaHangClient({
   const addToCart = (it: VtItem<Material>, qty: number, price: number) => {
     if (!(qty > 0)) return;
     const p = Math.max(0, Math.round(price));
-    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p } }));
+    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p, name: it.name, unit: it.unit } }));
     fetch(`/api/projects/${projectId}/mua-hang/cart`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
