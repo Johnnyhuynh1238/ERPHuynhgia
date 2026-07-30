@@ -1517,29 +1517,73 @@ export function ExpensesClient({
               />
             </label>
             <ReceiptMultiPicker value={payReceiptUrls} onChange={setPayReceiptUrls} />
-            <label className="block">
-              <span className="text-xs text-[#c9a98f]">Tài khoản quỹ *</span>
-              <select
-                value={payAccountId}
-                onChange={(e) => setPayAccountId(e.target.value)}
-                required
-                className="mt-1 w-full rounded-lg border border-[#7a5236] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              >
-                <option value="">— Chọn tài khoản —</option>
-                {cashAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#c9a98f]">Ghi chú KT</span>
-              <textarea
-                rows={2}
-                value={payNote}
-                onChange={(e) => setPayNote(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[#7a5236] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
+            <div className="block">
+              <span className="text-xs font-semibold text-[#f0752f]">💰 Chi từ tài khoản quỹ *</span>
+              <div className="mt-2 flex flex-col gap-2">
+                {cashAccounts.map((a) => {
+                  const on = payAccountId === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setPayAccountId(a.id)}
+                      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-[#f0752f] bg-[#f0752f]/10" : "border-[#7a5236] bg-[#3a1608]"}`}
+                    >
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#5a3418] text-base">{a.kind === "cash" ? "💵" : "🏦"}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[#f7f2e4]">{a.name}</div>
+                        <div className="text-[10px] text-[#a8886e]">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <div className="font-mono text-sm font-bold text-[#f7f2e4]">{money(a.currentBalance)}</div>
+                        <div className="text-[9px] text-[#a8886e]">số dư</div>
+                      </div>
+                      <div className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${on ? "border-[#f0752f]" : "border-[#7a5236]"}`}>
+                        {on && <div className="h-[9px] w-[9px] rounded-full bg-[#f0752f]" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {(() => {
+                const sel = cashAccounts.find((a) => a.id === payAccountId);
+                if (!sel) return null;
+                const after = sel.currentBalance - (Number(payAmount) || 0);
+                return (
+                  <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs ${after < 0 ? "bg-red-500/10" : "bg-[#5a3418]/40"}`}>
+                    <span className="text-[#c9a98f]">Số dư sau chi ({sel.name})</span>
+                    <span className={`font-mono font-bold ${after < 0 ? "text-red-300" : "text-[#f7f2e4]"}`}>{money(after)}{after < 0 ? " ⚠ âm quỹ" : ""}</span>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="block">
+              <span className="text-xs font-semibold text-[#c9a98f]">Ghi chú</span>
+              <div className="mt-2 flex flex-col gap-2">
+                {openPay.note && (
+                  <div className="flex items-start gap-2 rounded-lg border border-[#5a3418] bg-[#3a1608] px-2.5 py-2">
+                    <span className="shrink-0 rounded-full bg-[#8a3d1c]/40 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#d8996a]">Admin</span>
+                    <div className="min-w-0">
+                      <div className="text-xs text-[#f7f2e4]">{openPay.note}</div>
+                      <div className="mt-0.5 text-[9px] text-[#a8886e]">{openPay.creator.fullName} · {fmtDate(openPay.createdAt)}</div>
+                    </div>
+                  </div>
+                )}
+                {openPay.paidNote && (
+                  <div className="flex items-start gap-2 rounded-lg border border-[#5a3418] bg-[#3a1608] px-2.5 py-2">
+                    <span className="shrink-0 rounded-full bg-[#3f6f86]/30 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#8fc0d8]">Kế toán</span>
+                    <div className="text-xs text-[#f7f2e4]">{openPay.paidNote}</div>
+                  </div>
+                )}
+                <textarea
+                  rows={2}
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  placeholder="Thêm ghi chú của kế toán…"
+                  className="w-full rounded-lg border border-[#7a5236] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                />
+              </div>
+            </div>
             <div className="text-[11px] text-amber-300">
               Lưu ý: trừ vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.
             </div>
