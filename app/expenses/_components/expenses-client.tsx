@@ -626,33 +626,50 @@ export function ExpensesClient({
           </div>,
           document.body,
         )}
-      <div className="rounded-2xl border border-[#7a5236] bg-[#4a1d0c] p-4">
-        <div>
-          <h1 className="text-xl font-semibold text-orange-300">Lệnh chi</h1>
-          <p className="mt-1 text-xs text-[#c9a98f]">
-            Tạo lệnh chi, duyệt và thanh toán các khoản chi ngoài công nợ NCC.
-          </p>
-        </div>
+      {/* Header */}
+      <div>
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#d8996a]">Sổ quỹ công ty</div>
+        <h1 className="mt-1.5 text-[25px] font-semibold leading-tight tracking-tight text-[#f7f2e4]">Lệnh chi</h1>
       </div>
-      {/* Top bar: balance + actions */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#7a5236] bg-[#431a0a] px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setShowTreasury(true)}
-          className="flex items-baseline gap-2 rounded-lg px-1 -mx-1 text-left transition active:scale-[0.99]"
-          title="Bấm để xem chi tiết sổ quỹ"
-        >
-          <span className="text-[11px] uppercase tracking-wide text-[#c9a98f]">Số dư quỹ</span>
-          <span className={`text-base font-bold ${balanceTone}`}>
-            {balance == null ? "…" : money(balance)}
-          </span>
-          <span className="text-[10px] text-[#c9a98f]">› chi tiết</span>
+
+      {/* Tiles */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="min-w-0 rounded-xl border border-[#7a5236] bg-[#4a1d0c] px-3 py-2.5">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Chờ chi</div>
+          <div className="mt-1 truncate font-mono text-[15px] font-semibold text-[#d8b25e]">{money(pendingTotal)}</div>
+          <div className="text-[10px] text-[#a8886e]">{pendingCount} lệnh</div>
+        </div>
+        <div className="min-w-0 rounded-xl border border-[#7a5236] bg-[#4a1d0c] px-3 py-2.5">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Đã chi</div>
+          <div className="mt-1 truncate font-mono text-[15px] font-semibold text-emerald-300">{money(totalPaid)}</div>
+        </div>
+        <button type="button" onClick={() => setShowTreasury(true)} className="min-w-0 rounded-xl border border-[#7a5236] bg-[#4a1d0c] px-3 py-2.5 text-left transition active:scale-[0.98]">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Số dư quỹ ›</div>
+          <div className={`mt-1 truncate font-mono text-[15px] font-semibold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</div>
         </button>
-        {pendingCount > 0 && (
-          <div className="text-[11px] text-amber-300">
-            · Chờ chi: {pendingCount} lệnh ({money(pendingTotal)})
-          </div>
-        )}
+      </div>
+
+      {/* Status tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {[
+          { k: "pending", l: "Chờ chi" },
+          { k: "tptc_pending", l: "Chờ duyệt" },
+          { k: "paid", l: "Đã chi" },
+          { k: "cancelled", l: "Đã huỷ" },
+          { k: "all", l: "Tất cả" },
+        ].map((t) => (
+          <button
+            key={t.k}
+            type="button"
+            onClick={() => setStatus(t.k)}
+            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${status === t.k ? "border-[#f7f2e4] bg-[#f7f2e4] text-[#3a1608]" : "border-[#7a5236] text-[#c9a98f]"}`}
+          >
+            {t.l}
+          </button>
+        ))}
+      </div>
+      {/* Action row */}
+      <div className="flex items-center gap-2">
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -701,17 +718,6 @@ export function ExpensesClient({
       {/* Filters (collapsible) */}
       {showFilters && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-[#7a5236] bg-[#431a0a] p-2">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-lg border border-[#7a5236] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
-          >
-            <option value="pending">Cần chi</option>
-            <option value="tptc_pending">Chờ admin duyệt</option>
-            <option value="paid">Đã chi</option>
-            <option value="cancelled">Đã huỷ</option>
-            <option value="all">Tất cả</option>
-          </select>
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
