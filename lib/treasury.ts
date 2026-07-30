@@ -10,6 +10,7 @@ export type CashTxnInput = {
   accountId: string;
   counterAccountId?: string | null;
   projectId?: string | null;
+  designContractId?: string | null;
   categoryId?: string | null;
   note?: string | null;
   createdBy: string;
@@ -60,6 +61,7 @@ export async function recordCashTxn(tx: Prisma.TransactionClient, input: CashTxn
       accountId: input.accountId,
       counterAccountId: input.counterAccountId ?? null,
       projectId: input.projectId ?? null,
+      designContractId: input.designContractId ?? null,
       categoryId: input.categoryId ?? null,
       note: input.note?.trim() || null,
       createdBy: input.createdBy,

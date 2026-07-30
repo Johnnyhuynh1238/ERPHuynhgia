@@ -3029,6 +3029,7 @@ model DesignContract {
   steps            DesignContractStep[]
   cashTransactions CashTransaction[]
   expenses         Expense[]
+  receipts         Receipt[]
 
   @@index([status, signedAt(sort: Desc)])
   @@index([customerPhone])
@@ -3812,6 +3813,7 @@ model Receipt {
   code               String        @unique
   source             ReceiptSource
   projectId          String?       @map("project_id") @db.Uuid
+  designContractId   String?       @map("design_contract_id") @db.Uuid
   paymentScheduleId  String?       @map("payment_schedule_id") @db.Uuid
   amount             Decimal       @db.Decimal(18, 2)
   payer              String?
@@ -3835,6 +3837,7 @@ model Receipt {
   rejectedReason String?   @map("rejected_reason") @db.Text
 
   project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  designContract  DesignContract?  @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   paymentSchedule PaymentSchedule? @relation("ReceiptOnSchedule", fields: [paymentScheduleId], references: [id], onDelete: SetNull)
   creator         User             @relation("ReceiptCreator", fields: [createdBy], references: [id])
   receiver        User?            @relation("ReceiptReceiver", fields: [receivedBy], references: [id], onDelete: SetNull)
@@ -3845,6 +3848,7 @@ model Receipt {
   @@index([projectId, createdAt(sort: Desc)])
   @@index([source, createdAt(sort: Desc)])
   @@index([paymentScheduleId])
+  @@index([designContractId])
   @@map("receipts")
 }
 

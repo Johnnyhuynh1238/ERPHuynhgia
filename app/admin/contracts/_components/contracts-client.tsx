@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 import "./contracts.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -41,6 +42,25 @@ type ContractItem = {
 };
 type Summary = { count: number; thu: number; chi: number; needsInfo: number; preConstruction: number };
 type CashLine = { id: string; occurredAt: string; direction: "in" | "out"; amount: number; note: string | null };
+
+type ReceiptStatus = "awaiting_approval" | "pending" | "received" | "cancelled";
+type ReceiptItem = {
+  id: string;
+  code: string;
+  amount: number;
+  status: ReceiptStatus;
+  payer: string | null;
+  note: string | null;
+  receivedAmount: number | null;
+  receivedAt: string | null;
+  createdAt: string;
+};
+const RECEIPT_STATUS: Record<ReceiptStatus, { label: string; color: string }> = {
+  awaiting_approval: { label: "Chờ duyệt", color: "var(--gold)" },
+  pending: { label: "Chờ thu", color: "var(--sky)" },
+  received: { label: "Đã thu", color: "var(--ok)" },
+  cancelled: { label: "Huỷ", color: "var(--mut2)" },
+};
 
 type Filter = "all" | "pre" | "needs" | "design" | "construction";
 
@@ -355,6 +375,18 @@ function ContractDrawer({
           </div>
         )}
 
+        {/* Đợt thu (lệnh thu gắn HĐ) */}
+        {isDesign && (
+          <ReceiptsSection
+            contractId={item.id}
+            customerName={item.customerName}
+            totalValue={item.value}
+            isAdmin={isAdmin}
+            flash={flash}
+            onChanged={() => loadCash("")}
+          />
+        )}
+
         {/* Thu / chi */}
         <div className="cx-sech">
           <span>Thu{isAdmin ? " / chi" : ""} từ sổ quỹ</span>
@@ -423,6 +455,261 @@ function ContractDrawer({
         )}
       </div>
     </div>
+  );
+}
+
+function ReceiptsSection({
+  contractId,
+  customerName,
+  totalValue,
+  isAdmin,
+  flash,
+  onChanged,
+}: {
+  contractId: string;
+  customerName: string;
+  totalValue: number | null;
+  isAdmin: boolean;
+  flash: (m: string) => void;
+  onChanged: () => void;
+}) {
+  const [rows, setRows] = useState<ReceiptItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+
+  const { accounts } = useCashAccounts();
+  const [openReceive, setOpenReceive] = useState<string | null>(null);
+  const [recvAmount, setRecvAmount] = useState("");
+  const [recvDate, setRecvDate] = useState(new Date().toISOString().slice(0, 10));
+  const [recvAccountId, setRecvAccountId] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/receipts?designContractId=${contractId}`, { cache: "no-store" });
+      const j = await r.json();
+      setRows((j.rows ?? []) as ReceiptItem[]);
+    } finally {
+      setLoading(false);
+    }
+  }, [contractId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const post = async (url: string, body?: unknown) => {
+    setBusy(true);
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        flash(j.message || "Lỗi");
+        return false;
+      }
+      if (j.message) flash(j.message);
+      return true;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createOne = async (amt: number, nt: string) =>
+    post("/api/receipts", {
+      source: "customer",
+      designContractId: contractId,
+      amount: amt,
+      payer: customerName || null,
+      paymentMethod: "transfer",
+      note: nt.trim() || null,
+    });
+
+  const createReceipt = async () => {
+    const amt = Number(amount.replace(/[^\d]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) {
+      flash("Nhập số tiền > 0");
+      return;
+    }
+    if (await createOne(amt, note)) {
+      setAmount("");
+      setNote("");
+      setShowCreate(false);
+      await load();
+    }
+  };
+
+  const seed = async () => {
+    if (!totalValue || totalValue <= 0) {
+      flash("HĐ chưa có giá trị để chia đợt");
+      return;
+    }
+    if (rows.length > 0 && !window.confirm("Đã có đợt thu. Vẫn tạo thêm 3 đợt 50/40/10?")) return;
+    const d1 = Math.round(totalValue * 0.5);
+    const d2 = Math.round(totalValue * 0.4);
+    const plan = [
+      { amt: d1, nt: "Đợt 1 — ký HĐ (50%)" },
+      { amt: d2, nt: "Đợt 2 — hoàn thành GĐ1 (40%)" },
+      { amt: totalValue - d1 - d2, nt: "Đợt 3 — bàn giao hồ sơ (10%)" },
+    ];
+    setBusy(true);
+    try {
+      for (const p of plan) {
+        await fetch("/api/receipts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "customer",
+            designContractId: contractId,
+            amount: p.amt,
+            payer: customerName || null,
+            paymentMethod: "transfer",
+            note: p.nt,
+          }),
+        });
+      }
+    } finally {
+      setBusy(false);
+    }
+    flash("Đã tạo 3 đợt 50/40/10");
+    await load();
+  };
+
+  const reject = async (id: string) => {
+    const reason = window.prompt("Lý do từ chối (≥ 3 ký tự):");
+    if (!reason || reason.trim().length < 3) return;
+    if (await post(`/api/receipts/${id}/reject`, { reason: reason.trim() })) await load();
+  };
+
+  const approve = async (id: string) => {
+    if (await post(`/api/receipts/${id}/approve`)) await load();
+  };
+
+  const openReceiveForm = (r: ReceiptItem) => {
+    setOpenReceive(r.id);
+    setRecvAmount(String(r.amount));
+    setRecvDate(new Date().toISOString().slice(0, 10));
+    setRecvAccountId(accounts[0]?.id ?? "");
+  };
+
+  const markReceived = async (id: string) => {
+    const amt = Number(recvAmount.replace(/[^\d]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) {
+      flash("Nhập số tiền > 0");
+      return;
+    }
+    if (!recvAccountId) {
+      flash("Chọn tài khoản nhận");
+      return;
+    }
+    if (await post(`/api/receipts/${id}/mark-received`, { receivedAt: recvDate, receivedAmount: amt, accountId: recvAccountId })) {
+      setOpenReceive(null);
+      await load();
+      onChanged();
+    }
+  };
+
+  const planned = rows.filter((r) => r.status !== "cancelled").reduce((s, r) => s + r.amount, 0);
+  const collected = rows.filter((r) => r.status === "received").reduce((s, r) => s + (r.receivedAmount ?? r.amount), 0);
+
+  return (
+    <>
+      <div className="cx-sech">
+        <span>Đợt thu</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {totalValue != null && (
+            <button type="button" className="cx-chip" onClick={seed} disabled={busy}>50/40/10</button>
+          )}
+          <button type="button" className="cx-chip" onClick={() => setShowCreate((s) => !s)}>
+            {showCreate ? "Đóng" : isAdmin ? "＋ Tạo đợt thu" : "＋ Gửi lệnh thu"}
+          </button>
+        </div>
+      </div>
+
+      <div className="cx-finrow">
+        <span>Kế hoạch: <span className="num">{fmt(planned)}</span></span>
+        <span className="thu">Đã thu: <span className="num">{fmt(collected)}</span></span>
+      </div>
+
+      {showCreate && (
+        <div style={{ border: "1px solid var(--line2)", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+          <div className="cx-fld"><span className="cx-lbl">Số tiền đợt (đ)</span><input className="cx-ctrl num" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+          <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Đợt 1 — ký HĐ" /></div>
+          <button type="button" className="cx-btn primary block" onClick={createReceipt} disabled={busy}>
+            {isAdmin ? "Tạo đợt thu" : "Gửi lệnh thu cho admin duyệt"}
+          </button>
+          {!isAdmin && <div style={{ fontSize: 11, color: "var(--mut2)", marginTop: 6 }}>Đợt ở trạng thái “Chờ duyệt” tới khi admin duyệt.</div>}
+        </div>
+      )}
+
+      <div className="cx-cash">
+        {loading ? (
+          <div style={{ fontSize: 12, color: "var(--mut2)" }}>Đang tải…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ fontSize: 12, color: "var(--mut2)" }}>Chưa có đợt thu nào.</div>
+        ) : (
+          rows.map((r) => {
+            const st = RECEIPT_STATUS[r.status];
+            return (
+              <div key={r.id} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <span style={{ color: st.color, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>
+                  <span className="num" style={{ fontWeight: 600 }}>{fmt(r.amount)}</span>
+                  <span className="nt" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--mut)" }}>{r.note || r.code}</span>
+                  <span className="dt" style={{ color: "var(--mut2)" }}>{fmtDate(r.createdAt)}</span>
+                </div>
+
+                {r.status === "received" && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--ok)" }}>
+                    Đã thu {fmt(r.receivedAmount ?? r.amount)} · {fmtDate(r.receivedAt)}
+                  </div>
+                )}
+
+                {(r.status === "awaiting_approval" || r.status === "pending") && (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {r.status === "awaiting_approval" && isAdmin && (
+                      <>
+                        <button type="button" className="cx-chip go" onClick={() => approve(r.id)} disabled={busy}>Duyệt</button>
+                        <button type="button" className="cx-chip" onClick={() => reject(r.id)} disabled={busy}>Từ chối</button>
+                      </>
+                    )}
+                    {r.status === "awaiting_approval" && !isAdmin && (
+                      <span style={{ fontSize: 12, color: "var(--mut2)" }}>Chờ admin duyệt…</span>
+                    )}
+                    {r.status === "pending" && (
+                      <button type="button" className="cx-chip go" onClick={() => openReceiveForm(r)} disabled={busy}>Xác nhận đã thu</button>
+                    )}
+                  </div>
+                )}
+
+                {openReceive === r.id && (
+                  <div style={{ marginTop: 8, border: "1px solid var(--line2)", borderRadius: 8, padding: 8 }}>
+                    <div className="cx-fld"><span className="cx-lbl">Số tiền thực thu</span><input className="cx-ctrl num" inputMode="numeric" value={recvAmount} onChange={(e) => setRecvAmount(e.target.value)} /></div>
+                    <div className="cx-fld"><span className="cx-lbl">Ngày thu</span><input type="date" className="cx-ctrl" value={recvDate} onChange={(e) => setRecvDate(e.target.value)} /></div>
+                    <div className="cx-fld"><span className="cx-lbl">Quỹ nhận</span>
+                      <select className="cx-ctrl" value={recvAccountId} onChange={(e) => setRecvAccountId(e.target.value)}>
+                        <option value="">— Chọn quỹ —</option>
+                        {accounts.map((a) => (<option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>))}
+                      </select>
+                    </div>
+                    <div className="cx-acts">
+                      <button type="button" className="cx-btn ghost" onClick={() => setOpenReceive(null)}>Huỷ</button>
+                      <button type="button" className="cx-btn primary block" onClick={() => markReceived(r.id)} disabled={busy}>Ghi sổ quỹ</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
   );
 }
 

@@ -72,6 +72,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         refId: receipt.id,
         accountId: data.accountId,
         projectId: receipt.projectId,
+        designContractId: receipt.designContractId,
         note: `${receipt.code} — ${SOURCE_LABEL[receipt.source] || receipt.source}${receipt.payer ? ` / ${receipt.payer}` : ""}${data.receivedNote ? ` — ${data.receivedNote}` : ""}`,
         createdBy: user.id,
       });

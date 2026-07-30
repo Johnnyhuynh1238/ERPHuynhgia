@@ -31,6 +31,7 @@ async function nextReceiptCode() {
 const createSchema = z.object({
   source: z.enum(["customer", "loan", "advance_return", "other"]),
   projectId: z.string().uuid().nullable().optional(),
+  designContractId: z.string().uuid().nullable().optional(),
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   payer: z.string().trim().max(255).optional().nullable(),
   paymentMethod: z.enum(["cash", "transfer"]).optional(),
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status");
   const source = url.searchParams.get("source");
   const projectId = url.searchParams.get("projectId");
+  const designContractId = url.searchParams.get("designContractId");
   const search = url.searchParams.get("search")?.trim();
 
   const where: Prisma.ReceiptWhereInput = {};
@@ -61,6 +63,7 @@ export async function GET(request: Request) {
   }
   if (projectId === "none") where.projectId = null;
   else if (projectId) where.projectId = projectId;
+  if (designContractId) where.designContractId = designContractId;
   if (search) {
     where.OR = [
       { code: { contains: search, mode: "insensitive" } },
@@ -114,6 +117,13 @@ export async function POST(request: Request) {
     const project = await prisma.project.findUnique({ where: { id: data.projectId }, select: { id: true } });
     if (!project) return NextResponse.json({ message: "Dự án không tồn tại" }, { status: 400 });
   }
+  if (data.designContractId) {
+    const dc = await prisma.designContract.findUnique({
+      where: { id: data.designContractId },
+      select: { id: true },
+    });
+    if (!dc) return NextResponse.json({ message: "HĐ thiết kế không tồn tại" }, { status: 400 });
+  }
 
   const code = await nextReceiptCode();
   const isKtCreated = user.role === UserRole.accountant;
@@ -124,6 +134,7 @@ export async function POST(request: Request) {
       code,
       source: data.source as ReceiptSource,
       projectId: data.projectId || null,
+      designContractId: data.designContractId || null,
       amount: new Prisma.Decimal(data.amount),
       payer: data.payer?.trim() || null,
       paymentMethod: data.paymentMethod || null,
