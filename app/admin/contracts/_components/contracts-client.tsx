@@ -627,7 +627,7 @@ function ReceiptsSection({
             <button type="button" className="cx-chip" onClick={seed} disabled={busy}>50/40/10</button>
           )}
           <button type="button" className="cx-chip" onClick={() => setShowCreate((s) => !s)}>
-            {showCreate ? "Đóng" : isAdmin ? "＋ Tạo đợt thu" : "＋ Gửi lệnh thu"}
+            {showCreate ? "Đóng" : "＋ Gửi lệnh thu"}
           </button>
         </div>
       </div>
@@ -642,9 +642,11 @@ function ReceiptsSection({
           <div className="cx-fld"><span className="cx-lbl">Số tiền đợt (đ)</span><input className="cx-ctrl num" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
           <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Đợt 1 — ký HĐ" /></div>
           <button type="button" className="cx-btn primary block" onClick={createReceipt} disabled={busy}>
-            {isAdmin ? "Tạo đợt thu" : "Gửi lệnh thu cho admin duyệt"}
+            {isAdmin ? "Gửi lệnh thu (kế toán chọn quỹ & thu)" : "Gửi lệnh thu cho admin duyệt"}
           </button>
-          {!isAdmin && <div style={{ fontSize: 11, color: "var(--mut2)", marginTop: 6 }}>Đợt ở trạng thái “Chờ duyệt” tới khi admin duyệt.</div>}
+          <div style={{ fontSize: 11, color: "var(--mut2)", marginTop: 6 }}>
+            {isAdmin ? "Kế toán sẽ chọn quỹ & xác nhận thu." : "Đợt ở trạng thái “Chờ duyệt” tới khi admin duyệt."}
+          </div>
         </div>
       )}
 
@@ -682,8 +684,11 @@ function ReceiptsSection({
                     {r.status === "awaiting_approval" && !isAdmin && (
                       <span style={{ fontSize: 12, color: "var(--mut2)" }}>Chờ admin duyệt…</span>
                     )}
-                    {r.status === "pending" && (
+                    {r.status === "pending" && !isAdmin && (
                       <button type="button" className="cx-chip go" onClick={() => openReceiveForm(r)} disabled={busy}>Xác nhận đã thu</button>
+                    )}
+                    {r.status === "pending" && isAdmin && (
+                      <span style={{ fontSize: 12, color: "var(--mut2)" }}>Chờ kế toán chọn quỹ &amp; thu…</span>
                     )}
                   </div>
                 )}
