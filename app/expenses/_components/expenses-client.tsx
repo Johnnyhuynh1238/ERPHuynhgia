@@ -598,7 +598,7 @@ export function ExpensesClient({
 
   const balanceTone =
     balance == null
-      ? "text-[#c9a98f]"
+      ? "text-[#aa9a8b]"
       : balance < 5_000_000
         ? "text-red-300"
         : balance < 20_000_000
@@ -617,15 +617,15 @@ export function ExpensesClient({
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#5a3418] bg-[#3a1608] shadow-2xl sm:w-auto sm:rounded-2xl"
+              className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#604232] bg-[#3a1608] shadow-2xl sm:w-auto sm:rounded-2xl"
               style={{ width: "min(480px, 100%)", height: "calc(100dvh - 8px)", maxHeight: "100dvh" }}
             >
-              <div className="flex items-center gap-2 border-b border-[#5a3418] bg-[#3a1608] px-3 py-2">
+              <div className="flex items-center gap-2 border-b border-[#604232] bg-[#3a1608] px-3 py-2">
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d8996a]"><Sparkles className="h-4 w-4" /> AI Thu-Chi</span>
                 <button
                   type="button"
                   onClick={() => setAiOpen(false)}
-                  className="ml-auto rounded-md px-2 py-0.5 text-[#c9a98f] hover:bg-[#5a3418] hover:text-white"
+                  className="ml-auto rounded-md px-2 py-0.5 text-[#aa9a8b] hover:bg-[#604232] hover:text-white"
                   aria-label="Đóng"
                 >
                   ✕
@@ -648,17 +648,17 @@ export function ExpensesClient({
 
       {/* Tiles */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Chờ chi</div>
+        <div className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Chờ chi</div>
           <div className="mt-1 truncate font-mono text-[13px] font-semibold text-[#d8b25e]">{money(pendingTotal)}</div>
-          <div className="text-[10px] text-[#a8886e]">{pendingCount} lệnh</div>
+          <div className="text-[10px] text-[#856e60]">{pendingCount} lệnh</div>
         </div>
-        <div className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Đã chi</div>
+        <div className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Đã chi</div>
           <div className="mt-1 truncate font-mono text-[13px] font-semibold text-emerald-300">{money(totalPaid)}</div>
         </div>
-        <button type="button" onClick={() => setShowTreasury(true)} className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5 text-left transition active:scale-[0.98]">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Số dư quỹ ›</div>
+        <button type="button" onClick={() => setShowTreasury(true)} className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5 text-left transition active:scale-[0.98]">
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Số dư quỹ ›</div>
           <div className={`mt-1 truncate font-mono text-[13px] font-semibold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</div>
         </button>
       </div>
@@ -676,7 +676,7 @@ export function ExpensesClient({
             key={t.k}
             type="button"
             onClick={() => setStatus(t.k)}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${status === t.k ? "border-[#f7f2e4] bg-[#f7f2e4] text-[#3a1608]" : "border-[#5a3418] text-[#c9a98f]"}`}
+            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${status === t.k ? "border-[#f7f2e4] bg-[#f7f2e4] text-[#3a1608]" : "border-[#604232] text-[#aa9a8b]"}`}
           >
             {t.l}
           </button>
@@ -691,7 +691,7 @@ export function ExpensesClient({
             className={`rounded-lg border px-2 py-1 text-xs ${
               showFilters
                 ? "border-[#f0752f] bg-[#f0752f]/15 text-[#f0a56a]"
-                : "border-[#5a3418] text-[#c9a98f] hover:text-[#f7f2e4]"
+                : "border-[#604232] text-[#aa9a8b] hover:text-[#f7f2e4]"
             }`}
             title="Bộ lọc"
             aria-label="Bộ lọc"
@@ -701,7 +701,7 @@ export function ExpensesClient({
           <button
             type="button"
             onClick={() => setShowHelp(true)}
-            className="rounded-full border border-[#5a3418] px-2 py-1 text-xs text-[#c9a98f] hover:text-[#f7f2e4]"
+            className="rounded-full border border-[#604232] px-2 py-1 text-xs text-[#aa9a8b] hover:text-[#f7f2e4]"
             title="Hướng dẫn"
             aria-label="Hướng dẫn"
           >
@@ -731,11 +731,11 @@ export function ExpensesClient({
 
       {/* Filters (collapsible) */}
       {showFilters && (
-        <div className="flex flex-wrap gap-2 rounded-xl border border-[#5a3418] bg-[#431a0a] p-2">
+        <div className="flex flex-wrap gap-2 rounded-xl border border-[#604232] bg-[#431a0a] p-2">
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
+            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
           >
             <option value="">Tất cả dự án</option>
             <option value="none">Chi chung công ty</option>
@@ -748,7 +748,7 @@ export function ExpensesClient({
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
+            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
           >
             <option value="">Tất cả danh mục</option>
             {categories.map((c) => (
@@ -761,20 +761,20 @@ export function ExpensesClient({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm theo code/payee/ghi chú"
-            className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4] min-w-[180px] flex-1"
+            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4] min-w-[180px] flex-1"
           />
         </div>
       )}
 
       {/* Create form */}
       {showCreate && canCreate && (
-        <form onSubmit={submitCreate} className="rounded-xl border border-[#5a3418] bg-[#431a0a] p-3 space-y-3">
+        <form onSubmit={submitCreate} className="rounded-xl border border-[#604232] bg-[#431a0a] p-3 space-y-3">
           <div className="flex flex-wrap items-baseline gap-3 rounded-lg bg-[#3a1608] px-3 py-2 text-xs">
-            <span className="text-[#c9a98f]">Số dư quỹ hiện tại:</span>
+            <span className="text-[#aa9a8b]">Số dư quỹ hiện tại:</span>
             <span className={`font-bold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</span>
             {balanceAfterForm != null && Number(form.amount) > 0 && (
               <>
-                <span className="text-[#c9a98f]">→ sau khi chi:</span>
+                <span className="text-[#aa9a8b]">→ sau khi chi:</span>
                 <span className={balanceAfterForm < 0 ? "font-bold text-red-300" : "font-semibold text-[#e8dcc8]"}>
                   {money(balanceAfterForm)}
                 </span>
@@ -785,7 +785,7 @@ export function ExpensesClient({
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Chi cho hợp đồng</span>
+              <span className="text-xs text-[#aa9a8b]">Chi cho hợp đồng</span>
               <select
                 value={form.projectId ? `p:${form.projectId}` : form.designContractId ? `d:${form.designContractId}` : ""}
                 onChange={(e) => {
@@ -798,7 +798,7 @@ export function ExpensesClient({
                   else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2), categoryId: keepCat });
                   else setForm({ ...form, projectId: "", designContractId: "", categoryId: keepCat });
                 }}
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               >
                 <option value="">Chi chung công ty</option>
                 <optgroup label="HĐ thi công">
@@ -818,12 +818,12 @@ export function ExpensesClient({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Danh mục *</span>
+              <span className="text-xs text-[#aa9a8b]">Danh mục *</span>
               <select
                 value={form.categoryId}
                 onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
                 required
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               >
                 <option value="">— Chọn —</option>
                 {visibleCategories.map((c) => (
@@ -834,25 +834,25 @@ export function ExpensesClient({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Số tiền (₫) *</span>
+              <span className="text-xs text-[#aa9a8b]">Số tiền (₫) *</span>
               <MoneyInput
                 value={form.amount}
                 onChange={(raw) => setForm({ ...form, amount: raw })}
                 required
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Người/đơn vị nhận</span>
+              <span className="text-xs text-[#aa9a8b]">Người/đơn vị nhận</span>
               <input
                 value={form.payee}
                 onChange={(e) => setForm({ ...form, payee: e.target.value })}
                 placeholder="VD: Cửa hàng VLXD Minh Anh"
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">SĐT người nhận *</span>
+              <span className="text-xs text-[#aa9a8b]">SĐT người nhận *</span>
               <input
                 type="tel"
                 inputMode="tel"
@@ -860,24 +860,24 @@ export function ExpensesClient({
                 onChange={(e) => setForm({ ...form, payeePhone: e.target.value.replace(/[^0-9+ ]/g, "") })}
                 placeholder="VD: 0912 345 678"
                 required
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Phương thức</span>
+              <span className="text-xs text-[#aa9a8b]">Phương thức</span>
               <select
                 value={form.paymentMethod}
                 onChange={(e) =>
                   setForm({ ...form, paymentMethod: e.target.value as "cash" | "transfer" })
                 }
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               >
                 <option value="transfer">Chuyển khoản</option>
                 <option value="cash">Tiền mặt</option>
               </select>
             </label>
             <div className="block">
-              <span className="text-xs text-[#c9a98f]">
+              <span className="text-xs text-[#aa9a8b]">
                 Ảnh hoá đơn / báo giá {form.attachmentUrls.length > 0 && `(${form.attachmentUrls.length}/20)`}
               </span>
               <input
@@ -895,7 +895,7 @@ export function ExpensesClient({
                   type="button"
                   onClick={() => attachmentInputRef.current?.click()}
                   disabled={uploadingAttachment || form.attachmentUrls.length >= 20}
-                  className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
+                  className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
                 >
                   {uploadingAttachment ? "Đang tải…" : form.attachmentUrls.length ? "📎 Thêm ảnh" : "📷 Chọn ảnh"}
                 </button>
@@ -910,10 +910,10 @@ export function ExpensesClient({
                     return (
                       <div
                         key={`${url}-${i}`}
-                        className="group relative aspect-square overflow-hidden rounded-lg border border-[#5a3418] bg-[#3a1608]"
+                        className="group relative aspect-square overflow-hidden rounded-lg border border-[#604232] bg-[#3a1608]"
                       >
                         {isPdf ? (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-[#c9a98f]">
+                          <div className="flex h-full w-full items-center justify-center text-xs text-[#aa9a8b]">
                             📄 PDF
                           </div>
                         ) : (
@@ -941,7 +941,7 @@ export function ExpensesClient({
 
           {/* Bank info for KT to "Chuyển khoản" — KT tạo thì không cần (admin duyệt xong KT tự chi) */}
           {!isKt && (
-          <div className="rounded-lg border border-[#5a3418] bg-[#3a1608] p-3 space-y-2">
+          <div className="rounded-lg border border-[#604232] bg-[#3a1608] p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold text-[#e8dcc8]">Tài khoản nhận (để KT bấm “Chuyển khoản”)</div>
               <div className="flex items-center gap-2">
@@ -968,11 +968,11 @@ export function ExpensesClient({
             </div>
             <div className="grid gap-2 md:grid-cols-3">
               <label className="block">
-                <span className="text-[11px] text-[#c9a98f]">Ngân hàng</span>
+                <span className="text-[11px] text-[#aa9a8b]">Ngân hàng</span>
                 <select
                   value={form.payeeBankBin}
                   onChange={(e) => setForm({ ...form, payeeBankBin: e.target.value })}
-                  className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
                 >
                   <option value="">— Chọn ngân hàng —</option>
                   {VN_BANKS.map((b) => (
@@ -983,23 +983,23 @@ export function ExpensesClient({
                 </select>
               </label>
               <label className="block">
-                <span className="text-[11px] text-[#c9a98f]">Số tài khoản</span>
+                <span className="text-[11px] text-[#aa9a8b]">Số tài khoản</span>
                 <input
                   value={form.payeeAccountNumber}
                   onChange={(e) =>
                     setForm({ ...form, payeeAccountNumber: e.target.value.replace(/[^0-9A-Za-z]/g, "") })
                   }
                   placeholder="VD: 0123456789"
-                  className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
                 />
               </label>
               <label className="block">
-                <span className="text-[11px] text-[#c9a98f]">Tên chủ TK</span>
+                <span className="text-[11px] text-[#aa9a8b]">Tên chủ TK</span>
                 <input
                   value={form.payeeAccountName}
                   onChange={(e) => setForm({ ...form, payeeAccountName: e.target.value })}
                   placeholder="Hiện trên QR (tuỳ chọn)"
-                  className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
                 />
               </label>
             </div>
@@ -1014,15 +1014,15 @@ export function ExpensesClient({
           {/* Priority toggle — reminder chỉ chạy khi lệnh vào hàng chờ KT chi, KT tạo phải qua admin duyệt trước */}
           {!isKt && (
           <div>
-            <div className="text-xs text-[#c9a98f] mb-1">Độ khẩn</div>
-            <div className="inline-flex rounded-lg border border-[#5a3418] bg-[#3a1608] p-0.5">
+            <div className="text-xs text-[#aa9a8b] mb-1">Độ khẩn</div>
+            <div className="inline-flex rounded-lg border border-[#604232] bg-[#3a1608] p-0.5">
               <button
                 type="button"
                 onClick={() => setForm({ ...form, priority: "normal" })}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium ${
                   form.priority === "normal"
-                    ? "bg-[#5a3418] text-[#f7f2e4]"
-                    : "text-[#c9a98f]"
+                    ? "bg-[#604232] text-[#f7f2e4]"
+                    : "text-[#aa9a8b]"
                 }`}
               >
                 Thường (nhắc 15ph/lần)
@@ -1033,7 +1033,7 @@ export function ExpensesClient({
                 className={`rounded-md px-3 py-1.5 text-xs font-medium ${
                   form.priority === "urgent"
                     ? "bg-red-500/20 text-red-200"
-                    : "text-[#c9a98f]"
+                    : "text-[#aa9a8b]"
                 }`}
               >
                 🚨 Gấp (nhắc 1ph/lần)
@@ -1043,13 +1043,13 @@ export function ExpensesClient({
           )}
 
           <label className="block">
-            <span className="text-xs text-[#c9a98f]">Ghi chú</span>
+            <span className="text-xs text-[#aa9a8b]">Ghi chú</span>
             <textarea
               rows={2}
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
               placeholder="Nội dung chi (vd: mua mực in cho VP, xăng xe đi công trình…)"
-              className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+              className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
             />
           </label>
           {isKt && (
@@ -1071,7 +1071,7 @@ export function ExpensesClient({
                 setShowCreate(false);
                 setForm(emptyCreate);
               }}
-              className="rounded-lg border border-[#5a3418] px-3 py-1.5 text-sm text-[#c9a98f]"
+              className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
             >
               Huỷ
             </button>
@@ -1081,12 +1081,12 @@ export function ExpensesClient({
 
       {/* Card list */}
       {loading && (
-        <div className="rounded-xl border border-[#5a3418] bg-[#431a0a] p-6 text-center text-sm text-[#c9a98f]">
+        <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-6 text-center text-sm text-[#aa9a8b]">
           Đang tải…
         </div>
       )}
       {!loading && rows.length === 0 && (
-        <div className="rounded-xl border border-[#5a3418] bg-[#431a0a] p-6 text-center text-sm text-[#c9a98f]">
+        <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-6 text-center text-sm text-[#aa9a8b]">
           Chưa có lệnh chi nào.
         </div>
       )}
@@ -1120,7 +1120,7 @@ export function ExpensesClient({
                   ? "border-zinc-700/40 opacity-80"
                   : r.status === "tptc_pending"
                     ? "border-violet-500/30"
-                    : "border-[#5a3418]";
+                    : "border-[#604232]";
 
             return (
               <div
@@ -1157,7 +1157,7 @@ export function ExpensesClient({
                         🚨 GẤP
                       </span>
                     )}
-                    <span className="font-mono text-[10px] tracking-wider text-[#a8886e]">{r.code}</span>
+                    <span className="font-mono text-[10px] tracking-wider text-[#856e60]">{r.code}</span>
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-xl font-extrabold leading-none tracking-tight text-[#f7f2e4] whitespace-nowrap">
@@ -1176,9 +1176,9 @@ export function ExpensesClient({
                   <div className="flex items-center gap-2 text-[#e5e7f5]">
                     <span className="h-1.5 w-1.5 rounded-full bg-orange-400/80 shrink-0" aria-hidden />
                     <span className="font-medium truncate">{r.category.name}</span>
-                    {r.payee && <span className="text-[#c9a98f] truncate">· {r.payee}</span>}
+                    {r.payee && <span className="text-[#aa9a8b] truncate">· {r.payee}</span>}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#c9a98f]">
+                  <div className="flex items-center gap-2 text-[11px] text-[#aa9a8b]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264] shrink-0" aria-hidden />
                     {r.project ? (
                       <span className="truncate">
@@ -1192,7 +1192,7 @@ export function ExpensesClient({
                       <span>Chi chung công ty</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#a8886e]">
+                  <div className="flex items-center gap-2 text-[11px] text-[#856e60]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264]/60 shrink-0" aria-hidden />
                     <span>{fmtDate(r.createdAt)} · {r.creator.fullName}</span>
                   </div>
@@ -1200,7 +1200,7 @@ export function ExpensesClient({
 
                 {/* Note admin (lúc gửi lệnh chi) */}
                 {r.note && (
-                  <div className="rounded-lg bg-[#3a1608]/80 border border-[#5a3418]/50 px-3 py-2 text-xs text-[#e8dcc8] italic">
+                  <div className="rounded-lg bg-[#3a1608]/80 border border-[#604232]/50 px-3 py-2 text-xs text-[#e8dcc8] italic">
                     &ldquo;{r.note}&rdquo;
                   </div>
                 )}
@@ -1215,7 +1215,7 @@ export function ExpensesClient({
 
                 {/* Bank info */}
                 {bank && r.payeeAccountNumber && (
-                  <div className="flex items-center gap-2.5 rounded-lg bg-[#3a1608] border border-[#5a3418]/60 px-3 py-2">
+                  <div className="flex items-center gap-2.5 rounded-lg bg-[#3a1608] border border-[#604232]/60 px-3 py-2">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-orange-500/15 text-orange-300 text-[10px] font-bold">
                       {bank.shortName.slice(0, 3).toUpperCase()}
                     </div>
@@ -1224,7 +1224,7 @@ export function ExpensesClient({
                       <div className="font-mono text-[11px] text-[#e8dcc8] truncate">{r.payeeAccountNumber}</div>
                     </div>
                     {r.payeeAccountName && (
-                      <div className="text-right text-[10px] font-medium uppercase tracking-wide text-[#c9a98f] truncate max-w-[140px]">
+                      <div className="text-right text-[10px] font-medium uppercase tracking-wide text-[#aa9a8b] truncate max-w-[140px]">
                         {r.payeeAccountName}
                       </div>
                     )}
@@ -1267,7 +1267,7 @@ export function ExpensesClient({
                   (canCreate && r.status !== "cancelled") ||
                   attachmentList(r).length > 0 ||
                   r.paidReceiptUrl) && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#5a3418]/40" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#604232]/40" onClick={(e) => e.stopPropagation()}>
                     {canCreate && r.status !== "cancelled" && (
                       <button
                         onClick={() => sendPublicLink(r)}
@@ -1283,7 +1283,7 @@ export function ExpensesClient({
                         onClick={toggle}
                         className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                           isExpanded
-                            ? "bg-[#5a3418] text-[#e8dcc8] hover:bg-[#373d57]"
+                            ? "bg-[#604232] text-[#e8dcc8] hover:bg-[#373d57]"
                             : "bg-orange-500 text-[#3a1608] hover:bg-orange-400"
                         }`}
                       >
@@ -1388,7 +1388,7 @@ export function ExpensesClient({
 
                 {/* Expanded transfer details */}
                 {canQuickTransfer && isExpanded && (
-                  <div className="slide-up rounded-lg bg-[#3a1608]/60 border border-[#5a3418]/60 p-3 mt-1" onClick={(e) => e.stopPropagation()}>
+                  <div className="slide-up rounded-lg bg-[#3a1608]/60 border border-[#604232]/60 p-3 mt-1" onClick={(e) => e.stopPropagation()}>
                     <TransferDetails
                       expense={r}
                       canMarkPaid={canMarkPaid}
@@ -1407,7 +1407,7 @@ export function ExpensesClient({
       )}
 
       {!loading && rows.length > 0 && (
-        <div className="rounded-xl border border-[#5a3418] bg-[#3a1608]/50 px-3 py-2 text-xs text-[#e8dcc8] flex flex-wrap gap-x-3 gap-y-1">
+        <div className="rounded-xl border border-[#604232] bg-[#3a1608]/50 px-3 py-2 text-xs text-[#e8dcc8] flex flex-wrap gap-x-3 gap-y-1">
           <span>
             Tổng <b>{rows.length}</b> lệnh · {money(totalAmount)}
           </span>
@@ -1423,7 +1423,7 @@ export function ExpensesClient({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg space-y-3 rounded-xl border border-[#5a3418] bg-[#431a0a] p-4 text-sm text-[#e8dcc8]"
+            className="w-full max-w-lg space-y-3 rounded-xl border border-[#604232] bg-[#431a0a] p-4 text-sm text-[#e8dcc8]"
           >
             <div className="text-base font-semibold text-orange-300">Hướng dẫn dùng Lệnh chi</div>
             <div className="space-y-2">
@@ -1473,17 +1473,17 @@ export function ExpensesClient({
           <form
             onSubmit={submitPay}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[540px] max-h-[93dvh] space-y-4 overflow-y-auto rounded-t-2xl border border-[#5a3418] bg-[#3a1608] p-5 sm:rounded-2xl"
+            className="w-full max-w-[540px] max-h-[93dvh] space-y-4 overflow-y-auto rounded-t-2xl border border-[#604232] bg-[#3a1608] p-5 sm:rounded-2xl"
           >
-            <div className="flex items-start justify-between gap-3 border-b border-[#5a3418] pb-3">
+            <div className="flex items-start justify-between gap-3 border-b border-[#604232] pb-3">
               <div>
                 <div className="text-lg font-semibold text-emerald-300">Ghi nhận đã chi</div>
-                <div className="font-mono text-[11px] tracking-wider text-[#a8886e]">{openPay.code}</div>
+                <div className="font-mono text-[11px] tracking-wider text-[#856e60]">{openPay.code}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenPay(null)}
-                className="rounded-lg border border-[#5a3418] px-2.5 py-1 text-sm text-[#c9a98f]"
+                className="rounded-lg border border-[#604232] px-2.5 py-1 text-sm text-[#aa9a8b]"
                 aria-label="Đóng"
               >
                 ✕
@@ -1491,7 +1491,7 @@ export function ExpensesClient({
             </div>
 
             {/* Thông tin đầy đủ lệnh chi */}
-            <div className="rounded-xl border border-[#5a3418] bg-[#431a0a] p-4">
+            <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-4">
               <div className="text-2xl font-extrabold tracking-tight text-[#f7f2e4]">
                 {money(openPay.amount)}
               </div>
@@ -1520,22 +1520,22 @@ export function ExpensesClient({
             </div>
             <div className="pt-1 text-sm font-semibold text-[#e8dcc8]">Xác nhận đã chi</div>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Số tiền thực chi (₫) *</span>
+              <span className="text-xs text-[#aa9a8b]">Số tiền thực chi (₫) *</span>
               <MoneyInput
                 value={payAmount}
                 onChange={setPayAmount}
                 required
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Ngày chi *</span>
+              <span className="text-xs text-[#aa9a8b]">Ngày chi *</span>
               <input
                 type="date"
                 value={payDate}
                 onChange={(e) => setPayDate(e.target.value)}
                 required
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <ReceiptMultiPicker value={payReceiptUrls} onChange={setPayReceiptUrls} />
@@ -1549,18 +1549,18 @@ export function ExpensesClient({
                       key={a.id}
                       type="button"
                       onClick={() => setPayAccountId(a.id)}
-                      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-[#f0752f] bg-[#f0752f]/10" : "border-[#5a3418] bg-[#3a1608]"}`}
+                      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-[#f0752f] bg-[#f0752f]/10" : "border-[#604232] bg-[#3a1608]"}`}
                     >
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#5a3418] text-base">{a.kind === "cash" ? "💵" : "🏦"}</div>
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#604232] text-base">{a.kind === "cash" ? "💵" : "🏦"}</div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-[#f7f2e4]">{a.name}</div>
-                        <div className="text-[10px] text-[#a8886e]">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
+                        <div className="text-[10px] text-[#856e60]">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
                       </div>
                       <div className="ml-auto text-right">
                         <div className="font-mono text-sm font-bold text-[#f7f2e4]">{money(a.currentBalance)}</div>
-                        <div className="text-[9px] text-[#a8886e]">số dư</div>
+                        <div className="text-[9px] text-[#856e60]">số dư</div>
                       </div>
-                      <div className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${on ? "border-[#f0752f]" : "border-[#5a3418]"}`}>
+                      <div className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${on ? "border-[#f0752f]" : "border-[#604232]"}`}>
                         {on && <div className="h-[9px] w-[9px] rounded-full bg-[#f0752f]" />}
                       </div>
                     </button>
@@ -1572,27 +1572,27 @@ export function ExpensesClient({
                 if (!sel) return null;
                 const after = sel.currentBalance - (Number(payAmount) || 0);
                 return (
-                  <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs ${after < 0 ? "bg-red-500/10" : "bg-[#5a3418]/40"}`}>
-                    <span className="text-[#c9a98f]">Số dư sau chi ({sel.name})</span>
+                  <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs ${after < 0 ? "bg-red-500/10" : "bg-[#604232]/40"}`}>
+                    <span className="text-[#aa9a8b]">Số dư sau chi ({sel.name})</span>
                     <span className={`font-mono font-bold ${after < 0 ? "text-red-300" : "text-[#f7f2e4]"}`}>{money(after)}{after < 0 ? " ⚠ âm quỹ" : ""}</span>
                   </div>
                 );
               })()}
             </div>
             <div className="block">
-              <span className="text-xs font-semibold text-[#c9a98f]">Ghi chú</span>
+              <span className="text-xs font-semibold text-[#aa9a8b]">Ghi chú</span>
               <div className="mt-2 flex flex-col gap-2">
                 {openPay.note && (
-                  <div className="flex items-start gap-2 rounded-lg border border-[#5a3418] bg-[#3a1608] px-2.5 py-2">
+                  <div className="flex items-start gap-2 rounded-lg border border-[#604232] bg-[#3a1608] px-2.5 py-2">
                     <span className="shrink-0 rounded-full bg-[#8a3d1c]/40 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#d8996a]">Admin</span>
                     <div className="min-w-0">
                       <div className="text-xs text-[#f7f2e4]">{openPay.note}</div>
-                      <div className="mt-0.5 text-[9px] text-[#a8886e]">{openPay.creator.fullName} · {fmtDate(openPay.createdAt)}</div>
+                      <div className="mt-0.5 text-[9px] text-[#856e60]">{openPay.creator.fullName} · {fmtDate(openPay.createdAt)}</div>
                     </div>
                   </div>
                 )}
                 {openPay.paidNote && (
-                  <div className="flex items-start gap-2 rounded-lg border border-[#5a3418] bg-[#3a1608] px-2.5 py-2">
+                  <div className="flex items-start gap-2 rounded-lg border border-[#604232] bg-[#3a1608] px-2.5 py-2">
                     <span className="shrink-0 rounded-full bg-[#3f6f86]/30 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#8fc0d8]">Kế toán</span>
                     <div className="text-xs text-[#f7f2e4]">{openPay.paidNote}</div>
                   </div>
@@ -1602,7 +1602,7 @@ export function ExpensesClient({
                   value={payNote}
                   onChange={(e) => setPayNote(e.target.value)}
                   placeholder="Thêm ghi chú của kế toán…"
-                  className="w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                  className="w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
                 />
               </div>
             </div>
@@ -1620,7 +1620,7 @@ export function ExpensesClient({
               <button
                 type="button"
                 onClick={() => setOpenPay(null)}
-                className="rounded-lg border border-[#5a3418] px-3 py-1.5 text-sm text-[#c9a98f]"
+                className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
               >
                 Huỷ
               </button>
@@ -1639,16 +1639,16 @@ export function ExpensesClient({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md space-y-3 rounded-xl border border-[#5a3418] bg-[#431a0a] p-4"
+            className="w-full max-w-md space-y-3 rounded-xl border border-[#604232] bg-[#431a0a] p-4"
           >
             <div className="text-base font-semibold text-red-300">Huỷ lệnh chi {openCancel.code}</div>
             <label className="block">
-              <span className="text-xs text-[#c9a98f]">Lý do huỷ *</span>
+              <span className="text-xs text-[#aa9a8b]">Lý do huỷ *</span>
               <textarea
                 rows={3}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
               />
             </label>
             <div className="flex gap-2">
@@ -1661,7 +1661,7 @@ export function ExpensesClient({
               </button>
               <button
                 onClick={() => setOpenCancel(null)}
-                className="rounded-lg border border-[#5a3418] px-3 py-1.5 text-sm text-[#c9a98f]"
+                className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
               >
                 Đóng
               </button>
@@ -1677,13 +1677,13 @@ export function ExpensesClient({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl rounded-xl border border-[#5a3418] bg-[#3a1608] shadow-xl"
+            className="w-full max-w-5xl rounded-xl border border-[#604232] bg-[#3a1608] shadow-xl"
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#5a3418] bg-[#431a0a] px-4 py-2.5">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#604232] bg-[#431a0a] px-4 py-2.5">
               <div className="text-base font-semibold text-orange-300">Sổ quỹ — chi tiết</div>
               <button
                 onClick={() => setShowTreasury(false)}
-                className="rounded-lg px-2 py-1 text-[#c9a98f] hover:bg-[#3a1608] hover:text-[#f7f2e4]"
+                className="rounded-lg px-2 py-1 text-[#aa9a8b] hover:bg-[#3a1608] hover:text-[#f7f2e4]"
                 aria-label="Đóng"
               >
                 ✕
@@ -1810,7 +1810,7 @@ function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: s
 
   return (
     <div className="block">
-      <span className="text-xs text-[#c9a98f]">Ảnh chứng từ chuyển khoản (tuỳ chọn)</span>
+      <span className="text-xs text-[#aa9a8b]">Ảnh chứng từ chuyển khoản (tuỳ chọn)</span>
       <input
         ref={ref}
         type="file"
@@ -1826,7 +1826,7 @@ function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: s
           type="button"
           onClick={() => ref.current?.click()}
           disabled={uploading}
-          className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
+          className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
         >
           {uploading ? "Đang tải…" : value ? "📎 Đổi ảnh" : "📷 Chọn ảnh"}
         </button>
@@ -1893,7 +1893,7 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
 
   return (
     <div className="block">
-      <span className="text-xs text-[#c9a98f]">
+      <span className="text-xs text-[#aa9a8b]">
         Ảnh chuyển khoản (tuỳ chọn){value.length > 0 && ` — ${value.length}/${MAX}`}
       </span>
       <input
@@ -1915,7 +1915,7 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
               <img
                 src={`/api/expenses/upload-preview?url=${encodeURIComponent(url)}`}
                 alt={`Bill ${i + 1}`}
-                className="h-16 w-full rounded-md border border-[#5a3418] object-cover"
+                className="h-16 w-full rounded-md border border-[#604232] object-cover"
               />
               <button
                 type="button"
@@ -1934,7 +1934,7 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
           type="button"
           onClick={() => ref.current?.click()}
           disabled={uploading || value.length >= MAX}
-          className="rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
+          className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
         >
           {uploading ? "Đang tải…" : value.length ? "📷 Thêm ảnh" : "📷 Chọn ảnh (nhiều)"}
         </button>
@@ -1945,8 +1945,8 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
 
 function InfoRow({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-[#5a3418]/40 pb-1.5">
-      <dt className="shrink-0 text-[#c9a98f]">{k}</dt>
+    <div className="flex justify-between gap-4 border-b border-[#604232]/40 pb-1.5">
+      <dt className="shrink-0 text-[#aa9a8b]">{k}</dt>
       <dd className="break-words text-right font-medium text-[#e5e7f5]">{v}</dd>
     </div>
   );
@@ -2116,7 +2116,7 @@ function TransferDetails({
 
         <div className="space-y-1 rounded-lg bg-[#3a1608] p-2.5 text-xs">
           <div className="flex justify-between gap-2">
-            <span className="text-[#c9a98f]">NH nhận</span>
+            <span className="text-[#aa9a8b]">NH nhận</span>
             <span className="font-semibold text-[#f7f2e4]">{recipientBank?.shortName ?? "—"}</span>
           </div>
           <button
@@ -2125,12 +2125,12 @@ function TransferDetails({
             className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
             title="Bấm để copy"
           >
-            <span className="text-[#c9a98f]">Số TK</span>
+            <span className="text-[#aa9a8b]">Số TK</span>
             <span className="font-mono text-[#f7f2e4]">{expense.payeeAccountNumber} ⧉</span>
           </button>
           {expense.payeeAccountName && (
             <div className="flex justify-between gap-2 px-1">
-              <span className="text-[#c9a98f]">Chủ TK</span>
+              <span className="text-[#aa9a8b]">Chủ TK</span>
               <span className="font-semibold uppercase text-[#f7f2e4]">{expense.payeeAccountName}</span>
             </div>
           )}
@@ -2140,7 +2140,7 @@ function TransferDetails({
             className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
             title="Bấm để copy"
           >
-            <span className="text-[#c9a98f]">Số tiền</span>
+            <span className="text-[#aa9a8b]">Số tiền</span>
             <span className="font-bold text-orange-300">{money(expense.amount)} ⧉</span>
           </button>
           <button
@@ -2149,7 +2149,7 @@ function TransferDetails({
             className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
             title="Bấm để copy"
           >
-            <span className="text-[#c9a98f]">Nội dung</span>
+            <span className="text-[#aa9a8b]">Nội dung</span>
             <span className="font-mono text-[#f7f2e4]">{memo} ⧉</span>
           </button>
           {expense.note && (
@@ -2159,7 +2159,7 @@ function TransferDetails({
               className="flex w-full items-start justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
               title="Bấm để copy ghi chú admin"
             >
-              <span className="text-[#c9a98f] shrink-0">Ghi chú</span>
+              <span className="text-[#aa9a8b] shrink-0">Ghi chú</span>
               <span className="text-right text-[#f7f2e4] break-words">{expense.note} ⧉</span>
             </button>
           )}
@@ -2208,7 +2208,7 @@ function TransferDetails({
           </button>
           <button
             onClick={() => saveQrImage(false)}
-            className="w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-3 py-1.5 text-xs font-medium text-[#e8dcc8]"
+            className="w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-xs font-medium text-[#e8dcc8]"
           >
             💾 Chỉ lưu ảnh QR
           </button>
@@ -2229,30 +2229,30 @@ function TransferDetails({
                 <div className="text-xs font-semibold text-emerald-300">Xác nhận đã chuyển khoản</div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[11px] text-[#c9a98f]">Số tiền (₫) *</span>
+                    <span className="text-[11px] text-[#aa9a8b]">Số tiền (₫) *</span>
                     <MoneyInput
                       value={payAmount}
                       onChange={setPayAmount}
-                      className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                      className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[11px] text-[#c9a98f]">Ngày chi *</span>
+                    <span className="text-[11px] text-[#aa9a8b]">Ngày chi *</span>
                     <input
                       type="date"
                       value={payDate}
                       onChange={(e) => setPayDate(e.target.value)}
-                      className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                      className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
                     />
                   </label>
                 </div>
                 <ReceiptFilePicker value={payReceipt} onChange={setPayReceipt} />
                 <label className="block">
-                  <span className="text-[11px] text-[#c9a98f]">Tài khoản quỹ *</span>
+                  <span className="text-[11px] text-[#aa9a8b]">Tài khoản quỹ *</span>
                   <select
                     value={payAccountId}
                     onChange={(e) => setPayAccountId(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                    className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
                   >
                     <option value="">— Chọn tài khoản —</option>
                     {cashAccounts.map((a) => (
@@ -2261,13 +2261,13 @@ function TransferDetails({
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] text-[#c9a98f]">Ghi chú KT</span>
+                  <span className="text-[11px] text-[#aa9a8b]">Ghi chú KT</span>
                   <textarea
                     rows={2}
                     value={payNote}
                     onChange={(e) => setPayNote(e.target.value)}
                     placeholder="VD: chuyển lúc 14h, mã GD 88231"
-                    className="mt-0.5 w-full rounded-lg border border-[#5a3418] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
+                    className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
                   />
                 </label>
                 <div className="text-[10px] text-amber-300">
@@ -2285,7 +2285,7 @@ function TransferDetails({
                   <button
                     type="button"
                     onClick={() => setShowPayForm(false)}
-                    className="rounded-lg border border-[#5a3418] px-3 py-2 text-xs text-[#c9a98f]"
+                    className="rounded-lg border border-[#604232] px-3 py-2 text-xs text-[#aa9a8b]"
                   >
                     Quay lại
                   </button>
