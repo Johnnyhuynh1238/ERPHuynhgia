@@ -606,7 +606,7 @@ export function ExpensesClient({
           : "text-emerald-300";
 
   return (
-    <div className={`space-y-3 ${plexSans.variable} ${plexMono.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif" }}>
+    <div className={`space-y-3 -mx-4 -mt-4 min-h-[100dvh] bg-[#3a1608] px-4 pt-4 pb-16 md:-mx-6 md:px-6 ${plexSans.variable} ${plexMono.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif" }}>
       {aiOpen &&
         mounted &&
         createPortal(
