@@ -1,5 +1,6 @@
 "use client";
 
+import "./expenses.css";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -9,21 +10,7 @@ import { MoneyInput } from "@/components/money-input";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
-import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
-
-const plexSans = IBM_Plex_Sans({
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex-sans",
-  display: "swap",
-});
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
-  display: "swap",
-});
+import { useCashAccounts, CashAccountOption } from "@/lib/use-cash-accounts";
 
 type ProjectOption = { id: string; code: string; name: string };
 type CategoryOption = { id: string; code: string; name: string; scope: string | null };
@@ -67,15 +54,13 @@ type Expense = {
 function money(v: number | null | undefined) {
   return `${(v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} đ`;
 }
+function moneyPlain(v: number | null | undefined) {
+  return (v || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+}
 function fmtDate(s: string | null) {
   if (!s) return "—";
   const d = new Date(s);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-}
-function statusMeta(s: Expense["status"]) {
-  if (s === "pending") return { label: "Chờ chi", cls: "bg-amber-500/15 text-amber-300" };
-  if (s === "paid") return { label: "Đã chi", cls: "bg-emerald-500/15 text-emerald-300" };
-  return { label: "Đã huỷ", cls: "bg-zinc-500/15 text-zinc-300" };
 }
 
 type CreateForm = {
@@ -116,6 +101,21 @@ const emptyCreate: CreateForm = {
   subPaymentId: "",
 };
 
+const TABS: { key: string; label: string }[] = [
+  { key: "pending", label: "Chờ chi" },
+  { key: "tptc_pending", label: "Chờ duyệt" },
+  { key: "paid", label: "Đã chi" },
+  { key: "cancelled", label: "Đã huỷ" },
+  { key: "all", label: "Tất cả" },
+];
+
+function statusBadge(s: Expense["status"]) {
+  if (s === "pending") return { label: "Chờ chi", cls: "st-pend" };
+  if (s === "tptc_pending") return { label: "Chờ duyệt", cls: "st-wait" };
+  if (s === "paid") return { label: "Đã chi", cls: "st-paid" };
+  return { label: "Đã huỷ", cls: "st-cancel" };
+}
+
 export function ExpensesClient({
   role,
   projects,
@@ -131,6 +131,19 @@ export function ExpensesClient({
   const isKt = role === "accountant";
   const canCreate = role === "admin" || role === "accountant";
   const canMarkPaid = role === "admin" || role === "accountant";
+
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  useEffect(() => {
+    const s = window.localStorage.getItem("lc.theme");
+    if (s === "light" || s === "dark") setTheme(s);
+  }, []);
+  function toggleTheme() {
+    setTheme((t) => {
+      const n = t === "dark" ? "light" : "dark";
+      window.localStorage.setItem("lc.theme", n);
+      return n;
+    });
+  }
 
   const [rows, setRows] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -292,6 +305,11 @@ export function ExpensesClient({
 
   const totalAmount = useMemo(() => rows.reduce((s, r) => s + r.amount, 0), [rows]);
   const totalPaid = useMemo(() => rows.reduce((s, r) => s + (r.paidAmount || 0), 0), [rows]);
+  const paidLoaded = useMemo(() => rows.filter((r) => r.status === "paid"), [rows]);
+  const paidLoadedSum = useMemo(
+    () => paidLoaded.reduce((s, r) => s + (r.paidAmount || r.amount), 0),
+    [paidLoaded],
+  );
 
   const balanceAfterForm = useMemo(() => {
     const amt = Number(form.amount);
@@ -302,8 +320,7 @@ export function ExpensesClient({
   // Danh mục theo ngữ cảnh "Chi cho": có HĐ (thi công/thiết kế) → scope "project";
   // Chi chung công ty → scope "company". Giữ thêm danh mục đang chọn nếu ngoài scope
   // (vd lệnh chi thầu phụ prefill "Thầu phụ") để hiển thị đúng.
-  const chiScope: "project" | "company" =
-    form.projectId || form.designContractId ? "project" : "company";
+  const chiScope: "project" | "company" = form.projectId || form.designContractId ? "project" : "company";
   const visibleCategories = useMemo(() => {
     const inScope = categories.filter((c) => c.scope === chiScope);
     const sel = categories.find((c) => c.id === form.categoryId);
@@ -558,11 +575,12 @@ export function ExpensesClient({
     setPayAmount(String(e.amount));
     setPayNote("");
     setPayReceiptUrls([]);
+    setPayAccountId("");
     setPayDate(new Date().toISOString().slice(0, 10));
   }
 
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
-  // Lấy (lazy-tạo) link theo dõi công khai rồi mở share (Zalo/SMS…) để gửi NCC.
+  // Lấy (lazy-tạo) link theo dõi công khai rồi copy để gửi NCC.
   async function sendPublicLink(e: Expense) {
     setLinkBusyId(e.id);
     try {
@@ -596,17 +614,49 @@ export function ExpensesClient({
     }
   }
 
-  const balanceTone =
-    balance == null
-      ? "text-[#aa9a8b]"
-      : balance < 5_000_000
-        ? "text-red-300"
-        : balance < 20_000_000
-          ? "text-amber-300"
-          : "text-emerald-300";
+  async function approveExpense(r: Expense) {
+    if (!(await confirmDialog(`Duyệt lệnh chi ${r.code}?`))) return;
+    const res = await fetch(`/api/expenses/${r.id}/approve`, { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(j.message || "Không duyệt được");
+      return;
+    }
+    toast.success(j.message || "Đã duyệt");
+    load();
+  }
+
+  async function rejectExpense(r: Expense) {
+    const reason = window.prompt(`Lý do từ chối lệnh chi ${r.code}:`);
+    if (!reason || reason.trim().length < 3) {
+      if (reason !== null) toast.error("Lý do tối thiểu 3 ký tự");
+      return;
+    }
+    const res = await fetch(`/api/expenses/${r.id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(j.message || "Không từ chối được");
+      return;
+    }
+    toast.success(j.message || "Đã từ chối");
+    load();
+  }
+
+  const selAcc = cashAccounts.find((a) => a.id === payAccountId) || null;
+  const payAfter = selAcc ? selAcc.currentBalance - (Number(payAmount) || 0) : null;
+
+  function tabCount(key: string): number | null {
+    if (key === "pending") return pendingCount;
+    if (key === status) return rows.length;
+    return null;
+  }
 
   return (
-    <div className={`space-y-3 -mx-4 -mt-4 min-h-[100dvh] bg-[#3a1608] px-4 pt-4 pb-16 md:-mx-6 md:px-6 ${plexSans.variable} ${plexMono.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif" }}>
+    <div className="lc-doc" data-theme={theme}>
       {aiOpen &&
         mounted &&
         createPortal(
@@ -617,15 +667,15 @@ export function ExpensesClient({
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#604232] bg-[#3a1608] shadow-2xl sm:w-auto sm:rounded-2xl"
+              className="flex w-full flex-col overflow-hidden rounded-t-2xl border border-[#2d3249] bg-[#0b0d16] shadow-2xl sm:w-auto sm:rounded-2xl"
               style={{ width: "min(480px, 100%)", height: "calc(100dvh - 8px)", maxHeight: "100dvh" }}
             >
-              <div className="flex items-center gap-2 border-b border-[#604232] bg-[#3a1608] px-3 py-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d8996a]"><Sparkles className="h-4 w-4" /> AI Thu-Chi</span>
+              <div className="flex items-center gap-2 border-b border-[#252840] bg-[#12141f] px-3 py-2">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#7aa2ff]"><Sparkles className="h-4 w-4" /> AI Thu-Chi</span>
                 <button
                   type="button"
                   onClick={() => setAiOpen(false)}
-                  className="ml-auto rounded-md px-2 py-0.5 text-[#aa9a8b] hover:bg-[#604232] hover:text-white"
+                  className="ml-auto rounded-md px-2 py-0.5 text-[#8b95b7] hover:bg-[#252840] hover:text-white"
                   aria-label="Đóng"
                 >
                   ✕
@@ -640,246 +690,609 @@ export function ExpensesClient({
           </div>,
           document.body,
         )}
-      {/* Header */}
-      <div>
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#d8996a]">Sổ quỹ công ty</div>
-        <h1 className="mt-1.5 text-[25px] font-semibold leading-tight tracking-tight text-[#f7f2e4]">Lệnh chi</h1>
-      </div>
 
-      {/* Tiles */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Chờ chi</div>
-          <div className="mt-1 truncate font-mono text-[13px] font-semibold text-[#d8b25e]">{money(pendingTotal)}</div>
-          <div className="text-[10px] text-[#856e60]">{pendingCount} lệnh</div>
-        </div>
-        <div className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Đã chi</div>
-          <div className="mt-1 truncate font-mono text-[13px] font-semibold text-emerald-300">{money(totalPaid)}</div>
-        </div>
-        <button type="button" onClick={() => setShowTreasury(true)} className="min-w-0 rounded-xl border border-[#604232] bg-[#4a1d0c] px-3 py-2.5 text-left transition active:scale-[0.98]">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#aa9a8b]">Số dư quỹ ›</div>
-          <div className={`mt-1 truncate font-mono text-[13px] font-semibold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</div>
-        </button>
-      </div>
-
-      {/* Status tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {[
-          { k: "pending", l: "Chờ chi" },
-          { k: "tptc_pending", l: "Chờ duyệt" },
-          { k: "paid", l: "Đã chi" },
-          { k: "cancelled", l: "Đã huỷ" },
-          { k: "all", l: "Tất cả" },
-        ].map((t) => (
-          <button
-            key={t.k}
-            type="button"
-            onClick={() => setStatus(t.k)}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${status === t.k ? "border-[#f7f2e4] bg-[#f7f2e4] text-[#3a1608]" : "border-[#604232] text-[#aa9a8b]"}`}
-          >
-            {t.l}
-          </button>
-        ))}
-      </div>
-      {/* Action row */}
-      <div className="flex items-center gap-2">
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className={`rounded-lg border px-2 py-1 text-xs ${
-              showFilters
-                ? "border-[#f0752f] bg-[#f0752f]/15 text-[#f0a56a]"
-                : "border-[#604232] text-[#aa9a8b] hover:text-[#f7f2e4]"
-            }`}
-            title="Bộ lọc"
-            aria-label="Bộ lọc"
-          >
-            ⏷ Lọc
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            className="rounded-full border border-[#604232] px-2 py-1 text-xs text-[#aa9a8b] hover:text-[#f7f2e4]"
-            title="Hướng dẫn"
-            aria-label="Hướng dẫn"
-          >
-            ?
-          </button>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setAiOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#2d6cf6]/50 bg-[#2d6cf6]/15 px-2.5 py-1 text-xs font-semibold text-[#d8996a] hover:bg-[#2d6cf6]/25"
-              title="Nhập lệnh chi bằng AI (chat)"
-              aria-label="AI thu chi"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> AI
+      <div className="wrap">
+        {/* Topbar */}
+        <div className="topbar">
+          <div className="brand">
+            <div className="mark">HG</div>
+            <div>
+              <b>HUỲNH GIA</b>
+              <span>Kế toán</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            {isAdmin && (
+              <button className="iconbtn" onClick={() => setAiOpen(true)} title="Nhập lệnh chi bằng AI" aria-label="AI">
+                <Sparkles style={{ width: 15, height: 15 }} />
+              </button>
+            )}
+            <button className="iconbtn" onClick={() => setShowHelp(true)} title="Hướng dẫn" aria-label="Hướng dẫn">
+              ?
             </button>
-          )}
+            <button className="iconbtn" onClick={toggleTheme} title="Đổi nền" aria-label="Đổi nền">
+              ◐
+            </button>
+          </div>
+        </div>
+
+        {/* Head + meta */}
+        <div className="head-row">
+          <div>
+            <div className="eyebrow">Sổ quỹ công ty</div>
+            <h1>Lệnh chi</h1>
+          </div>
           {canCreate && (
-            <button
-              onClick={() => setShowCreate((v) => !v)}
-              className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#3a1608]"
-            >
+            <button className="btn primary" onClick={() => setShowCreate(true)}>
               + Lệnh chi
             </button>
           )}
         </div>
+        <div className="meta">
+          <span>
+            Chờ chi <span className="num">{pendingCount}</span>
+          </span>
+          <span className="d">·</span>
+          <span className="num">{money(pendingTotal)}</span>
+        </div>
+
+        {/* Stats */}
+        <div className="stats">
+          <div className="tile">
+            <div className="k">Chờ chi</div>
+            <div className="v am num">{moneyPlain(pendingTotal)}</div>
+            <div className="s">{pendingCount} lệnh</div>
+          </div>
+          <div className="tile">
+            <div className="k">Đã chi (đang xem)</div>
+            <div className="v chi num">{moneyPlain(paidLoadedSum)}</div>
+            <div className="s">{paidLoaded.length} lệnh</div>
+          </div>
+          <button className="tile" onClick={() => setShowTreasury(true)} title="Xem chi tiết sổ quỹ">
+            <div className="k">Số dư quỹ ›</div>
+            <div className="v num">{balance == null ? "…" : moneyPlain(balance)}</div>
+            <div className="s">TM + NH</div>
+          </button>
+        </div>
+
+        {/* Search + filter toggle */}
+        <div className="actions">
+          <div className="search">
+            <span className="ic">⌕</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm nội dung / người nhận / STK"
+            />
+          </div>
+          <button
+            className="iconbtn"
+            onClick={() => setShowFilters((v) => !v)}
+            title="Bộ lọc dự án / danh mục"
+            aria-label="Bộ lọc"
+            style={showFilters ? { borderColor: "var(--orange)", color: "var(--orange)" } : undefined}
+          >
+            ⏷
+          </button>
+        </div>
+
+        {showFilters && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            <select className="ctrl" style={{ flex: 1, minWidth: 160 }} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+              <option value="">Tất cả dự án</option>
+              <option value="none">Chi chung công ty</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
+            </select>
+            <select className="ctrl" style={{ flex: 1, minWidth: 160 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">Tất cả danh mục</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="tabs">
+          {TABS.map((t) => {
+            const cnt = tabCount(t.key);
+            return (
+              <button key={t.key} className={`tab${status === t.key ? " on" : ""}`} onClick={() => setStatus(t.key)}>
+                {t.label}
+                {cnt != null && <span className="cnt">{cnt}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* List */}
+        {loading && <div className="empty">Đang tải…</div>}
+        {!loading && rows.length === 0 && <div className="empty">Chưa có lệnh chi nào.</div>}
+
+        {!loading && rows.length > 0 && (
+          <div className="list">
+            {rows.map((r) => {
+              const isUrgent = r.priority === "urgent" && r.status === "pending";
+              const canQuickTransfer = r.status === "pending" && !!r.payeeBankBin && !!r.payeeAccountNumber && canMarkPaid;
+              const isExpanded = expandedId === r.id;
+              const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
+              const bank = r.payeeBankBin ? findBankByBin(r.payeeBankBin) : null;
+              const sb = statusBadge(r.status);
+              const atts = attachmentList(r);
+
+              const hasActbar =
+                canQuickTransfer ||
+                (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
+                (r.status === "pending" && isAdmin) ||
+                (r.status === "tptc_pending" && isAdmin) ||
+                (canCreate && r.status !== "cancelled") ||
+                atts.length > 0 ||
+                !!r.paidReceiptUrl;
+
+              return (
+                <div
+                  key={r.id}
+                  ref={r.id === highlightId ? highlightRef : undefined}
+                  onClick={canQuickTransfer ? toggle : undefined}
+                  className={`rcx${canQuickTransfer ? " clickable" : ""}${isUrgent ? " urgent" : ""}${
+                    r.id === highlightId ? " hl" : ""
+                  }`}
+                  style={r.status === "cancelled" ? { opacity: 0.72 } : r.status === "paid" ? { opacity: 0.92 } : undefined}
+                >
+                  {/* Header */}
+                  <div className="rcx-hd">
+                    <div className="rcx-badges">
+                      <span className={`stbadge ${sb.cls}`}>{sb.label}</span>
+                      {isUrgent && <span className="stbadge st-urgent">🚨 Gấp</span>}
+                      <span className="ccode">{r.code}</span>
+                    </div>
+                    <div className="rcx-amt num" style={r.status === "paid" ? { fontSize: 18 } : undefined}>
+                      {moneyPlain(r.amount)}
+                      <span className="u"> đ</span>
+                      {r.paidAmount != null && r.paidAmount !== r.amount && (
+                        <span className="real">Thực chi {money(r.paidAmount)}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Meta */}
+                  <div className="rcx-meta">
+                    <div className="mrow">
+                      <span className="mdot" style={{ background: "var(--orange)" }} />
+                      <span className="strong">{r.category.name}</span>
+                      {r.payee && <span className="mut">· {r.payee}</span>}
+                    </div>
+                    <div className="mrow" style={{ color: "var(--mut)" }}>
+                      <span className="mdot" style={{ background: "var(--mut2)" }} />
+                      {r.project ? (
+                        <span>
+                          <span className="num" style={{ color: "var(--terra)" }}>
+                            {r.project.code}
+                          </span>{" "}
+                          — {r.project.name}
+                        </span>
+                      ) : r.designContract ? (
+                        <span>
+                          <span className="num" style={{ color: "var(--terra)" }}>
+                            TK
+                          </span>{" "}
+                          — {r.designContract.customerName}
+                        </span>
+                      ) : (
+                        <span>Chi chung công ty</span>
+                      )}
+                    </div>
+                    <div className="mrow dim">
+                      <span className="mdot" style={{ background: "var(--mut2)", opacity: 0.6 }} />
+                      {fmtDate(r.createdAt)} · {r.creator.fullName}
+                    </div>
+
+                    {r.status === "tptc_pending" && (
+                      <div className="mrow wait">
+                        <span className="mdot" style={{ background: "var(--violet)" }} />⏳ KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt
+                      </div>
+                    )}
+                    {r.status === "paid" && (
+                      <div className="mrow ok">
+                        <span className="mdot" style={{ background: "var(--ok)" }} />✓ Đã chi {fmtDate(r.paidAt)}
+                        {r.payer ? ` · KT ${r.payer.fullName}` : ""}
+                      </div>
+                    )}
+                    {r.status === "cancelled" && (
+                      <div className="mrow cancel">
+                        <span className="mdot" style={{ background: "var(--mut2)" }} />✕ Huỷ {fmtDate(r.cancelledAt)}
+                        {r.cancelledReason ? ` · ${r.cancelledReason}` : ""}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Note admin */}
+                  {r.note && <div className="note-adm">&ldquo;{r.note}&rdquo;</div>}
+
+                  {/* Ghi chú KT lúc thanh toán */}
+                  {r.paidNote && (
+                    <div className="note-kt">
+                      <b>Ghi chú KT:</b> <span style={{ fontStyle: "italic" }}>&ldquo;{r.paidNote}&rdquo;</span>
+                    </div>
+                  )}
+
+                  {/* Bank box */}
+                  {bank && r.payeeAccountNumber && (
+                    <div className="bankbox">
+                      <div className="lg">{bank.shortName.slice(0, 3).toUpperCase()}</div>
+                      <div className="bk">
+                        <div className="nm">{bank.shortName}</div>
+                        <div className="no num">{r.payeeAccountNumber}</div>
+                      </div>
+                      {r.payeeAccountName && <div className="own">{r.payeeAccountName}</div>}
+                    </div>
+                  )}
+
+                  {/* Actbar */}
+                  {hasActbar && (
+                    <div className="actbar" onClick={(e) => e.stopPropagation()}>
+                      {canCreate && r.status !== "cancelled" && (
+                        <button
+                          className="actbtn a-link"
+                          onClick={() => sendPublicLink(r)}
+                          disabled={linkBusyId === r.id}
+                          title="Copy link theo dõi thanh toán để gửi NCC"
+                        >
+                          {linkBusyId === r.id ? "Đang tạo…" : "🔗 Gửi link NCC"}
+                        </button>
+                      )}
+                      {canQuickTransfer && (
+                        <button className={`actbtn ${isExpanded ? "a-cancel" : "a-ck"}`} onClick={toggle}>
+                          {isExpanded ? "⌃ Thu gọn" : "💸 Chuyển khoản"}
+                        </button>
+                      )}
+                      {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
+                        <button className="actbtn a-ok" onClick={() => openPayDialog(r)}>
+                          💵 Ghi nhận đã chi
+                        </button>
+                      )}
+                      {r.status === "tptc_pending" && isAdmin && (
+                        <>
+                          <button className="actbtn a-approve" onClick={() => approveExpense(r)}>
+                            ✓ Duyệt
+                          </button>
+                          <button className="actbtn a-cancel" onClick={() => rejectExpense(r)}>
+                            ✕ Từ chối
+                          </button>
+                        </>
+                      )}
+                      {r.status === "pending" && isAdmin && (
+                        <button
+                          className="actbtn a-cancel"
+                          onClick={() => {
+                            setOpenCancel(r);
+                            setCancelReason("");
+                          }}
+                        >
+                          Huỷ
+                        </button>
+                      )}
+                      {(atts.length > 0 || r.paidReceiptUrl) && (
+                        <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
+                          {atts.length > 0 && (
+                            <button
+                              className="actbtn a-bill"
+                              style={{ marginLeft: 0 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewer({ urls: atts, index: 0, expenseId: r.id, type: "attachment" });
+                              }}
+                            >
+                              📎 {atts.length > 1 ? `${atts.length} hoá đơn` : "Hoá đơn"}
+                            </button>
+                          )}
+                          {r.paidReceiptUrl && (
+                            <a
+                              className="actbtn a-doc"
+                              href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              📄 Chứng từ
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Expanded transfer */}
+                  {canQuickTransfer && isExpanded && (
+                    <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                      <TransferDetails
+                        expense={r}
+                        canMarkPaid={canMarkPaid}
+                        onPaid={() => {
+                          setExpandedId(null);
+                          load();
+                          loadBalance();
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && rows.length > 0 && (
+          <div className="foot-note">
+            Tổng {rows.length} lệnh · {money(totalAmount)}
+            {totalPaid > 0 ? ` · Đã chi ${money(totalPaid)}` : ""}
+          </div>
+        )}
       </div>
 
-      {/* Filters (collapsible) */}
-      {showFilters && (
-        <div className="flex flex-wrap gap-2 rounded-xl border border-[#604232] bg-[#431a0a] p-2">
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
-          >
-            <option value="">Tất cả dự án</option>
-            <option value="none">Chi chung công ty</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4]"
-          >
-            <option value="">Tất cả danh mục</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo code/payee/ghi chú"
-            className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-sm text-[#f7f2e4] min-w-[180px] flex-1"
-          />
+      {/* ===== POPUP: Ghi nhận đã chi ===== */}
+      {openPay && (
+        <div className="scrim" onClick={(e) => e.target === e.currentTarget && setOpenPay(null)}>
+          <form className="sheet" onSubmit={submitPay}>
+            <div className="sheet-hd">
+              <div>
+                <h3 className="ok">✓ Ghi nhận đã chi</h3>
+                <div className="sub">LC · {openPay.code}</div>
+              </div>
+              <button className="iconbtn" type="button" onClick={() => setOpenPay(null)} title="Đóng">
+                ✕
+              </button>
+            </div>
+
+            <div className="payinfo">
+              <div className="big num">
+                {moneyPlain(openPay.amount)} <span className="u">đ</span>
+              </div>
+              <div className="rows">
+                <div className="irow">
+                  <span className="k">Danh mục</span>
+                  <span className="v">{openPay.category.name}</span>
+                </div>
+                <div className="irow">
+                  <span className="k">SĐT người nhận</span>
+                  <span className="v">{openPay.payeePhone || "—"}</span>
+                </div>
+                <div className="irow">
+                  <span className="k">Dự án</span>
+                  <span className="v">
+                    {openPay.project
+                      ? `${openPay.project.code} — ${openPay.project.name}`
+                      : openPay.designContract
+                        ? `TK — ${openPay.designContract.customerName}`
+                        : "Chi chung công ty"}
+                  </span>
+                </div>
+                <div className="irow">
+                  <span className="k">Phương thức</span>
+                  <span className="v">{openPay.paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản"}</span>
+                </div>
+                <div className="irow">
+                  <span className="k">Nội dung</span>
+                  <span className="v">{openPay.note || "—"}</span>
+                </div>
+                <div className="irow">
+                  <span className="k">Ngày tạo</span>
+                  <span className="v">
+                    {fmtDate(openPay.createdAt)} · {openPay.creator.fullName}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="hint strong">Xác nhận đã chi</div>
+
+            <div className="fgrid">
+              <div className="fld">
+                <span className="lbl">
+                  Số tiền thực chi <span className="req">*</span>
+                </span>
+                <div className="money-wrap">
+                  <MoneyInput value={payAmount} onChange={setPayAmount} required className="ctrl num" />
+                  <span className="cur">đ</span>
+                </div>
+              </div>
+              <div className="fld">
+                <div className="dateinline">
+                  <span className="lbl">Ngày chi</span>
+                  <input className="ctrl bare" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} required />
+                </div>
+              </div>
+            </div>
+
+            {/* Chọn TK quỹ */}
+            <div className="acclbl">
+              💰 Chi từ tài khoản quỹ <span className="req">*</span>
+            </div>
+            <div className="accpick">
+              {cashAccounts.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`acc${payAccountId === a.id ? " on" : ""}`}
+                  onClick={() => setPayAccountId(a.id)}
+                >
+                  <div className="ic">{a.kind === "cash" ? "💵" : "🏦"}</div>
+                  <div>
+                    <div className="nm">{a.name}</div>
+                    <div className="kd">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
+                  </div>
+                  <div className="bal">
+                    <div className="b num">{moneyPlain(a.currentBalance)}</div>
+                    <div className="l">số dư đ</div>
+                  </div>
+                  <div className="rad" />
+                </button>
+              ))}
+              {cashAccounts.length === 0 && <div className="hint">Chưa có tài khoản quỹ.</div>}
+            </div>
+
+            {selAcc && payAfter != null && (
+              <div className="after">
+                <span className="lb">Số dư sau chi ({selAcc.name})</span>
+                <span className={`v ${payAfter < 0 ? "warn" : "ok"}`}>{money(payAfter)}</span>
+              </div>
+            )}
+
+            {/* Ghi chú */}
+            <div className="notes">
+              <div className="lbl">Ghi chú</div>
+              {openPay.note && (
+                <div className="notelist">
+                  <div className="note">
+                    <span className="who admin">Admin</span>
+                    <div className="bd">
+                      <div className="tx">{openPay.note}</div>
+                      <div className="mt">
+                        {openPay.creator.fullName} · {fmtDate(openPay.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="addnote">
+                <input
+                  className="ctrl"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  placeholder="Thêm ghi chú của kế toán…"
+                />
+              </div>
+            </div>
+
+            {/* Ảnh chứng từ */}
+            <ReceiptMultiPicker value={payReceiptUrls} onChange={setPayReceiptUrls} />
+
+            <div className="acts">
+              <button className="btn ghost" type="button" onClick={() => setOpenPay(null)}>
+                Huỷ
+              </button>
+              <button className="btn primary block" type="submit" disabled={paying}>
+                {paying ? "Đang ghi…" : "Xác nhận + ghi sổ quỹ →"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Create form */}
+      {/* ===== POPUP: Tạo lệnh chi ===== */}
       {showCreate && canCreate && (
-        <form onSubmit={submitCreate} className="rounded-xl border border-[#604232] bg-[#431a0a] p-3 space-y-3">
-          <div className="flex flex-wrap items-baseline gap-3 rounded-lg bg-[#3a1608] px-3 py-2 text-xs">
-            <span className="text-[#aa9a8b]">Số dư quỹ hiện tại:</span>
-            <span className={`font-bold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</span>
-            {balanceAfterForm != null && Number(form.amount) > 0 && (
-              <>
-                <span className="text-[#aa9a8b]">→ sau khi chi:</span>
-                <span className={balanceAfterForm < 0 ? "font-bold text-red-300" : "font-semibold text-[#e8dcc8]"}>
-                  {money(balanceAfterForm)}
-                </span>
-                {balanceAfterForm < 0 && <span className="text-red-300">⚠ vượt quỹ</span>}
-              </>
-            )}
-          </div>
+        <div className="scrim" onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}>
+          <form className="sheet" onSubmit={submitCreate}>
+            <div className="sheet-hd">
+              <div>
+                <h3 className="orange">+ Lệnh chi mới</h3>
+                <div className="sub">
+                  Số dư quỹ: {balance == null ? "…" : money(balance)}
+                  {balanceAfterForm != null && Number(form.amount) > 0
+                    ? ` → sau chi: ${money(balanceAfterForm)}${balanceAfterForm < 0 ? " ⚠" : ""}`
+                    : ""}
+                </div>
+              </div>
+              <button className="iconbtn" type="button" onClick={() => setShowCreate(false)} title="Đóng">
+                ✕
+              </button>
+            </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Chi cho hợp đồng</span>
-              <select
-                value={form.projectId ? `p:${form.projectId}` : form.designContractId ? `d:${form.designContractId}` : ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  const newScope: "project" | "company" = v.startsWith("p:") || v.startsWith("d:") ? "project" : "company";
-                  // Đổi ngữ cảnh → nếu danh mục đang chọn khác scope mới thì bỏ chọn.
-                  const selCat = categories.find((c) => c.id === form.categoryId);
-                  const keepCat = selCat && selCat.scope === newScope ? form.categoryId : "";
-                  if (v.startsWith("p:")) setForm({ ...form, projectId: v.slice(2), designContractId: "", categoryId: keepCat });
-                  else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2), categoryId: keepCat });
-                  else setForm({ ...form, projectId: "", designContractId: "", categoryId: keepCat });
-                }}
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              >
-                <option value="">Chi chung công ty</option>
-                <optgroup label="HĐ thi công">
-                  {projects.map((p) => (
-                    <option key={p.id} value={`p:${p.id}`}>
-                      {p.code} — {p.name}
+            <div className="formgrid" style={{ marginBottom: 12 }}>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">Chi cho hợp đồng</span>
+                <select
+                  className="ctrl"
+                  value={form.projectId ? `p:${form.projectId}` : form.designContractId ? `d:${form.designContractId}` : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const newScope: "project" | "company" = v.startsWith("p:") || v.startsWith("d:") ? "project" : "company";
+                    // Đổi ngữ cảnh → nếu danh mục đang chọn khác scope mới thì bỏ chọn.
+                    const selCat = categories.find((c) => c.id === form.categoryId);
+                    const keepCat = selCat && selCat.scope === newScope ? form.categoryId : "";
+                    if (v.startsWith("p:")) setForm({ ...form, projectId: v.slice(2), designContractId: "", categoryId: keepCat });
+                    else if (v.startsWith("d:")) setForm({ ...form, projectId: "", designContractId: v.slice(2), categoryId: keepCat });
+                    else setForm({ ...form, projectId: "", designContractId: "", categoryId: keepCat });
+                  }}
+                >
+                  <option value="">Chi chung công ty</option>
+                  <optgroup label="HĐ thi công">
+                    {projects.map((p) => (
+                      <option key={p.id} value={`p:${p.id}`}>
+                        {p.code} — {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="HĐ thiết kế">
+                    {designContracts.map((c) => (
+                      <option key={c.id} value={`d:${c.id}`}>
+                        TK {c.signedAt} — {c.customerName}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </label>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">
+                  Danh mục <span className="req">*</span>
+                </span>
+                <select className="ctrl" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required>
+                  <option value="">— Chọn —</option>
+                  {visibleCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
-                </optgroup>
-                <optgroup label="HĐ thiết kế">
-                  {designContracts.map((c) => (
-                    <option key={c.id} value={`d:${c.id}`}>
-                      TK {c.signedAt} — {c.customerName}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Danh mục *</span>
-              <select
-                value={form.categoryId}
-                onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                required
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              >
-                <option value="">— Chọn —</option>
-                {visibleCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Số tiền (₫) *</span>
-              <MoneyInput
-                value={form.amount}
-                onChange={(raw) => setForm({ ...form, amount: raw })}
-                required
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Người/đơn vị nhận</span>
-              <input
-                value={form.payee}
-                onChange={(e) => setForm({ ...form, payee: e.target.value })}
-                placeholder="VD: Cửa hàng VLXD Minh Anh"
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">SĐT người nhận *</span>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={form.payeePhone}
-                onChange={(e) => setForm({ ...form, payeePhone: e.target.value.replace(/[^0-9+ ]/g, "") })}
-                placeholder="VD: 0912 345 678"
-                required
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Phương thức</span>
-              <select
-                value={form.paymentMethod}
-                onChange={(e) =>
-                  setForm({ ...form, paymentMethod: e.target.value as "cash" | "transfer" })
-                }
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              >
-                <option value="transfer">Chuyển khoản</option>
-                <option value="cash">Tiền mặt</option>
-              </select>
-            </label>
-            <div className="block">
-              <span className="text-xs text-[#aa9a8b]">
-                Ảnh hoá đơn / báo giá {form.attachmentUrls.length > 0 && `(${form.attachmentUrls.length}/20)`}
-              </span>
+                </select>
+              </label>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">
+                  Số tiền <span className="req">*</span>
+                </span>
+                <div className="money-wrap">
+                  <MoneyInput value={form.amount} onChange={(raw) => setForm({ ...form, amount: raw })} required className="ctrl num" />
+                  <span className="cur">đ</span>
+                </div>
+              </label>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">Người/đơn vị nhận</span>
+                <input className="ctrl" value={form.payee} onChange={(e) => setForm({ ...form, payee: e.target.value })} placeholder="VD: Cửa hàng VLXD Minh Anh" />
+              </label>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">
+                  SĐT người nhận <span className="req">*</span>
+                </span>
+                <input
+                  className="ctrl"
+                  type="tel"
+                  inputMode="tel"
+                  value={form.payeePhone}
+                  onChange={(e) => setForm({ ...form, payeePhone: e.target.value.replace(/[^0-9+ ]/g, "") })}
+                  placeholder="VD: 0912 345 678"
+                  required
+                />
+              </label>
+              <label className="fld" style={{ marginBottom: 0 }}>
+                <span className="lbl">Phương thức</span>
+                <select
+                  className="ctrl"
+                  value={form.paymentMethod}
+                  onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as "cash" | "transfer" })}
+                >
+                  <option value="transfer">Chuyển khoản</option>
+                  <option value="cash">Tiền mặt</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Ảnh hoá đơn */}
+            <div className="fld">
+              <span className="lbl">Ảnh hoá đơn / báo giá {form.attachmentUrls.length > 0 && `(${form.attachmentUrls.length}/20)`}</span>
               <input
                 ref={attachmentInputRef}
                 type="file"
@@ -890,779 +1303,198 @@ export function ExpensesClient({
                   if (e.target.files?.length) uploadAttachments(e.target.files);
                 }}
               />
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => attachmentInputRef.current?.click()}
-                  disabled={uploadingAttachment || form.attachmentUrls.length >= 20}
-                  className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
-                >
-                  {uploadingAttachment ? "Đang tải…" : form.attachmentUrls.length ? "📎 Thêm ảnh" : "📷 Chọn ảnh"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="attach"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={uploadingAttachment || form.attachmentUrls.length >= 20}
+              >
+                {uploadingAttachment ? "Đang tải…" : form.attachmentUrls.length ? "📎 Thêm ảnh hoá đơn" : "📷 Kéo thả / bấm chọn ảnh hoá đơn"}
+              </button>
               {form.attachmentUrls.length > 0 && (
-                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                <div className="thumbs">
                   {form.attachmentUrls.map((url, i) => {
                     const isPdf = url.toLowerCase().endsWith(".pdf");
-                    const previewSrc = url.startsWith("minio://")
-                      ? `/api/expenses/upload-preview?url=${encodeURIComponent(url)}`
-                      : url;
+                    const previewSrc = url.startsWith("minio://") ? `/api/expenses/upload-preview?url=${encodeURIComponent(url)}` : url;
                     return (
-                      <div
-                        key={`${url}-${i}`}
-                        className="group relative aspect-square overflow-hidden rounded-lg border border-[#604232] bg-[#3a1608]"
-                      >
+                      <div key={`${url}-${i}`} className="thumb">
                         {isPdf ? (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-[#aa9a8b]">
-                            📄 PDF
-                          </div>
+                          <div className="pdf">📄 PDF</div>
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={previewSrc} alt={`bill-${i + 1}`} className="h-full w-full object-cover" />
+                          <img src={previewSrc} alt={`bill-${i + 1}`} />
                         )}
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(i)}
-                          className="absolute right-1 top-1 rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-red-500"
-                          title="Xoá ảnh"
-                        >
+                        <button type="button" className="rm" onClick={() => removeAttachment(i)} title="Xoá ảnh">
                           ✕
                         </button>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-1 py-0.5 text-[10px] text-white">
-                          #{i + 1}
-                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Bank info for KT to "Chuyển khoản" — KT tạo thì không cần (admin duyệt xong KT tự chi) */}
-          {!isKt && (
-          <div className="rounded-lg border border-[#604232] bg-[#3a1608] p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-semibold text-[#e8dcc8]">Tài khoản nhận (để KT bấm “Chuyển khoản”)</div>
-              <div className="flex items-center gap-2">
-                <input
-                  ref={qrInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) decodeQrFile(f);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => qrInputRef.current?.click()}
-                  disabled={decoding}
-                  className="rounded-lg border border-[#f0752f]/40 bg-[#f0752f]/10 px-2 py-1 text-[11px] font-semibold text-[#f0a56a] disabled:opacity-50"
-                  title="Tải ảnh QR để tự động điền"
-                >
-                  {decoding ? "Đang đọc QR…" : "📷 Tải ảnh QR"}
-                </button>
-              </div>
-            </div>
-            <div className="grid gap-2 md:grid-cols-3">
-              <label className="block">
-                <span className="text-[11px] text-[#aa9a8b]">Ngân hàng</span>
-                <select
-                  value={form.payeeBankBin}
-                  onChange={(e) => setForm({ ...form, payeeBankBin: e.target.value })}
-                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                >
-                  <option value="">— Chọn ngân hàng —</option>
-                  {VN_BANKS.map((b) => (
-                    <option key={b.bin} value={b.bin}>
-                      {b.shortName} ({b.name})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-[11px] text-[#aa9a8b]">Số tài khoản</span>
-                <input
-                  value={form.payeeAccountNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, payeeAccountNumber: e.target.value.replace(/[^0-9A-Za-z]/g, "") })
-                  }
-                  placeholder="VD: 0123456789"
-                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[11px] text-[#aa9a8b]">Tên chủ TK</span>
-                <input
-                  value={form.payeeAccountName}
-                  onChange={(e) => setForm({ ...form, payeeAccountName: e.target.value })}
-                  placeholder="Hiện trên QR (tuỳ chọn)"
-                  className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#431a0a] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                />
-              </label>
-            </div>
-            {form.payeeBankBin && form.payeeAccountNumber && (
-              <div className="text-[11px] text-emerald-300">
-                ✓ KT sẽ thấy nút “Chuyển khoản” mở thẳng app ngân hàng
+            {/* Tài khoản nhận (admin nhập cho KT chuyển) */}
+            {!isKt && (
+              <div className="fld">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span className="lbl">Tài khoản nhận (để KT bấm “Chuyển khoản”)</span>
+                  <input
+                    ref={qrInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) decodeQrFile(f);
+                    }}
+                  />
+                  <button type="button" className="actbtn a-link" onClick={() => qrInputRef.current?.click()} disabled={decoding}>
+                    {decoding ? "Đang đọc QR…" : "📷 Tải ảnh QR"}
+                  </button>
+                </div>
+                <div className="formgrid">
+                  <label className="fld" style={{ marginBottom: 0 }}>
+                    <span className="lbl">Ngân hàng</span>
+                    <select className="ctrl" value={form.payeeBankBin} onChange={(e) => setForm({ ...form, payeeBankBin: e.target.value })}>
+                      <option value="">— Chọn ngân hàng —</option>
+                      {VN_BANKS.map((b) => (
+                        <option key={b.bin} value={b.bin}>
+                          {b.shortName} ({b.name})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="fld" style={{ marginBottom: 0 }}>
+                    <span className="lbl">Số tài khoản</span>
+                    <input
+                      className="ctrl"
+                      value={form.payeeAccountNumber}
+                      onChange={(e) => setForm({ ...form, payeeAccountNumber: e.target.value.replace(/[^0-9A-Za-z]/g, "") })}
+                      placeholder="VD: 0123456789"
+                    />
+                  </label>
+                  <label className="fld full" style={{ marginBottom: 0 }}>
+                    <span className="lbl">Tên chủ TK</span>
+                    <input
+                      className="ctrl"
+                      value={form.payeeAccountName}
+                      onChange={(e) => setForm({ ...form, payeeAccountName: e.target.value })}
+                      placeholder="Hiện trên QR (tuỳ chọn)"
+                    />
+                  </label>
+                </div>
+                {form.payeeBankBin && form.payeeAccountNumber && (
+                  <div className="ok-line">✓ KT sẽ thấy nút “Chuyển khoản” mở thẳng app ngân hàng</div>
+                )}
               </div>
             )}
-          </div>
-          )}
 
-          {/* Priority toggle — reminder chỉ chạy khi lệnh vào hàng chờ KT chi, KT tạo phải qua admin duyệt trước */}
-          {!isKt && (
-          <div>
-            <div className="text-xs text-[#aa9a8b] mb-1">Độ khẩn</div>
-            <div className="inline-flex rounded-lg border border-[#604232] bg-[#3a1608] p-0.5">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, priority: "normal" })}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                  form.priority === "normal"
-                    ? "bg-[#604232] text-[#f7f2e4]"
-                    : "text-[#aa9a8b]"
-                }`}
-              >
-                Thường (nhắc 15ph/lần)
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, priority: "urgent" })}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                  form.priority === "urgent"
-                    ? "bg-red-500/20 text-red-200"
-                    : "text-[#aa9a8b]"
-                }`}
-              >
-                🚨 Gấp (nhắc 1ph/lần)
-              </button>
-            </div>
-          </div>
-          )}
-
-          <label className="block">
-            <span className="text-xs text-[#aa9a8b]">Ghi chú</span>
-            <textarea
-              rows={2}
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
-              placeholder="Nội dung chi (vd: mua mực in cho VP, xăng xe đi công trình…)"
-              className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-            />
-          </label>
-          {isKt && (
-            <div className="rounded-lg bg-violet-500/10 px-3 py-2 text-xs text-violet-300">
-              Lệnh chi do KT tạo sẽ chờ admin duyệt trước khi thanh toán.
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#3a1608] disabled:opacity-50"
-            >
-              {creating ? "Đang tạo…" : isKt ? "Gửi admin duyệt" : "Gửi KT thanh toán"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreate(false);
-                setForm(emptyCreate);
-              }}
-              className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
-            >
-              Huỷ
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Card list */}
-      {loading && (
-        <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-6 text-center text-sm text-[#aa9a8b]">
-          Đang tải…
-        </div>
-      )}
-      {!loading && rows.length === 0 && (
-        <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-6 text-center text-sm text-[#aa9a8b]">
-          Chưa có lệnh chi nào.
-        </div>
-      )}
-      {!loading && rows.length > 0 && (
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((r) => {
-            const isUrgent = r.priority === "urgent" && r.status === "pending";
-            const canQuickTransfer = r.status === "pending" && !!r.payeeBankBin && !!r.payeeAccountNumber && canMarkPaid;
-            const isExpanded = expandedId === r.id;
-            const toggle = () => setExpandedId((prev) => (prev === r.id ? null : r.id));
-            const bank = r.payeeBankBin ? findBankByBin(r.payeeBankBin) : null;
-            // Bấm cả dòng lệnh chi pending -> mở popup full màn (thông tin đủ + ghi nhận chi).
-            // Nút "💸 Chuyển khoản" riêng vẫn mở khay QR chuyển nhanh.
-            const rowAction: (() => void) | null =
-              r.status === "pending" && canMarkPaid ? () => openPayDialog(r) : null;
-
-            const statusBadge =
-              r.status === "pending"
-                ? { label: "Chờ chi", chip: "bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30" }
-                : r.status === "tptc_pending"
-                  ? { label: "Chờ admin duyệt", chip: "bg-violet-400/15 text-violet-300 ring-1 ring-violet-400/30" }
-                  : r.status === "paid"
-                    ? { label: "Đã chi", chip: "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30" }
-                    : { label: "Đã huỷ", chip: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30" };
-
-            const cardBorder = isUrgent
-              ? "border-red-500/60 shadow-[0_0_0_1px_rgba(248,113,113,0.20),0_4px_16px_-6px_rgba(248,113,113,0.3)]"
-              : r.status === "paid"
-                ? "border-emerald-500/20"
-                : r.status === "cancelled"
-                  ? "border-zinc-700/40 opacity-80"
-                  : r.status === "tptc_pending"
-                    ? "border-violet-500/30"
-                    : "border-[#604232]";
-
-            return (
-              <div
-                key={r.id}
-                ref={r.id === highlightId ? highlightRef : undefined}
-                onClick={rowAction ?? undefined}
-                role={rowAction ? "button" : undefined}
-                tabIndex={rowAction ? 0 : undefined}
-                aria-expanded={canQuickTransfer ? isExpanded : undefined}
-                onKeyDown={
-                  rowAction
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          rowAction();
-                        }
-                      }
-                    : undefined
-                }
-                className={`rounded-2xl border bg-[#4a1d0c] p-4 flex flex-col gap-3 ${cardBorder} ${
-                  rowAction ? "cursor-pointer transition hover:border-orange-400/40 active:scale-[0.995]" : ""
-                } ${isExpanded ? "md:col-span-2 xl:col-span-3 ring-1 ring-orange-400/30" : ""} ${
-                  r.id === highlightId ? "ring-2 ring-orange-400/80 animate-pulse" : ""
-                }`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex flex-wrap items-center gap-1.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusBadge.chip}`}>
-                      {statusBadge.label}
-                    </span>
-                    {isUrgent && (
-                      <span className="rounded-full bg-red-500/25 px-2 py-0.5 text-[10px] font-bold text-red-200 ring-1 ring-red-400/40">
-                        🚨 GẤP
-                      </span>
-                    )}
-                    <span className="font-mono text-[10px] tracking-wider text-[#856e60]">{r.code}</span>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xl font-extrabold leading-none tracking-tight text-[#f7f2e4] whitespace-nowrap">
-                      {money(r.amount)}
-                    </div>
-                    {r.paidAmount != null && r.paidAmount !== r.amount && (
-                      <div className="mt-1 text-[10px] font-medium text-emerald-300 whitespace-nowrap">
-                        Thực chi {money(r.paidAmount)}
-                      </div>
-                    )}
-                  </div>
+            {/* Độ khẩn */}
+            {!isKt && (
+              <div className="fld">
+                <span className="lbl">Độ khẩn</span>
+                <div className="seg">
+                  <button type="button" className={form.priority === "normal" ? "on" : ""} onClick={() => setForm({ ...form, priority: "normal" })}>
+                    Thường (nhắc 15ph/lần)
+                  </button>
+                  <button
+                    type="button"
+                    className={form.priority === "urgent" ? "on urgent" : ""}
+                    onClick={() => setForm({ ...form, priority: "urgent" })}
+                  >
+                    🚨 Gấp (nhắc 1ph/lần)
+                  </button>
                 </div>
-
-                {/* Meta: category + project + creator */}
-                <div className="space-y-1 text-xs">
-                  <div className="flex items-center gap-2 text-[#e5e7f5]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400/80 shrink-0" aria-hidden />
-                    <span className="font-medium truncate">{r.category.name}</span>
-                    {r.payee && <span className="text-[#aa9a8b] truncate">· {r.payee}</span>}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#aa9a8b]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264] shrink-0" aria-hidden />
-                    {r.project ? (
-                      <span className="truncate">
-                        <span className="font-mono text-[#a1a8c8]">{r.project.code}</span> — {r.project.name}
-                      </span>
-                    ) : r.designContract ? (
-                      <span className="truncate">
-                        <span className="font-mono text-[#a1a8c8]">TK</span> — {r.designContract.customerName}
-                      </span>
-                    ) : (
-                      <span>Chi chung công ty</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#856e60]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#3a4264]/60 shrink-0" aria-hidden />
-                    <span>{fmtDate(r.createdAt)} · {r.creator.fullName}</span>
-                  </div>
-                </div>
-
-                {/* Note admin (lúc gửi lệnh chi) */}
-                {r.note && (
-                  <div className="rounded-lg bg-[#3a1608]/80 border border-[#604232]/50 px-3 py-2 text-xs text-[#e8dcc8] italic">
-                    &ldquo;{r.note}&rdquo;
-                  </div>
-                )}
-
-                {/* Ghi chú thêm của kế toán lúc thanh toán — hiện ngay dưới lệnh */}
-                {r.paidNote && (
-                  <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/25 px-3 py-2 text-xs text-emerald-200/90">
-                    <span className="font-semibold text-emerald-300">Ghi chú KT:</span>{" "}
-                    <span className="italic">&ldquo;{r.paidNote}&rdquo;</span>
-                  </div>
-                )}
-
-                {/* Bank info */}
-                {bank && r.payeeAccountNumber && (
-                  <div className="flex items-center gap-2.5 rounded-lg bg-[#3a1608] border border-[#604232]/60 px-3 py-2">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-orange-500/15 text-orange-300 text-[10px] font-bold">
-                      {bank.shortName.slice(0, 3).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-semibold text-[#f7f2e4] truncate">{bank.shortName}</div>
-                      <div className="font-mono text-[11px] text-[#e8dcc8] truncate">{r.payeeAccountNumber}</div>
-                    </div>
-                    {r.payeeAccountName && (
-                      <div className="text-right text-[10px] font-medium uppercase tracking-wide text-[#aa9a8b] truncate max-w-[140px]">
-                        {r.payeeAccountName}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Status meta */}
-                {r.status === "tptc_pending" && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-violet-300/80">
-                    <span aria-hidden>⏳</span>
-                    <span>
-                      KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt
-                    </span>
-                  </div>
-                )}
-                {r.status === "paid" && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-emerald-300/80">
-                    <span aria-hidden>✓</span>
-                    <span>
-                      Đã chi {fmtDate(r.paidAt)}
-                      {r.payer ? ` · KT ${r.payer.fullName}` : ""}
-                    </span>
-                  </div>
-                )}
-                {r.status === "cancelled" && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-zinc-400">
-                    <span aria-hidden>✕</span>
-                    <span>
-                      Huỷ {fmtDate(r.cancelledAt)}
-                      {r.cancelledReason ? ` · ${r.cancelledReason}` : ""}
-                    </span>
-                  </div>
-                )}
-
-                {/* Actions */}
-                {(canQuickTransfer ||
-                  (r.status === "pending" && canMarkPaid && !canQuickTransfer) ||
-                  (r.status === "pending" && isAdmin) ||
-                  (r.status === "tptc_pending" && isAdmin) ||
-                  (canCreate && r.status !== "cancelled") ||
-                  attachmentList(r).length > 0 ||
-                  r.paidReceiptUrl) && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#604232]/40" onClick={(e) => e.stopPropagation()}>
-                    {canCreate && r.status !== "cancelled" && (
-                      <button
-                        onClick={() => sendPublicLink(r)}
-                        disabled={linkBusyId === r.id}
-                        title="Copy link theo dõi thanh toán để gửi NCC"
-                        className="rounded-lg bg-orange-500/15 text-orange-300 px-3 py-1.5 text-xs font-semibold hover:bg-orange-500/25 disabled:opacity-50"
-                      >
-                        {linkBusyId === r.id ? "Đang tạo…" : "🔗 Gửi link NCC"}
-                      </button>
-                    )}
-                    {canQuickTransfer && (
-                      <button
-                        onClick={toggle}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                          isExpanded
-                            ? "bg-[#604232] text-[#e8dcc8] hover:bg-[#373d57]"
-                            : "bg-orange-500 text-[#3a1608] hover:bg-orange-400"
-                        }`}
-                      >
-                        {isExpanded ? "⌃ Thu gọn" : "💸 Chuyển khoản"}
-                      </button>
-                    )}
-                    {r.status === "pending" && canMarkPaid && !canQuickTransfer && (
-                      <button
-                        onClick={() => openPayDialog(r)}
-                        className="rounded-lg bg-emerald-500/20 text-emerald-300 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30"
-                      >
-                        Ghi nhận đã chi
-                      </button>
-                    )}
-                    {r.status === "tptc_pending" && isAdmin && (
-                      <>
-                        <button
-                          onClick={async () => {
-                            if (!await confirmDialog(`Duyệt lệnh chi ${r.code}?`)) return;
-                            const res = await fetch(`/api/expenses/${r.id}/approve`, { method: "POST" });
-                            const j = await res.json().catch(() => ({}));
-                            if (!res.ok) {
-                              toast.error(j.message || "Không duyệt được");
-                              return;
-                            }
-                            toast.success(j.message || "Đã duyệt");
-                            load();
-                          }}
-                          className="rounded-lg bg-emerald-500/20 text-emerald-300 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30"
-                        >
-                          ✓ Duyệt
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const reason = window.prompt(`Lý do từ chối lệnh chi ${r.code}:`);
-                            if (!reason || reason.trim().length < 3) {
-                              if (reason !== null) toast.error("Lý do tối thiểu 3 ký tự");
-                              return;
-                            }
-                            const res = await fetch(`/api/expenses/${r.id}/reject`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ reason: reason.trim() }),
-                            });
-                            const j = await res.json().catch(() => ({}));
-                            if (!res.ok) {
-                              toast.error(j.message || "Không từ chối được");
-                              return;
-                            }
-                            toast.success(j.message || "Đã từ chối");
-                            load();
-                          }}
-                          className="rounded-lg bg-red-500/15 text-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-500/25"
-                        >
-                          ✕ Từ chối
-                        </button>
-                      </>
-                    )}
-                    {r.status === "pending" && isAdmin && (
-                      <button
-                        onClick={() => {
-                          setOpenCancel(r);
-                          setCancelReason("");
-                        }}
-                        className="rounded-lg bg-red-500/15 text-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-500/25"
-                      >
-                        Huỷ
-                      </button>
-                    )}
-                    {(() => {
-                      const atts = attachmentList(r);
-                      if (atts.length === 0 && !r.paidReceiptUrl) return null;
-                      return (
-                        <div className="ml-auto flex gap-1.5">
-                          {atts.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setViewer({ urls: atts, index: 0, expenseId: r.id, type: "attachment" });
-                              }}
-                              className="rounded-lg bg-blue-500/15 text-blue-300 px-3 py-1.5 text-xs font-medium hover:bg-blue-500/25"
-                            >
-                              📎 {atts.length > 1 ? `${atts.length} hoá đơn` : "Hoá đơn"}
-                            </button>
-                          )}
-                          {r.paidReceiptUrl && (
-                            <a
-                              href={r.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${r.id}/file?type=receipt` : r.paidReceiptUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-lg bg-emerald-500/15 text-emerald-300 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25"
-                            >
-                              📄 Chứng từ
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Expanded transfer details */}
-                {canQuickTransfer && isExpanded && (
-                  <div className="slide-up rounded-lg bg-[#3a1608]/60 border border-[#604232]/60 p-3 mt-1" onClick={(e) => e.stopPropagation()}>
-                    <TransferDetails
-                      expense={r}
-                      canMarkPaid={canMarkPaid}
-                      onPaid={() => {
-                        setExpandedId(null);
-                        load();
-                        loadBalance();
-                      }}
-                    />
-                  </div>
-                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
 
-      {!loading && rows.length > 0 && (
-        <div className="rounded-xl border border-[#604232] bg-[#3a1608]/50 px-3 py-2 text-xs text-[#e8dcc8] flex flex-wrap gap-x-3 gap-y-1">
-          <span>
-            Tổng <b>{rows.length}</b> lệnh · {money(totalAmount)}
-          </span>
-          {totalPaid > 0 && <span className="text-emerald-300">Đã chi: {money(totalPaid)}</span>}
-        </div>
-      )}
-
-      {/* Help modal */}
-      {showHelp && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowHelp(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg space-y-3 rounded-xl border border-[#604232] bg-[#431a0a] p-4 text-sm text-[#e8dcc8]"
-          >
-            <div className="text-base font-semibold text-orange-300">Hướng dẫn dùng Lệnh chi</div>
-            <div className="space-y-2">
-              <p>
-                <b>Admin</b> tạo lệnh chi (vật tư, văn phòng, máy móc, …) → KT nhận push +
-                bell → KT bấm <b className="text-emerald-300">“Đã chi”</b> sau khi chuyển tiền.
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-[13px]">
-                <li>
-                  <b className="text-red-300">🚨 Gấp</b>: nhắc KT mỗi <b>1 phút</b> đến khi xử lý.
-                </li>
-                <li>
-                  <b>Thường</b>: nhắc mỗi <b>15 phút</b>.
-                </li>
-                <li>
-                  Khi tạo, anh thấy ngay <b>số dư quỹ trước/sau</b> để biết có vượt không.
-                </li>
-                <li>
-                  Lệnh đã <b>“Đã chi”</b> sẽ tự trừ vào sổ quỹ — không huỷ được. Sai thì xoá ở
-                  /treasury (nguồn).
-                </li>
-                <li>
-                  Lệnh đang <b>chờ chi</b> mới huỷ được, phải nhập lý do.
-                </li>
-              </ul>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowHelp(false)}
-                className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#3a1608]"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pay dialog (for cash / non-bank expenses) */}
-      {mounted && openPay &&
-        createPortal(
-          <div className={`${plexSans.variable} ${plexMono.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif" }}>
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/60 sm:items-center sm:p-4"
-          onClick={() => setOpenPay(null)}
-        >
-          <form
-            onSubmit={submitPay}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[540px] max-h-[93dvh] space-y-4 overflow-y-auto rounded-t-2xl border border-[#604232] bg-[#3a1608] p-5 sm:rounded-2xl"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-[#604232] pb-3">
-              <div>
-                <div className="text-lg font-semibold text-emerald-300">Ghi nhận đã chi</div>
-                <div className="font-mono text-[11px] tracking-wider text-[#856e60]">{openPay.code}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpenPay(null)}
-                className="rounded-lg border border-[#604232] px-2.5 py-1 text-sm text-[#aa9a8b]"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Thông tin đầy đủ lệnh chi */}
-            <div className="rounded-xl border border-[#604232] bg-[#431a0a] p-4">
-              <div className="text-2xl font-extrabold tracking-tight text-[#f7f2e4]">
-                {money(openPay.amount)}
-              </div>
-              <dl className="mt-3 grid grid-cols-1 gap-y-2 text-sm">
-                <InfoRow k="Danh mục" v={openPay.category.name} />
-                {openPay.payee && <InfoRow k="Người nhận" v={openPay.payee} />}
-                {openPay.payeePhone && <InfoRow k="SĐT người nhận" v={openPay.payeePhone} />}
-                <InfoRow
-                  k="Dự án"
-                  v={openPay.project ? `${openPay.project.code} — ${openPay.project.name}` : "Chi chung công ty"}
-                />
-                <InfoRow k="Phương thức" v={openPay.paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản"} />
-                {(() => {
-                  const b = openPay.payeeBankBin ? findBankByBin(openPay.payeeBankBin) : null;
-                  if (!b || !openPay.payeeAccountNumber) return null;
-                  return (
-                    <InfoRow
-                      k="Ngân hàng"
-                      v={`${b.shortName} · ${openPay.payeeAccountNumber}${openPay.payeeAccountName ? " · " + openPay.payeeAccountName : ""}`}
-                    />
-                  );
-                })()}
-                {openPay.note && <InfoRow k="Nội dung" v={openPay.note} />}
-                <InfoRow k="Ngày tạo" v={`${fmtDate(openPay.createdAt)} · ${openPay.creator.fullName}`} />
-              </dl>
-            </div>
-            <div className="pt-1 text-sm font-semibold text-[#e8dcc8]">Xác nhận đã chi</div>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Số tiền thực chi (₫) *</span>
-              <MoneyInput
-                value={payAmount}
-                onChange={setPayAmount}
-                required
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
+            <label className="fld">
+              <span className="lbl">Ghi chú</span>
+              <textarea
+                className="ctrl"
+                rows={2}
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="Nội dung chi (vd: mua mực in cho VP, xăng xe đi công trình…)"
               />
             </label>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Ngày chi *</span>
-              <input
-                type="date"
-                value={payDate}
-                onChange={(e) => setPayDate(e.target.value)}
-                required
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
-            <ReceiptMultiPicker value={payReceiptUrls} onChange={setPayReceiptUrls} />
-            <div className="block">
-              <span className="text-xs font-semibold text-[#f0752f]">💰 Chi từ tài khoản quỹ *</span>
-              <div className="mt-2 flex flex-col gap-2">
-                {cashAccounts.map((a) => {
-                  const on = payAccountId === a.id;
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => setPayAccountId(a.id)}
-                      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-[#f0752f] bg-[#f0752f]/10" : "border-[#604232] bg-[#3a1608]"}`}
-                    >
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#604232] text-base">{a.kind === "cash" ? "💵" : "🏦"}</div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-[#f7f2e4]">{a.name}</div>
-                        <div className="text-[10px] text-[#856e60]">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <div className="font-mono text-sm font-bold text-[#f7f2e4]">{money(a.currentBalance)}</div>
-                        <div className="text-[9px] text-[#856e60]">số dư</div>
-                      </div>
-                      <div className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${on ? "border-[#f0752f]" : "border-[#604232]"}`}>
-                        {on && <div className="h-[9px] w-[9px] rounded-full bg-[#f0752f]" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              {(() => {
-                const sel = cashAccounts.find((a) => a.id === payAccountId);
-                if (!sel) return null;
-                const after = sel.currentBalance - (Number(payAmount) || 0);
-                return (
-                  <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs ${after < 0 ? "bg-red-500/10" : "bg-[#604232]/40"}`}>
-                    <span className="text-[#aa9a8b]">Số dư sau chi ({sel.name})</span>
-                    <span className={`font-mono font-bold ${after < 0 ? "text-red-300" : "text-[#f7f2e4]"}`}>{money(after)}{after < 0 ? " ⚠ âm quỹ" : ""}</span>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="block">
-              <span className="text-xs font-semibold text-[#aa9a8b]">Ghi chú</span>
-              <div className="mt-2 flex flex-col gap-2">
-                {openPay.note && (
-                  <div className="flex items-start gap-2 rounded-lg border border-[#604232] bg-[#3a1608] px-2.5 py-2">
-                    <span className="shrink-0 rounded-full bg-[#8a3d1c]/40 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#d8996a]">Admin</span>
-                    <div className="min-w-0">
-                      <div className="text-xs text-[#f7f2e4]">{openPay.note}</div>
-                      <div className="mt-0.5 text-[9px] text-[#856e60]">{openPay.creator.fullName} · {fmtDate(openPay.createdAt)}</div>
-                    </div>
-                  </div>
-                )}
-                {openPay.paidNote && (
-                  <div className="flex items-start gap-2 rounded-lg border border-[#604232] bg-[#3a1608] px-2.5 py-2">
-                    <span className="shrink-0 rounded-full bg-[#3f6f86]/30 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#8fc0d8]">Kế toán</span>
-                    <div className="text-xs text-[#f7f2e4]">{openPay.paidNote}</div>
-                  </div>
-                )}
-                <textarea
-                  rows={2}
-                  value={payNote}
-                  onChange={(e) => setPayNote(e.target.value)}
-                  placeholder="Thêm ghi chú của kế toán…"
-                  className="w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-                />
-              </div>
-            </div>
-            <div className="text-[11px] text-amber-300">
-              Lưu ý: trừ vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={paying}
-                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-[#3a1608] disabled:opacity-50"
-              >
-                {paying ? "Đang ghi…" : "Xác nhận đã chi"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpenPay(null)}
-                className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
-              >
+
+            {isKt && <div className="kt-note">Lệnh chi do KT tạo sẽ chờ admin duyệt trước khi thanh toán.</div>}
+
+            <div className="acts">
+              <button className="btn ghost" type="button" onClick={() => { setShowCreate(false); setForm(emptyCreate); }}>
                 Huỷ
+              </button>
+              <button className="btn primary block" type="submit" disabled={creating}>
+                {creating ? "Đang tạo…" : isKt ? "Gửi admin duyệt" : "Gửi KT thanh toán"}
               </button>
             </div>
           </form>
         </div>
-          </div>,
-          document.body,
-        )}
+      )}
 
-      {/* Cancel dialog */}
+      {/* ===== POPUP: Huỷ ===== */}
       {openCancel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setOpenCancel(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md space-y-3 rounded-xl border border-[#604232] bg-[#431a0a] p-4"
-          >
-            <div className="text-base font-semibold text-red-300">Huỷ lệnh chi {openCancel.code}</div>
-            <label className="block">
-              <span className="text-xs text-[#aa9a8b]">Lý do huỷ *</span>
-              <textarea
-                rows={3}
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-sm text-[#f7f2e4]"
-              />
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={submitCancel}
-                disabled={cancelling}
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-semibold text-[#3a1608] disabled:opacity-50"
-              >
+        <div className="scrim" onClick={(e) => e.target === e.currentTarget && setOpenCancel(null)}>
+          <div className="sheet">
+            <div className="sheet-hd">
+              <div>
+                <h3 className="red">Huỷ lệnh chi</h3>
+                <div className="sub">{openCancel.code}</div>
+              </div>
+              <button className="iconbtn" type="button" onClick={() => setOpenCancel(null)} title="Đóng">
+                ✕
+              </button>
+            </div>
+            <div className="fld">
+              <span className="lbl">
+                Lý do huỷ <span className="req">*</span>
+              </span>
+              <textarea className="ctrl" rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            </div>
+            <div className="acts">
+              <button className="btn ghost" type="button" onClick={() => setOpenCancel(null)}>
+                Đóng
+              </button>
+              <button className="btn primary block" style={{ background: "var(--red)" }} type="button" onClick={submitCancel} disabled={cancelling}>
                 {cancelling ? "Đang huỷ…" : "Xác nhận huỷ"}
               </button>
-              <button
-                onClick={() => setOpenCancel(null)}
-                className="rounded-lg border border-[#604232] px-3 py-1.5 text-sm text-[#aa9a8b]"
-              >
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== POPUP: Hướng dẫn ===== */}
+      {showHelp && (
+        <div className="scrim" onClick={(e) => e.target === e.currentTarget && setShowHelp(false)}>
+          <div className="sheet">
+            <div className="sheet-hd">
+              <div>
+                <h3 className="orange">Hướng dẫn dùng Lệnh chi</h3>
+              </div>
+              <button className="iconbtn" type="button" onClick={() => setShowHelp(false)} title="Đóng">
+                ✕
+              </button>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>
+              <p style={{ marginBottom: 10 }}>
+                <b>Admin</b> tạo lệnh chi → KT nhận push + bell → KT bấm <b style={{ color: "var(--ok)" }}>“Ghi nhận đã chi”</b> sau khi chuyển tiền.
+              </p>
+              <ul style={{ paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+                <li>
+                  <b style={{ color: "var(--red)" }}>🚨 Gấp</b>: nhắc KT mỗi <b>1 phút</b> đến khi xử lý.
+                </li>
+                <li>
+                  <b>Thường</b>: nhắc mỗi <b>15 phút</b>.
+                </li>
+                <li>Khi tạo, anh thấy ngay <b>số dư quỹ trước/sau</b> để biết có vượt không.</li>
+                <li>Lệnh đã <b>“Đã chi”</b> sẽ tự trừ vào sổ quỹ — không huỷ được. Sai thì xoá ở /treasury.</li>
+                <li>Lệnh đang <b>chờ chi</b> mới huỷ được, phải nhập lý do.</li>
+              </ul>
+            </div>
+            <div className="acts">
+              <button className="btn primary block" type="button" onClick={() => setShowHelp(false)}>
                 Đóng
               </button>
             </div>
@@ -1670,22 +1502,13 @@ export function ExpensesClient({
         </div>
       )}
 
+      {/* ===== Sổ quỹ chi tiết ===== */}
       {showTreasury && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 pt-4"
-          onClick={() => setShowTreasury(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl rounded-xl border border-[#604232] bg-[#3a1608] shadow-xl"
-          >
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#604232] bg-[#431a0a] px-4 py-2.5">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 pt-4" onClick={() => setShowTreasury(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-5xl rounded-xl border border-[#2d3249] bg-[#0b0d16] shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
               <div className="text-base font-semibold text-orange-300">Sổ quỹ — chi tiết</div>
-              <button
-                onClick={() => setShowTreasury(false)}
-                className="rounded-lg px-2 py-1 text-[#aa9a8b] hover:bg-[#3a1608] hover:text-[#f7f2e4]"
-                aria-label="Đóng"
-              >
+              <button onClick={() => setShowTreasury(false)} className="rounded-lg px-2 py-1 text-[#8b95b7] hover:bg-[#0b0d16] hover:text-[#f0f2ff]" aria-label="Đóng">
                 ✕
               </button>
             </div>
@@ -1696,7 +1519,7 @@ export function ExpensesClient({
         </div>
       )}
 
-      {/* Lightbox xem ảnh hoá đơn (multi) */}
+      {/* ===== Lightbox ảnh ===== */}
       {viewer && (() => {
         const url = viewer.urls[viewer.index];
         const src = url.startsWith("minio://")
@@ -1704,68 +1527,40 @@ export function ExpensesClient({
           : url;
         const isPdf = url.toLowerCase().endsWith(".pdf");
         return (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4"
-            onClick={() => setViewer(null)}
-          >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setViewer(null);
-              }}
-              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-2xl text-white hover:bg-black/80"
-              aria-label="Đóng"
-            >
+          <div className="lc-doc-viewer" onClick={() => setViewer(null)}>
+            <button type="button" className="vbtn vclose" onClick={(e) => { e.stopPropagation(); setViewer(null); }} aria-label="Đóng">
               ✕
             </button>
             {viewer.urls.length > 1 && (
               <>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v));
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-3xl text-white hover:bg-black/80"
+                  className="vbtn vprev"
+                  onClick={(e) => { e.stopPropagation(); setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v)); }}
                   aria-label="Trước"
                 >
                   ‹
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v));
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-3xl text-white hover:bg-black/80"
+                  className="vbtn vnext"
+                  onClick={(e) => { e.stopPropagation(); setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v)); }}
                   aria-label="Sau"
                 >
                   ›
                 </button>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+                <div className="vcount">
                   {viewer.index + 1} / {viewer.urls.length}
                 </div>
               </>
             )}
             {isPdf ? (
-              <a
-                href={src}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-lg bg-white px-6 py-4 text-center text-lg font-semibold text-blue-600 shadow-2xl"
-              >
+              <a href={src} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white px-6 py-4 text-lg font-semibold text-blue-600 shadow-2xl">
                 📄 Mở PDF #{viewer.index + 1}
               </a>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={src}
-                alt={`Hoá đơn ${viewer.index + 1}`}
-                onClick={(e) => e.stopPropagation()}
-                className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
-              />
+              <img src={src} alt={`Hoá đơn ${viewer.index + 1}`} onClick={(e) => e.stopPropagation()} />
             )}
           </div>
         );
@@ -1775,75 +1570,6 @@ export function ExpensesClient({
 }
 
 const KT_BANK_LS_KEY = "expenses.ktBankBin";
-
-function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const ref = useRef<HTMLInputElement | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  async function handle(file: File) {
-    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
-      toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("File quá lớn (tối đa 8MB)");
-      return;
-    }
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("kind", "receipt");
-      const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(j.message || "Upload thất bại");
-        return;
-      }
-      onChange(j.url);
-      toast.success("Đã tải ảnh chứng từ");
-    } finally {
-      setUploading(false);
-      if (ref.current) ref.current.value = "";
-    }
-  }
-
-  return (
-    <div className="block">
-      <span className="text-xs text-[#aa9a8b]">Ảnh chứng từ chuyển khoản (tuỳ chọn)</span>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handle(f);
-        }}
-      />
-      <div className="mt-1 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          disabled={uploading}
-          className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
-        >
-          {uploading ? "Đang tải…" : value ? "📎 Đổi ảnh" : "📷 Chọn ảnh"}
-        </button>
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-[11px] text-red-300 hover:text-red-200"
-          >
-            Xoá
-          </button>
-        )}
-        {value && <span className="text-[11px] text-emerald-300">✓ đã đính kèm</span>}
-      </div>
-    </div>
-  );
-}
 
 // Chọn nhiều ảnh chứng từ chuyển khoản (bill) — hiện trên trang theo dõi công khai của NCC.
 function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
@@ -1892,10 +1618,8 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
   }
 
   return (
-    <div className="block">
-      <span className="text-xs text-[#aa9a8b]">
-        Ảnh chuyển khoản (tuỳ chọn){value.length > 0 && ` — ${value.length}/${MAX}`}
-      </span>
+    <div className="fld">
+      <span className="lbl">Ảnh uỷ nhiệm chi / biên lai (tuỳ chọn){value.length > 0 && ` — ${value.length}/${MAX}`}</span>
       <input
         ref={ref}
         type="file"
@@ -1907,47 +1631,82 @@ function ReceiptMultiPicker({ value, onChange }: { value: string[]; onChange: (v
           if (fs && fs.length) handleFiles(fs);
         }}
       />
+      <button type="button" className="attach" onClick={() => ref.current?.click()} disabled={uploading || value.length >= MAX}>
+        {uploading ? "Đang tải…" : value.length ? "📎 Thêm ảnh chứng từ" : "📎 Kéo thả ảnh / PDF · hoặc bấm chọn"}
+      </button>
       {value.length > 0 && (
-        <div className="mt-2 grid grid-cols-4 gap-2">
+        <div className="thumbs">
           {value.map((url, i) => (
-            <div key={i} className="relative">
+            <div key={i} className="thumb">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/expenses/upload-preview?url=${encodeURIComponent(url)}`}
-                alt={`Bill ${i + 1}`}
-                className="h-16 w-full rounded-md border border-[#604232] object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => onChange(value.filter((_, idx) => idx !== i))}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white"
-                aria-label="Xoá ảnh"
-              >
-                ×
+              <img src={`/api/expenses/upload-preview?url=${encodeURIComponent(url)}`} alt={`Bill ${i + 1}`} />
+              <button type="button" className="rm" onClick={() => onChange(value.filter((_, idx) => idx !== i))} aria-label="Xoá ảnh">
+                ✕
               </button>
             </div>
           ))}
         </div>
       )}
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          disabled={uploading || value.length >= MAX}
-          className="rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-2 text-xs font-medium text-[#e8dcc8] disabled:opacity-50"
-        >
-          {uploading ? "Đang tải…" : value.length ? "📷 Thêm ảnh" : "📷 Chọn ảnh (nhiều)"}
-        </button>
-      </div>
     </div>
   );
 }
 
-function InfoRow({ k, v }: { k: string; v: string }) {
+function ReceiptFilePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handle(file: File) {
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      toast.error("Chỉ hỗ trợ ảnh hoặc PDF");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("File quá lớn (tối đa 8MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "receipt");
+      const res = await fetch("/api/expenses/upload-receipt", { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(j.message || "Upload thất bại");
+        return;
+      }
+      onChange(j.url);
+      toast.success("Đã tải ảnh chứng từ");
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  }
+
   return (
-    <div className="flex justify-between gap-4 border-b border-[#604232]/40 pb-1.5">
-      <dt className="shrink-0 text-[#aa9a8b]">{k}</dt>
-      <dd className="break-words text-right font-medium text-[#e5e7f5]">{v}</dd>
+    <div className="fld">
+      <span className="lbl">Ảnh chứng từ chuyển khoản (tuỳ chọn)</span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handle(f);
+        }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button type="button" className="attach" style={{ flex: 1 }} onClick={() => ref.current?.click()} disabled={uploading}>
+          {uploading ? "Đang tải…" : value ? "📎 Đổi ảnh chứng từ" : "📷 Chọn ảnh chứng từ"}
+        </button>
+        {value && (
+          <button type="button" className="actbtn a-cancel" onClick={() => onChange("")}>
+            Xoá
+          </button>
+        )}
+      </div>
+      {value && <div className="ok-line">✓ đã đính kèm</div>}
     </div>
   );
 }
@@ -1963,15 +1722,16 @@ function TransferDetails({
 }) {
   const recipientBank = findBankByBin(expense.payeeBankBin);
   const memo = expense.code;
-  const qrUrl = expense.payeeBankBin && expense.payeeAccountNumber
-    ? buildVietQrImageUrl({
-        bankBin: expense.payeeBankBin,
-        accountNumber: expense.payeeAccountNumber,
-        amount: expense.amount,
-        addInfo: memo,
-        accountName: expense.payeeAccountName ?? undefined,
-      })
-    : null;
+  const qrUrl =
+    expense.payeeBankBin && expense.payeeAccountNumber
+      ? buildVietQrImageUrl({
+          bankBin: expense.payeeBankBin,
+          accountNumber: expense.payeeAccountNumber,
+          amount: expense.amount,
+          addInfo: memo,
+          accountName: expense.payeeAccountName ?? undefined,
+        })
+      : null;
 
   const [ktBankBin, setKtBankBin] = useState<string>("");
   useEffect(() => {
@@ -2104,198 +1864,154 @@ function TransferDetails({
   }
 
   return (
-    <div className="text-sm text-[#e8dcc8]">
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          <div className="space-y-2.5">
-        {qrUrl && (
-          <div className="flex justify-center rounded-lg bg-white p-1.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrUrl} alt="VietQR" className="h-56 w-56 object-contain" />
+    <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+      {qrUrl && (
+        <div className="qrbox">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrUrl} alt="VietQR" />
+        </div>
+      )}
+
+      <div className="kv">
+        <div className="row" style={{ cursor: "default" }}>
+          <span className="k">NH nhận</span>
+          <span className="v">{recipientBank?.shortName ?? "—"}</span>
+        </div>
+        <button type="button" className="row" onClick={() => copy(expense.payeeAccountNumber!, "số TK")} title="Bấm để copy">
+          <span className="k">Số TK</span>
+          <span className="v mono">{expense.payeeAccountNumber} ⧉</span>
+        </button>
+        {expense.payeeAccountName && (
+          <div className="row" style={{ cursor: "default" }}>
+            <span className="k">Chủ TK</span>
+            <span className="v" style={{ textTransform: "uppercase" }}>
+              {expense.payeeAccountName}
+            </span>
           </div>
         )}
+        <button type="button" className="row" onClick={() => copy(String(Math.round(expense.amount)), "số tiền")} title="Bấm để copy">
+          <span className="k">Số tiền</span>
+          <span className="v amt">{money(expense.amount)} ⧉</span>
+        </button>
+        <button type="button" className="row" onClick={() => copy(memo, "nội dung")} title="Bấm để copy">
+          <span className="k">Nội dung</span>
+          <span className="v mono">{memo} ⧉</span>
+        </button>
+        {expense.note && (
+          <button type="button" className="row" onClick={() => copy(expense.note!, "ghi chú admin")} title="Bấm để copy">
+            <span className="k">Ghi chú</span>
+            <span className="v" style={{ fontWeight: 400 }}>
+              {expense.note} ⧉
+            </span>
+          </button>
+        )}
+      </div>
 
-        <div className="space-y-1 rounded-lg bg-[#3a1608] p-2.5 text-xs">
-          <div className="flex justify-between gap-2">
-            <span className="text-[#aa9a8b]">NH nhận</span>
-            <span className="font-semibold text-[#f7f2e4]">{recipientBank?.shortName ?? "—"}</span>
+      <div className="fld">
+        <span className="lbl">App NH em đang dùng để chuyển</span>
+        <select className="ctrl" value={ktBankBin} onChange={(e) => chooseKtBank(e.target.value)}>
+          <option value="">— Chọn NH em dùng —</option>
+          {VN_BANKS.map((b) => (
+            <option key={b.bin} value={b.bin}>
+              {b.shortName} ({b.name})
+            </option>
+          ))}
+        </select>
+        {ktBank && !ktBank.autofill && (
+          <div className="hint">
+            {ktBank.appId
+              ? `Bấm nút → lưu QR vào Photos → app ${ktBank.shortName} tự mở → Quét QR → Quét từ thư viện.`
+              : `Lưu QR → mở app ${ktBank.shortName} thủ công → Quét QR → Quét từ thư viện.`}
           </div>
-          <button
-            type="button"
-            onClick={() => copy(expense.payeeAccountNumber!, "số TK")}
-            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
-            title="Bấm để copy"
-          >
-            <span className="text-[#aa9a8b]">Số TK</span>
-            <span className="font-mono text-[#f7f2e4]">{expense.payeeAccountNumber} ⧉</span>
-          </button>
-          {expense.payeeAccountName && (
-            <div className="flex justify-between gap-2 px-1">
-              <span className="text-[#aa9a8b]">Chủ TK</span>
-              <span className="font-semibold uppercase text-[#f7f2e4]">{expense.payeeAccountName}</span>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => copy(String(Math.round(expense.amount)), "số tiền")}
-            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
-            title="Bấm để copy"
-          >
-            <span className="text-[#aa9a8b]">Số tiền</span>
-            <span className="font-bold text-orange-300">{money(expense.amount)} ⧉</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => copy(memo, "nội dung")}
-            className="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
-            title="Bấm để copy"
-          >
-            <span className="text-[#aa9a8b]">Nội dung</span>
-            <span className="font-mono text-[#f7f2e4]">{memo} ⧉</span>
-          </button>
-          {expense.note && (
-            <button
-              type="button"
-              onClick={() => copy(expense.note!, "ghi chú admin")}
-              className="flex w-full items-start justify-between gap-2 rounded text-left hover:bg-[#431a0a]/60 px-1 py-0.5"
-              title="Bấm để copy ghi chú admin"
-            >
-              <span className="text-[#aa9a8b] shrink-0">Ghi chú</span>
-              <span className="text-right text-[#f7f2e4] break-words">{expense.note} ⧉</span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+        <button className="btn primary block" onClick={transferCombo} disabled={!ktBank}>
+          {!ktBank
+            ? "Chọn NH em dùng để chuyển"
+            : ktBank.autofill && ktBank.appId
+              ? `💸 Chuyển qua ${ktBank.shortName}`
+              : ktBank.appId
+                ? `💸 Lưu QR + Mở ${ktBank.shortName}`
+                : `💾 Lưu QR (mở app ${ktBank.shortName} thủ công)`}
+        </button>
+        <button className="btn ghost block" onClick={() => saveQrImage(false)}>
+          💾 Chỉ lưu ảnh QR
+        </button>
+      </div>
+
+      {canMarkPaid && (
+        <div style={{ border: "1px solid color-mix(in srgb, var(--ok) 40%, var(--line2))", background: "color-mix(in srgb, var(--ok) 10%, transparent)", borderRadius: 12, padding: 11 }}>
+          {!showPayForm ? (
+            <button className="btn primary block" style={{ background: "var(--ok)" }} type="button" onClick={() => setShowPayForm(true)}>
+              ✓ Đã chuyển xong — ghi sổ
             </button>
+          ) : (
+            <>
+              <div className="acclbl" style={{ color: "var(--ok)" }}>
+                Xác nhận đã chuyển khoản
+              </div>
+              <div className="fgrid" style={{ marginBottom: 12 }}>
+                <div className="fld" style={{ marginBottom: 0 }}>
+                  <span className="lbl">
+                    Số tiền <span className="req">*</span>
+                  </span>
+                  <div className="money-wrap">
+                    <MoneyInput value={payAmount} onChange={setPayAmount} className="ctrl num" />
+                    <span className="cur">đ</span>
+                  </div>
+                </div>
+                <div className="fld" style={{ marginBottom: 0 }}>
+                  <div className="dateinline">
+                    <span className="lbl">Ngày chi</span>
+                    <input className="ctrl bare" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <ReceiptFilePicker value={payReceipt} onChange={setPayReceipt} />
+              <div className="acclbl" style={{ color: "var(--terra)" }}>
+                💰 Chi từ tài khoản quỹ <span className="req">*</span>
+              </div>
+              <div className="accpick" style={{ marginBottom: 12 }}>
+                {cashAccounts.map((a: CashAccountOption) => (
+                  <button key={a.id} type="button" className={`acc${payAccountId === a.id ? " on" : ""}`} onClick={() => setPayAccountId(a.id)}>
+                    <div className="ic">{a.kind === "cash" ? "💵" : "🏦"}</div>
+                    <div>
+                      <div className="nm">{a.name}</div>
+                      <div className="kd">{a.kind === "cash" ? "Quỹ tiền mặt" : "Ngân hàng"}</div>
+                    </div>
+                    <div className="bal">
+                      <div className="b num">{moneyPlain(a.currentBalance)}</div>
+                      <div className="l">số dư đ</div>
+                    </div>
+                    <div className="rad" />
+                  </button>
+                ))}
+              </div>
+              <label className="fld">
+                <span className="lbl">Ghi chú KT</span>
+                <textarea
+                  className="ctrl"
+                  rows={2}
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  placeholder="VD: chuyển lúc 14h, mã GD 88231"
+                />
+              </label>
+              <div className="warn-line">Trừ ngay vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.</div>
+              <div className="acts">
+                <button type="button" className="btn ghost" onClick={() => setShowPayForm(false)}>
+                  Quay lại
+                </button>
+                <button type="button" className="btn primary block" style={{ background: "var(--ok)" }} onClick={confirmPaid} disabled={paying}>
+                  {paying ? "Đang ghi…" : "Xác nhận đã chuyển"}
+                </button>
+              </div>
+            </>
           )}
         </div>
-          </div>
-
-          <div className="space-y-2.5">
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
-          <label className="block">
-            <span className="font-semibold">App NH em đang dùng để chuyển</span>
-            <select
-              value={ktBankBin}
-              onChange={(e) => chooseKtBank(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-amber-500/40 bg-[#431a0a] px-2 py-1.5 text-xs text-amber-100"
-            >
-              <option value="">— Chọn NH em dùng —</option>
-              {VN_BANKS.map((b) => (
-                <option key={b.bin} value={b.bin}>
-                  {b.shortName} ({b.name})
-                </option>
-              ))}
-            </select>
-          </label>
-          {ktBank && !ktBank.autofill && (
-            <div className="mt-1 text-[10px] text-amber-200/80">
-              {ktBank.appId
-                ? `Bấm nút → lưu QR vào Photos → app ${ktBank.shortName} tự mở → Quét QR → Quét từ thư viện.`
-                : `Lưu QR → mở app ${ktBank.shortName} thủ công → Quét QR → Quét từ thư viện.`}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <button
-            onClick={transferCombo}
-            disabled={!ktBank}
-            className="w-full rounded-lg bg-orange-500 px-3 py-2.5 text-sm font-semibold text-[#3a1608] disabled:opacity-50"
-          >
-            {!ktBank
-              ? "Chọn NH em dùng để chuyển"
-              : ktBank.autofill && ktBank.appId
-                ? `💸 Chuyển qua ${ktBank.shortName}`
-                : ktBank.appId
-                  ? `💸 Lưu QR + Mở ${ktBank.shortName}`
-                  : `💾 Lưu QR (mở app ${ktBank.shortName} thủ công)`}
-          </button>
-          <button
-            onClick={() => saveQrImage(false)}
-            className="w-full rounded-lg border border-[#604232] bg-[#3a1608] px-3 py-1.5 text-xs font-medium text-[#e8dcc8]"
-          >
-            💾 Chỉ lưu ảnh QR
-          </button>
-        </div>
-
-        {canMarkPaid && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 space-y-2">
-            {!showPayForm ? (
-              <button
-                type="button"
-                onClick={() => setShowPayForm(true)}
-                className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-[#3a1608]"
-              >
-                ✓ Đã chuyển xong — ghi sổ
-              </button>
-            ) : (
-              <>
-                <div className="text-xs font-semibold text-emerald-300">Xác nhận đã chuyển khoản</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="text-[11px] text-[#aa9a8b]">Số tiền (₫) *</span>
-                    <MoneyInput
-                      value={payAmount}
-                      onChange={setPayAmount}
-                      className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] text-[#aa9a8b]">Ngày chi *</span>
-                    <input
-                      type="date"
-                      value={payDate}
-                      onChange={(e) => setPayDate(e.target.value)}
-                      className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                    />
-                  </label>
-                </div>
-                <ReceiptFilePicker value={payReceipt} onChange={setPayReceipt} />
-                <label className="block">
-                  <span className="text-[11px] text-[#aa9a8b]">Tài khoản quỹ *</span>
-                  <select
-                    value={payAccountId}
-                    onChange={(e) => setPayAccountId(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                  >
-                    <option value="">— Chọn tài khoản —</option>
-                    {cashAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-[11px] text-[#aa9a8b]">Ghi chú KT</span>
-                  <textarea
-                    rows={2}
-                    value={payNote}
-                    onChange={(e) => setPayNote(e.target.value)}
-                    placeholder="VD: chuyển lúc 14h, mã GD 88231"
-                    className="mt-0.5 w-full rounded-lg border border-[#604232] bg-[#3a1608] px-2 py-1.5 text-xs text-[#f7f2e4]"
-                  />
-                </label>
-                <div className="text-[10px] text-amber-300">
-                  Trừ ngay vào số dư tài khoản đã chọn. Không huỷ được sau khi xác nhận.
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={confirmPaid}
-                    disabled={paying}
-                    className="flex-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-[#3a1608] disabled:opacity-50"
-                  >
-                    {paying ? "Đang ghi…" : "Xác nhận đã chuyển"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowPayForm(false)}
-                    className="rounded-lg border border-[#604232] px-3 py-2 text-xs text-[#aa9a8b]"
-                  >
-                    Quay lại
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-          </div>
-        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,1195 @@
+/* Lệnh chi — design system Huỳnh Gia (khớp mockup /mockup-lenh-chi).
+   Mọi selector scope dưới .lc-doc để không đụng global. */
+
+.lc-doc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --card2: #f7f1e3;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b5432e;
+  --violet: #6c4a86;
+  --sky: #3f6f86;
+  --track: rgba(46, 20, 10, 0.07);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  color-scheme: light;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  border-radius: 16px;
+  overflow: hidden;
+  padding-bottom: 24px;
+}
+.lc-doc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --card2: #431a0a;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --red: #e07a5f;
+  --violet: #b498d0;
+  --sky: #8fc0d8;
+  --track: rgba(247, 242, 228, 0.09);
+}
+
+.lc-doc *,
+.lc-doc *::before,
+.lc-doc *::after {
+  box-sizing: border-box;
+}
+.lc-doc .num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.lc-doc .wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 clamp(14px, 4.5vw, 20px);
+}
+
+.lc-doc .topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 0 12px;
+}
+.lc-doc .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lc-doc .mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--text);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+.lc-doc .brand b {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: block;
+  line-height: 1.1;
+}
+.lc-doc .brand span {
+  font-size: 10px;
+  color: var(--mut);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lc-doc .iconbtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line2);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.lc-doc .head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lc-doc .eyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--terra);
+}
+.lc-doc h1 {
+  font-size: clamp(20px, 6vw, 25px);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  margin: 6px 0 0;
+  line-height: 1.12;
+}
+.lc-doc .meta {
+  font-size: 12px;
+  color: var(--mut);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  align-items: center;
+  margin-top: 7px;
+}
+.lc-doc .meta .num {
+  color: var(--terra);
+  font-size: 11px;
+  font-weight: 600;
+}
+.lc-doc .meta .d {
+  color: var(--line2);
+}
+.lc-doc .btn {
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.lc-doc .btn.primary {
+  background: var(--orange);
+  color: #fff;
+}
+.lc-doc .btn.ghost {
+  background: none;
+  border: 1px solid var(--line2);
+  color: var(--text);
+}
+.lc-doc .btn.block {
+  flex: 1;
+  justify-content: center;
+}
+.lc-doc .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lc-doc .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 15px 0 4px;
+}
+.lc-doc .tile {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 11px 10px;
+  min-width: 0;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  cursor: default;
+}
+.lc-doc button.tile {
+  cursor: pointer;
+}
+.lc-doc .tile .k {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mut);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-doc .tile .v {
+  font-size: clamp(13px, 3.9vw, 16.5px);
+  font-weight: 600;
+  margin-top: 5px;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-doc .tile .v.chi {
+  color: var(--terra);
+}
+.lc-doc .tile .v.am {
+  color: var(--gold);
+}
+.lc-doc .tile .s {
+  font-size: 10px;
+  color: var(--mut2);
+  margin-top: 1px;
+}
+
+.lc-doc .actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0 12px;
+}
+.lc-doc .search {
+  flex: 1;
+  position: relative;
+}
+.lc-doc .search input {
+  width: 100%;
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 11px 9px 30px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.lc-doc .search input::placeholder {
+  color: var(--mut2);
+}
+.lc-doc .search .ic {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--mut2);
+}
+
+.lc-doc .tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+.lc-doc .tab {
+  flex: 0 0 auto;
+  border: 1px solid var(--line2);
+  background: none;
+  color: var(--mut);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-doc .tab.on {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.lc-doc .tab .cnt {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--track);
+  color: inherit;
+}
+.lc-doc .tab.on .cnt {
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+}
+
+.lc-doc .list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lc-doc .seclbl {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mut2);
+  margin: 20px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lc-doc .seclbl::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.lc-doc .foot-note {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--mut2);
+  margin-top: 26px;
+}
+.lc-doc .empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--mut);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 26px 14px;
+}
+
+/* Card lệnh chi (giàu) */
+.lc-doc .rcx {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 9px;
+}
+.lc-doc .rcx.clickable {
+  cursor: pointer;
+}
+.lc-doc .rcx.urgent {
+  border-color: color-mix(in srgb, var(--red) 55%, var(--line2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent) inset;
+}
+.lc-doc .rcx.hl {
+  box-shadow: 0 0 0 2px var(--orange) inset;
+}
+.lc-doc .rcx-hd {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.lc-doc .rcx-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.lc-doc .stbadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.lc-doc .st-pend {
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  color: var(--gold);
+}
+.lc-doc .st-wait {
+  background: color-mix(in srgb, var(--violet) 20%, transparent);
+  color: var(--violet);
+}
+.lc-doc .st-paid {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+.lc-doc .st-cancel {
+  background: var(--track);
+  color: var(--mut);
+}
+.lc-doc .st-urgent {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+  color: var(--red);
+}
+.lc-doc .ccode {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--mut2);
+  letter-spacing: 0.05em;
+}
+.lc-doc .rcx-amt {
+  text-align: right;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: var(--text);
+}
+.lc-doc .rcx-amt .u {
+  font-size: 12px;
+  color: var(--mut2);
+}
+.lc-doc .rcx-amt .real {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ok);
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+.lc-doc .rcx-meta {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lc-doc .mrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.lc-doc .mrow .strong {
+  font-weight: 600;
+}
+.lc-doc .mrow .mut {
+  color: var(--mut);
+}
+.lc-doc .mrow.dim {
+  color: var(--mut2);
+  font-size: 11px;
+}
+.lc-doc .mrow.ok {
+  color: var(--ok);
+  font-size: 11px;
+}
+.lc-doc .mrow.wait {
+  color: var(--violet);
+  font-size: 11px;
+}
+.lc-doc .mrow.cancel {
+  color: var(--mut);
+  font-size: 11px;
+}
+.lc-doc .mdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.lc-doc .note-adm {
+  margin-top: 12px;
+  background: color-mix(in srgb, var(--terra) 9%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text);
+}
+.lc-doc .note-kt {
+  margin-top: 9px;
+  background: color-mix(in srgb, var(--sky) 9%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 12px;
+  color: var(--text);
+}
+.lc-doc .note-kt b {
+  color: var(--sky);
+}
+.lc-doc .bankbox {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+}
+.lc-doc .bankbox .lg {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--orange);
+  flex: 0 0 auto;
+}
+.lc-doc .bankbox .bk {
+  flex: 1;
+  min-width: 0;
+}
+.lc-doc .bankbox .bk .nm {
+  font-size: 11px;
+  font-weight: 600;
+}
+.lc-doc .bankbox .bk .no {
+  font-size: 11px;
+  color: var(--mut);
+}
+.lc-doc .bankbox .own {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--mut2);
+  text-align: right;
+}
+.lc-doc .actbar {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.lc-doc .actbtn {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9px;
+  padding: 6px 11px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.lc-doc .actbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lc-doc .a-link {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--orange);
+}
+.lc-doc .a-ck {
+  background: var(--orange);
+  color: #fff;
+}
+.lc-doc .a-ok {
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+  color: var(--ok);
+}
+.lc-doc .a-approve {
+  background: var(--ok);
+  color: #fff;
+}
+.lc-doc .a-cancel {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+.lc-doc .a-bill {
+  background: color-mix(in srgb, var(--sky) 16%, transparent);
+  color: var(--sky);
+  margin-left: auto;
+}
+.lc-doc .a-doc {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* Popup / sheet */
+.lc-doc .scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 8, 3, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+.lc-doc .sheet {
+  background: var(--card);
+  width: 100%;
+  max-width: 520px;
+  border: 1px solid var(--line2);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  max-height: 93dvh;
+  overflow-y: auto;
+  padding: 16px 15px calc(18px + env(safe-area-inset-bottom));
+  animation: lc-up 0.22s ease;
+}
+@keyframes lc-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (min-width: 600px) {
+  .lc-doc .scrim {
+    align-items: center;
+    padding: 20px;
+  }
+  .lc-doc .sheet {
+    border-radius: 20px;
+    border-bottom: 1px solid var(--line2);
+  }
+}
+.lc-doc .sheet-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.lc-doc .sheet-hd h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.lc-doc .sheet-hd h3.ok {
+  color: var(--ok);
+}
+.lc-doc .sheet-hd h3.red {
+  color: var(--red);
+}
+.lc-doc .sheet-hd h3.orange {
+  color: var(--orange);
+}
+.lc-doc .sheet-hd .sub {
+  font-size: 11px;
+  color: var(--mut);
+  margin-top: 2px;
+}
+.lc-doc .hint {
+  font-size: 11px;
+  color: var(--mut);
+  margin: 6px 0 14px;
+}
+.lc-doc .hint.strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.lc-doc .fld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.lc-doc .lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.lc-doc .lbl .req {
+  color: var(--red);
+}
+.lc-doc .ctrl {
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+.lc-doc textarea.ctrl {
+  resize: vertical;
+  min-height: 60px;
+}
+.lc-doc .ctrl.num {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+}
+.lc-doc .money-wrap {
+  position: relative;
+}
+.lc-doc .money-wrap .cur {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--mut2);
+}
+.lc-doc .fgrid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 11px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+.lc-doc .fgrid .fld {
+  margin-bottom: 0;
+}
+.lc-doc .formgrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 11px;
+}
+@media (min-width: 520px) {
+  .lc-doc .formgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.lc-doc .formgrid .full {
+  grid-column: 1 / -1;
+}
+.lc-doc .dateinline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+.lc-doc .dateinline .lbl {
+  margin: 0;
+  white-space: nowrap;
+}
+.lc-doc .ctrl.bare {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 13px;
+  width: auto;
+}
+
+/* payinfo + account picker */
+.lc-doc .payinfo {
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 13px 14px;
+  margin-bottom: 14px;
+}
+.lc-doc .payinfo .big {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-family: "IBM Plex Mono", monospace;
+}
+.lc-doc .payinfo .big .u {
+  font-size: 14px;
+  color: var(--mut2);
+}
+.lc-doc .payinfo .rows {
+  margin-top: 8px;
+}
+.lc-doc .irow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.lc-doc .irow .k {
+  color: var(--mut);
+}
+.lc-doc .irow .v {
+  font-weight: 600;
+  text-align: right;
+}
+.lc-doc .acclbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--terra);
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-doc .acclbl .req {
+  color: var(--red);
+}
+.lc-doc .accpick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lc-doc .acc {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  border-radius: 12px;
+  padding: 12px 13px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+  color: var(--text);
+}
+.lc-doc .acc.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 9%, var(--card2));
+  box-shadow: 0 0 0 1px var(--orange) inset;
+}
+.lc-doc .acc .ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  flex: 0 0 auto;
+  background: var(--track);
+}
+.lc-doc .acc .nm {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.lc-doc .acc .kd {
+  font-size: 10.5px;
+  color: var(--mut2);
+}
+.lc-doc .acc .bal {
+  margin-left: auto;
+  text-align: right;
+  flex: 0 0 auto;
+}
+.lc-doc .acc .bal .b {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.lc-doc .acc .bal .l {
+  font-size: 9.5px;
+  color: var(--mut2);
+}
+.lc-doc .acc .rad {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--line2);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+.lc-doc .acc.on .rad {
+  border-color: var(--orange);
+}
+.lc-doc .acc.on .rad::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+
+.lc-doc .after {
+  margin: 12px 0;
+  font-size: 12px;
+  background: var(--track);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.lc-doc .after .lb {
+  color: var(--mut);
+}
+.lc-doc .after .v {
+  font-weight: 700;
+  font-family: "IBM Plex Mono", monospace;
+}
+.lc-doc .after .v.ok {
+  color: var(--ok);
+}
+.lc-doc .after .v.warn {
+  color: var(--red);
+}
+.lc-doc .attach {
+  border: 1px dashed var(--line2);
+  border-radius: 11px;
+  padding: 13px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--mut);
+  cursor: pointer;
+  background: none;
+  width: 100%;
+  font-family: inherit;
+}
+.lc-doc .attach:disabled {
+  opacity: 0.6;
+}
+
+/* notes */
+.lc-doc .notes {
+  margin-bottom: 12px;
+}
+.lc-doc .notes .lbl {
+  margin-bottom: 7px;
+}
+.lc-doc .notelist {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.lc-doc .note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.lc-doc .note .who {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.lc-doc .note .who.admin {
+  background: color-mix(in srgb, var(--terra) 20%, transparent);
+  color: var(--terra);
+}
+.lc-doc .note .who.kt {
+  background: color-mix(in srgb, var(--sky) 18%, transparent);
+  color: var(--sky);
+}
+.lc-doc .note .bd {
+  flex: 1;
+  min-width: 0;
+}
+.lc-doc .note .tx {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.lc-doc .note .mt {
+  font-size: 9.5px;
+  color: var(--mut2);
+  margin-top: 2px;
+}
+.lc-doc .addnote {
+  position: relative;
+}
+.lc-doc .addnote input {
+  padding-right: 64px;
+}
+.lc-doc .addnote .send {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: var(--orange);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.lc-doc .acts {
+  display: flex;
+  gap: 9px;
+  margin-top: 16px;
+}
+.lc-doc .seg {
+  display: flex;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.lc-doc .seg button {
+  flex: 1;
+  background: var(--card2);
+  border: none;
+  padding: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mut);
+  cursor: pointer;
+  font-family: inherit;
+  border-right: 1px solid var(--line2);
+}
+.lc-doc .seg button:last-child {
+  border-right: none;
+}
+.lc-doc .seg button.on {
+  background: var(--orange);
+  color: #fff;
+}
+.lc-doc .seg button.on.urgent {
+  background: var(--red);
+}
+
+/* thumbnails (ảnh hoá đơn / chứng từ) */
+.lc-doc .thumbs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin-top: 8px;
+}
+.lc-doc .thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid var(--line2);
+  background: var(--card2);
+}
+.lc-doc .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lc-doc .thumb .pdf {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 11px;
+  color: var(--mut);
+}
+.lc-doc .thumb .rm {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* misc helpers */
+.lc-doc .kt-note {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--violet) 12%, transparent);
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  font-size: 12px;
+  color: var(--violet);
+  margin-bottom: 12px;
+}
+.lc-doc .warn-line {
+  font-size: 11px;
+  color: var(--red);
+  margin: 6px 0 2px;
+}
+.lc-doc .ok-line {
+  font-size: 11px;
+  color: var(--ok);
+  margin-top: 4px;
+}
+.lc-doc .qrbox {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.lc-doc .qrbox img {
+  width: 210px;
+  height: 210px;
+  object-fit: contain;
+}
+.lc-doc .kv {
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.lc-doc .kv .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  align-items: center;
+}
+.lc-doc .kv .row .k {
+  color: var(--mut);
+}
+.lc-doc .kv .row .v {
+  font-weight: 600;
+  text-align: right;
+}
+.lc-doc .kv .row .v.mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+.lc-doc .kv .row .v.amt {
+  color: var(--orange);
+  font-weight: 800;
+}
+
+/* lightbox */
+.lc-doc-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 4, 1, 0.9);
+  padding: 16px;
+}
+.lc-doc-viewer img {
+  max-height: 92vh;
+  max-width: 96vw;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.lc-doc-viewer .vbtn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+.lc-doc-viewer .vclose {
+  right: 16px;
+  top: 16px;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+.lc-doc-viewer .vprev,
+.lc-doc-viewer .vnext {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  font-size: 26px;
+}
+.lc-doc-viewer .vprev {
+  left: 16px;
+}
+.lc-doc-viewer .vnext {
+  right: 16px;
+}
+.lc-doc-viewer .vcount {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
