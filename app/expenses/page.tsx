@@ -31,14 +31,6 @@ export default async function ExpensesPage() {
   return (
     <ProtectedLayout>
       <div className="space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold text-orange-300">Lệnh chi</h1>
-          <p className="text-sm text-[#8b95b7]">
-            {user.role === UserRole.accountant
-              ? "KT tạo lệnh chi → admin duyệt → KT thanh toán. Mỗi lần đánh dấu đã chi sẽ trừ vào số dư công ty trong sổ quỹ."
-              : "Admin tạo lệnh chi cho kế toán thanh toán (vật tư ngoài đề xuất, văn phòng, máy móc, …). Mỗi lần KT đánh dấu đã chi sẽ trừ vào số dư công ty trong sổ quỹ."}
-          </p>
-        </div>
         <ExpensesClient
           role={user.role}
           projects={projects}

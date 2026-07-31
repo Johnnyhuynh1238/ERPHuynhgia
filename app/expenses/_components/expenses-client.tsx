@@ -650,16 +650,16 @@ export function ExpensesClient({
       <div className="grid grid-cols-3 gap-2">
         <div className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5">
           <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Chờ chi</div>
-          <div className="mt-1 truncate font-mono text-[15px] font-semibold text-[#d8b25e]">{money(pendingTotal)}</div>
+          <div className="mt-1 truncate font-mono text-[13px] font-semibold text-[#d8b25e]">{money(pendingTotal)}</div>
           <div className="text-[10px] text-[#a8886e]">{pendingCount} lệnh</div>
         </div>
         <div className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5">
           <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Đã chi</div>
-          <div className="mt-1 truncate font-mono text-[15px] font-semibold text-emerald-300">{money(totalPaid)}</div>
+          <div className="mt-1 truncate font-mono text-[13px] font-semibold text-emerald-300">{money(totalPaid)}</div>
         </div>
         <button type="button" onClick={() => setShowTreasury(true)} className="min-w-0 rounded-xl border border-[#5a3418] bg-[#4a1d0c] px-3 py-2.5 text-left transition active:scale-[0.98]">
           <div className="text-[9.5px] font-semibold uppercase tracking-wide text-[#c9a98f]">Số dư quỹ ›</div>
-          <div className={`mt-1 truncate font-mono text-[15px] font-semibold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</div>
+          <div className={`mt-1 truncate font-mono text-[13px] font-semibold ${balanceTone}`}>{balance == null ? "…" : money(balance)}</div>
         </button>
       </div>
 
@@ -1463,17 +1463,19 @@ export function ExpensesClient({
       )}
 
       {/* Pay dialog (for cash / non-bank expenses) */}
-      {openPay && (
+      {mounted && openPay &&
+        createPortal(
+          <div className={`${plexSans.variable} ${plexMono.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif" }}>
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/70"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/60 sm:items-center sm:p-4"
           onClick={() => setOpenPay(null)}
         >
           <form
             onSubmit={submitPay}
             onClick={(e) => e.stopPropagation()}
-            className="min-h-dvh w-full space-y-4 bg-[#3a1608] p-5 sm:p-8"
+            className="w-full max-w-[540px] max-h-[93dvh] space-y-4 overflow-y-auto rounded-t-2xl border border-[#5a3418] bg-[#3a1608] p-5 sm:rounded-2xl"
           >
-            <div className="sticky top-0 -mx-5 -mt-5 flex items-start justify-between gap-3 border-b border-[#5a3418] bg-[#3a1608] px-5 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-[#5a3418] pb-3">
               <div>
                 <div className="text-lg font-semibold text-emerald-300">Ghi nhận đã chi</div>
                 <div className="font-mono text-[11px] tracking-wider text-[#a8886e]">{openPay.code}</div>
@@ -1625,7 +1627,9 @@ export function ExpensesClient({
             </div>
           </form>
         </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* Cancel dialog */}
       {openCancel && (
