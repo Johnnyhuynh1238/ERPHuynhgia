@@ -2,7 +2,7 @@
 
 import "./expenses.css";
 import { confirmDialog } from "@/components/confirm-dialog";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -649,6 +649,10 @@ export function ExpensesClient({
   const selAcc = cashAccounts.find((a) => a.id === payAccountId) || null;
   const payAfter = selAcc ? selAcc.currentBalance - (Number(payAmount) || 0) : null;
 
+  // Portal overlay ra body: thoát khỏi transform của AppShell (fixed mới bám viewport → full màn).
+  const overlay = (node: ReactNode) =>
+    mounted ? createPortal(<div className="lc-scope" data-theme={theme}>{node}</div>, document.body) : null;
+
   function tabCount(key: string): number | null {
     if (key === "pending") return pendingCount;
     if (key === status) return rows.length;
@@ -656,7 +660,7 @@ export function ExpensesClient({
   }
 
   return (
-    <div className="lc-doc" data-theme={theme}>
+    <div className="lc-doc lc-scope" data-theme={theme}>
       {aiOpen &&
         mounted &&
         createPortal(
@@ -1036,7 +1040,7 @@ export function ExpensesClient({
       </div>
 
       {/* ===== POPUP: Ghi nhận đã chi ===== */}
-      {openPay && (
+      {openPay && overlay(
         <div className="scrim" onClick={(e) => e.target === e.currentTarget && setOpenPay(null)}>
           <form className="sheet" onSubmit={submitPay}>
             <div className="sheet-hd">
@@ -1185,7 +1189,7 @@ export function ExpensesClient({
       )}
 
       {/* ===== POPUP: Tạo lệnh chi ===== */}
-      {showCreate && canCreate && (
+      {showCreate && canCreate && overlay(
         <div className="scrim" onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}>
           <form className="sheet" onSubmit={submitCreate}>
             <div className="sheet-hd">
@@ -1435,7 +1439,7 @@ export function ExpensesClient({
       )}
 
       {/* ===== POPUP: Huỷ ===== */}
-      {openCancel && (
+      {openCancel && overlay(
         <div className="scrim" onClick={(e) => e.target === e.currentTarget && setOpenCancel(null)}>
           <div className="sheet">
             <div className="sheet-hd">
@@ -1466,7 +1470,7 @@ export function ExpensesClient({
       )}
 
       {/* ===== POPUP: Hướng dẫn ===== */}
-      {showHelp && (
+      {showHelp && overlay(
         <div className="scrim" onClick={(e) => e.target === e.currentTarget && setShowHelp(false)}>
           <div className="sheet">
             <div className="sheet-hd">
@@ -1503,7 +1507,7 @@ export function ExpensesClient({
       )}
 
       {/* ===== Sổ quỹ chi tiết ===== */}
-      {showTreasury && (
+      {showTreasury && overlay(
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 pt-4" onClick={() => setShowTreasury(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-5xl rounded-xl border border-[#2d3249] bg-[#0b0d16] shadow-xl">
             <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[#2d3249] bg-[#13151f] px-4 py-2.5">
@@ -1520,7 +1524,7 @@ export function ExpensesClient({
       )}
 
       {/* ===== Lightbox ảnh ===== */}
-      {viewer && (() => {
+      {viewer && overlay((() => {
         const url = viewer.urls[viewer.index];
         const src = url.startsWith("minio://")
           ? `/api/expenses/${viewer.expenseId}/file?type=${viewer.type}${viewer.type === "attachment" ? `&index=${viewer.index}` : ""}`
@@ -1564,7 +1568,7 @@ export function ExpensesClient({
             )}
           </div>
         );
-      })()}
+      })())}
     </div>
   );
 }

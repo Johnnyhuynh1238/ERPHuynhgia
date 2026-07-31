@@ -1,7 +1,7 @@
 /* Lệnh chi — design system Huỳnh Gia (khớp mockup /mockup-lenh-chi).
-   Mọi selector scope dưới .lc-doc để không đụng global. */
+   Mọi selector scope dưới .lc-scope để không đụng global. */
 
-.lc-doc {
+.lc-scope {
   --bg: #f5efe1;
   --card: #fbf7ec;
   --card2: #f7f1e3;
@@ -20,15 +20,17 @@
   --track: rgba(46, 20, 10, 0.07);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   color-scheme: light;
-  background: var(--bg);
   color: var(--text);
   line-height: 1.4;
   letter-spacing: -0.006em;
+}
+.lc-doc {
+  background: var(--bg);
   border-radius: 16px;
   overflow: hidden;
   padding-bottom: 24px;
 }
-.lc-doc[data-theme="dark"] {
+.lc-scope[data-theme="dark"] {
   color-scheme: dark;
   --bg: #3a1608;
   --card: #4a1d0c;
@@ -48,34 +50,34 @@
   --track: rgba(247, 242, 228, 0.09);
 }
 
-.lc-doc *,
-.lc-doc *::before,
-.lc-doc *::after {
+.lc-scope *,
+.lc-scope *::before,
+.lc-scope *::after {
   box-sizing: border-box;
 }
-.lc-doc .num {
+.lc-scope .num {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
-.lc-doc .wrap {
+.lc-scope .wrap {
   max-width: 640px;
   margin: 0 auto;
   padding: 0 clamp(14px, 4.5vw, 20px);
 }
 
-.lc-doc .topbar {
+.lc-scope .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 15px 0 12px;
 }
-.lc-doc .brand {
+.lc-scope .brand {
   display: flex;
   align-items: center;
   gap: 9px;
 }
-.lc-doc .mark {
+.lc-scope .mark {
   width: 30px;
   height: 30px;
   border-radius: 7px;
@@ -86,20 +88,20 @@
   font-weight: 700;
   font-size: 12px;
 }
-.lc-doc .brand b {
+.lc-scope .brand b {
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   display: block;
   line-height: 1.1;
 }
-.lc-doc .brand span {
+.lc-scope .brand span {
   font-size: 10px;
   color: var(--mut);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.lc-doc .iconbtn {
+.lc-scope .iconbtn {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -113,27 +115,27 @@
   line-height: 1;
 }
 
-.lc-doc .head-row {
+.lc-scope .head-row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
 }
-.lc-doc .eyebrow {
+.lc-scope .eyebrow {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--terra);
 }
-.lc-doc h1 {
+.lc-scope h1 {
   font-size: clamp(20px, 6vw, 25px);
   font-weight: 600;
   letter-spacing: -0.022em;
   margin: 6px 0 0;
   line-height: 1.12;
 }
-.lc-doc .meta {
+.lc-scope .meta {
   font-size: 12px;
   color: var(--mut);
   display: flex;
@@ -142,15 +144,15 @@
   align-items: center;
   margin-top: 7px;
 }
-.lc-doc .meta .num {
+.lc-scope .meta .num {
   color: var(--terra);
   font-size: 11px;
   font-weight: 600;
 }
-.lc-doc .meta .d {
+.lc-scope .meta .d {
   color: var(--line2);
 }
-.lc-doc .btn {
+.lc-scope .btn {
   border: none;
   border-radius: 10px;
   font-size: 13px;
@@ -163,31 +165,31 @@
   font-family: inherit;
   white-space: nowrap;
 }
-.lc-doc .btn.primary {
+.lc-scope .btn.primary {
   background: var(--orange);
   color: #fff;
 }
-.lc-doc .btn.ghost {
+.lc-scope .btn.ghost {
   background: none;
   border: 1px solid var(--line2);
   color: var(--text);
 }
-.lc-doc .btn.block {
+.lc-scope .btn.block {
   flex: 1;
   justify-content: center;
 }
-.lc-doc .btn:disabled {
+.lc-scope .btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.lc-doc .stats {
+.lc-scope .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 7px;
   margin: 15px 0 4px;
 }
-.lc-doc .tile {
+.lc-scope .tile {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -198,10 +200,10 @@
   color: var(--text);
   cursor: default;
 }
-.lc-doc button.tile {
+.lc-scope button.tile {
   cursor: pointer;
 }
-.lc-doc .tile .k {
+.lc-scope .tile .k {
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -211,7 +213,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lc-doc .tile .v {
+.lc-scope .tile .v {
   font-size: clamp(13px, 3.9vw, 16.5px);
   font-weight: 600;
   margin-top: 5px;
@@ -220,29 +222,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lc-doc .tile .v.chi {
+.lc-scope .tile .v.chi {
   color: var(--terra);
 }
-.lc-doc .tile .v.am {
+.lc-scope .tile .v.am {
   color: var(--gold);
 }
-.lc-doc .tile .s {
+.lc-scope .tile .s {
   font-size: 10px;
   color: var(--mut2);
   margin-top: 1px;
 }
 
-.lc-doc .actions {
+.lc-scope .actions {
   display: flex;
   gap: 8px;
   align-items: center;
   margin: 16px 0 12px;
 }
-.lc-doc .search {
+.lc-scope .search {
   flex: 1;
   position: relative;
 }
-.lc-doc .search input {
+.lc-scope .search input {
   width: 100%;
   border: 1px solid var(--line2);
   background: var(--card);
@@ -252,10 +254,10 @@
   font-size: 12.5px;
   font-family: inherit;
 }
-.lc-doc .search input::placeholder {
+.lc-scope .search input::placeholder {
   color: var(--mut2);
 }
-.lc-doc .search .ic {
+.lc-scope .search .ic {
   position: absolute;
   left: 10px;
   top: 50%;
@@ -264,14 +266,14 @@
   color: var(--mut2);
 }
 
-.lc-doc .tabs {
+.lc-scope .tabs {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 4px;
   margin-bottom: 12px;
 }
-.lc-doc .tab {
+.lc-scope .tab {
   flex: 0 0 auto;
   border: 1px solid var(--line2);
   background: none;
@@ -287,28 +289,28 @@
   align-items: center;
   gap: 6px;
 }
-.lc-doc .tab.on {
+.lc-scope .tab.on {
   background: var(--text);
   color: var(--bg);
   border-color: var(--text);
 }
-.lc-doc .tab .cnt {
+.lc-scope .tab .cnt {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--track);
   color: inherit;
 }
-.lc-doc .tab.on .cnt {
+.lc-scope .tab.on .cnt {
   background: color-mix(in srgb, var(--bg) 22%, transparent);
 }
 
-.lc-doc .list {
+.lc-scope .list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.lc-doc .seclbl {
+.lc-scope .seclbl {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -319,19 +321,19 @@
   align-items: center;
   gap: 9px;
 }
-.lc-doc .seclbl::after {
+.lc-scope .seclbl::after {
   content: "";
   flex: 1;
   height: 1px;
   background: var(--line);
 }
-.lc-doc .foot-note {
+.lc-scope .foot-note {
   text-align: center;
   font-size: 10.5px;
   color: var(--mut2);
   margin-top: 26px;
 }
-.lc-doc .empty {
+.lc-scope .empty {
   text-align: center;
   font-size: 13px;
   color: var(--mut);
@@ -342,37 +344,37 @@
 }
 
 /* Card lệnh chi (giàu) */
-.lc-doc .rcx {
+.lc-scope .rcx {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px;
   margin-bottom: 9px;
 }
-.lc-doc .rcx.clickable {
+.lc-scope .rcx.clickable {
   cursor: pointer;
 }
-.lc-doc .rcx.urgent {
+.lc-scope .rcx.urgent {
   border-color: color-mix(in srgb, var(--red) 55%, var(--line2));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent) inset;
 }
-.lc-doc .rcx.hl {
+.lc-scope .rcx.hl {
   box-shadow: 0 0 0 2px var(--orange) inset;
 }
-.lc-doc .rcx-hd {
+.lc-scope .rcx-hd {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
 }
-.lc-doc .rcx-badges {
+.lc-scope .rcx-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   min-width: 0;
 }
-.lc-doc .stbadge {
+.lc-scope .stbadge {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -380,33 +382,33 @@
   padding: 2px 8px;
   border-radius: 999px;
 }
-.lc-doc .st-pend {
+.lc-scope .st-pend {
   background: color-mix(in srgb, var(--gold) 22%, transparent);
   color: var(--gold);
 }
-.lc-doc .st-wait {
+.lc-scope .st-wait {
   background: color-mix(in srgb, var(--violet) 20%, transparent);
   color: var(--violet);
 }
-.lc-doc .st-paid {
+.lc-scope .st-paid {
   background: color-mix(in srgb, var(--ok) 18%, transparent);
   color: var(--ok);
 }
-.lc-doc .st-cancel {
+.lc-scope .st-cancel {
   background: var(--track);
   color: var(--mut);
 }
-.lc-doc .st-urgent {
+.lc-scope .st-urgent {
   background: color-mix(in srgb, var(--red) 22%, transparent);
   color: var(--red);
 }
-.lc-doc .ccode {
+.lc-scope .ccode {
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   color: var(--mut2);
   letter-spacing: 0.05em;
 }
-.lc-doc .rcx-amt {
+.lc-scope .rcx-amt {
   text-align: right;
   font-size: 20px;
   font-weight: 800;
@@ -414,11 +416,11 @@
   white-space: nowrap;
   color: var(--text);
 }
-.lc-doc .rcx-amt .u {
+.lc-scope .rcx-amt .u {
   font-size: 12px;
   color: var(--mut2);
 }
-.lc-doc .rcx-amt .real {
+.lc-scope .rcx-amt .real {
   display: block;
   font-size: 10px;
   font-weight: 600;
@@ -426,47 +428,47 @@
   letter-spacing: 0;
   margin-top: 2px;
 }
-.lc-doc .rcx-meta {
+.lc-scope .rcx-meta {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.lc-doc .mrow {
+.lc-scope .mrow {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
 }
-.lc-doc .mrow .strong {
+.lc-scope .mrow .strong {
   font-weight: 600;
 }
-.lc-doc .mrow .mut {
+.lc-scope .mrow .mut {
   color: var(--mut);
 }
-.lc-doc .mrow.dim {
+.lc-scope .mrow.dim {
   color: var(--mut2);
   font-size: 11px;
 }
-.lc-doc .mrow.ok {
+.lc-scope .mrow.ok {
   color: var(--ok);
   font-size: 11px;
 }
-.lc-doc .mrow.wait {
+.lc-scope .mrow.wait {
   color: var(--violet);
   font-size: 11px;
 }
-.lc-doc .mrow.cancel {
+.lc-scope .mrow.cancel {
   color: var(--mut);
   font-size: 11px;
 }
-.lc-doc .mdot {
+.lc-scope .mdot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   flex: 0 0 auto;
 }
-.lc-doc .note-adm {
+.lc-scope .note-adm {
   margin-top: 12px;
   background: color-mix(in srgb, var(--terra) 9%, transparent);
   border: 1px solid var(--line);
@@ -476,7 +478,7 @@
   font-style: italic;
   color: var(--text);
 }
-.lc-doc .note-kt {
+.lc-scope .note-kt {
   margin-top: 9px;
   background: color-mix(in srgb, var(--sky) 9%, transparent);
   border: 1px solid var(--line);
@@ -485,10 +487,10 @@
   font-size: 12px;
   color: var(--text);
 }
-.lc-doc .note-kt b {
+.lc-scope .note-kt b {
   color: var(--sky);
 }
-.lc-doc .bankbox {
+.lc-scope .bankbox {
   margin-top: 12px;
   display: flex;
   align-items: center;
@@ -498,7 +500,7 @@
   border-radius: 10px;
   padding: 9px 11px;
 }
-.lc-doc .bankbox .lg {
+.lc-scope .bankbox .lg {
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -510,25 +512,25 @@
   color: var(--orange);
   flex: 0 0 auto;
 }
-.lc-doc .bankbox .bk {
+.lc-scope .bankbox .bk {
   flex: 1;
   min-width: 0;
 }
-.lc-doc .bankbox .bk .nm {
+.lc-scope .bankbox .bk .nm {
   font-size: 11px;
   font-weight: 600;
 }
-.lc-doc .bankbox .bk .no {
+.lc-scope .bankbox .bk .no {
   font-size: 11px;
   color: var(--mut);
 }
-.lc-doc .bankbox .own {
+.lc-scope .bankbox .own {
   font-size: 10px;
   text-transform: uppercase;
   color: var(--mut2);
   text-align: right;
 }
-.lc-doc .actbar {
+.lc-scope .actbar {
   margin-top: 12px;
   padding-top: 11px;
   border-top: 1px solid var(--line);
@@ -537,7 +539,7 @@
   gap: 7px;
   align-items: center;
 }
-.lc-doc .actbtn {
+.lc-scope .actbtn {
   font-size: 12px;
   font-weight: 600;
   border-radius: 9px;
@@ -546,36 +548,36 @@
   cursor: pointer;
   font-family: inherit;
 }
-.lc-doc .actbtn:disabled {
+.lc-scope .actbtn:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.lc-doc .a-link {
+.lc-scope .a-link {
   background: color-mix(in srgb, var(--orange) 15%, transparent);
   color: var(--orange);
 }
-.lc-doc .a-ck {
+.lc-scope .a-ck {
   background: var(--orange);
   color: #fff;
 }
-.lc-doc .a-ok {
+.lc-scope .a-ok {
   background: color-mix(in srgb, var(--ok) 20%, transparent);
   color: var(--ok);
 }
-.lc-doc .a-approve {
+.lc-scope .a-approve {
   background: var(--ok);
   color: #fff;
 }
-.lc-doc .a-cancel {
+.lc-scope .a-cancel {
   background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
 }
-.lc-doc .a-bill {
+.lc-scope .a-bill {
   background: color-mix(in srgb, var(--sky) 16%, transparent);
   color: var(--sky);
   margin-left: auto;
 }
-.lc-doc .a-doc {
+.lc-scope .a-doc {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
   color: var(--ok);
   text-decoration: none;
@@ -583,98 +585,84 @@
 }
 
 /* Popup / sheet */
-.lc-doc .scrim {
+.lc-scope .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(20, 8, 3, 0.5);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  background: var(--bg);
   z-index: 60;
-}
-.lc-doc .sheet {
-  background: var(--card);
-  width: 100%;
-  max-width: 520px;
-  border: 1px solid var(--line2);
-  border-bottom: none;
-  border-radius: 20px 20px 0 0;
-  max-height: 93dvh;
   overflow-y: auto;
-  padding: 16px 15px calc(18px + env(safe-area-inset-bottom));
-  animation: lc-up 0.22s ease;
+  -webkit-overflow-scrolling: touch;
+}
+.lc-scope .sheet {
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  max-width: 560px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 16px clamp(14px, 4.5vw, 20px) calc(28px + env(safe-area-inset-bottom));
+  animation: lc-up 0.2s ease;
 }
 @keyframes lc-up {
   from {
-    transform: translateY(24px);
-    opacity: 0.6;
+    opacity: 0.5;
+    transform: translateY(10px);
   }
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
-@media (min-width: 600px) {
-  .lc-doc .scrim {
-    align-items: center;
-    padding: 20px;
-  }
-  .lc-doc .sheet {
-    border-radius: 20px;
-    border-bottom: 1px solid var(--line2);
-  }
-}
-.lc-doc .sheet-hd {
+.lc-scope .sheet-hd {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 2px;
 }
-.lc-doc .sheet-hd h3 {
+.lc-scope .sheet-hd h3 {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-.lc-doc .sheet-hd h3.ok {
+.lc-scope .sheet-hd h3.ok {
   color: var(--ok);
 }
-.lc-doc .sheet-hd h3.red {
+.lc-scope .sheet-hd h3.red {
   color: var(--red);
 }
-.lc-doc .sheet-hd h3.orange {
+.lc-scope .sheet-hd h3.orange {
   color: var(--orange);
 }
-.lc-doc .sheet-hd .sub {
+.lc-scope .sheet-hd .sub {
   font-size: 11px;
   color: var(--mut);
   margin-top: 2px;
 }
-.lc-doc .hint {
+.lc-scope .hint {
   font-size: 11px;
   color: var(--mut);
   margin: 6px 0 14px;
 }
-.lc-doc .hint.strong {
+.lc-scope .hint.strong {
   font-weight: 600;
   color: var(--text);
 }
-.lc-doc .fld {
+.lc-scope .fld {
   display: flex;
   flex-direction: column;
   gap: 5px;
   margin-bottom: 12px;
 }
-.lc-doc .lbl {
+.lc-scope .lbl {
   font-size: 11px;
   font-weight: 600;
   color: var(--mut);
 }
-.lc-doc .lbl .req {
+.lc-scope .lbl .req {
   color: var(--red);
 }
-.lc-doc .ctrl {
+.lc-scope .ctrl {
   border: 1px solid var(--line2);
   background: var(--card2);
   color: var(--text);
@@ -684,18 +672,18 @@
   font-family: inherit;
   width: 100%;
 }
-.lc-doc textarea.ctrl {
+.lc-scope textarea.ctrl {
   resize: vertical;
   min-height: 60px;
 }
-.lc-doc .ctrl.num {
+.lc-scope .ctrl.num {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 600;
 }
-.lc-doc .money-wrap {
+.lc-scope .money-wrap {
   position: relative;
 }
-.lc-doc .money-wrap .cur {
+.lc-scope .money-wrap .cur {
   position: absolute;
   right: 12px;
   top: 50%;
@@ -703,40 +691,40 @@
   font-size: 12px;
   color: var(--mut2);
 }
-.lc-doc .fgrid {
+.lc-scope .fgrid {
   display: grid;
   grid-template-columns: 1.35fr 1fr;
   gap: 11px;
   align-items: end;
   margin-bottom: 18px;
 }
-.lc-doc .fgrid .fld {
+.lc-scope .fgrid .fld {
   margin-bottom: 0;
 }
-.lc-doc .formgrid {
+.lc-scope .formgrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 11px;
 }
 @media (min-width: 520px) {
-  .lc-doc .formgrid {
+  .lc-scope .formgrid {
     grid-template-columns: 1fr 1fr;
   }
 }
-.lc-doc .formgrid .full {
+.lc-scope .formgrid .full {
   grid-column: 1 / -1;
 }
-.lc-doc .dateinline {
+.lc-scope .dateinline {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-bottom: 1px;
 }
-.lc-doc .dateinline .lbl {
+.lc-scope .dateinline .lbl {
   margin: 0;
   white-space: nowrap;
 }
-.lc-doc .ctrl.bare {
+.lc-scope .ctrl.bare {
   border: none;
   background: none;
   padding: 0;
@@ -748,27 +736,27 @@
 }
 
 /* payinfo + account picker */
-.lc-doc .payinfo {
+.lc-scope .payinfo {
   background: var(--card2);
   border: 1px solid var(--line);
   border-radius: 13px;
   padding: 13px 14px;
   margin-bottom: 14px;
 }
-.lc-doc .payinfo .big {
+.lc-scope .payinfo .big {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-family: "IBM Plex Mono", monospace;
 }
-.lc-doc .payinfo .big .u {
+.lc-scope .payinfo .big .u {
   font-size: 14px;
   color: var(--mut2);
 }
-.lc-doc .payinfo .rows {
+.lc-scope .payinfo .rows {
   margin-top: 8px;
 }
-.lc-doc .irow {
+.lc-scope .irow {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -776,14 +764,14 @@
   border-top: 1px solid var(--line);
   font-size: 12.5px;
 }
-.lc-doc .irow .k {
+.lc-scope .irow .k {
   color: var(--mut);
 }
-.lc-doc .irow .v {
+.lc-scope .irow .v {
   font-weight: 600;
   text-align: right;
 }
-.lc-doc .acclbl {
+.lc-scope .acclbl {
   font-size: 11px;
   font-weight: 600;
   color: var(--terra);
@@ -792,15 +780,15 @@
   align-items: center;
   gap: 6px;
 }
-.lc-doc .acclbl .req {
+.lc-scope .acclbl .req {
   color: var(--red);
 }
-.lc-doc .accpick {
+.lc-scope .accpick {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.lc-doc .acc {
+.lc-scope .acc {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -814,12 +802,12 @@
   width: 100%;
   color: var(--text);
 }
-.lc-doc .acc.on {
+.lc-scope .acc.on {
   border-color: var(--orange);
   background: color-mix(in srgb, var(--orange) 9%, var(--card2));
   box-shadow: 0 0 0 1px var(--orange) inset;
 }
-.lc-doc .acc .ic {
+.lc-scope .acc .ic {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -829,30 +817,30 @@
   flex: 0 0 auto;
   background: var(--track);
 }
-.lc-doc .acc .nm {
+.lc-scope .acc .nm {
   font-size: 13.5px;
   font-weight: 600;
 }
-.lc-doc .acc .kd {
+.lc-scope .acc .kd {
   font-size: 10.5px;
   color: var(--mut2);
 }
-.lc-doc .acc .bal {
+.lc-scope .acc .bal {
   margin-left: auto;
   text-align: right;
   flex: 0 0 auto;
 }
-.lc-doc .acc .bal .b {
+.lc-scope .acc .bal .b {
   font-size: 13px;
   font-weight: 700;
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
-.lc-doc .acc .bal .l {
+.lc-scope .acc .bal .l {
   font-size: 9.5px;
   color: var(--mut2);
 }
-.lc-doc .acc .rad {
+.lc-scope .acc .rad {
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -861,10 +849,10 @@
   display: grid;
   place-items: center;
 }
-.lc-doc .acc.on .rad {
+.lc-scope .acc.on .rad {
   border-color: var(--orange);
 }
-.lc-doc .acc.on .rad::after {
+.lc-scope .acc.on .rad::after {
   content: "";
   width: 9px;
   height: 9px;
@@ -872,7 +860,7 @@
   background: var(--orange);
 }
 
-.lc-doc .after {
+.lc-scope .after {
   margin: 12px 0;
   font-size: 12px;
   background: var(--track);
@@ -882,20 +870,20 @@
   justify-content: space-between;
   align-items: center;
 }
-.lc-doc .after .lb {
+.lc-scope .after .lb {
   color: var(--mut);
 }
-.lc-doc .after .v {
+.lc-scope .after .v {
   font-weight: 700;
   font-family: "IBM Plex Mono", monospace;
 }
-.lc-doc .after .v.ok {
+.lc-scope .after .v.ok {
   color: var(--ok);
 }
-.lc-doc .after .v.warn {
+.lc-scope .after .v.warn {
   color: var(--red);
 }
-.lc-doc .attach {
+.lc-scope .attach {
   border: 1px dashed var(--line2);
   border-radius: 11px;
   padding: 13px;
@@ -907,24 +895,24 @@
   width: 100%;
   font-family: inherit;
 }
-.lc-doc .attach:disabled {
+.lc-scope .attach:disabled {
   opacity: 0.6;
 }
 
 /* notes */
-.lc-doc .notes {
+.lc-scope .notes {
   margin-bottom: 12px;
 }
-.lc-doc .notes .lbl {
+.lc-scope .notes .lbl {
   margin-bottom: 7px;
 }
-.lc-doc .notelist {
+.lc-scope .notelist {
   display: flex;
   flex-direction: column;
   gap: 7px;
   margin-bottom: 8px;
 }
-.lc-doc .note {
+.lc-scope .note {
   display: flex;
   gap: 8px;
   align-items: flex-start;
@@ -933,7 +921,7 @@
   border-radius: 10px;
   padding: 8px 10px;
 }
-.lc-doc .note .who {
+.lc-scope .note .who {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -943,35 +931,35 @@
   white-space: nowrap;
   text-transform: uppercase;
 }
-.lc-doc .note .who.admin {
+.lc-scope .note .who.admin {
   background: color-mix(in srgb, var(--terra) 20%, transparent);
   color: var(--terra);
 }
-.lc-doc .note .who.kt {
+.lc-scope .note .who.kt {
   background: color-mix(in srgb, var(--sky) 18%, transparent);
   color: var(--sky);
 }
-.lc-doc .note .bd {
+.lc-scope .note .bd {
   flex: 1;
   min-width: 0;
 }
-.lc-doc .note .tx {
+.lc-scope .note .tx {
   font-size: 12px;
   color: var(--text);
   line-height: 1.4;
 }
-.lc-doc .note .mt {
+.lc-scope .note .mt {
   font-size: 9.5px;
   color: var(--mut2);
   margin-top: 2px;
 }
-.lc-doc .addnote {
+.lc-scope .addnote {
   position: relative;
 }
-.lc-doc .addnote input {
+.lc-scope .addnote input {
   padding-right: 64px;
 }
-.lc-doc .addnote .send {
+.lc-scope .addnote .send {
   position: absolute;
   right: 5px;
   top: 50%;
@@ -986,18 +974,18 @@
   cursor: pointer;
   font-family: inherit;
 }
-.lc-doc .acts {
+.lc-scope .acts {
   display: flex;
   gap: 9px;
   margin-top: 16px;
 }
-.lc-doc .seg {
+.lc-scope .seg {
   display: flex;
   border: 1px solid var(--line2);
   border-radius: 10px;
   overflow: hidden;
 }
-.lc-doc .seg button {
+.lc-scope .seg button {
   flex: 1;
   background: var(--card2);
   border: none;
@@ -1009,25 +997,25 @@
   font-family: inherit;
   border-right: 1px solid var(--line2);
 }
-.lc-doc .seg button:last-child {
+.lc-scope .seg button:last-child {
   border-right: none;
 }
-.lc-doc .seg button.on {
+.lc-scope .seg button.on {
   background: var(--orange);
   color: #fff;
 }
-.lc-doc .seg button.on.urgent {
+.lc-scope .seg button.on.urgent {
   background: var(--red);
 }
 
 /* thumbnails (ảnh hoá đơn / chứng từ) */
-.lc-doc .thumbs {
+.lc-scope .thumbs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 7px;
   margin-top: 8px;
 }
-.lc-doc .thumb {
+.lc-scope .thumb {
   position: relative;
   aspect-ratio: 1;
   border-radius: 9px;
@@ -1035,12 +1023,12 @@
   border: 1px solid var(--line2);
   background: var(--card2);
 }
-.lc-doc .thumb img {
+.lc-scope .thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.lc-doc .thumb .pdf {
+.lc-scope .thumb .pdf {
   display: grid;
   place-items: center;
   width: 100%;
@@ -1048,7 +1036,7 @@
   font-size: 11px;
   color: var(--mut);
 }
-.lc-doc .thumb .rm {
+.lc-scope .thumb .rm {
   position: absolute;
   right: 3px;
   top: 3px;
@@ -1065,7 +1053,7 @@
 }
 
 /* misc helpers */
-.lc-doc .kt-note {
+.lc-scope .kt-note {
   border-radius: 10px;
   background: color-mix(in srgb, var(--violet) 12%, transparent);
   border: 1px solid var(--line);
@@ -1074,17 +1062,17 @@
   color: var(--violet);
   margin-bottom: 12px;
 }
-.lc-doc .warn-line {
+.lc-scope .warn-line {
   font-size: 11px;
   color: var(--red);
   margin: 6px 0 2px;
 }
-.lc-doc .ok-line {
+.lc-scope .ok-line {
   font-size: 11px;
   color: var(--ok);
   margin-top: 4px;
 }
-.lc-doc .qrbox {
+.lc-scope .qrbox {
   background: #fff;
   border-radius: 12px;
   padding: 8px;
@@ -1092,19 +1080,19 @@
   justify-content: center;
   margin-bottom: 10px;
 }
-.lc-doc .qrbox img {
+.lc-scope .qrbox img {
   width: 210px;
   height: 210px;
   object-fit: contain;
 }
-.lc-doc .kv {
+.lc-scope .kv {
   background: var(--card2);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 12px;
 }
-.lc-doc .kv .row {
+.lc-scope .kv .row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -1119,17 +1107,17 @@
   text-align: left;
   align-items: center;
 }
-.lc-doc .kv .row .k {
+.lc-scope .kv .row .k {
   color: var(--mut);
 }
-.lc-doc .kv .row .v {
+.lc-scope .kv .row .v {
   font-weight: 600;
   text-align: right;
 }
-.lc-doc .kv .row .v.mono {
+.lc-scope .kv .row .v.mono {
   font-family: "IBM Plex Mono", monospace;
 }
-.lc-doc .kv .row .v.amt {
+.lc-scope .kv .row .v.amt {
   color: var(--orange);
   font-weight: 800;
 }
