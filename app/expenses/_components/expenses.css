@@ -26,9 +26,14 @@
 }
 .lc-doc {
   background: var(--bg);
-  border-radius: 16px;
-  overflow: hidden;
   padding-bottom: 24px;
+  /* Breakout khỏi padding của app-shell (px-4 / md:p-6) để nền + nội dung full màn ngang. */
+  margin: -16px -16px 0;
+}
+@media (min-width: 768px) {
+  .lc-doc {
+    margin: -24px -24px 0;
+  }
 }
 .lc-scope[data-theme="dark"] {
   color-scheme: dark;
