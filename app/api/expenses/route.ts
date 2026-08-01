@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     if (!dc) return NextResponse.json({ message: "Hợp đồng thiết kế không tồn tại" }, { status: 400 });
   }
 
-  // Đợt thanh toán thầu phụ (nếu có): kiểm tra tồn tại, chưa chi, chưa có lệnh chi khác.
+  // Đợt thanh toán thầu phụ (nếu có): kiểm tra tồn tại, chưa chi, không có lệnh chi ĐANG CHỜ.
   if (data.subPaymentId) {
     const sp = await prisma.subPayment.findUnique({
       where: { id: data.subPaymentId },
@@ -144,13 +144,18 @@ export async function POST(request: Request) {
     if (sp.status === SubPaymentStatus.paid) {
       return NextResponse.json({ message: "Đợt này đã chi xong" }, { status: 400 });
     }
+    // Chỉ chặn khi CÒN lệnh chi đang chờ (pending/tptc_pending). Lệnh đã paid KHÔNG chặn —
+    // tạm ứng theo đợt: đợt trả thiếu cần lập lệnh chi tiếp cho phần còn lại.
     const dup = await prisma.expense.findFirst({
-      where: { subPaymentId: sp.id, status: { not: ExpenseStatus.cancelled } },
+      where: {
+        subPaymentId: sp.id,
+        status: { in: [ExpenseStatus.pending, ExpenseStatus.tptc_pending] },
+      },
       select: { code: true },
     });
     if (dup) {
       return NextResponse.json(
-        { message: `Đợt này đã có lệnh chi ${dup.code} đang xử lý` },
+        { message: `Đợt này đã có lệnh chi ${dup.code} đang chờ xử lý` },
         { status: 409 },
       );
     }
