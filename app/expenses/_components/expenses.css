@@ -61,7 +61,7 @@
   font-feature-settings: "tnum" 1;
 }
 .lc-scope .wrap {
-  max-width: 640px;
+  max-width: none;
   margin: 0 auto;
   padding: 0 clamp(14px, 4.5vw, 20px);
 }
@@ -306,9 +306,10 @@
 }
 
 .lc-scope .list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 9px;
+  align-items: start;
 }
 .lc-scope .seclbl {
   font-size: 10.5px;
@@ -349,7 +350,6 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px;
-  margin-bottom: 9px;
 }
 .lc-scope .rcx.clickable {
   cursor: pointer;
