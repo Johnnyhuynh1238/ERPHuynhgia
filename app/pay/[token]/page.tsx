@@ -29,7 +29,8 @@ export async function generateMetadata({ params }: { params: { token: string } }
         expense.payee ? ` · ${expense.payee}` : ""
       } · Bấm để xem chi tiết & ảnh chuyển khoản.`
     : "Tra cứu lệnh chi, ảnh chuyển khoản, cập nhật tự động.";
-  const ogImage = `${SITE_URL}/pay-og.png`;
+  // Bump ?v khi đổi ảnh pay-og.png để Zalo/Messenger fetch lại (bot cache ảnh theo URL).
+  const ogImage = `${SITE_URL}/pay-og.png?v=3`;
 
   return {
     title,
