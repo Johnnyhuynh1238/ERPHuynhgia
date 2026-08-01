@@ -570,6 +570,16 @@ export function MuaHangClient({
   };
 
   // Nội dung PO dùng chung cho modal (xem/ảnh) và cửa sổ in
+  // Bỏ ghi chú "Vượt dự toán: ..." khỏi PO — thông tin nội bộ, NCC không cần thấy.
+  // Note gốc vẫn giữ nguyên trong DB / đơn để admin đối chiếu.
+  const poNoteForSupplier = (note: string | null) => {
+    if (!note) return "";
+    return note
+      .replace(/\s*Vượt dự toán:[\s\S]*?(?=\s+VT phụ:|\s+Phụ kiện|$)/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  };
+
   const poBodyHtml = (o: Order) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const logoSrc = `${origin}/po-logo.png`;
@@ -635,7 +645,10 @@ export function MuaHangClient({
   <tfoot><tr class="grand"><td colspan="4"></td><td class="lbl">Tổng cộng</td><td class="sum">${fmt(o.total)}</td></tr></tfoot>
 </table></div>
 <p class="amount-words">Bằng chữ: <b>${docTien(o.total)}.</b></p>
-${o.note ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;padding-left:0"><li>${esc(o.note)}</li></ol></div>` : ""}
+${(() => {
+      const n = poNoteForSupplier(o.note);
+      return n ? `<div class="terms"><h4>Ghi chú</h4><ol style="list-style:none;padding-left:0"><li>${esc(n)}</li></ol></div>` : "";
+    })()}
 <div class="terms"><h4>Điều kiện đặt hàng</h4><ol>
   <li>Giao đúng chủng loại, quy cách, số lượng ghi trên đơn. Hàng không đạt được trả lại.</li>
   <li>Xuất hóa đơn / phiếu giao hàng kèm theo lô hàng.</li>
