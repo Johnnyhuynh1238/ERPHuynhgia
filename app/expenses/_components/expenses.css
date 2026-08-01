@@ -593,29 +593,66 @@
 .lc-scope .scrim {
   position: fixed;
   inset: 0;
-  background: var(--bg);
+  background: rgba(20, 8, 3, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   z-index: 60;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  animation: lc-fade 0.2s ease;
 }
 .lc-scope .sheet {
-  background: var(--bg);
+  background: var(--card);
   color: var(--text);
   width: 100%;
   max-width: 560px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 16px clamp(14px, 4.5vw, 20px) calc(28px + env(safe-area-inset-bottom));
-  animation: lc-up 0.2s ease;
+  max-height: 92dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line2);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 18px clamp(14px, 4.5vw, 20px) calc(22px + env(safe-area-inset-bottom));
+  animation: lc-up 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-@keyframes lc-up {
+/* Thanh kéo trên đầu sheet */
+.lc-scope .sheet::before {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line2);
+  margin: -4px auto 12px;
+}
+@keyframes lc-fade {
   from {
-    opacity: 0.5;
-    transform: translateY(10px);
+    opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes lc-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
     transform: translateY(0);
+  }
+}
+@media (min-width: 640px) {
+  .lc-scope .scrim {
+    align-items: center;
+    padding: 20px;
+  }
+  .lc-scope .sheet {
+    border-radius: 22px;
+    border-bottom: 1px solid var(--line2);
+    max-height: 90dvh;
+  }
+  .lc-scope .sheet::before {
+    display: none;
   }
 }
 .lc-scope .sheet-hd {
