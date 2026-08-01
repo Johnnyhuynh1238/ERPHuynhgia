@@ -9,13 +9,43 @@ export const dynamic = "force-dynamic";
 const KT_PHONE = "0974828375";
 const KT_PHONE_LABEL = "0974 828 375";
 
-export const metadata: Metadata = {
-  title: "Theo dõi thanh toán — Huỳnh Gia",
-  robots: { index: false, follow: false },
-};
+const SITE_URL = (process.env.NEXTAUTH_URL || "https://erp.huynhgia6.com").replace(/\/$/, "");
 
 function money(v: number) {
   return new Intl.NumberFormat("vi-VN").format(Math.round(v));
+}
+
+export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+  const expense = await prisma.expense.findUnique({
+    where: { publicToken: params.token },
+    select: { code: true, amount: true, payee: true, status: true },
+  });
+
+  const title = expense
+    ? `Lệnh chi ${expense.code} · ${money(Number(expense.amount))}đ — Huỳnh Gia`
+    : "Theo dõi thanh toán — Huỳnh Gia";
+  const desc = expense
+    ? `${expense.status === "paid" ? "✓ Đã thanh toán" : "⏳ Đang chờ thanh toán"}${
+        expense.payee ? ` · ${expense.payee}` : ""
+      } · Bấm để xem chi tiết & ảnh chuyển khoản.`
+    : "Tra cứu lệnh chi, ảnh chuyển khoản, cập nhật tự động.";
+  const ogImage = `${SITE_URL}/pay-og.png`;
+
+  return {
+    title,
+    description: desc,
+    robots: { index: false, follow: false },
+    openGraph: {
+      type: "website",
+      title,
+      description: desc,
+      url: `${SITE_URL}/pay/${params.token}`,
+      siteName: "Huỳnh Gia — House Design and Build",
+      locale: "vi_VN",
+      images: [{ url: ogImage, secureUrl: ogImage, width: 1200, height: 630, type: "image/png" }],
+    },
+    twitter: { card: "summary_large_image", title, description: desc, images: [ogImage] },
+  };
 }
 function fmtDate(d: Date | null) {
   if (!d) return "";
