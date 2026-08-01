@@ -38,6 +38,7 @@ function isStaticAsset(pathname: string) {
     pathname.startsWith("/manifest") ||
     pathname.startsWith("/cn-manifest") ||
     pathname === "/pay-logo.png" ||
+    pathname === "/pay-og.png" ||
     pathname === "/sw-push.js"
   );
 }
