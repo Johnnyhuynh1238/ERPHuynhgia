@@ -116,6 +116,65 @@ function statusBadge(s: Expense["status"]) {
   return { label: "Đã huỷ", cls: "st-cancel" };
 }
 
+// Chọn dòng tên chủ TK từ text OCR (chữ HOA ko dấu, VD "LE TIEN SI").
+function pickPayeeName(text: string, accountNumber: string): string | null {
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const isName = (l: string) => /^[A-Z][A-Z .]{2,}$/.test(l) && l.replace(/[ .]/g, "").length >= 3;
+  const isNoise = (l: string) => /(BANK|NAPAS|VIETQR|QUET MA|CHUYEN TIEN|SCAN|TRANSFER)/.test(l.toUpperCase());
+  // 1) Dòng chữ HOA ngay TRÊN dòng chứa số TK (layout VietQR chuẩn).
+  const acc = accountNumber.replace(/\D/g, "");
+  const idxAcc = acc ? lines.findIndex((l) => l.replace(/\D/g, "").includes(acc)) : -1;
+  if (idxAcc > 0) {
+    for (let i = idxAcc - 1; i >= 0; i--) {
+      if (isName(lines[i]) && !isNoise(lines[i])) return lines[i];
+    }
+  }
+  // 2) Fallback: dòng HOA dài nhất, loại nhãn NH/logo.
+  const cands = lines.filter((l) => isName(l) && !isNoise(l));
+  if (cands.length) return cands.sort((a, b) => b.length - a.length)[0];
+  return null;
+}
+
+// OCR dải chữ PHÍA TRÊN mã QR (tên + STK) — tên chủ TK không nằm trong payload QR.
+async function ocrPayeeName(
+  img: HTMLImageElement,
+  qrTopY: number,
+  accountNumber: string,
+): Promise<string | null> {
+  if (qrTopY < 40) return null;
+  const cw = img.naturalWidth;
+  const ch = Math.min(qrTopY, img.naturalHeight);
+  const up = cw < 900 ? Math.min(3, Math.max(1, Math.round(900 / cw))) : 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = cw * up;
+  canvas.height = ch * up;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, cw, ch, 0, 0, canvas.width, canvas.height);
+
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng", 1, {
+    workerPath: "/tesseract/worker.min.js",
+    corePath: "/tesseract/tesseract-core-simd-lstm.wasm.js",
+    langPath: "/tesseract",
+  });
+  try {
+    await worker.setParameters({
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .",
+      preserve_interword_spaces: "1",
+    });
+    const { data } = await worker.recognize(canvas);
+    return pickPayeeName(data.text || "", accountNumber);
+  } finally {
+    await worker.terminate();
+  }
+}
+
 export function ExpensesClient({
   role,
   projects,
@@ -400,7 +459,7 @@ export function ExpensesClient({
 
       const jsQR = (await import("jsqr")).default;
 
-      const tryAt = (targetW: number): string | null => {
+      const tryAt = (targetW: number): { data: string; topY: number } | null => {
         const scale = Math.min(1, targetW / img.naturalWidth);
         const w = Math.max(64, Math.round(img.naturalWidth * scale));
         const h = Math.max(64, Math.round(img.naturalHeight * scale));
@@ -412,22 +471,25 @@ export function ExpensesClient({
         ctx.drawImage(img, 0, 0, w, h);
         const data = ctx.getImageData(0, 0, w, h);
         const code = jsQR(data.data, data.width, data.height, { inversionAttempts: "attemptBoth" });
-        return code?.data || null;
+        if (!code?.data) return null;
+        // Mép trên QR quy về toạ độ ảnh gốc (dùng để cắt dải chữ tên phía trên).
+        const topYScaled = Math.min(code.location.topLeftCorner.y, code.location.topRightCorner.y);
+        return { data: code.data, topY: Math.round(topYScaled / scale) };
       };
 
       // Thử nhiều scale: ảnh chụp 4K thường fail ở native, nhưng pass khi downscale
       const targets = [1280, 800, 1920, 2400, img.naturalWidth];
-      let raw: string | null = null;
+      let hit: { data: string; topY: number } | null = null;
       for (const t of targets) {
-        raw = tryAt(t);
-        if (raw) break;
+        hit = tryAt(t);
+        if (hit) break;
       }
 
-      if (!raw) {
+      if (!hit) {
         toast.error(`Không đọc được QR (${img.naturalWidth}x${img.naturalHeight}). Thử ảnh cận hơn hoặc screenshot nhé`);
         return;
       }
-      const parsed = parseVietQrString(raw);
+      const parsed = parseVietQrString(hit.data);
       if (!parsed) {
         toast.error("QR đọc được nhưng không phải chuẩn VietQR. Nhập tay STK nhé");
         return;
@@ -440,6 +502,16 @@ export function ExpensesClient({
         amount: parsed.amount && parsed.amount > 0 ? String(parsed.amount) : f.amount,
       }));
       toast.success(`Đã đọc QR: ${bank?.shortName ?? parsed.bankBin} · ${parsed.accountNumber}`);
+
+      // Tên chủ TK in dạng chữ phía trên QR (ko có trong payload) → OCR bù, ko chặn flow.
+      ocrPayeeName(img, hit.topY, parsed.accountNumber)
+        .then((name) => {
+          if (name) {
+            setForm((f) => (f.payeeAccountName.trim() ? f : { ...f, payeeAccountName: name }));
+            toast.success(`Đọc tên: ${name}`);
+          }
+        })
+        .catch((e) => console.warn("OCR tên TK lỗi", e));
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Lỗi đọc QR");

@@ -57,6 +57,33 @@ export function findBankByBin(bin: string | null | undefined): VnBank | null {
 }
 
 /**
+ * Dò ngân hàng từ tên tự do (VD "Vietcombank", "VCB", "MB", "Techcombank").
+ * Dùng khi dữ liệu chỉ lưu tên NH dạng text (thầu phụ, NCC) mà cần BIN để render/QR.
+ * Best-effort: khớp code/shortName/name (bỏ dấu, bỏ ký tự thừa), ko khớp trả null.
+ */
+export function findBankByName(input: string | null | undefined): VnBank | null {
+  if (!input) return null;
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[^a-z0-9]/g, "");
+  const q = norm(input);
+  if (!q) return null;
+  // Khớp chính xác code / shortName / name trước.
+  for (const b of VN_BANKS) {
+    if (norm(b.code) === q || norm(b.shortName) === q || norm(b.name) === q) return b;
+  }
+  // Khớp chứa nhau trên shortName / name.
+  for (const b of VN_BANKS) {
+    const sn = norm(b.shortName);
+    const nm = norm(b.name);
+    if (q.includes(sn) || sn.includes(q) || q.includes(nm) || nm.includes(q)) return b;
+  }
+  return null;
+}
+
+/**
  * Build VietQR.io universal link để mở thẳng app NH (cơ chế Zalo).
  * @param ktAppId appId của NH KT chọn (app sẽ mở)
  * @param recipientAccount STK người nhận

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { fireAndForget, notifyExpenseKtRequest } from "@/lib/notifications";
+import { findBankByName } from "@/lib/vn-banks";
 
 // Sinh mã lệnh chi CHI-YYYYMM-NNNN (đồng bộ /api/expenses).
 async function nextExpenseCode() {
@@ -84,6 +85,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   }
 
   const sub = payment.subContract.subcontractor;
+  // Thầu phụ chỉ lưu tên NH dạng text → dò BIN Napas để card lệnh chi hiện hộp NH + tạo QR.
+  const payeeBank = findBankByName(sub.bankName);
   const code = await nextExpenseCode();
   const isKtCreated = user.role === UserRole.accountant;
   const note = `Thanh toán HĐ thầu phụ ${payment.subContract.code} · Đợt ${payment.stage}${payment.description ? ` — ${payment.description}` : ""}`;
@@ -100,6 +103,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
         paymentMethod: "transfer",
         note,
         status: isKtCreated ? ExpenseStatus.tptc_pending : ExpenseStatus.pending,
+        payeeBankBin: payeeBank?.bin || null,
         payeeAccountNumber: sub.bankAccount || null,
         payeeAccountName: sub.bankAccountName || sub.name,
         subPaymentId: payment.id,
