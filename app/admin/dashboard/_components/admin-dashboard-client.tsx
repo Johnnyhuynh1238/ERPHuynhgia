@@ -78,6 +78,7 @@ type AppKey =
   | "kinh-doanh"
   | "hop-dong"
   | "du-an"
+  | "thau-phu"
   | "tai-chinh"
   | "nhan-su"
   | "kpi"
@@ -128,8 +129,14 @@ const APPS: AppDef[] = [
       { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
       "divider",
       { label: "NCC vật tư", href: "/admin/suppliers" },
-      "divider",
-      { label: "Thầu phụ", href: "/subcontractors" },
+    ],
+  },
+  {
+    key: "thau-phu",
+    label: "Thầu phụ",
+    Icon: HardHat,
+    buildItems: () => [
+      { label: "Danh bạ thầu phụ", href: "/subcontractors" },
       { label: "HĐ thầu phụ", href: "/sub-contracts" },
       { label: "Chi thầu phụ", href: "/sub-payments" },
     ],
@@ -194,6 +201,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "kinh-doanh": ["leadsNew"],
   "hop-dong": [],
   "du-an": [],
+  "thau-phu": [],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
   "nhan-su": [],
   "kpi": [],

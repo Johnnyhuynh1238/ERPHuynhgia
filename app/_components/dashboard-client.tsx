@@ -15,7 +15,6 @@ import {
   DollarSign,
   FolderKanban,
   Hammer,
-  HardHat,
   ListTodo,
   Receipt,
   ShieldAlert,
@@ -333,22 +332,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
           return <div key={card.key}>{cardNode}</div>;
         })}
       </div>
-
-      {data.role === "admin" || data.role === "construction_manager" ? (
-        <Link
-          href="/subcontractors"
-          className="flex items-center gap-3 rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 transition-colors hover:bg-[#22263a]"
-        >
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#f97316]/15 text-[#fb923c]">
-            <HardHat className="h-5 w-5" />
-          </span>
-          <span className="flex-1">
-            <span className="block text-sm font-semibold text-[#f0f2ff]">Thầu phụ</span>
-            <span className="block text-xs text-[#8892b0]">Danh bạ nhà thầu phụ</span>
-          </span>
-          <ChevronRight className="h-5 w-5 text-[#8892b0]" />
-        </Link>
-      ) : null}
 
       {data.role === "admin" || data.role === "construction_manager" ? (
         <div className="space-y-4">
