@@ -1,11 +1,13 @@
 "use client";
 
+import "./subcontractors.css";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { confirmDialog } from "@/components/confirm-dialog";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Phone, Plus, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+
+const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 type Specialty = {
   id: string;
@@ -73,10 +75,10 @@ const DEFAULT_FORM: FormState = {
   specialtyIds: [],
 };
 
-function statusChipClass(status: SubcontractorStatus) {
-  if (status === "active") return "bg-emerald-500/15 text-emerald-300";
-  if (status === "inactive") return "bg-zinc-500/15 text-zinc-300";
-  return "bg-red-500/15 text-red-300";
+function statusClass(status: SubcontractorStatus) {
+  if (status === "active") return "a";
+  if (status === "inactive") return "i";
+  return "b";
 }
 
 function statusLabel(status: SubcontractorStatus) {
@@ -108,6 +110,7 @@ function mapToForm(item: SubcontractorItem): FormState {
 }
 
 export function SubcontractorsClient({ canWrite, canEditPayment = false }: { canWrite: boolean; canEditPayment?: boolean }) {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<SubcontractorItem[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -117,6 +120,7 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
   const [status, setStatus] = useState<"all" | SubcontractorStatus>("all");
   const [specialtyId, setSpecialtyId] = useState("");
 
+  const [detail, setDetail] = useState<SubcontractorItem | null>(null);
   const [openSheet, setOpenSheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState<SubcontractorItem | null>(null);
@@ -126,6 +130,17 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
   const [payItem, setPayItem] = useState<SubcontractorItem | null>(null);
   const [payForm, setPayForm] = useState({ bankName: "", bankAccount: "", bankAccountName: "" });
   const [paySubmitting, setPaySubmitting] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("subcontractors-theme");
+    if (saved === "dark" || saved === "light") setTheme(saved);
+  }, []);
+  const toggleTheme = () =>
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      localStorage.setItem("subcontractors-theme", next);
+      return next;
+    });
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 250);
@@ -174,12 +189,14 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
   }
 
   function openEdit(item: SubcontractorItem) {
+    setDetail(null);
     setEditing(item);
     setForm(mapToForm(item));
     setOpenSheet(true);
   }
 
   function openPayment(item: SubcontractorItem) {
+    setDetail(null);
     setPayItem(item);
     setPayForm({
       bankName: item.bankName || "",
@@ -265,7 +282,7 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
 
   async function handleDelete(item: SubcontractorItem) {
     if (!canWrite) return;
-    if (!await confirmDialog(`Ngưng hoạt động thầu phụ ${item.name}?`)) return;
+    if (!(await confirmDialog(`Ngưng hoạt động thầu phụ ${item.name}?`))) return;
 
     const res = await fetch(`/api/subcontractors/${item.id}`, { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
@@ -276,12 +293,13 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
     }
 
     toast.success(json.message || "Đã cập nhật");
+    setDetail(null);
     await loadData();
   }
 
   async function handleBlacklist(item: SubcontractorItem) {
     if (!canWrite) return;
-    if (!await confirmDialog(`Đưa thầu phụ ${item.name} vào blacklist?`)) return;
+    if (!(await confirmDialog(`Đưa thầu phụ ${item.name} vào blacklist?`))) return;
 
     const res = await fetch(`/api/subcontractors/${item.id}/blacklist`, {
       method: "POST",
@@ -296,163 +314,191 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
     }
 
     toast.success(json.message || "Đã blacklist");
+    setDetail(null);
     await loadData();
   }
 
-  const totalText = useMemo(() => `Tổng ${rows.length} thầu phụ`, [rows.length]);
+  const summary = useMemo(() => {
+    const total = rows.length;
+    const active = rows.filter((r) => r.status === "active").length;
+    const black = rows.filter((r) => r.status === "blacklisted").length;
+    const rated = rows.filter((r) => typeof r.avgRating === "number");
+    const avg = rated.length ? rated.reduce((s, r) => s + (r.avgRating || 0), 0) / rated.length : null;
+    return { total, active, black, avg };
+  }, [rows]);
+
+  const bankText = (item: SubcontractorItem) =>
+    [item.bankAccount, item.bankName].filter(Boolean).join(" · ") || null;
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-[#f0f2ff]">Danh bạ thầu phụ</h1>
+    <div className={`subdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="wrap">
+        <div className="topbar">
+          <div className="brand">
+            <div className="mark">HG</div>
+            <div>
+              <b>Thầu phụ</b>
+              <span>Huỳnh Gia · Danh bạ</span>
+            </div>
+          </div>
+          <div className="grow" />
+          <button className="iconbtn" onClick={toggleTheme} title="Đổi giao diện">
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
           {canWrite ? (
-            <Button className="bg-[#f97316] text-black hover:bg-[#fb923c]" onClick={openCreate}>
-              <Plus className="mr-1 h-4 w-4" /> Tạo mới
-            </Button>
+            <button className="iconbtn pri" onClick={openCreate} title="Tạo mới">
+              ＋
+            </button>
           ) : null}
         </div>
 
-        <div className="mt-3 grid gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8892b0]" />
-            <input
-              className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] py-2 pl-9 pr-3 text-sm text-[#f0f2ff]"
-              placeholder="Tìm mã, tên, SĐT, email"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </div>
+        <div className="eyebrow">Danh bạ nhà thầu phụ</div>
+        <h1>Danh sách thầu phụ</h1>
 
-          <div className="grid grid-cols-2 gap-2">
-            <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as "all" | SubcontractorStatus)}>
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Ngưng</option>
-              <option value="blacklisted">Blacklist</option>
-            </select>
+        <div className="sum">
+          <div className="cell"><div className="k">Tổng thầu phụ</div><div className="v">{summary.total}</div></div>
+          <div className="cell"><div className="k">Đang hoạt động</div><div className="v g">{summary.active}</div></div>
+          <div className="cell"><div className="k">Blacklist</div><div className="v r">{summary.black}</div></div>
+          <div className="cell"><div className="k">ĐTB toàn bộ</div><div className="v t">{summary.avg != null ? summary.avg.toFixed(2) : "-"}</div></div>
+        </div>
 
-            <select className="rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
-              <option value="">Tất cả chuyên môn</option>
-              {specialties.map((item) => (
-                <option key={item.id} value={item.id}>{item.icon || "🛠️"} {item.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
+          <input placeholder="Tìm mã, tên, SĐT, email…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+        </div>
+        <div className="frow">
+          <select value={status} onChange={(e) => setStatus(e.target.value as "all" | SubcontractorStatus)}>
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Ngưng</option>
+            <option value="blacklisted">Blacklist</option>
+          </select>
+          <select value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
+            <option value="">Tất cả chuyên môn</option>
+            {specialties.map((item) => (
+              <option key={item.id} value={item.id}>{item.icon || "🛠️"} {item.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="count">{loading ? "Đang tải…" : `${rows.length} thầu phụ`}</div>
+
+        <div className="tbwrap">
+          {loading ? (
+            <div className="placeholder">Đang tải dữ liệu…</div>
+          ) : rows.length === 0 ? (
+            <div className="placeholder">Chưa có thầu phụ phù hợp bộ lọc.</div>
+          ) : (
+            <table>
+              <colgroup><col className="c1" /><col className="c2" /><col className="c3" /></colgroup>
+              <thead>
+                <tr><th>Thầu phụ</th><th className="r">ĐTB</th><th /></tr>
+              </thead>
+              <tbody>
+                {rows.map((item) => (
+                  <tr key={item.id} onClick={() => setDetail(item)}>
+                    <td>
+                      <div className="name">{item.name}</div>
+                      <div className="metaline">
+                        <span className="code">{item.code}</span>
+                        {item.specialties.slice(0, 2).map((sp) => (
+                          <span key={sp.id} className="tag">{sp.icon || "🛠️"} {sp.name}</span>
+                        ))}
+                        {item.specialties.length > 2 ? <span className="tag">+{item.specialties.length - 2}</span> : null}
+                      </div>
+                    </td>
+                    <td className="r">
+                      <span className="rate">{item.avgRating ? item.avgRating.toFixed(2) : "-"}<span className="star"> ★</span></span>
+                      <div className="rsub">{item.evaluationCount} ĐG · {item.hireAgainRate}%</div>
+                    </td>
+                    <td className="r"><span className={`dot ${statusClass(item.status)}`} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 text-xs text-[#8892b0]">{totalText}</div>
-
-      <div className="space-y-3">
-        {loading ? (
-          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-5 text-center text-sm text-[#8892b0]">Đang tải dữ liệu...</div>
-        ) : rows.length === 0 ? (
-          <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">Chưa có thầu phụ phù hợp bộ lọc.</div>
-        ) : (
-          rows.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4 slide-up">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <Link href={`/subcontractors/${item.id}`} className="text-sm font-bold text-[#f0f2ff] hover:underline">
-                    {item.code} • {item.name}
-                  </Link>
-                  <div className="mt-1 text-xs text-[#8892b0]">{typeLabel(item.type)} {item.taxCode ? `• MST ${item.taxCode}` : ""}</div>
-                </div>
-                <span className={`rounded-full px-2 py-1 text-[11px] ${statusChipClass(item.status)}`}>{statusLabel(item.status)}</span>
+      {/* ---- detail sheet ---- */}
+      {detail ? (
+        <>
+          <div className="backdrop" onClick={() => setDetail(null)} />
+          <div className="sheet detail">
+            <div className="handle" />
+            <div className="shead">
+              <div className="grow">
+                <div className="n">{detail.name}</div>
+                <div className="c">{detail.code} · {typeLabel(detail.type)}</div>
               </div>
-
-              <div className="mt-3 flex items-center gap-2 text-sm">
-                <a href={`tel:${item.phone}`} className="inline-flex items-center gap-1 rounded-full bg-[#f97316]/15 px-2 py-1 text-[#fb923c]">
-                  <Phone className="h-3.5 w-3.5" /> {item.phone}
-                </a>
-                {item.altPhone ? <a href={`tel:${item.altPhone}`} className="text-xs text-[#a4acc8]">{item.altPhone}</a> : null}
+              <span className={`st ${statusClass(detail.status)}`}>{statusLabel(detail.status)}</span>
+            </div>
+            <div className="sbody">
+              <div className="kv"><span className="k">SĐT</span><span className="val mono">{detail.phone}{detail.altPhone ? ` · ${detail.altPhone}` : ""}</span></div>
+              <div className="kv">
+                <span className="k">Chuyên môn</span>
+                <span className="chips">
+                  {detail.specialties.length ? detail.specialties.map((sp) => (
+                    <span key={sp.id} className="chip">{sp.icon || "🛠️"} {sp.name}</span>
+                  )) : <span className="val">—</span>}
+                </span>
               </div>
-
-              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
-                  <div className="text-[#8892b0]">ĐTB</div>
-                  <div className="font-semibold text-[#f0f2ff]">{item.avgRating ? item.avgRating.toFixed(2) : "-"}</div>
-                </div>
-                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
-                  <div className="text-[#8892b0]">Lượt đánh giá</div>
-                  <div className="font-semibold text-[#f0f2ff]">{item.evaluationCount}</div>
-                </div>
-                <div className="rounded-lg border border-[#252840] bg-[#13151f] p-2">
-                  <div className="text-[#8892b0]">Hire lại</div>
-                  <div className="font-semibold text-[#f0f2ff]">{item.hireAgainRate}%</div>
-                </div>
+              <div className="kv"><span className="k">ĐTB / Lượt ĐG</span><span className="val mono">{detail.avgRating ? detail.avgRating.toFixed(2) : "-"} ★ · {detail.evaluationCount}</span></div>
+              <div className="kv"><span className="k">Tỉ lệ hire lại</span><span className="val mono">{detail.hireAgainRate}%</span></div>
+              <div className="kv"><span className="k">Số HĐ đã ký</span><span className="val mono">{detail.totalContracts}</span></div>
+              {detail.taxCode ? <div className="kv"><span className="k">MST</span><span className="val mono">{detail.taxCode}</span></div> : null}
+              {detail.email ? <div className="kv"><span className="k">Email</span><span className="val">{detail.email}</span></div> : null}
+              {detail.address ? <div className="kv"><span className="k">Địa chỉ</span><span className="val">{detail.address}</span></div> : null}
+              <div className="kv">
+                <span className="k">🏦 Tài khoản</span>
+                <span className="val">
+                  {bankText(detail) || <span className="mono">Chưa có TK</span>}
+                  {detail.bankAccountName ? <div className="mono" style={{ fontWeight: 400, opacity: 0.7 }}>{detail.bankAccountName}</div> : null}
+                </span>
               </div>
-
-              <div className="mt-2 flex flex-wrap gap-1">
-                {item.specialties.length > 0 ? (
-                  item.specialties.map((sp) => (
-                    <span key={sp.id} className="rounded-full bg-[#252840] px-2 py-1 text-[11px] text-[#a4acc8]">
-                      {sp.icon || "🛠️"} {sp.name}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-[#8892b0]">Chưa gán chuyên môn</span>
-                )}
-              </div>
-
-              <div className="mt-2 flex items-start justify-between gap-2 rounded-lg border border-[#252840] bg-[#13151f] p-2 text-xs">
-                <div className="min-w-0">
-                  <div className="text-[#8892b0]">🏦 Tài khoản thanh toán</div>
-                  {item.bankAccount || item.bankName || item.bankAccountName ? (
-                    <div className="mt-0.5 text-[#f0f2ff]">
-                      <span className="font-semibold">{item.bankAccount || "—"}</span>
-                      {item.bankName ? <span className="text-[#a4acc8]"> · {item.bankName}</span> : null}
-                      {item.bankAccountName ? <div className="text-[#a4acc8]">{item.bankAccountName}</div> : null}
-                    </div>
-                  ) : (
-                    <div className="mt-0.5 text-[#6b7394]">Chưa có TK</div>
-                  )}
-                </div>
-                {canWrite || canEditPayment ? (
-                  <Button variant="outline" size="sm" className="shrink-0" onClick={() => openPayment(item)}>✏️ Sửa TK</Button>
+              {detail.notes ? <div className="kv"><span className="k">Ghi chú</span><span className="val">{detail.notes}</span></div> : null}
+            </div>
+            <div className="sacts">
+              <a className="btn call" href={`tel:${detail.phone}`}>📞 Gọi</a>
+              {canWrite || canEditPayment ? <button className="btn" onClick={() => openPayment(detail)}>✏️ Sửa TK</button> : null}
+            </div>
+            {canWrite ? (
+              <div className="sacts" style={{ paddingTop: 8 }}>
+                <button className="btn" onClick={() => openEdit(detail)}>Sửa</button>
+                <button className="btn" onClick={() => handleDelete(detail)}>Ngưng HĐ</button>
+                {detail.status !== "blacklisted" ? (
+                  <button className="btn danger" onClick={() => handleBlacklist(detail)}>Blacklist</button>
                 ) : null}
               </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
 
-              {canWrite ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(item)}>Sửa</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(item)}>Ngưng HĐ</Button>
-                  {item.status !== "blacklisted" ? (
-                    <Button variant="destructive" size="sm" onClick={() => handleBlacklist(item)}>
-                      <ShieldAlert className="mr-1 h-3.5 w-3.5" /> Blacklist
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
-
+      {/* ---- create / edit form ---- */}
       {openSheet ? (
-        <div className="fixed inset-0 z-50 bg-black/60">
-          <button type="button" className="h-full w-full" aria-label="Đóng" onClick={() => setOpenSheet(false)} />
-          <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 slide-up">
-            <div className="mb-3 text-lg font-semibold text-[#f0f2ff]">{sheetTitle}</div>
-
-            <form className="max-h-[75vh] space-y-3 overflow-y-auto pb-1" onSubmit={submitForm}>
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Tên thầu phụ</label>
-                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required />
+        <>
+          <div className="backdrop" onClick={() => setOpenSheet(false)} />
+          <div className="sheet form">
+            <div className="handle" />
+            <div className="form-title">{sheetTitle}</div>
+            <form className="fscroll" onSubmit={submitForm}>
+              <div className="field">
+                <label>Tên thầu phụ</label>
+                <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">Loại</label>
-                  <select className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as SubcontractorType }))}>
+              <div className="grid2">
+                <div className="field">
+                  <label>Loại</label>
+                  <select value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as SubcontractorType }))}>
                     <option value="individual">Cá nhân</option>
                     <option value="company">Công ty</option>
                   </select>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">Trạng thái</label>
-                  <select className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as SubcontractorStatus }))}>
+                <div className="field">
+                  <label>Trạng thái</label>
+                  <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as SubcontractorStatus }))}>
                     <option value="active">Hoạt động</option>
                     <option value="inactive">Ngưng</option>
                     <option value="blacklisted">Blacklist</option>
@@ -460,62 +506,55 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">SĐT</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} required />
+              <div className="grid2">
+                <div className="field">
+                  <label>SĐT</label>
+                  <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} required />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">SĐT phụ</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.altPhone} onChange={(e) => setForm((p) => ({ ...p, altPhone: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">Email</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">MST</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.taxCode} onChange={(e) => setForm((p) => ({ ...p, taxCode: e.target.value }))} />
+                <div className="field">
+                  <label>SĐT phụ</label>
+                  <input value={form.altPhone} onChange={(e) => setForm((p) => ({ ...p, altPhone: e.target.value }))} />
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Địa chỉ</label>
-                <textarea rows={2} className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">Ngân hàng</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.bankName} onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))} />
+              <div className="grid2">
+                <div className="field">
+                  <label>Email</label>
+                  <input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">STK</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.bankAccount} onChange={(e) => setForm((p) => ({ ...p, bankAccount: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[#a4acc8]">Tên TK</label>
-                  <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.bankAccountName} onChange={(e) => setForm((p) => ({ ...p, bankAccountName: e.target.value }))} />
+                <div className="field">
+                  <label>MST</label>
+                  <input value={form.taxCode} onChange={(e) => setForm((p) => ({ ...p, taxCode: e.target.value }))} />
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Chuyên môn</label>
-                <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2d3249] bg-[#1a1d2e] p-2">
+              <div className="field">
+                <label>Địa chỉ</label>
+                <textarea rows={2} value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
+              </div>
+
+              <div className="grid3">
+                <div className="field">
+                  <label>Ngân hàng</label>
+                  <input value={form.bankName} onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))} />
+                </div>
+                <div className="field">
+                  <label>STK</label>
+                  <input value={form.bankAccount} onChange={(e) => setForm((p) => ({ ...p, bankAccount: e.target.value }))} />
+                </div>
+                <div className="field">
+                  <label>Tên TK</label>
+                  <input value={form.bankAccountName} onChange={(e) => setForm((p) => ({ ...p, bankAccountName: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Chuyên môn</label>
+                <div className="spgrid">
                   {specialties.map((sp) => {
                     const active = form.specialtyIds.includes(sp.id);
                     return (
-                      <button
-                        type="button"
-                        key={sp.id}
-                        onClick={() => toggleSpecialty(sp.id)}
-                        className={`rounded-lg border px-2 py-1 text-left text-xs ${
-                          active ? "border-[#f97316] bg-[#f97316]/20 text-[#fb923c]" : "border-[#2d3249] bg-[#13151f] text-[#a4acc8]"
-                        }`}
-                      >
+                      <button type="button" key={sp.id} onClick={() => toggleSpecialty(sp.id)} className={`spbtn ${active ? "on" : ""}`}>
                         {sp.icon || "🛠️"} {sp.name}
                       </button>
                     );
@@ -523,50 +562,48 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Ghi chú</label>
-                <textarea rows={2} className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+              <div className="field">
+                <label>Ghi chú</label>
+                <textarea rows={2} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
               </div>
 
-              <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="outline" onClick={() => setOpenSheet(false)}>Hủy</Button>
-                <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={submitting}>
-                  {submitting ? "Đang lưu..." : "Lưu"}
-                </Button>
+              <div className="fbtns">
+                <button type="button" className="btn" onClick={() => setOpenSheet(false)}>Hủy</button>
+                <button type="submit" className="btn call" disabled={submitting}>{submitting ? "Đang lưu…" : "Lưu"}</button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       ) : null}
 
+      {/* ---- payment account sheet ---- */}
       {payItem ? (
-        <div className="fixed inset-0 z-50 bg-black/60">
-          <button type="button" className="h-full w-full" aria-label="Đóng" onClick={() => setPayItem(null)} />
-          <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 slide-up">
-            <div className="mb-1 text-lg font-semibold text-[#f0f2ff]">Tài khoản thanh toán</div>
-            <div className="mb-3 text-xs text-[#8892b0]">{payItem.code} • {payItem.name}</div>
-            <form onSubmit={submitPayment} className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Ngân hàng</label>
-                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankName} onChange={(e) => setPayForm((p) => ({ ...p, bankName: e.target.value }))} placeholder="VD: Vietcombank" />
+        <>
+          <div className="backdrop" onClick={() => setPayItem(null)} />
+          <div className="sheet form">
+            <div className="handle" />
+            <div className="form-title">Tài khoản thanh toán</div>
+            <div style={{ fontSize: 12, color: "var(--mut)", marginBottom: 4 }}>{payItem.code} · {payItem.name}</div>
+            <form className="fscroll" onSubmit={submitPayment}>
+              <div className="field">
+                <label>Ngân hàng</label>
+                <input value={payForm.bankName} onChange={(e) => setPayForm((p) => ({ ...p, bankName: e.target.value }))} placeholder="VD: Vietcombank" />
               </div>
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Số tài khoản</label>
-                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankAccount} onChange={(e) => setPayForm((p) => ({ ...p, bankAccount: e.target.value }))} />
+              <div className="field">
+                <label>Số tài khoản</label>
+                <input value={payForm.bankAccount} onChange={(e) => setPayForm((p) => ({ ...p, bankAccount: e.target.value }))} />
               </div>
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Chủ tài khoản</label>
-                <input className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm" value={payForm.bankAccountName} onChange={(e) => setPayForm((p) => ({ ...p, bankAccountName: e.target.value }))} />
+              <div className="field">
+                <label>Chủ tài khoản</label>
+                <input value={payForm.bankAccountName} onChange={(e) => setPayForm((p) => ({ ...p, bankAccountName: e.target.value }))} />
               </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="outline" onClick={() => setPayItem(null)}>Hủy</Button>
-                <Button type="submit" className="bg-[#f97316] text-black hover:bg-[#fb923c]" disabled={paySubmitting}>
-                  {paySubmitting ? "Đang lưu..." : "Lưu TK"}
-                </Button>
+              <div className="fbtns">
+                <button type="button" className="btn" onClick={() => setPayItem(null)}>Hủy</button>
+                <button type="submit" className="btn call" disabled={paySubmitting}>{paySubmitting ? "Đang lưu…" : "Lưu TK"}</button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       ) : null}
     </div>
   );

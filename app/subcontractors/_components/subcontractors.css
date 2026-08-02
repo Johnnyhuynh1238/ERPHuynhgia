@@ -1,0 +1,149 @@
+/* Danh bạ thầu phụ — brand ngà (sáng) / mahogany (tối). IBM Plex.
+   Mọi thứ scope trong .subdoc để không đụng app shell tối của ERP. */
+
+.subdoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b4472a;
+  --sheet: #fbf7ec;
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  color-scheme: light;
+}
+.subdoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --red: #e08a6a;
+  --sheet: #4a1d0c;
+}
+.subdoc * { box-sizing: border-box; }
+.subdoc .num,
+.subdoc .mono {
+  font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.subdoc .wrap { max-width: 640px; margin: 0 auto; padding: 16px 14px 40px; }
+
+/* ---- topbar ---- */
+.subdoc .topbar { display: flex; align-items: center; gap: 10px; }
+.subdoc .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.subdoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; letter-spacing: -0.02em; flex-shrink: 0; }
+.subdoc .brand b { font-size: 13px; font-weight: 700; display: block; line-height: 1.1; }
+.subdoc .brand span { font-size: 9px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.subdoc .grow { flex: 1; }
+.subdoc .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 16px; display: grid; place-items: center; line-height: 1; flex-shrink: 0; }
+.subdoc .iconbtn:active { transform: scale(0.94); }
+.subdoc .iconbtn.pri { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.subdoc .eyebrow { margin-top: 16px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.subdoc h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+
+/* ---- summary 2x2 ---- */
+.subdoc .sum { margin-top: 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.subdoc .cell { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; }
+.subdoc .cell .k { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); font-weight: 600; }
+.subdoc .cell .v { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 20px; letter-spacing: -0.03em; margin-top: 4px; }
+.subdoc .v.g { color: var(--ok); }
+.subdoc .v.t { color: var(--terra); }
+.subdoc .v.r { color: var(--red); }
+
+/* ---- filters ---- */
+.subdoc .search { position: relative; margin-top: 11px; }
+.subdoc .search input { width: 100%; height: 40px; border-radius: 11px; border: 1px solid var(--line2); background: var(--card); padding: 0 12px 0 36px; font-family: inherit; font-size: 14px; color: var(--text); }
+.subdoc .search svg { position: absolute; left: 12px; top: 12px; width: 16px; height: 16px; stroke: var(--mut); fill: none; stroke-width: 2; }
+.subdoc .frow { display: flex; gap: 8px; margin-top: 8px; }
+.subdoc select { flex: 1; min-width: 0; height: 38px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); padding: 0 10px; font-family: inherit; font-size: 12.5px; color: var(--text); }
+.subdoc .count { margin-top: 14px; font-size: 11px; color: var(--mut); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* ---- table ---- */
+.subdoc .tbwrap { margin-top: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.subdoc table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.subdoc col.c2 { width: 108px; }
+.subdoc col.c3 { width: 26px; }
+.subdoc thead th { text-align: left; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.subdoc th.r, .subdoc td.r { text-align: right; }
+.subdoc tbody td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.subdoc tbody tr { cursor: pointer; }
+.subdoc tbody tr:last-child td { border-bottom: none; }
+.subdoc tbody tr:active { background: rgba(46, 20, 10, 0.04); }
+.subdoc[data-theme="dark"] tbody tr:active { background: rgba(247, 242, 228, 0.05); }
+.subdoc .name { font-weight: 600; font-size: 14px; line-height: 1.25; }
+.subdoc .metaline { font-size: 10.5px; color: var(--mut); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.subdoc .code { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; color: var(--terra); font-weight: 500; }
+.subdoc .tag { font-size: 10px; padding: 1px 7px; border-radius: 20px; background: rgba(46, 20, 10, 0.06); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; }
+.subdoc[data-theme="dark"] .tag { background: rgba(247, 242, 228, 0.07); }
+.subdoc .rate { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-weight: 600; font-size: 15px; white-space: nowrap; }
+.subdoc .star { color: var(--gold); font-size: 12px; }
+.subdoc .rsub { font-size: 9.5px; color: var(--mut); margin-top: 2px; white-space: nowrap; }
+.subdoc .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.subdoc .dot.a { background: var(--ok); }
+.subdoc .dot.i { background: var(--mut2); }
+.subdoc .dot.b { background: var(--red); }
+.subdoc .placeholder { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--mut); }
+
+/* ---- overlay + sheets ---- */
+.subdoc .backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(46, 20, 10, 0.45); }
+.subdoc .sheet { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 61; width: 100%; max-width: 640px; display: flex; flex-direction: column; background: var(--sheet); border-top-left-radius: 22px; border-top-right-radius: 22px; border: 1px solid var(--line); padding: 6px 16px 20px; box-shadow: 0 -12px 40px rgba(46, 20, 10, 0.2); animation: subUp 0.22s ease; }
+@keyframes subUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+.subdoc .sheet.detail { height: 93dvh; }
+.subdoc .sheet.form { max-height: 90dvh; }
+.subdoc .handle { width: 38px; height: 4px; border-radius: 3px; background: var(--line2); margin: 8px auto 12px; flex-shrink: 0; }
+
+/* detail sheet */
+.subdoc .shead { display: flex; align-items: flex-start; gap: 10px; }
+.subdoc .shead .n { font-size: 18px; font-weight: 700; }
+.subdoc .shead .c { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 11px; color: var(--terra); margin-top: 2px; }
+.subdoc .st { font-size: 10.5px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+.subdoc .st.a { background: rgba(91, 122, 82, 0.14); color: var(--ok); }
+.subdoc .st.i { background: rgba(46, 20, 10, 0.07); color: var(--mut); }
+.subdoc[data-theme="dark"] .st.i { background: rgba(247, 242, 228, 0.08); }
+.subdoc .st.b { background: rgba(180, 71, 42, 0.14); color: var(--red); }
+.subdoc .sbody { flex: 1; overflow-y: auto; margin-top: 12px; }
+.subdoc .kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.subdoc .kv:last-child { border-bottom: none; }
+.subdoc .kv .k { color: var(--mut); flex-shrink: 0; }
+.subdoc .kv .val { font-weight: 600; text-align: right; }
+.subdoc .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.subdoc .chip { font-size: 11px; padding: 2px 9px; border-radius: 20px; background: rgba(46, 20, 10, 0.06); color: var(--text); border: 1px solid var(--line); }
+.subdoc[data-theme="dark"] .chip { background: rgba(247, 242, 228, 0.07); }
+.subdoc .sacts { display: flex; gap: 8px; margin-top: auto; padding-top: 16px; }
+.subdoc .btn { flex: 1; height: 44px; border-radius: 11px; border: 1px solid var(--line2); background: none; color: var(--text); font-family: inherit; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; text-decoration: none; }
+.subdoc .btn:active { transform: scale(0.97); }
+.subdoc .btn.call { background: var(--text); color: var(--bg); border-color: var(--text); }
+.subdoc .btn.danger { color: var(--red); border-color: rgba(180, 71, 42, 0.4); }
+.subdoc .btn:disabled { opacity: 0.55; cursor: default; }
+
+/* form sheet */
+.subdoc .form-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.subdoc .fscroll { overflow-y: auto; padding-bottom: 4px; }
+.subdoc .field { margin-top: 12px; }
+.subdoc .field > label { display: block; font-size: 11px; color: var(--mut); font-weight: 600; margin-bottom: 5px; }
+.subdoc .field input, .subdoc .field textarea, .subdoc .field select { width: 100%; border-radius: 10px; border: 1px solid var(--line2); background: var(--bg); padding: 9px 11px; font-family: inherit; font-size: 13.5px; color: var(--text); }
+.subdoc .field input:focus, .subdoc .field textarea:focus, .subdoc .field select:focus { outline: none; border-color: var(--terra); }
+.subdoc .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.subdoc .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.subdoc .spgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 1px solid var(--line2); border-radius: 11px; padding: 9px; background: var(--bg); }
+.subdoc .spbtn { border-radius: 9px; border: 1px solid var(--line2); background: var(--card); color: var(--mut); padding: 7px 9px; text-align: left; font-family: inherit; font-size: 12px; cursor: pointer; }
+.subdoc .spbtn.on { border-color: var(--terra); background: rgba(138, 61, 28, 0.12); color: var(--terra); font-weight: 600; }
+.subdoc .fbtns { display: flex; gap: 8px; padding-top: 14px; }
