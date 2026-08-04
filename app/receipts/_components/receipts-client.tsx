@@ -144,7 +144,7 @@ export function ReceiptsClient({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailRow, setDetailRow] = useState<Receipt | null>(null);
 
   const [openReceive, setOpenReceive] = useState<Receipt | null>(null);
   const [receiving, setReceiving] = useState(false);
@@ -469,9 +469,8 @@ export function ReceiptsClient({
         ) : (
           <div className="rt-list">
             {rows.map((r) => {
-              const expanded = expandedId === r.id;
               return (
-                <div key={r.id} className={`rt-rc${expanded ? " exp" : ""}`} onClick={() => setExpandedId(expanded ? null : r.id)}>
+                <div key={r.id} className="rt-rc" onClick={() => setDetailRow(r)}>
                   <div className="rt-r1">
                     <span className={`rt-badge src-${r.source}`}>{SOURCE_LABEL[r.source]}</span>
                     <span className="rt-ttl">{cardTitle(r)}</span>
@@ -503,79 +502,95 @@ export function ReceiptsClient({
                     </div>
                   </div>
 
-                  {expanded && (
-                    <div className="rt-exp" onClick={(e) => e.stopPropagation()}>
-                      <div className="col">
-                        <div className="rt-kv"><span className="lb">Tạo bởi: </span>{r.creator.fullName} · {fmtDate(r.createdAt)}</div>
-                        <div className="rt-kv"><span className="lb">Phương thức: </span>{r.paymentMethod === "cash" ? "Tiền mặt" : r.paymentMethod === "transfer" ? "Chuyển khoản" : "—"}</div>
-                        {r.paymentSchedule && (
-                          <div className="rt-phase">Đợt {r.paymentSchedule.phaseNumber} — {r.paymentSchedule.milestoneDescription}</div>
-                        )}
-                        {r.note && (
-                          <button type="button" className="rt-copy" onClick={() => { navigator.clipboard?.writeText(r.note!); toast.success("Đã copy ghi chú"); }}>
-                            <span className="lb">Ghi chú: </span>{r.note} <span className="cp">⧉</span>
-                          </button>
-                        )}
-                        {r.payer && (
-                          <button type="button" className="rt-copy" onClick={() => { navigator.clipboard?.writeText(r.payer!); toast.success("Đã copy tên người nộp"); }}>
-                            <span className="lb">Người nộp: </span>{r.payer} <span className="cp">⧉</span>
-                          </button>
-                        )}
-                        <button type="button" className="rt-copy" onClick={() => { navigator.clipboard?.writeText(String(Math.round(r.amount))); toast.success("Đã copy số tiền"); }}>
-                          <span className="lb">Số tiền: </span>{money(r.amount)} <span className="cp">⧉</span>
-                        </button>
-                        {r.attachmentUrl && (
-                          <a className="rt-link" href={`/api/receipts/${r.id}/file?type=attachment`} target="_blank" rel="noreferrer">📎 Xem chứng từ</a>
-                        )}
-                      </div>
-                      <div className="col">
-                        {r.status === "received" && (
-                          <>
-                            <div className="rt-kv"><span className="lb">Đã thu: </span>{money(r.receivedAmount)} · {fmtDate(r.receivedAt)}</div>
-                            {r.receiver && (<div className="rt-kv"><span className="lb">Người xác nhận: </span>{r.receiver.fullName}</div>)}
-                            {r.receivedNote && (<div className="rt-kv"><span className="lb">Ghi chú thu: </span>{r.receivedNote}</div>)}
-                            {r.receivedReceiptUrl && (
-                              <a className="rt-link" href={`/api/receipts/${r.id}/file?type=received`} target="_blank" rel="noreferrer">🧾 Xem phiếu thu</a>
-                            )}
-                          </>
-                        )}
-                        {r.status === "cancelled" && r.cancelledReason && (
-                          <div className="rt-kv"><span className="lb">Lý do huỷ: </span>{r.cancelledReason}</div>
-                        )}
-                        {r.project && (
-                          <div className="rt-kv"><span className="lb">Dự án: </span>{r.project.code} — {r.project.name}</div>
-                        )}
-                      </div>
-
-                      {r.status === "awaiting_approval" && (
-                        <div className="rt-exp-acts">
-                          <span className="rt-exp-hint">KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt</span>
-                          {isAdmin && (
-                            <>
-                              <button type="button" className="rt-chip go" onClick={() => approveReceipt(r)}>✓ Duyệt</button>
-                              <button type="button" className="rt-chip dn" onClick={() => rejectReceipt(r)}>✕ Từ chối</button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      {r.status === "pending" && (
-                        <div className="rt-exp-acts">
-                          {canMarkReceived && (
-                            <button type="button" className="rt-chip ok" onClick={() => openReceiveDialog(r)}>✓ Xác nhận đã thu</button>
-                          )}
-                          {isAdmin && (
-                            <button type="button" className="rt-chip dn" onClick={() => { setOpenCancel(r); setCancelReason(""); }}>Huỷ</button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* DETAIL SHEET */}
+      {mounted && detailRow &&
+        createPortal(
+          <div className={`rtportal ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+            {(() => {
+              const r = detailRow;
+              return (
+                <ModalShell
+                  title={`${SOURCE_LABEL[r.source]} · ${r.code}`}
+                  subtitle={`${statusLabel(r.status)} · ${fmtN(r.amount)}đ`}
+                  tone={r.status === "cancelled" ? "red" : "default"}
+                  onClose={() => setDetailRow(null)}
+                >
+                  <div className="rt-exp" style={{ marginTop: 0, borderTop: "none", paddingTop: 0 }}>
+                    <div className="col">
+                      <div className="rt-kv"><span className="lb">Tạo bởi: </span>{r.creator.fullName} · {fmtDate(r.createdAt)}</div>
+                      <div className="rt-kv"><span className="lb">Số tiền: </span>{money(r.amount)}</div>
+                      <div className="rt-kv"><span className="lb">Phương thức: </span>{r.paymentMethod === "cash" ? "Tiền mặt" : r.paymentMethod === "transfer" ? "Chuyển khoản" : "—"}</div>
+                      {r.paymentSchedule && (
+                        <div className="rt-phase">Đợt {r.paymentSchedule.phaseNumber} — {r.paymentSchedule.milestoneDescription}</div>
+                      )}
+                      {r.payer && (
+                        <button type="button" className="rt-copy" onClick={() => { navigator.clipboard?.writeText(r.payer!); toast.success("Đã copy tên người nộp"); }}>
+                          <span className="lb">Người nộp: </span>{r.payer} <span className="cp">⧉</span>
+                        </button>
+                      )}
+                      {r.note && (
+                        <button type="button" className="rt-copy" onClick={() => { navigator.clipboard?.writeText(r.note!); toast.success("Đã copy ghi chú"); }}>
+                          <span className="lb">Ghi chú: </span>{r.note} <span className="cp">⧉</span>
+                        </button>
+                      )}
+                      {r.attachmentUrl && (
+                        <a className="rt-link" href={`/api/receipts/${r.id}/file?type=attachment`} target="_blank" rel="noreferrer">📎 Xem chứng từ</a>
+                      )}
+                    </div>
+                    <div className="col">
+                      {r.project && (
+                        <div className="rt-kv"><span className="lb">Dự án: </span>{r.project.code} — {r.project.name}</div>
+                      )}
+                      {r.status === "received" && (
+                        <>
+                          <div className="rt-kv"><span className="lb">Đã thu: </span>{money(r.receivedAmount)} · {fmtDate(r.receivedAt)}</div>
+                          {r.receiver && (<div className="rt-kv"><span className="lb">Người xác nhận: </span>{r.receiver.fullName}</div>)}
+                          {r.receivedNote && (<div className="rt-kv"><span className="lb">Ghi chú thu: </span>{r.receivedNote}</div>)}
+                          {r.receivedReceiptUrl && (
+                            <a className="rt-link" href={`/api/receipts/${r.id}/file?type=received`} target="_blank" rel="noreferrer">🧾 Xem phiếu thu</a>
+                          )}
+                        </>
+                      )}
+                      {r.status === "cancelled" && r.cancelledReason && (
+                        <div className="rt-kv"><span className="lb">Lý do huỷ: </span>{r.cancelledReason}</div>
+                      )}
+                    </div>
+
+                    {r.status === "awaiting_approval" && (
+                      <div className="rt-exp-acts">
+                        <span className="rt-exp-hint">KT {r.creator?.fullName ?? ""} tạo · chờ admin duyệt</span>
+                        {isAdmin && (
+                          <>
+                            <button type="button" className="rt-chip go" onClick={() => { setDetailRow(null); approveReceipt(r); }}>✓ Duyệt</button>
+                            <button type="button" className="rt-chip dn" onClick={() => { setDetailRow(null); rejectReceipt(r); }}>✕ Từ chối</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {r.status === "pending" && (
+                      <div className="rt-exp-acts">
+                        {canMarkReceived && (
+                          <button type="button" className="rt-chip ok" onClick={() => { setDetailRow(null); openReceiveDialog(r); }}>✓ Xác nhận đã thu</button>
+                        )}
+                        {isAdmin && (
+                          <button type="button" className="rt-chip dn" onClick={() => { setDetailRow(null); setOpenCancel(r); setCancelReason(""); }}>Huỷ</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </ModalShell>
+              );
+            })()}
+          </div>,
+          document.body,
+        )}
 
       {/* CREATE MODAL */}
       {mounted && showCreate && canCreate &&

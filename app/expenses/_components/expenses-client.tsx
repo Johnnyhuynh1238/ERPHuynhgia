@@ -288,6 +288,7 @@ export function ExpensesClient({
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailRow, setDetailRow] = useState<Expense | null>(null);
 
   const [openPay, setOpenPay] = useState<Expense | null>(null);
   const [paying, setPaying] = useState(false);
@@ -915,8 +916,8 @@ export function ExpensesClient({
                 <div
                   key={r.id}
                   ref={r.id === highlightId ? highlightRef : undefined}
-                  onClick={canQuickTransfer ? toggle : undefined}
-                  className={`rcx${canQuickTransfer ? " clickable" : ""}${isUrgent ? " urgent" : ""}${
+                  onClick={canQuickTransfer ? toggle : () => setDetailRow(r)}
+                  className={`rcx clickable${isUrgent ? " urgent" : ""}${
                     r.id === highlightId ? " hl" : ""
                   }`}
                   style={r.status === "cancelled" ? { opacity: 0.72 } : r.status === "paid" ? { opacity: 0.92 } : undefined}
@@ -1110,6 +1111,183 @@ export function ExpensesClient({
           </div>
         )}
       </div>
+
+      {/* ===== POPUP: Chi tiết lệnh chi ===== */}
+      {detailRow && overlay((() => {
+        const dr = detailRow;
+        const sb = statusBadge(dr.status);
+        const bank = dr.payeeBankBin ? findBankByBin(dr.payeeBankBin) : null;
+        const atts = attachmentList(dr);
+        return (
+          <div className="scrim" onClick={(e) => e.target === e.currentTarget && setDetailRow(null)}>
+            <div className="sheet">
+              <div className="sheet-hd">
+                <div>
+                  <h3 className={dr.status === "paid" ? "ok" : dr.status === "cancelled" ? "red" : "orange"}>
+                    <span className={`stbadge ${sb.cls}`}>{sb.label}</span> {dr.code}
+                  </h3>
+                  <div className="sub">{fmtDate(dr.createdAt)} · {dr.creator.fullName}</div>
+                </div>
+                <button className="iconbtn" type="button" onClick={() => setDetailRow(null)} title="Đóng">
+                  ✕
+                </button>
+              </div>
+
+              <div className="payinfo">
+                <div className="big num">
+                  {moneyPlain(dr.amount)} <span className="u">đ</span>
+                </div>
+                <div className="rows">
+                  <div className="irow">
+                    <span className="k">Danh mục</span>
+                    <span className="v">{dr.category.name}</span>
+                  </div>
+                  <div className="irow">
+                    <span className="k">Người nhận</span>
+                    <span className="v">{dr.payee || "—"}</span>
+                  </div>
+                  <div className="irow">
+                    <span className="k">SĐT người nhận</span>
+                    <span className="v">{dr.payeePhone || "—"}</span>
+                  </div>
+                  <div className="irow">
+                    <span className="k">Dự án</span>
+                    <span className="v">
+                      {dr.project
+                        ? `${dr.project.code} — ${dr.project.name}`
+                        : dr.designContract
+                          ? `TK — ${dr.designContract.customerName}`
+                          : "Chi chung công ty"}
+                    </span>
+                  </div>
+                  <div className="irow">
+                    <span className="k">Phương thức</span>
+                    <span className="v">{dr.paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản"}</span>
+                  </div>
+                  <div className="irow">
+                    <span className="k">Nội dung</span>
+                    <span className="v">{dr.note || "—"}</span>
+                  </div>
+                  {dr.status === "paid" && (
+                    <>
+                      <div className="irow">
+                        <span className="k">Thực chi</span>
+                        <span className="v">{money(dr.paidAmount ?? dr.amount)}</span>
+                      </div>
+                      <div className="irow">
+                        <span className="k">Đã chi</span>
+                        <span className="v">
+                          {fmtDate(dr.paidAt)}{dr.payer ? ` · ${dr.payer.fullName}` : ""}
+                        </span>
+                      </div>
+                      {dr.paidNote && (
+                        <div className="irow">
+                          <span className="k">Ghi chú KT</span>
+                          <span className="v">{dr.paidNote}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {dr.status === "cancelled" && (
+                    <div className="irow">
+                      <span className="k">Lý do huỷ</span>
+                      <span className="v">
+                        {fmtDate(dr.cancelledAt)}{dr.cancelledReason ? ` · ${dr.cancelledReason}` : ""}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {bank && dr.payeeAccountNumber && (
+                <div className="bankbox">
+                  <div className="lg">{bank.shortName.slice(0, 3).toUpperCase()}</div>
+                  <div className="bk">
+                    <div className="nm">{bank.shortName}</div>
+                    <div className="no num">{dr.payeeAccountNumber}</div>
+                  </div>
+                  {dr.payeeAccountName && <div className="own">{dr.payeeAccountName}</div>}
+                </div>
+              )}
+
+              {dr.status === "tptc_pending" && (
+                <div className="hint strong">⏳ KT {dr.creator?.fullName ?? ""} tạo · chờ admin duyệt</div>
+              )}
+
+              <div className="actbar" style={{ marginTop: 14 }}>
+                {atts.length > 0 && (
+                  <button
+                    className="actbtn a-bill"
+                    onClick={() => setViewer({ urls: atts, index: 0, expenseId: dr.id, type: "attachment" })}
+                  >
+                    📎 {atts.length > 1 ? `${atts.length} hoá đơn` : "Hoá đơn"}
+                  </button>
+                )}
+                {dr.paidReceiptUrl && (
+                  <a
+                    className="actbtn a-doc"
+                    href={dr.paidReceiptUrl.startsWith("minio://") ? `/api/expenses/${dr.id}/file?type=receipt` : dr.paidReceiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    📄 Chứng từ
+                  </a>
+                )}
+                {canCreate && dr.status !== "cancelled" && (
+                  <button className="actbtn a-link" onClick={() => sendPublicLink(dr)} disabled={linkBusyId === dr.id}>
+                    {linkBusyId === dr.id ? "Đang tạo…" : "🔗 Gửi link NCC"}
+                  </button>
+                )}
+                {dr.status === "pending" && canMarkPaid && (
+                  <button
+                    className="actbtn a-ok"
+                    onClick={() => {
+                      setDetailRow(null);
+                      openPayDialog(dr);
+                    }}
+                  >
+                    💵 Ghi nhận đã chi
+                  </button>
+                )}
+                {dr.status === "tptc_pending" && isAdmin && (
+                  <>
+                    <button
+                      className="actbtn a-approve"
+                      onClick={() => {
+                        setDetailRow(null);
+                        approveExpense(dr);
+                      }}
+                    >
+                      ✓ Duyệt
+                    </button>
+                    <button
+                      className="actbtn a-cancel"
+                      onClick={() => {
+                        setDetailRow(null);
+                        rejectExpense(dr);
+                      }}
+                    >
+                      ✕ Từ chối
+                    </button>
+                  </>
+                )}
+                {dr.status === "pending" && isAdmin && (
+                  <button
+                    className="actbtn a-cancel"
+                    onClick={() => {
+                      setDetailRow(null);
+                      setOpenCancel(dr);
+                      setCancelReason("");
+                    }}
+                  >
+                    Huỷ
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })())}
 
       {/* ===== POPUP: Ghi nhận đã chi ===== */}
       {openPay && overlay(
