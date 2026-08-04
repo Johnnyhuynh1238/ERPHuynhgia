@@ -3,6 +3,7 @@
 import "./subcontractors.css";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { confirmDialog } from "@/components/confirm-dialog";
+import { VN_BANKS } from "@/lib/vn-banks";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -536,7 +537,18 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
               <div className="grid3">
                 <div className="field">
                   <label>Ngân hàng</label>
-                  <input value={form.bankName} onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))} />
+                  <select value={form.bankName} onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))}>
+                    <option value="">— Chọn ngân hàng —</option>
+                    {/* Giữ giá trị cũ nếu là text tự do không khớp danh sách Napas */}
+                    {form.bankName && !VN_BANKS.some((b) => b.shortName === form.bankName) && (
+                      <option value={form.bankName}>{form.bankName} (chưa chuẩn)</option>
+                    )}
+                    {VN_BANKS.map((b) => (
+                      <option key={b.bin} value={b.shortName}>
+                        {b.shortName} ({b.name})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="field">
                   <label>STK</label>
