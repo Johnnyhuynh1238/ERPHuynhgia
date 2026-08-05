@@ -37,6 +37,9 @@ const createSchema = z.object({
   paymentMethod: z.enum(["cash", "transfer"]).optional(),
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
+  // Gắn lệnh thu vào khoản vay (nhận tiền vay) hoặc phiếu tạm ứng (hoàn ứng).
+  loanId: z.string().uuid().optional().nullable(),
+  advanceId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -141,6 +144,8 @@ export async function POST(request: Request) {
       note: data.note?.trim() || null,
       attachmentUrl: data.attachmentUrl?.trim() || null,
       status: initialStatus,
+      loanId: data.loanId || null,
+      advanceId: data.advanceId || null,
       createdBy: user.id,
     },
     include: {

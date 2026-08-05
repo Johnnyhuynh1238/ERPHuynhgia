@@ -48,6 +48,9 @@ const createSchema = z.object({
   sourceId: z.string().uuid().optional().nullable(),
   // Gắn lệnh chi với 1 đợt thanh toán thầu phụ (mark-paid sẽ tự set đợt = paid).
   subPaymentId: z.string().uuid().optional().nullable(),
+  // Gắn lệnh chi vào khoản vay (trả gốc/lãi) hoặc phiếu tạm ứng (chi ứng).
+  loanId: z.string().uuid().optional().nullable(),
+  advanceId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -193,6 +196,8 @@ export async function POST(request: Request) {
         sourceType: data.sourceType || null,
         sourceId: data.sourceId || null,
         subPaymentId: data.subPaymentId || null,
+        loanId: data.loanId || null,
+        advanceId: data.advanceId || null,
         createdBy: user.id,
       },
       include: {

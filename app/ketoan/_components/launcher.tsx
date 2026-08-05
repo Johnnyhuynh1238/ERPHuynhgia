@@ -105,6 +105,7 @@ const APPS: AppDef[] = [
         { label: "Lệnh chi chờ chuyển", href: "/expenses?status=pending", badge: pb?.expense ?? 0 },
         { label: "Lệnh thu chờ nhận", href: "/receipts?status=pending", badge: pb?.receipt ?? 0 },
         "divider",
+        { label: "Vay & Tạm ứng", href: "/admin/debts", isNew: true },
         { label: "Sổ cái thu - chi", href: "/treasury" },
       ];
     },

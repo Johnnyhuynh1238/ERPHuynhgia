@@ -3789,6 +3789,10 @@ model Expense {
   // Scalar (không @relation) để khỏi thêm back-relation vào SubPayment; FK gắn ở migration.
   subPaymentId       String?   @map("sub_payment_id") @db.Uuid
 
+  // Gắn lệnh chi vào khoản vay (trả gốc/lãi) hoặc phiếu tạm ứng (chi ứng).
+  loanId    String? @map("loan_id") @db.Uuid
+  advanceId String? @map("advance_id") @db.Uuid
+
   project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   designContract DesignContract? @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   category     ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -3796,6 +3800,8 @@ model Expense {
   payer        User?           @relation("ExpensePayer", fields: [paidBy], references: [id], onDelete: SetNull)
   canceller    User?           @relation("ExpenseCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
   tptcApprover User?           @relation("ExpenseTptcApprover", fields: [tptcApprovedBy], references: [id], onDelete: SetNull)
+  loan         Loan?           @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  advance      Advance?        @relation(fields: [advanceId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
@@ -3803,6 +3809,8 @@ model Expense {
   @@index([nextReminderAt])
   @@index([subPaymentId])
   @@index([designContractId])
+  @@index([loanId])
+  @@index([advanceId])
   @@map("expenses")
 }
 
@@ -3836,6 +3844,10 @@ model Receipt {
   approvedAt     DateTime? @map("approved_at")
   rejectedReason String?   @map("rejected_reason") @db.Text
 
+  // Gắn lệnh thu vào khoản vay (nhận tiền vay) hoặc phiếu tạm ứng (hoàn ứng).
+  loanId    String? @map("loan_id") @db.Uuid
+  advanceId String? @map("advance_id") @db.Uuid
+
   project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   designContract  DesignContract?  @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   paymentSchedule PaymentSchedule? @relation("ReceiptOnSchedule", fields: [paymentScheduleId], references: [id], onDelete: SetNull)
@@ -3843,13 +3855,76 @@ model Receipt {
   receiver        User?            @relation("ReceiptReceiver", fields: [receivedBy], references: [id], onDelete: SetNull)
   canceller       User?            @relation("ReceiptCanceller", fields: [cancelledBy], references: [id], onDelete: SetNull)
   approver        User?            @relation("ReceiptApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  loan            Loan?            @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  advance         Advance?         @relation(fields: [advanceId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([source, createdAt(sort: Desc)])
   @@index([paymentScheduleId])
   @@index([designContractId])
+  @@index([loanId])
+  @@index([advanceId])
   @@map("receipts")
+}
+
+/// Khoản vay của công ty (cấp công ty, không gắn dự án).
+/// Nhận tiền vay = Receipt(source=loan, loanId). Trả gốc = Expense(TRANOGOC, loanId).
+/// Trả lãi = Expense(LAIVAY, loanId). Dư gốc = principal − Σ trả gốc đã chi.
+model Loan {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique
+  lender       String     // bên cho vay
+  principal    Decimal    @db.Decimal(18, 2)
+  interestRate Decimal?   @map("interest_rate") @db.Decimal(8, 4) // %/năm, tham khảo
+  disbursedAt  DateTime?  @map("disbursed_at")
+  dueDate      DateTime?  @map("due_date")
+  status       LoanStatus @default(active)
+  note         String?    @db.Text
+  createdBy    String     @map("created_by") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  closedAt     DateTime?  @map("closed_at")
+
+  expenses Expense[]
+  receipts Receipt[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("loans")
+}
+
+/// Phiếu tạm ứng của công ty (cấp công ty, không gắn dự án).
+/// Chi ứng = Expense(TAMUNG, advanceId). Hoàn ứng = Receipt(advance_return, advanceId).
+/// Dư ứng = amount − Σ hoàn ứng đã thu.
+model Advance {
+  id         String        @id @default(uuid()) @db.Uuid
+  code       String        @unique
+  recipient  String        // người/đơn vị nhận tạm ứng
+  amount     Decimal       @db.Decimal(18, 2)
+  advancedAt DateTime?     @map("advanced_at")
+  purpose    String?       @db.Text
+  status     AdvanceStatus @default(open)
+  note       String?       @db.Text
+  createdBy  String        @map("created_by") @db.Uuid
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  settledAt  DateTime?     @map("settled_at")
+
+  expenses Expense[]
+  receipts Receipt[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("advances")
+}
+
+enum LoanStatus {
+  active
+  paid
+}
+
+enum AdvanceStatus {
+  open
+  settled
 }
 
 /// Nhật ký mọi giao dịch thu/chi.
