@@ -93,7 +93,17 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
 .letterhead .lh-contact:first-of-type{margin-top:8px}
 .letterhead .lh-contact b{color:var(--browntx);font-weight:700}
 .letterhead .lh-right{position:absolute;right:6px;top:10px;text-align:right;color:var(--mute);font-size:11.5px;white-space:nowrap}
-@media print{.letterhead{border-color:#974706;padding:2px 78px 10px}.letterhead .lh-logo{height:44px;top:4px}.letterhead .lh-right{top:6px}}
+@media print{.letterhead{border-color:#974706;padding:4px 92px 10px 176px}.letterhead .lh-logo{height:40px;top:5px}.letterhead .lh-right{top:6px}}
+/* Bản in trắng đen: ép chữ đen đậm, nền trắng — rõ trên máy in đen trắng. Bấm nút "In T.Đen". */
+@media print{
+ body.bw *{color:#000!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ body.bw .card>.hd,body.bw tr.klsec2 td{background:#e9e9e9!important}
+ body.bw .hero,body.bw .profit,body.bw tr.tot td,body.bw .ghi,body.bw tr.klsum2 td{background:#fff!important}
+ body.bw .pill{background:#fff!important;border:1px solid #000!important}
+ body.bw .letterhead,body.bw .doc-rule,body.bw tr.tot td{border-color:#000!important}
+ body.bw .sec-title:before{background:#000!important}
+ body.bw th,body.bw td{border-color:#999!important}
+}
 @media print{.tabbar,.nav,.back,.go,.hint,.toast,.noprint{display:none!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{background:#fff}.page{max-width:100%;padding:0}
 .card,.hero{box-shadow:none;break-inside:avoid}.mucCard{break-inside:avoid}@page{size:A4;margin:13mm}}
 </style></head><body>
@@ -108,7 +118,8 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
   <button data-p="pl" onclick="nav('pl')">Lãi/lỗ</button>
   <button class="edit" id="editBtn" onclick="toggleEdit()">✎ Sửa</button>
   <button class="act" onclick="saveFile()">💾 Lưu file</button>
-  <button onclick="window.print()">In</button>
+  <button onclick="window.print()" title="Giữ màu — hợp in PDF">🎨 In màu</button>
+  <button onclick="printBW()" title="Chữ đen đậm — hợp in giấy đen trắng">🖨️ In T.Đen</button>
  </div>
 </div>
 <div id="root" class="page"></div>
@@ -306,6 +317,7 @@ if(DATA._matSpec!==1&&DATA.thoHangMuc){DATA.thoHangMuc.forEach(function(h){(h.vt
  else if(/^Thép cây/i.test(t))t=t.replace(/^Thép cây (Ø\d+).*/,'Thép Việt Nhật $1');
  else if(/^Xi măng/i.test(t)&&!/Insee/i.test(t))t=/PCB40/.test(t)?t.replace('PCB40','Insee PCB40'):t.replace(/^Xi măng/,'Xi măng Insee PCB40');
  v.ten=t;});});DATA._matSpec=1;try{saveLS()}catch(e){}}
+function printBW(){document.body.classList.add('bw');var done=function(){document.body.classList.remove('bw');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(done,2500);window.print();}
 async function boot(){
   if(CONTRACT){
     try{
