@@ -57,6 +57,21 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     : [];
   const inflightSet = new Set(inflight.map((e) => e.sourceId));
 
+  // Đã cọc = Σ tiền THỰC CHI các lệnh chi đã 'paid' gắn đơn (đơn trả ngay cọc trước khi nhận).
+  // Lệnh chi cuối (khi nhận) sẽ điền sẵn số còn lại = total − đã cọc.
+  const paidExpenses = orders.length
+    ? await prisma.expense.groupBy({
+        by: ["sourceId"],
+        where: {
+          sourceType: "mua_hang_order",
+          sourceId: { in: orders.map((o) => o.id) },
+          status: "paid",
+        },
+        _sum: { paidAmount: true },
+      })
+    : [];
+  const depositMap = new Map(paidExpenses.map((e) => [e.sourceId, Number(e._sum.paidAmount || 0)]));
+
   return NextResponse.json({
     items: orders.map((o) => ({
       id: o.id,
@@ -72,6 +87,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       receiptImages: o.receiptImages,
       receivedAt: o.receivedAt,
       hasInflightExpense: inflightSet.has(o.id),
+      depositPaid: depositMap.get(o.id) || 0,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
     })),

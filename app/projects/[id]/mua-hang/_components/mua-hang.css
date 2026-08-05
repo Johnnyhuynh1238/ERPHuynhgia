@@ -183,6 +183,7 @@
 .mhdoc .ord-card .r3 .linkbtn { border: none; padding: 0; background: none; font-size: 12px; color: var(--terra); }
 .mhdoc .ord-card .r3 .linkbtn.pay { color: var(--orange); border: none; background: none; padding: 0; }
 .mhdoc .ord-card .r3 .linkbtn.sent { border: none; background: none; padding: 0; color: #a85410; }
+.mhdoc .ord-card .r3 .linkbtn.coc { border: none; padding: 0; background: none; font-size: 12px; color: var(--terra); font-weight: 700; cursor: default; }
 .mhdoc .ord-card .r3 .del { margin-left: auto; border: none; padding: 0; background: none; font-size: 12px; color: var(--mut2); }
 .mhdoc .linkbtn { background: none; border: 1.5px solid var(--line2); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
 .mhdoc .linkbtn:active { transform: scale(0.97); }

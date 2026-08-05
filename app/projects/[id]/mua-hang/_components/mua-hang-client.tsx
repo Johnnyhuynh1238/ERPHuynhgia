@@ -37,6 +37,7 @@ type Order = {
   receiptImages?: ReceiptImg[]; // ảnh chứng minh nhận hàng
   receivedAt?: string | null;
   hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
+  depositPaid?: number; // Σ tiền đã cọc (lệnh chi 'paid' gắn đơn) — đơn trả ngay
 };
 type ReceiptImg = { url: string; kind: "phieu" | "hang" };
 
@@ -1239,16 +1240,28 @@ function CartPanel({
   );
 }
 
-// Đơn "trả ngay" = đã nhận, KHÔNG có NCC (đơn có NCC đã ghi công nợ → trả ở màn Công nợ).
-// Chỉ đơn này mới mở lệnh chi. Đơn đã "paid" thì thôi (tránh chi trùng).
-const canPayNow = (o: Order) => o.status === "received" && !(o.supplierName && o.supplierName.trim());
+// "Đơn trả ngay" = KHÔNG có NCC (đơn có NCC đã ghi công nợ → trả ở màn Công nợ).
+const isPayNowOrder = (o: Order) => !(o.supplierName && o.supplierName.trim());
+// Số còn phải trả = total − đã cọc (không âm).
+const remainOf = (o: Order) => Math.max(Math.round((o.total || 0) - (o.depositPaid || 0)), 0);
+// Đặt CỌC: đơn trả ngay CHƯA nhận (ordered). Cọc được nhiều lần nên nút luôn hiện.
+const canDeposit = (o: Order) => o.status === "ordered" && isPayNowOrder(o);
+// Chi nốt khi ĐÃ NHẬN: đơn trả ngay, chưa 'paid'. Đơn đã paid thì thôi (tránh chi trùng).
+const canPayNow = (o: Order) => o.status === "received" && isPayNowOrder(o);
 // Mở màn Lệnh chi (/expenses) với số + nội dung điền sẵn — admin/kế toán bấm xác nhận thủ công.
-const goLenhChi = (projectId: string, o: Order) => {
-  const note = `Mua hàng trả ngay — Đơn #${o.seq}${o.items.length ? ` (${o.items.length} vật tư)` : ""}`;
+// deposit=true → cọc (số bỏ trống cho nhập tay); ngược lại chi nốt số còn lại.
+const goLenhChi = (projectId: string, o: Order, deposit = false) => {
+  const remain = remainOf(o);
+  const note = deposit
+    ? `Đặt cọc mua hàng — Đơn #${o.seq}${o.items.length ? ` (${o.items.length} vật tư)` : ""}`
+    : `Mua hàng trả ngay — Đơn #${o.seq}${o.items.length ? ` (${o.items.length} vật tư)` : ""}${
+        o.depositPaid ? ` — đã cọc ${fmt(o.depositPaid)}đ` : ""
+      }`;
   const qs = new URLSearchParams({
     create: "1",
     projectId,
-    amount: String(Math.round(o.total || 0)),
+    // Cọc: gợi ý số còn lại nhưng cho sửa (cọc 1 phần). Chi nốt: điền sẵn số còn lại.
+    amount: String(deposit ? "" : remain),
     method: "cash",
     note,
     categoryCode: "VATTU", // danh mục điền sẵn "Vật tư" (admin đổi được)
@@ -1315,6 +1328,21 @@ function OrdersList({
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>
+            {(o.depositPaid ?? 0) > 0 && (
+              <span className="linkbtn coc" title="Tổng tiền đã đặt cọc cho đơn này">
+                💰 Đã cọc {fmt(o.depositPaid!)}đ
+              </span>
+            )}
+            {/* Đặt cọc: đơn trả ngay chưa nhận — cọc được nhiều lần nên nút luôn hiện. */}
+            {canDeposit(o) && (
+              <button
+                type="button"
+                className="linkbtn pay"
+                onClick={() => goLenhChi(projectId, o, true)}
+              >
+                💰 Đặt cọc
+              </button>
+            )}
             {canPayNow(o) &&
               (o.hasInflightExpense ? (
                 <span className="linkbtn sent" title="Đã có lệnh chi đang chờ kế toán/admin xử lý">
@@ -1322,7 +1350,7 @@ function OrdersList({
                 </span>
               ) : (
                 <button type="button" className="linkbtn pay" onClick={() => goLenhChi(projectId, o)}>
-                  🧾 Gửi lệnh chi
+                  🧾 {(o.depositPaid ?? 0) > 0 ? `Chi nốt ${fmt(remainOf(o))}đ` : "Gửi lệnh chi"}
                 </button>
               ))}
             {!hideDel?.(o) && (
