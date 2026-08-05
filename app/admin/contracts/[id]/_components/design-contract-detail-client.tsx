@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import "../../_components/contracts.css";
+
+const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 type Step = {
   id: string;
@@ -52,13 +57,26 @@ export function DesignContractDetailClient({
   shareToken: string;
 }) {
   const router = useRouter();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [steps, setSteps] = useState<Step[]>(contract.steps);
   const [openQuote, setOpenQuote] = useState(false);
   const [viewVersion, setViewVersion] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"share" | "edit" | null>(null);
+
+  useEffect(() => {
+    const t = (typeof window !== "undefined" && localStorage.getItem("cx-theme")) as "light" | "dark" | null;
+    if (t) setTheme(t);
+  }, []);
+  function toggleTheme() {
+    setTheme((p) => {
+      const n = p === "light" ? "dark" : "light";
+      try { localStorage.setItem("cx-theme", n); } catch { /* ignore */ }
+      return n;
+    });
+  }
 
   const quoteStep = steps.find((s) => s.kind === "du_toan_bao_gia");
   const converted = projectId != null;
@@ -68,20 +86,20 @@ export function DesignContractDetailClient({
     const r = await fetch(`/api/admin/design-contracts/${contract.id}/quote/versions`, { cache: "no-store" });
     if (r.ok) setVersions(await r.json());
   }, [contract.id]);
+  useEffect(() => { loadVersions(); }, [loadVersions]);
 
-  useEffect(() => {
-    loadVersions();
-  }, [loadVersions]);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl = `${origin}/bao-gia/${shareToken}`;
+  // Link sửa nội bộ: cần đăng nhập ERP (admin) mới vào được — full chức năng sửa.
+  const editUrl = `${origin}/bao-gia-app.html?contract=${contract.id}${converted ? "&ro=1" : ""}`;
 
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/bao-gia/${shareToken}` : `/bao-gia/${shareToken}`;
-
-  async function copyShare() {
+  async function copy(which: "share" | "edit", url: string) {
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(url);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1800);
     } catch {
-      setMsg("Không copy được, chép tay: " + shareUrl);
+      setMsg("Không copy được, chép tay: " + url);
     }
   }
 
@@ -134,100 +152,127 @@ export function DesignContractDetailClient({
     (converted ? "&ro=1" : "") +
     (viewVersion ? `&version=${viewVersion}` : "");
 
+  const STATUS_BADGE: Record<string, { bg: string; fg: string }> = {
+    approved: { bg: "color-mix(in srgb,var(--ok) 16%,transparent)", fg: "var(--ok)" },
+    customer_review: { bg: "color-mix(in srgb,var(--sky) 16%,transparent)", fg: "var(--sky)" },
+    in_progress: { bg: "color-mix(in srgb,var(--gold) 20%,transparent)", fg: "var(--terra)" },
+    pending: { bg: "var(--track)", fg: "var(--mut)" },
+  };
+
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto", padding: "16px 14px 60px", fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-      <Link href="/admin/contracts" style={{ color: "#9a4b2e", fontSize: 13, textDecoration: "none" }}>‹ Hợp đồng</Link>
-
-      <div style={{ background: "#fbf8f1", border: "1px solid #e7dfce", borderRadius: 12, padding: 16, marginTop: 10 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 19 }}>{contract.customerName}</h2>
-        <div style={{ fontSize: 13, color: "#6b6355", display: "flex", gap: 14, flexWrap: "wrap" }}>
-          {contract.customerPhone && <span>📞 {contract.customerPhone}</span>}
-          <span>Ký: {new Date(contract.signedAt).toLocaleDateString("vi-VN")}</span>
-          {grand != null && <span>Báo giá: <b style={{ color: "#9a4b2e" }}>{fmt(grand)} đ</b></span>}
+    <div className={`cxdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className="cxwrap">
+        <div className="cx-head">
+          <div>
+            <div className="cx-eyebrow">HĐ thiết kế</div>
+            <h1 className="cx-h1">{contract.customerName}</h1>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="cx-iconbtn" onClick={toggleTheme} title="Đổi nền">◐</button>
+          </div>
         </div>
 
-        {/* Link công khai khách xem (chỉ đọc) */}
-        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#8a8172" }}>🔗 Link khách xem:</span>
-          <input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1, minWidth: 180, fontSize: 12, padding: "5px 8px", border: "1px solid #d8cfbb", borderRadius: 6, background: "#fff" }} />
-          <button type="button" onClick={copyShare} style={{ fontSize: 12, padding: "6px 10px", border: 0, borderRadius: 6, background: "#9a4b2e", color: "#fff", cursor: "pointer" }}>{copied ? "✓ Đã chép" : "Chép"}</button>
+        <div style={{ marginTop: 6 }}>
+          <Link href="/admin/contracts" className="cx-link">‹ Về danh sách hợp đồng</Link>
         </div>
+
+        {/* Thông tin nhanh */}
+        <div className="cx-stats" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+          <div className="cx-tile"><div className="k">SĐT</div><div className="v num">{contract.customerPhone || "—"}</div></div>
+          <div className="cx-tile"><div className="k">Ngày ký</div><div className="v num">{new Date(contract.signedAt).toLocaleDateString("vi-VN")}</div></div>
+          <div className="cx-tile"><div className="k">Báo giá</div><div className="v num" style={{ color: "var(--terra)" }}>{grand != null ? fmt(grand) : "—"}</div></div>
+        </div>
+
+        {/* Link khách xem (công khai, chỉ đọc) */}
+        <div style={{ marginTop: 12, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: "11px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--mut)", textTransform: "uppercase", letterSpacing: ".06em", minWidth: 116 }}>🔗 Link khách xem</span>
+          <input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} className="num" style={{ flex: 1, minWidth: 170, fontSize: 12, padding: "7px 9px", border: "1px solid var(--line2)", borderRadius: 9, background: "var(--card2)", color: "var(--text)" }} />
+          <button type="button" className="cx-btn primary" onClick={() => copy("share", shareUrl)}>{copied === "share" ? "✓ Đã chép" : "Chép"}</button>
+        </div>
+
+        {/* Link sửa nội bộ (cần đăng nhập, full sửa) */}
+        <div style={{ marginTop: 8, background: "var(--card)", border: "1px solid color-mix(in srgb,var(--orange) 30%,var(--line))", borderRadius: 12, padding: "11px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--terra)", textTransform: "uppercase", letterSpacing: ".06em", minWidth: 116 }}>🔧 Link sửa (nội bộ)</span>
+          <input readOnly value={editUrl} onFocus={(e) => e.currentTarget.select()} className="num" style={{ flex: 1, minWidth: 170, fontSize: 12, padding: "7px 9px", border: "1px solid var(--line2)", borderRadius: 9, background: "var(--card2)", color: "var(--text)" }} />
+          <button type="button" className="cx-btn ghost" onClick={() => copy("edit", editUrl)}>{copied === "edit" ? "✓ Đã chép" : "Chép"}</button>
+          <a href={editUrl} target="_blank" rel="noopener noreferrer" className="cx-btn primary" style={{ textDecoration: "none" }}>Mở sửa ↗</a>
+        </div>
+        {converted && <div style={{ fontSize: 11.5, color: "var(--mut)", marginTop: 5 }}>Đã chuyển thi công → báo giá khoá, link sửa chỉ xem.</div>}
 
         {converted && (
-          <div style={{ marginTop: 10, fontSize: 13 }}>
-            ✅ Đã chuyển HĐ thi công —{" "}
-            <Link href={`/projects/${projectId}`} style={{ color: "#9a4b2e", fontWeight: 600 }}>Mở dự án {projectCode} →</Link>
+          <div style={{ marginTop: 10, fontSize: 13, color: "var(--ok)" }}>
+            ✅ Đã chuyển HĐ thi công — <Link href={`/projects/${projectId}`} className="cx-link">Mở dự án {projectCode} →</Link>
           </div>
         )}
-      </div>
 
-      <h3 style={{ fontSize: 15, margin: "20px 0 8px" }}>Các bước thiết kế</h3>
-      <div style={{ display: "grid", gap: 8 }}>
-        {steps.map((s, i) => {
-          const isQuote = s.kind === "du_toan_bao_gia";
-          return (
-            <div key={s.id} style={{ background: isQuote ? "#fdf3ec" : "#fff", border: `1px solid ${isQuote ? "#e8c3ad" : "#e7dfce"}`, borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ width: 22, height: 22, borderRadius: 11, background: s.status === "approved" ? "#2e7d4f" : "#c9bfa8", color: "#fff", display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{STEP_LABEL[s.kind] ?? s.kind}</span>
-                <select value={s.status} onChange={(e) => setStatus(s, e.target.value as Step["status"])} disabled={converted} style={{ fontSize: 13, padding: "4px 6px", borderRadius: 6, border: "1px solid #d8cfbb" }}>
-                  {STATUS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-                </select>
-              </div>
-
-              {isQuote && (
-                <div style={{ marginTop: 10 }}>
-                  <button type="button" onClick={() => { setOpenQuote((v) => !v); setViewVersion(null); }} style={{ background: "#9a4b2e", color: "#fff", border: 0, borderRadius: 8, padding: "8px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                    {openQuote ? "▲ Ẩn báo giá" : "📊 Mở Dự toán & Báo giá"}
-                  </button>
-
-                  {openQuote && (
-                    <>
-                      {viewVersion && (
-                        <div style={{ margin: "8px 0", fontSize: 13, color: "#9a4b2e" }}>
-                          Đang xem phiên bản cũ (chỉ đọc).{" "}
-                          <button type="button" onClick={() => setViewVersion(null)} style={{ border: 0, background: "none", color: "#2e7d4f", fontWeight: 600, cursor: "pointer" }}>← Về bản hiện tại</button>
-                        </div>
-                      )}
-                      <iframe key={iframeSrc} title="Dự toán & Báo giá" src={iframeSrc} style={{ width: "100%", height: "82vh", marginTop: 10, border: "1px solid #e7dfce", borderRadius: 10, background: "#fff" }} />
-                    </>
-                  )}
-
-                  {/* Lịch sử phiên bản */}
-                  {versions.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#8a8172", marginBottom: 6 }}>🕘 Lịch sử phiên bản ({versions.length})</div>
-                      <div style={{ display: "grid", gap: 5 }}>
-                        {versions.map((v) => (
-                          <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, background: "#fff", border: "1px solid #ece4d3", borderRadius: 7, padding: "6px 9px", flexWrap: "wrap" }}>
-                            <b>#{v.seq}</b>
-                            <span style={{ color: "#6b6355" }}>{dt(v.createdAt)}</span>
-                            {v.grand != null && <span style={{ marginLeft: "auto", color: "#9a4b2e", fontWeight: 600 }}>{fmt(v.grand)} đ</span>}
-                            <button type="button" onClick={() => { setOpenQuote(true); setViewVersion(v.id); }} style={{ border: "1px solid #d8cfbb", background: "#faf7f0", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>Xem</button>
-                            {!converted && <button type="button" onClick={() => restore(v)} disabled={busy} style={{ border: "1px solid #cdbfa6", background: "#fff", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>Khôi phục</button>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--mut)", textTransform: "uppercase", letterSpacing: ".1em", margin: "22px 0 9px" }}>Các bước thiết kế</h2>
+        <div className="cx-list">
+          {steps.map((s, i) => {
+            const isQuote = s.kind === "du_toan_bao_gia";
+            const b = STATUS_BADGE[s.status];
+            return (
+              <div key={s.id} style={{ background: "var(--card)", border: `1px solid ${isQuote ? "color-mix(in srgb,var(--orange) 45%,var(--line2))" : "var(--line)"}`, borderRadius: 13, padding: "11px 13px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
+                  <span className="num" style={{ width: 24, height: 24, borderRadius: 12, background: s.status === "approved" ? "var(--ok)" : "var(--track)", color: s.status === "approved" ? "#fff" : "var(--mut)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{STEP_LABEL[s.kind] ?? s.kind}{isQuote && <span className="cx-badge" style={{ marginLeft: 8, background: "color-mix(in srgb,var(--orange) 15%,transparent)", color: "var(--orange)" }}>bước cuối</span>}</span>
+                  <span className="cx-badge" style={{ background: b.bg, color: b.fg }}>{STATUS.find((o) => o.v === s.status)?.l}</span>
+                  <select value={s.status} onChange={(e) => setStatus(s, e.target.value as Step["status"])} disabled={converted} style={{ fontSize: 12.5, padding: "6px 8px", borderRadius: 9, border: "1px solid var(--line2)", background: "var(--card2)", color: "var(--text)", fontFamily: "inherit" }}>
+                    {STATUS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                  </select>
                 </div>
-              )}
+
+                {isQuote && (
+                  <div style={{ marginTop: 11 }}>
+                    <button type="button" className="cx-btn primary" onClick={() => { setOpenQuote((v) => !v); setViewVersion(null); }}>
+                      {openQuote ? "▲ Ẩn báo giá" : "📊 Mở Dự toán & Báo giá"}
+                    </button>
+
+                    {openQuote && (
+                      <>
+                        {viewVersion && (
+                          <div style={{ margin: "9px 0", fontSize: 12.5, color: "var(--terra)" }}>
+                            Đang xem phiên bản cũ (chỉ đọc). <button type="button" className="cx-link" onClick={() => setViewVersion(null)} style={{ border: 0, background: "none", cursor: "pointer" }}>← Về bản hiện tại</button>
+                          </div>
+                        )}
+                        <iframe key={iframeSrc} title="Dự toán & Báo giá" src={iframeSrc} style={{ width: "100%", height: "82vh", marginTop: 10, border: "1px solid var(--line2)", borderRadius: 12, background: "#fff" }} />
+                      </>
+                    )}
+
+                    {versions.length > 0 && (
+                      <div style={{ marginTop: 13 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--mut)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 7 }}>🕘 Lịch sử phiên bản ({versions.length})</div>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {versions.map((v) => (
+                            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, background: "var(--card2)", border: "1px solid var(--line)", borderRadius: 9, padding: "7px 10px", flexWrap: "wrap" }}>
+                              <b className="num">#{v.seq}</b>
+                              <span className="num" style={{ color: "var(--mut)" }}>{dt(v.createdAt)}</span>
+                              {v.grand != null && <span className="num" style={{ marginLeft: "auto", color: "var(--terra)", fontWeight: 600 }}>{fmt(v.grand)}</span>}
+                              <button type="button" className="cx-btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => { setOpenQuote(true); setViewVersion(v.id); }}>Xem</button>
+                              {!converted && <button type="button" className="cx-btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => restore(v)} disabled={busy}>Khôi phục</button>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {msg && <div className="cx-warn" style={{ marginTop: 14 }}>{msg}</div>}
+
+        <div style={{ marginTop: 22 }}>
+          <button type="button" className="cx-btn primary block" onClick={convert} disabled={!canConvert || busy} title={canConvert ? "" : "Cần duyệt bước Dự toán & Báo giá trước"} style={{ width: "100%", padding: "14px", fontSize: 15, background: canConvert ? "var(--ok)" : "var(--track)", color: canConvert ? "#fff" : "var(--mut)" }}>
+            {busy ? "Đang xử lý…" : converted ? "Đã chuyển HĐ thi công" : "🔨 Chốt giá → Chuyển HĐ thi công"}
+          </button>
+          {!canConvert && !converted && (
+            <div style={{ fontSize: 12, color: "var(--mut)", marginTop: 7, textAlign: "center" }}>
+              Duyệt bước “Dự toán &amp; Báo giá” (Đã duyệt) mới bật được nút chuyển.
             </div>
-          );
-        })}
-      </div>
-
-      {msg && <div style={{ marginTop: 14, color: "#b3261e", fontSize: 13 }}>{msg}</div>}
-
-      <div style={{ marginTop: 22 }}>
-        <button type="button" onClick={convert} disabled={!canConvert || busy} title={canConvert ? "" : "Cần duyệt bước Dự toán & Báo giá trước"} style={{ width: "100%", padding: "13px", fontSize: 15, fontWeight: 700, borderRadius: 10, border: 0, cursor: canConvert && !busy ? "pointer" : "not-allowed", background: canConvert ? "#2e7d4f" : "#d3cdbf", color: "#fff" }}>
-          {busy ? "Đang xử lý…" : converted ? "Đã chuyển HĐ thi công" : "🔨 Chốt giá → Chuyển HĐ thi công"}
-        </button>
-        {!canConvert && !converted && (
-          <div style={{ fontSize: 12, color: "#8a8172", marginTop: 6, textAlign: "center" }}>
-            Duyệt bước “Dự toán &amp; Báo giá” (Đã duyệt) mới bật được nút chuyển.
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

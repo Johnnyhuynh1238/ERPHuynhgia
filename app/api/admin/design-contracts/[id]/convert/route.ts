@@ -75,6 +75,23 @@ export async function POST(_request: Request, { params }: { params: { id: string
       data: { projectId: project.id, status: "done" },
     });
 
+    // Snapshot version "chốt" để lưu vết đúng trạng thái bàn giao sang dự án vận hành.
+    const lastV = await tx.designContractQuoteVersion.findFirst({
+      where: { contractId: contract.id },
+      orderBy: { seq: "desc" },
+      select: { seq: true },
+    });
+    await tx.designContractQuoteVersion.create({
+      data: {
+        contractId: contract.id,
+        seq: (lastV?.seq ?? 0) + 1,
+        data: contract.quoteData as Prisma.InputJsonValue,
+        grand: BigInt(Math.round(sum.grand || 0)),
+        note: `Chốt & chuyển thi công → ${nextCode}`,
+        createdById: user.id,
+      },
+    });
+
     return project;
   });
 
