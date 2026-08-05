@@ -61,7 +61,7 @@ const formatVnd = (n: number) =>
 
 const kindIcon = (kind: string) => (kind === "cash" ? "💵" : "🏦");
 
-type AppKey = "thu-chi" | "mua-hang" | "hop-dong" | "cong-no" | "don-hang" | "cham-cong";
+type AppKey = "thu-chi" | "vay-tam-ung" | "mua-hang" | "hop-dong" | "cong-no" | "don-hang" | "cham-cong";
 
 type PopItem = {
   label: string;
@@ -105,10 +105,16 @@ const APPS: AppDef[] = [
         { label: "Lệnh chi chờ chuyển", href: "/expenses?status=pending", badge: pb?.expense ?? 0 },
         { label: "Lệnh thu chờ nhận", href: "/receipts?status=pending", badge: pb?.receipt ?? 0 },
         "divider",
-        { label: "Vay & Tạm ứng", href: "/admin/debts", isNew: true },
         { label: "Sổ cái thu - chi", href: "/treasury" },
       ];
     },
+  },
+  {
+    // Quản lý nợ gốc / lãi vay / tạm ứng / hoàn ứng — cấp công ty.
+    key: "vay-tam-ung",
+    label: "Vay & Tạm ứng",
+    Icon: Wallet,
+    href: "/admin/debts",
   },
   {
     // Flow mới: mua hàng bám dự toán theo từng dự án (thay /proposals cũ).

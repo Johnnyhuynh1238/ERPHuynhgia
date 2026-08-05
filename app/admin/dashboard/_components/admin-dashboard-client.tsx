@@ -80,6 +80,7 @@ type AppKey =
   | "du-an"
   | "thau-phu"
   | "tai-chinh"
+  | "vay-tam-ung"
   | "nhan-su"
   | "kpi"
   | "cau-hinh"
@@ -148,11 +149,16 @@ const APPS: AppDef[] = [
     buildItems: (data) => [
       { label: "Lệnh thu", href: "/receipts", badge: data?.todos.receiptAwaitingApproval ?? 0 },
       { label: "Lệnh chi", href: "/expenses", badge: data?.todos.expensePending ?? 0 },
-      { label: "Vay & Tạm ứng", href: "/admin/debts", isNew: true },
       { label: "Công nợ NCC", href: "/projects" },
       "divider",
       { label: "Sổ quỹ", href: "/treasury" },
     ],
+  },
+  {
+    key: "vay-tam-ung",
+    label: "Vay & Tạm ứng",
+    Icon: Wallet,
+    href: "/admin/debts",
   },
   {
     key: "nhan-su",
@@ -204,6 +210,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "du-an": [],
   "thau-phu": [],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
+  "vay-tam-ung": [],
   "nhan-su": [],
   "kpi": [],
   "cau-hinh": [],
