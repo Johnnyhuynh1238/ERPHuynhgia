@@ -3002,6 +3002,7 @@ enum DesignContractStepKind {
   mat_tien_3d
   noi_that
   shop_drawing
+  du_toan_bao_gia // bước cuối: dự toán + báo giá cho khách
 }
 
 enum DesignContractStepStatus {
@@ -3021,12 +3022,16 @@ model DesignContract {
   totalValue    Decimal?             @map("total_value") @db.Decimal(15, 2)
   status        DesignContractStatus @default(active)
   notes         String?              @db.Text
+  quoteData     Json?                @map("quote_data") // cục DATA báo giá + dự toán (bước cuối)
+  quoteUpdatedAt DateTime?           @map("quote_updated_at")
+  quoteShareToken String?            @unique @map("quote_share_token") @db.Uuid // link công khai khách xem
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
 
   lead             BaogiaLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
   project          Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps            DesignContractStep[]
+  quoteVersions    DesignContractQuoteVersion[]
   cashTransactions CashTransaction[]
   expenses         Expense[]
   receipts         Receipt[]
@@ -3034,6 +3039,24 @@ model DesignContract {
   @@index([status, signedAt(sort: Desc)])
   @@index([customerPhone])
   @@map("design_contracts")
+}
+
+// Snapshot báo giá mỗi lần admin lưu / rời chế độ sửa (dedupe nếu không đổi).
+model DesignContractQuoteVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  contractId  String   @map("contract_id") @db.Uuid
+  seq         Int
+  data        Json
+  grand       BigInt? // tổng báo giá tại thời điểm snapshot
+  note        String?  @db.Text
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  contract DesignContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, seq])
+  @@index([contractId, createdAt(sort: Desc)])
+  @@map("design_contract_quote_versions")
 }
 
 model DesignContractStep {

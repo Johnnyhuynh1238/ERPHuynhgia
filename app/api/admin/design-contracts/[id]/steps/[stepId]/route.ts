@@ -47,9 +47,9 @@ export async function PATCH(
     data,
   });
 
-  // Auto: nếu cả 4 step approved → HĐ done
+  // Auto: nếu tất cả step approved → HĐ done
   const all = await prisma.designContractStep.findMany({ where: { contractId: params.id } });
-  if (all.length === 4 && all.every((s) => s.status === "approved")) {
+  if (all.length > 0 && all.every((s) => s.status === "approved")) {
     await prisma.designContract.update({ where: { id: params.id }, data: { status: "done" } });
   } else {
     await prisma.designContract.update({ where: { id: params.id }, data: { status: "active" } });

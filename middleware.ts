@@ -129,6 +129,13 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Trang công khai khách xem báo giá (chỉ đọc). Tự auth bằng quoteShareToken
+  // trên URL /bao-gia/<token>. Không gắn user, không đi qua NextAuth.
+  // Lưu ý: file tĩnh /bao-gia-app.html KHÔNG khớp prefix "/bao-gia/" → vẫn auth-gated.
+  if (pathname.startsWith("/bao-gia/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);

@@ -19,6 +19,7 @@ const STEP_KINDS: DesignContractStepKind[] = [
   "mat_tien_3d",
   "noi_that",
   "shop_drawing",
+  "du_toan_bao_gia",
 ];
 
 export async function POST(request: Request) {

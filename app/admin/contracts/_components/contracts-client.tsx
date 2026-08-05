@@ -363,6 +363,7 @@ function ContractDrawer({
             <div className="cx-fld"><span className="cx-lbl">Ngày ký</span><input type="date" className="cx-ctrl" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} /></div>
             <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="VD: Phước Thái" /></div>
             <button type="button" className="cx-btn primary block" onClick={saveDesign} disabled={saving}>{saving ? "Đang lưu…" : "Lưu thông tin"}</button>
+            <Link href={`/admin/contracts/${item.id}`} className="cx-link" style={{ display: "block", marginTop: 8, fontWeight: 600 }}>📐 Bước thiết kế · Dự toán &amp; Báo giá →</Link>
           </>
         ) : (
           <div style={{ fontSize: 13 }}>
