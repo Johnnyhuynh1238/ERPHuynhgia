@@ -377,7 +377,7 @@ function LoanCard({
           </span>
         </div>
       </div>
-      <div className={`dt-bar ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
+      <div className={`dt-prog ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
         <span style={{ width: `${pct}%` }} />
       </div>
 
@@ -478,7 +478,7 @@ function AdvanceCard({
           </span>
         </div>
       </div>
-      <div className={`dt-bar ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
+      <div className={`dt-prog ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
         <span style={{ width: `${pct}%` }} />
       </div>
 

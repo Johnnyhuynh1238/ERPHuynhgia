@@ -156,9 +156,9 @@ select.dt-ctrl{appearance:none;background-image:linear-gradient(45deg,transparen
 
 /* ── Vay & Tạm ứng: bổ sung ─────────────────────────────── */
 /* thanh tiến độ trả/hoàn */
-.dt-bar{height:6px;border-radius:999px;background:var(--track);overflow:hidden;margin-top:8px}
-.dt-bar>span{display:block;height:100%;border-radius:999px;background:var(--orange)}
-.dt-bar.ok>span{background:var(--ok)}
+.dt-prog{height:6px;border-radius:999px;background:var(--track);overflow:hidden;margin-top:8px}
+.dt-prog>span{display:block;height:100%;border-radius:999px;background:var(--orange)}
+.dt-prog.ok>span{background:var(--ok)}
 /* dòng số dư nổi bật trong card */
 .dt-outstand{font-family:var(--font-plex-mono),"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;color:var(--terra)}
 .dt-outstand.clear{color:var(--ok)}
