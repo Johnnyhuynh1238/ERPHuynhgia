@@ -9,6 +9,7 @@ import {
   requireSubcontractorWrite,
 } from "@/lib/subcontractor-auth";
 import { normalizeSubcontractorState, serializeSubcontractor } from "@/lib/subcontractor-utils";
+import { normalizeBankName } from "@/lib/vn-banks";
 
 const phoneRegex = /^(\+?[0-9\s\-().]{8,20})$/;
 
@@ -147,7 +148,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ...(payload.altPhone !== undefined ? { altPhone: payload.altPhone || null } : {}),
         ...(payload.email !== undefined ? { email: payload.email || null } : {}),
         ...(payload.address !== undefined ? { address: payload.address || null } : {}),
-        ...(payload.bankName !== undefined ? { bankName: payload.bankName || null } : {}),
+        ...(payload.bankName !== undefined ? { bankName: normalizeBankName(payload.bankName) } : {}),
         ...(payload.bankAccount !== undefined ? { bankAccount: payload.bankAccount || null } : {}),
         ...(payload.bankAccountName !== undefined ? { bankAccountName: payload.bankAccountName || null } : {}),
         ...(payload.notes !== undefined ? { notes: payload.notes || null } : {}),

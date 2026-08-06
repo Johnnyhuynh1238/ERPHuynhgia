@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSubcontractorRead, requireSubcontractorWrite } from "@/lib/subcontractor-auth";
 import { generateNextSubcontractorCode, normalizeSubcontractorState, serializeSubcontractor } from "@/lib/subcontractor-utils";
+import { normalizeBankName } from "@/lib/vn-banks";
 
 const phoneRegex = /^(\+?[0-9\s\-().]{8,20})$/;
 
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
           altPhone: payload.altPhone || null,
           email: payload.email || null,
           address: payload.address || null,
-          bankName: payload.bankName || null,
+          bankName: normalizeBankName(payload.bankName),
           bankAccount: payload.bankAccount || null,
           bankAccountName: payload.bankAccountName || null,
           status: normalized.status,

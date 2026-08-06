@@ -3,6 +3,7 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { normalizeBankName } from "@/lib/vn-banks";
 
 export const runtime = "nodejs";
 
@@ -100,6 +101,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   for (const [k, v] of Object.entries(parsed.data)) {
     if (v !== undefined) data[k] = v === "" ? null : v;
   }
+  if (data.bankName !== undefined) data.bankName = normalizeBankName(data.bankName as string | null);
   if (!Object.keys(data).length) {
     return NextResponse.json({ ok: true });
   }

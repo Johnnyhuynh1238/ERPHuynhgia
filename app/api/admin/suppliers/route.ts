@@ -4,6 +4,7 @@ import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { generateNextSupplierCode } from "@/lib/supplier";
+import { normalizeBankName } from "@/lib/vn-banks";
 
 export const runtime = "nodejs";
 
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
       email: parsed.data.email || null,
       address: parsed.data.address || null,
       taxCode: parsed.data.taxCode || null,
-      bankName: parsed.data.bankName || null,
+      bankName: normalizeBankName(parsed.data.bankName),
       bankAccount: parsed.data.bankAccount || null,
       bankAccountName: parsed.data.bankAccountName || null,
       notes: parsed.data.notes || null,

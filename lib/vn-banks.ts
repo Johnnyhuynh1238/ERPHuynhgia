@@ -56,31 +56,121 @@ export function findBankByBin(bin: string | null | undefined): VnBank | null {
   return VN_BANKS.find((b) => b.bin === bin) ?? null;
 }
 
+/** Chuẩn hoá tên: bỏ dấu, thường hoá, bỏ ký tự thừa (giữ a-z0-9). */
+function normBank(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/đ/g, "d") // đ/Đ không bị NFD tách → tự map sang d để không bị nuốt.
+    .normalize("NFD")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 /**
- * Dò ngân hàng từ tên tự do (VD "Vietcombank", "VCB", "MB", "Techcombank").
- * Dùng khi dữ liệu chỉ lưu tên NH dạng text (thầu phụ, NCC) mà cần BIN để render/QR.
- * Best-effort: khớp code/shortName/name (bỏ dấu, bỏ ký tự thừa), ko khớp trả null.
+ * Bí danh tên NH thường gặp khi AI đọc tin nhắn / người dùng gõ tay → BIN.
+ * Key đã chuẩn hoá qua normBank. Chỉ cần thêm các dạng KHÔNG suy ra được từ
+ * code/shortName/name (vd viết tắt, tên cũ, gõ thiếu). Map code/shortName/name
+ * tự sinh bên dưới nên không cần liệt kê lại.
+ */
+const BANK_ALIASES: Record<string, string> = {
+  // bin
+  vietcom: "970436",
+  techcom: "970407",
+  vietin: "970415",
+  viettin: "970415",
+  ctg: "970415",
+  quandoi: "970422",
+  nganhangquandoi: "970422",
+  mbb: "970422",
+  vpb: "970432",
+  sacom: "970403",
+  tienphong: "970423",
+  agri: "970405",
+  vbard: "970405",
+  maritime: "970426",
+  lienviet: "970449",
+  lienvietpost: "970449",
+  phuongdong: "970448",
+  banviet: "970454",
+  vietcapital: "970454",
+  donga: "970406",
+  dongabank: "970406",
+  exim: "970431",
+  baoviet: "970438",
+  pvcom: "970412",
+  kienlong: "970452",
+  namA: "970428",
+  namabank: "970428",
+  baca: "970409",
+  saigon: "970424",
+  seab: "970440",
+  // tên đầy đủ tiếng Việt hay gặp
+  ngoaithuong: "970436",
+  congthuong: "970415",
+  nongnghiep: "970405",
+  dautuphattrien: "970418",
+  daututphattrien: "970418",
+};
+
+/** Bảng tra chuẩn hoá → BIN, gộp code/shortName/name + bí danh (build 1 lần). */
+const BANK_INDEX: Map<string, string> = (() => {
+  const idx = new Map<string, string>();
+  for (const b of VN_BANKS) {
+    for (const key of [b.code, b.shortName, b.name]) {
+      const k = normBank(key);
+      if (k && !idx.has(k)) idx.set(k, b.bin);
+    }
+  }
+  for (const [k, bin] of Object.entries(BANK_ALIASES)) {
+    const nk = normBank(k);
+    if (nk && !idx.has(nk)) idx.set(nk, bin);
+  }
+  return idx;
+})();
+
+/** Bỏ các từ nhiễu ("ngân hàng", "bank", "nh") để tăng tỉ lệ khớp. */
+function stripBankNoise(q: string): string {
+  return q.replace(/nganhang/g, "").replace(/bank/g, "").replace(/^nh/, "");
+}
+
+/**
+ * Dò ngân hàng từ tên tự do (VD "Vietcombank", "VCB", "MB Bank", "techcom",
+ * "NH Quân Đội"). Dùng khi dữ liệu lưu tên NH dạng text (thầu phụ, NCC) mà cần
+ * BIN để render/QR. Ưu tiên khớp chính xác (code/shortName/name/bí danh), rồi
+ * thử bỏ từ nhiễu, cuối cùng mới khớp chứa nhau. Ko khớp trả null.
  */
 export function findBankByName(input: string | null | undefined): VnBank | null {
   if (!input) return null;
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[^a-z0-9]/g, "");
-  const q = norm(input);
+  const q = normBank(input);
   if (!q) return null;
-  // Khớp chính xác code / shortName / name trước.
-  for (const b of VN_BANKS) {
-    if (norm(b.code) === q || norm(b.shortName) === q || norm(b.name) === q) return b;
+
+  // 1) Khớp chính xác (kể cả sau khi bỏ từ nhiễu "bank"/"ngân hàng").
+  for (const cand of [q, stripBankNoise(q)]) {
+    if (!cand) continue;
+    const bin = BANK_INDEX.get(cand);
+    if (bin) return findBankByBin(bin);
   }
-  // Khớp chứa nhau trên shortName / name.
-  for (const b of VN_BANKS) {
-    const sn = norm(b.shortName);
-    const nm = norm(b.name);
-    if (q.includes(sn) || sn.includes(q) || q.includes(nm) || nm.includes(q)) return b;
+
+  // 2) Khớp chứa nhau trên shortName / name (chỉ khi đủ dài để tránh nhầm).
+  if (q.length >= 3) {
+    for (const b of VN_BANKS) {
+      const sn = normBank(b.shortName);
+      const nm = normBank(b.name);
+      if (q.includes(sn) || sn.includes(q) || q.includes(nm) || nm.includes(q)) return b;
+    }
   }
   return null;
+}
+
+/**
+ * Chuẩn hoá tên NH tự do về shortName chuẩn (VD "vcb" → "Vietcombank",
+ * "MB Bank" → "MB Bank"). Dùng ở API trước khi lưu để dữ liệu luôn ở dạng
+ * dò được BIN. Ko nhận diện được thì trả nguyên bản đã trim (không nuốt data).
+ */
+export function normalizeBankName(input: string | null | undefined): string | null {
+  const raw = (input ?? "").trim();
+  if (!raw) return null;
+  const b = findBankByName(raw);
+  return b ? b.shortName : raw;
 }
 
 /**
