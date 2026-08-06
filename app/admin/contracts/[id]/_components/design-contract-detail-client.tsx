@@ -89,7 +89,8 @@ export function DesignContractDetailClient({
   useEffect(() => { loadVersions(); }, [loadVersions]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const shareUrl = `${origin}/bao-gia/${shareToken}`;
+  // Link khách qua domain chính huynhgia6.com (/bg proxy sang ERP) — khách còn xem được trang chủ.
+  const shareUrl = `https://huynhgia6.com/bg/${shareToken}`;
   // Link sửa nội bộ: cần đăng nhập ERP (admin) mới vào được — full chức năng sửa.
   const editUrl = `${origin}/bao-gia-app.html?contract=${contract.id}${converted ? "&ro=1" : ""}`;
 
