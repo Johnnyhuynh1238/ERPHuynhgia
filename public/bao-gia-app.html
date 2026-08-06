@@ -310,8 +310,8 @@ async function saveFile(){if(CONTRACT){await postVersion();toast('✓ Đã lưu 
  try{if(window.showSaveFilePicker){if(!fileHandle)fileHandle=await window.showSaveFilePicker({suggestedName:'He thong Bao gia - Du toan (a6).html',types:[{description:'HTML',accept:{'text/html':['.html']}}]});
    const w=await fileHandle.createWritable();await w.write(html);await w.close();toast('✓ Đã lưu vào file');return;}}catch(e){if(e.name==='AbortError')return;}
  const b=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='He thong Bao gia - Du toan (a6).html';a.click();toast('Đã tải file — kéo đè lên file cũ');}
+function initMeta(){
 {const _c={full:"CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG VÀ NỘI THẤT HUỲNH GIA",slogan:"Xây Dựng Huỳnh Gia - Yên Tâm Nhận Nhà",diaChi:"2157 QL51, Phước Bình 1, Xã Phước Thái, TP. Đồng Nai",hotline:"0931.316.513",mst:"3604008952",web:"huynhgia6.com"};DATA.congty=DATA.congty||{};for(const k in _c){if(!DATA.congty[k]||String(DATA.congty[k]).charAt(0)==="[")DATA.congty[k]=_c[k];}}{const _d={cdt:"Anh Tâm",ct:"Nhà ở gia đình",dd:"Phước Thái, Long Thành, Đồng Nai",tang:"2 tầng",tg:"120 ngày"};DATA.duan=DATA.duan||{};for(const k in _d){if(!DATA.duan[k])DATA.duan[k]=_d[k];}}
-try{document.getElementById('logoImg').src=LOGO}catch(e){}
 if(DATA._matSpec!==1&&DATA.thoHangMuc){DATA.thoHangMuc.forEach(function(h){(h.vt||[]).forEach(function(v){var t=v.ten||'';
  if(/^Cát/i.test(t))t='Cát vàng';
  else if(/^Gạch/i.test(t))t='Gạch tuynel';
@@ -319,6 +319,9 @@ if(DATA._matSpec!==1&&DATA.thoHangMuc){DATA.thoHangMuc.forEach(function(h){(h.vt
  else if(/^Thép cây/i.test(t))t=t.replace(/^Thép cây (Ø\d+).*/,'Thép Việt Nhật $1');
  else if(/^Xi măng/i.test(t)&&!/Insee/i.test(t))t=/PCB40/.test(t)?t.replace('PCB40','Insee PCB40'):t.replace(/^Xi măng/,'Xi măng Insee PCB40');
  v.ten=t;});});DATA._matSpec=1;try{saveLS()}catch(e){}}
+}
+if(!CONTRACT)initMeta();
+try{document.getElementById('logoImg').src=LOGO}catch(e){}
 function printBW(){document.body.classList.add('bw');var done=function(){document.body.classList.remove('bw');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(done,2500);window.print();}
 async function boot(){
   if(CONTRACT){
@@ -326,7 +329,7 @@ async function boot(){
       const url=VERSION?('/api/admin/design-contracts/'+CONTRACT+'/quote/versions/'+VERSION)
                        :('/api/admin/design-contracts/'+CONTRACT+'/quote');
       const r=await fetch(url);
-      if(r.ok){const j=await r.json();const qd=j&&(j.quoteData||j.data);if(qd){DATA=qd;normVon();}else if(!VERSION){await putQuote();}}
+      if(r.ok){const j=await r.json();const qd=j&&(j.quoteData||j.data);if(qd){DATA=qd;normVon();initMeta();}else if(!VERSION){await putQuote();}}
     }catch(e){}
   }
   try{document.title=(DATA&&DATA.project)?('Báo giá — '+DATA.project):'Bảng báo giá';}catch(e){}
