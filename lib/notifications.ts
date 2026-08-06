@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, StaffNotificationKind, CustomerNotificationKind } from "@prisma/client";
 import { sendPushToProjectCustomer, sendPushToUser } from "@/lib/push-server";
+import { zaloNotifyExpense, zaloNotifyReceipt } from "@/lib/zalo-notify";
 
 const TPTC_ROLE = "construction_manager";
 
@@ -1032,6 +1033,8 @@ export async function notifyExpenseCreated(input: {
     expenseId: input.expenseId,
     tag: `expense-new-${input.expenseId}`,
   });
+  // Admin tạo lệnh chi → bắn Zalo kế toán (VietQR + link) ngay.
+  fireAndForget(zaloNotifyExpense(input.expenseId));
 }
 
 /**
@@ -1217,6 +1220,8 @@ export async function notifyExpenseKtApproved(input: {
     expenseId: input.expenseId,
     tag: `expense-kt-approved-${input.expenseId}`,
   });
+  // Admin duyệt lệnh chi do KT tạo → giờ mới bắn Zalo kế toán (VietQR + link).
+  fireAndForget(zaloNotifyExpense(input.expenseId));
 }
 
 /**
@@ -1318,6 +1323,8 @@ export async function notifyReceiptCreated(input: {
     receiptId: input.receiptId,
     tag: `receipt-new-${input.receiptId}`,
   });
+  // Admin tạo lệnh thu → bắn Zalo kế toán (chỉ link) ngay.
+  fireAndForget(zaloNotifyReceipt(input.receiptId));
 }
 
 /**
@@ -1400,6 +1407,8 @@ export async function notifyReceiptKtApproved(input: {
     receiptId: input.receiptId,
     tag: `receipt-kt-approved-${input.receiptId}`,
   });
+  // Admin duyệt lệnh thu do KT tạo → giờ mới bắn Zalo kế toán (chỉ link).
+  fireAndForget(zaloNotifyReceipt(input.receiptId));
 }
 
 /**
