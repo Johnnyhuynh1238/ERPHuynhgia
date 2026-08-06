@@ -178,3 +178,14 @@ select.dt-ctrl{appearance:none;background-image:linear-gradient(45deg,transparen
 .dt-txn-hd{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-top:8px}
 /* nút hành động tạo giao dịch trong expand */
 .dt-txn-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}
+
+/* ── Popup chi tiết ─────────────────────────────────────── */
+.dt-sheet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.dt-sheet-stats>div{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 11px;min-width:0}
+.dt-sheet-stats .lb{font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-sheet-stats .vl{font-family:var(--font-plex-mono),"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;margin-top:5px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-sheet-stats .vl.big{color:var(--terra);font-size:16px}
+.dt-sheet-stats .vl.out{color:var(--red)} .dt-sheet-stats .vl.in{color:var(--ok)}
+.dt-info{display:flex;flex-direction:column;gap:2px;padding:2px 0 4px}
+.dt-info .dt-kv{font-size:12.5px;color:var(--text);padding:3px 0;line-height:1.45}
+.dt-info .dt-kv .lb{color:var(--mut)}

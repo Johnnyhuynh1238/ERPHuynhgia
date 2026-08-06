@@ -34,11 +34,8 @@ type LoanRow = {
   note: string | null;
   principal: number;
   disbursed: number;
-  disbursedPending: number;
   principalPaid: number;
-  principalPending: number;
   interestPaid: number;
-  interestPending: number;
   outstanding: number;
 };
 
@@ -52,9 +49,7 @@ type AdvanceRow = {
   note: string | null;
   amount: number;
   paidOut: number;
-  paidOutPending: number;
   returned: number;
-  returnedPending: number;
   outstanding: number;
 };
 
@@ -73,6 +68,7 @@ type AdvanceDetail = AdvanceRow & { expenseTxns: Txn[]; receiptTxns: Txn[] };
 const fmtN = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const fmtDate = (s: string | null) =>
   s ? new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+const toDateInput = (s: string | null) => (s ? new Date(s).toISOString().slice(0, 10) : "");
 
 const TXN_ST: Record<string, string> = {
   tptc_pending: "Chờ admin duyệt",
@@ -84,12 +80,12 @@ const TXN_ST: Record<string, string> = {
 
 // Loại giao dịch tạo được trong màn này.
 type TxnType = "loan-disburse" | "loan-principal" | "loan-interest" | "advance-out" | "advance-return";
-const TXN_META: Record<TxnType, { title: string; who: string; whoLabel: string; dir: "in" | "out" }> = {
-  "loan-disburse": { title: "Nhận tiền vay", who: "payer", whoLabel: "Bên cho vay", dir: "in" },
-  "loan-principal": { title: "Trả nợ gốc", who: "payee", whoLabel: "Trả cho", dir: "out" },
-  "loan-interest": { title: "Trả lãi vay", who: "payee", whoLabel: "Trả cho", dir: "out" },
-  "advance-out": { title: "Chi tạm ứng", who: "payee", whoLabel: "Người nhận", dir: "out" },
-  "advance-return": { title: "Hoàn ứng", who: "payer", whoLabel: "Người hoàn", dir: "in" },
+const TXN_META: Record<TxnType, { title: string; whoLabel: string; dir: "in" | "out" }> = {
+  "loan-disburse": { title: "Nhận tiền vay", whoLabel: "Bên cho vay", dir: "in" },
+  "loan-principal": { title: "Trả nợ gốc", whoLabel: "Trả cho", dir: "out" },
+  "loan-interest": { title: "Trả lãi vay", whoLabel: "Trả cho", dir: "out" },
+  "advance-out": { title: "Chi tạm ứng", whoLabel: "Người nhận", dir: "out" },
+  "advance-return": { title: "Hoàn ứng", whoLabel: "Người hoàn", dir: "in" },
 };
 
 export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: CategoryIds }) {
@@ -97,7 +93,6 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
   const isKt = role === "accountant";
   const canCreate = isAdmin || isKt;
 
-  // Brand theme (Ngà sáng / Mahogany tối), nhớ localStorage — đồng bộ các màn khác.
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   useEffect(() => {
     const t = typeof window !== "undefined" ? localStorage.getItem("hg-theme") : null;
@@ -118,13 +113,13 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
   const [loans, setLoans] = useState<LoanRow[]>([]);
   const [advances, setAdvances] = useState<AdvanceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<LoanDetail | AdvanceDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   const [showLoanForm, setShowLoanForm] = useState(false);
   const [showAdvForm, setShowAdvForm] = useState(false);
   const [txnCtx, setTxnCtx] = useState<{ type: TxnType; refId: string; refCode: string } | null>(null);
+  // Popup chi tiết khi bấm 1 dòng. reloadKey ép modal nạp lại sau khi có thay đổi.
+  const [detailCtx, setDetailCtx] = useState<{ kind: "loans" | "advances"; id: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -145,38 +140,12 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
     void loadList();
   }, [loadList]);
 
-  const loadDetail = useCallback(
-    async (kind: "loans" | "advances", id: string) => {
-      setDetailLoading(true);
-      try {
-        const d = await fetch(`/api/${kind}/${id}`).then((r) => r.json());
-        setDetail(d);
-      } catch {
-        toast.error("Không tải được chi tiết");
-      } finally {
-        setDetailLoading(false);
-      }
-    },
-    [],
-  );
+  // Gọi sau mọi thay đổi (tạo giao dịch, sửa, đổi trạng thái): nạp lại list + modal.
+  const refreshAll = useCallback(() => {
+    void loadList();
+    setReloadKey((k) => k + 1);
+  }, [loadList]);
 
-  const toggleExpand = (kind: "loans" | "advances", id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null);
-      setDetail(null);
-      return;
-    }
-    setExpandedId(id);
-    setDetail(null);
-    void loadDetail(kind, id);
-  };
-
-  const refreshAfterTxn = async () => {
-    await loadList();
-    if (expandedId) await loadDetail(tab, expandedId);
-  };
-
-  // Tổng số dư đang treo (để hiển thị stat tiles).
   const loanStats = useMemo(() => {
     const active = loans.filter((l) => l.status === "active");
     return {
@@ -187,10 +156,7 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
   }, [loans]);
   const advStats = useMemo(() => {
     const open = advances.filter((a) => a.status === "open");
-    return {
-      count: open.length,
-      outstanding: open.reduce((s, a) => s + a.outstanding, 0),
-    };
+    return { count: open.length, outstanding: open.reduce((s, a) => s + a.outstanding, 0) };
   }, [advances]);
 
   return (
@@ -200,26 +166,20 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
           <div>
             <div className="dt-eyebrow">Tài chính công ty</div>
             <h1 className="dt-h1">Vay &amp; Tạm ứng</h1>
-            <div className="dt-meta">
-              <span>Quản lý nợ gốc · lãi vay · tạm ứng · hoàn ứng</span>
-            </div>
+            <div className="dt-meta"><span>Quản lý nợ gốc · lãi vay · tạm ứng · hoàn ứng</span></div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="dt-iconbtn" onClick={toggleTheme} title="Đổi giao diện">
               {theme === "dark" ? "☀" : "☾"}
             </button>
             {canCreate && (
-              <button
-                className="dt-btn primary"
-                onClick={() => (tab === "loans" ? setShowLoanForm(true) : setShowAdvForm(true))}
-              >
+              <button className="dt-btn primary" onClick={() => (tab === "loans" ? setShowLoanForm(true) : setShowAdvForm(true))}>
                 + {tab === "loans" ? "Khoản vay" : "Tạm ứng"}
               </button>
             )}
           </div>
         </div>
 
-        {/* stat tiles */}
         <div className="dt-stats">
           {tab === "loans" ? (
             <>
@@ -236,19 +196,13 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
           )}
         </div>
 
-        {/* tabs */}
         <div className="dt-bar">
           <div className="dt-tabs">
-            <button className={`dt-tab ${tab === "loans" ? "on" : ""}`} onClick={() => { setTab("loans"); setExpandedId(null); }}>
-              Khoản vay
-            </button>
-            <button className={`dt-tab ${tab === "advances" ? "on" : ""}`} onClick={() => { setTab("advances"); setExpandedId(null); }}>
-              Tạm ứng
-            </button>
+            <button className={`dt-tab ${tab === "loans" ? "on" : ""}`} onClick={() => setTab("loans")}>Khoản vay</button>
+            <button className={`dt-tab ${tab === "advances" ? "on" : ""}`} onClick={() => setTab("advances")}>Tạm ứng</button>
           </div>
         </div>
 
-        {/* list */}
         {loading ? (
           <div className="dt-empty">Đang tải…</div>
         ) : tab === "loans" ? (
@@ -257,19 +211,7 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
           ) : (
             <div className="dt-list">
               {loans.map((l) => (
-                <LoanCard
-                  key={l.id}
-                  loan={l}
-                  expanded={expandedId === l.id}
-                  detail={expandedId === l.id ? (detail as LoanDetail | null) : null}
-                  detailLoading={expandedId === l.id && detailLoading}
-                  isAdmin={isAdmin}
-                  canCreate={canCreate}
-                  onToggle={() => toggleExpand("loans", l.id)}
-                  onTxn={(type) => setTxnCtx({ type, refId: l.id, refCode: l.code })}
-                  onChanged={refreshAfterTxn}
-                  theme={theme}
-                />
+                <LoanCard key={l.id} loan={l} onOpen={() => setDetailCtx({ kind: "loans", id: l.id })} />
               ))}
             </div>
           )
@@ -278,97 +220,62 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
         ) : (
           <div className="dt-list">
             {advances.map((a) => (
-              <AdvanceCard
-                key={a.id}
-                adv={a}
-                expanded={expandedId === a.id}
-                detail={expandedId === a.id ? (detail as AdvanceDetail | null) : null}
-                detailLoading={expandedId === a.id && detailLoading}
-                isAdmin={isAdmin}
-                canCreate={canCreate}
-                onToggle={() => toggleExpand("advances", a.id)}
-                onTxn={(type) => setTxnCtx({ type, refId: a.id, refCode: a.code })}
-                onChanged={refreshAfterTxn}
-                theme={theme}
-              />
+              <AdvanceCard key={a.id} adv={a} onOpen={() => setDetailCtx({ kind: "advances", id: a.id })} />
             ))}
           </div>
         )}
       </div>
 
       {showLoanForm && (
-        <LoanForm
-          theme={theme}
-          onClose={() => setShowLoanForm(false)}
-          onSaved={() => { setShowLoanForm(false); void loadList(); }}
-        />
+        <LoanForm theme={theme} onClose={() => setShowLoanForm(false)} onSaved={() => { setShowLoanForm(false); refreshAll(); }} />
       )}
       {showAdvForm && (
-        <AdvanceForm
-          theme={theme}
-          onClose={() => setShowAdvForm(false)}
-          onSaved={() => { setShowAdvForm(false); void loadList(); }}
+        <AdvanceForm theme={theme} onClose={() => setShowAdvForm(false)} onSaved={() => { setShowAdvForm(false); refreshAll(); }} />
+      )}
+
+      {detailCtx?.kind === "loans" && (
+        <LoanDetailSheet
+          theme={theme} id={detailCtx.id} reloadKey={reloadKey} isAdmin={isAdmin} canCreate={canCreate}
+          onClose={() => setDetailCtx(null)}
+          onChanged={refreshAll}
+          onClosed={() => setDetailCtx(null)}
+          onTxn={(type, refCode) => setTxnCtx({ type, refId: detailCtx.id, refCode })}
         />
       )}
+      {detailCtx?.kind === "advances" && (
+        <AdvanceDetailSheet
+          theme={theme} id={detailCtx.id} reloadKey={reloadKey} isAdmin={isAdmin} canCreate={canCreate}
+          onClose={() => setDetailCtx(null)}
+          onChanged={refreshAll}
+          onClosed={() => setDetailCtx(null)}
+          onTxn={(type, refCode) => setTxnCtx({ type, refId: detailCtx.id, refCode })}
+        />
+      )}
+
       {txnCtx && (
         <TxnForm
-          theme={theme}
-          ctx={txnCtx}
-          categoryIds={categoryIds}
-          isKt={isKt}
+          theme={theme} ctx={txnCtx} categoryIds={categoryIds} isKt={isKt}
           onClose={() => setTxnCtx(null)}
-          onSaved={() => { setTxnCtx(null); void refreshAfterTxn(); }}
+          onSaved={() => { setTxnCtx(null); refreshAll(); }}
         />
       )}
     </div>
   );
 }
 
-/* ── Loan card ───────────────────────────────────────────── */
-function LoanCard({
-  loan, expanded, detail, detailLoading, isAdmin, canCreate, onToggle, onTxn, onChanged, theme,
-}: {
-  loan: LoanRow;
-  expanded: boolean;
-  detail: LoanDetail | null;
-  detailLoading: boolean;
-  isAdmin: boolean;
-  canCreate: boolean;
-  onToggle: () => void;
-  onTxn: (t: TxnType) => void;
-  onChanged: () => void;
-  theme: string;
-}) {
+/* ── Cards (bấm → mở popup) ──────────────────────────────── */
+function LoanCard({ loan, onOpen }: { loan: LoanRow; onOpen: () => void }) {
   const pct = loan.principal > 0 ? Math.min(100, (loan.principalPaid / loan.principal) * 100) : 0;
   const cleared = loan.outstanding <= 0.5;
-
-  const setStatus = async (status: "active" | "paid") => {
-    const res = await fetch(`/api/loans/${loan.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) { toast.success(status === "paid" ? "Đã đóng khoản vay" : "Đã mở lại"); onChanged(); }
-    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
-  };
-  const del = async () => {
-    if (!(await confirmDialog({ title: "Xoá khoản vay?", message: `${loan.code} — ${loan.lender}` }))) return;
-    const res = await fetch(`/api/loans/${loan.id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Đã xoá"); onChanged(); }
-    else toast.error((await res.json().catch(() => ({}))).message || "Không xoá được");
-  };
-
   return (
-    <div className={`dt-rc ${expanded ? "exp" : ""}`}>
-      <div className="dt-r1" onClick={onToggle} style={{ cursor: "pointer" }}>
+    <div className="dt-rc" onClick={onOpen} style={{ cursor: "pointer" }}>
+      <div className="dt-r1">
         <div className="dt-ttl">{loan.lender}</div>
         <div className={`dt-outstand ${cleared ? "clear" : ""}`}>{fmtN(loan.outstanding)}</div>
       </div>
-      <div className="dt-r2" onClick={onToggle} style={{ cursor: "pointer" }}>
+      <div className="dt-r2">
         <div className="dt-m">
-          <span className="code">{loan.code}</span>
-          <span className="d">·</span>
-          <span>gốc {fmtN(loan.principal)}</span>
+          <span className="code">{loan.code}</span><span className="d">·</span><span>gốc {fmtN(loan.principal)}</span>
           {loan.interestRate != null && (<><span className="d">·</span><span>{loan.interestRate}%/năm</span></>)}
         </div>
         <div className="dt-rt">
@@ -377,158 +284,37 @@ function LoanCard({
           </span>
         </div>
       </div>
-      <div className={`dt-prog ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
-        <span style={{ width: `${pct}%` }} />
-      </div>
-
-      {expanded && (
-        <div className="dt-exp">
-          {detailLoading || !detail ? (
-            <div className="dt-empty" style={{ gridColumn: "1/-1" }}>Đang tải…</div>
-          ) : (
-            <>
-              <div className="col">
-                <div className="dt-kvrow"><span className="lb">Đã nhận vay</span><span className="vl in">{fmtN(detail.disbursed)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Đã trả gốc</span><span className="vl out">{fmtN(detail.principalPaid)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Dư gốc còn lại</span><span className="vl">{fmtN(detail.outstanding)}</span></div>
-              </div>
-              <div className="col">
-                <div className="dt-kvrow"><span className="lb">Đã trả lãi</span><span className="vl out">{fmtN(detail.interestPaid)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Ngày vay</span><span className="vl">{fmtDate(detail.disbursedAt)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Hạn trả</span><span className="vl">{fmtDate(detail.dueDate)}</span></div>
-              </div>
-
-              <TxnList expense={detail.expenseTxns} receipt={detail.receiptTxns} />
-
-              {canCreate && loan.status === "active" && (
-                <div className="dt-txn-acts">
-                  <button className="dt-chip go" onClick={() => onTxn("loan-disburse")}>+ Nhận tiền vay</button>
-                  <button className="dt-chip" onClick={() => onTxn("loan-principal")}>+ Trả gốc</button>
-                  <button className="dt-chip" onClick={() => onTxn("loan-interest")}>+ Trả lãi</button>
-                </div>
-              )}
-              {isAdmin && (
-                <div className="dt-txn-acts">
-                  {loan.status === "active" ? (
-                    <button className="dt-chip ok" onClick={() => setStatus("paid")}>✓ Đánh dấu trả xong</button>
-                  ) : (
-                    <button className="dt-chip" onClick={() => setStatus("active")}>↺ Mở lại</button>
-                  )}
-                  <button className="dt-chip dn" onClick={del}>Xoá</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      <div className={`dt-prog ${cleared ? "ok" : ""}`}><span style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }
 
-/* ── Advance card ────────────────────────────────────────── */
-function AdvanceCard({
-  adv, expanded, detail, detailLoading, isAdmin, canCreate, onToggle, onTxn, onChanged, theme,
-}: {
-  adv: AdvanceRow;
-  expanded: boolean;
-  detail: AdvanceDetail | null;
-  detailLoading: boolean;
-  isAdmin: boolean;
-  canCreate: boolean;
-  onToggle: () => void;
-  onTxn: (t: TxnType) => void;
-  onChanged: () => void;
-  theme: string;
-}) {
+function AdvanceCard({ adv, onOpen }: { adv: AdvanceRow; onOpen: () => void }) {
   const base = adv.paidOut > 0 ? adv.paidOut : adv.amount;
   const pct = base > 0 ? Math.min(100, (adv.returned / base) * 100) : 0;
   const cleared = adv.outstanding <= 0.5;
-
-  const setStatus = async (status: "open" | "settled") => {
-    const res = await fetch(`/api/advances/${adv.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) { toast.success(status === "settled" ? "Đã tất toán" : "Đã mở lại"); onChanged(); }
-    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
-  };
-  const del = async () => {
-    if (!(await confirmDialog({ title: "Xoá phiếu tạm ứng?", message: `${adv.code} — ${adv.recipient}` }))) return;
-    const res = await fetch(`/api/advances/${adv.id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Đã xoá"); onChanged(); }
-    else toast.error((await res.json().catch(() => ({}))).message || "Không xoá được");
-  };
-
   return (
-    <div className={`dt-rc ${expanded ? "exp" : ""}`}>
-      <div className="dt-r1" onClick={onToggle} style={{ cursor: "pointer" }}>
+    <div className="dt-rc" onClick={onOpen} style={{ cursor: "pointer" }}>
+      <div className="dt-r1">
         <div className="dt-ttl">{adv.recipient}</div>
         <div className={`dt-outstand ${cleared ? "clear" : ""}`}>{fmtN(adv.outstanding)}</div>
       </div>
-      <div className="dt-r2" onClick={onToggle} style={{ cursor: "pointer" }}>
-        <div className="dt-m">
-          <span className="code">{adv.code}</span>
-          <span className="d">·</span>
-          <span>ứng {fmtN(adv.amount)}</span>
-        </div>
+      <div className="dt-r2">
+        <div className="dt-m"><span className="code">{adv.code}</span><span className="d">·</span><span>ứng {fmtN(adv.amount)}</span></div>
         <div className="dt-rt">
           <span className={`dt-st ${adv.status === "settled" ? "stt-received" : "stt-pending"}`}>
             {adv.status === "settled" ? "Đã tất toán" : "Đang mở"}
           </span>
         </div>
       </div>
-      <div className={`dt-prog ${cleared ? "ok" : ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
-        <span style={{ width: `${pct}%` }} />
-      </div>
-
-      {expanded && (
-        <div className="dt-exp">
-          {detailLoading || !detail ? (
-            <div className="dt-empty" style={{ gridColumn: "1/-1" }}>Đang tải…</div>
-          ) : (
-            <>
-              <div className="col">
-                <div className="dt-kvrow"><span className="lb">Đã chi ứng</span><span className="vl out">{fmtN(detail.paidOut)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Đã hoàn</span><span className="vl in">{fmtN(detail.returned)}</span></div>
-                <div className="dt-kvrow"><span className="lb">Dư ứng chưa hoàn</span><span className="vl">{fmtN(detail.outstanding)}</span></div>
-              </div>
-              <div className="col">
-                <div className="dt-kvrow"><span className="lb">Ngày ứng</span><span className="vl">{fmtDate(detail.advancedAt)}</span></div>
-                {detail.purpose && <div className="dt-kv"><span className="lb">Mục đích: </span>{detail.purpose}</div>}
-              </div>
-
-              <TxnList expense={detail.expenseTxns} receipt={detail.receiptTxns} />
-
-              {canCreate && adv.status === "open" && (
-                <div className="dt-txn-acts">
-                  <button className="dt-chip go" onClick={() => onTxn("advance-out")}>+ Chi tạm ứng</button>
-                  <button className="dt-chip" onClick={() => onTxn("advance-return")}>+ Hoàn ứng</button>
-                </div>
-              )}
-              {isAdmin && (
-                <div className="dt-txn-acts">
-                  {adv.status === "open" ? (
-                    <button className="dt-chip ok" onClick={() => setStatus("settled")}>✓ Tất toán</button>
-                  ) : (
-                    <button className="dt-chip" onClick={() => setStatus("open")}>↺ Mở lại</button>
-                  )}
-                  <button className="dt-chip dn" onClick={del}>Xoá</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      <div className={`dt-prog ${cleared ? "ok" : ""}`}><span style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }
 
 /* ── Danh sách giao dịch con ─────────────────────────────── */
 function TxnList({ expense, receipt }: { expense: Txn[]; receipt: Txn[] }) {
-  const all = [...receipt, ...expense].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  const all = [...receipt, ...expense].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   if (all.length === 0) return <div className="dt-txns"><div className="dt-txn-hd">Chưa có giao dịch</div></div>;
   return (
     <div className="dt-txns">
@@ -579,7 +365,231 @@ function Sheet({ theme, title, sub, onClose, children }: {
   );
 }
 
-/* ── Form: Khoản vay ─────────────────────────────────────── */
+/* ── Popup chi tiết Khoản vay ────────────────────────────── */
+function LoanDetailSheet({ theme, id, reloadKey, isAdmin, canCreate, onClose, onChanged, onClosed, onTxn }: {
+  theme: string; id: string; reloadKey: number; isAdmin: boolean; canCreate: boolean;
+  onClose: () => void; onChanged: () => void; onClosed: () => void; onTxn: (t: TxnType, code: string) => void;
+}) {
+  const [d, setD] = useState<LoanDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [edit, setEdit] = useState(false);
+  const [lender, setLender] = useState("");
+  const [rate, setRate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    fetch(`/api/loans/${id}`)
+      .then((r) => r.json())
+      .then((x) => {
+        if (!alive) return;
+        setD(x);
+        setLender(x.lender ?? "");
+        setRate(x.interestRate != null ? String(x.interestRate) : "");
+        setDueDate(toDateInput(x.dueDate));
+        setNote(x.note ?? "");
+      })
+      .catch(() => toast.error("Không tải được chi tiết"))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [id, reloadKey]);
+
+  const saveInfo = async () => {
+    setBusy(true);
+    const res = await fetch(`/api/loans/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lender, interestRate: rate === "" ? null : Number(rate), dueDate: dueDate || null, note: note || null }),
+    });
+    setBusy(false);
+    if (res.ok) { toast.success("Đã lưu thông tin"); setEdit(false); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
+  };
+  const setStatus = async (status: "active" | "paid") => {
+    const res = await fetch(`/api/loans/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    if (res.ok) { toast.success(status === "paid" ? "Đã đóng khoản vay" : "Đã mở lại"); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
+  };
+  const del = async () => {
+    if (!(await confirmDialog({ title: "Xoá khoản vay?", message: `${d?.code} — ${d?.lender}` }))) return;
+    const res = await fetch(`/api/loans/${id}`, { method: "DELETE" });
+    if (res.ok) { toast.success("Đã xoá"); onClosed(); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Không xoá được");
+  };
+
+  return (
+    <Sheet theme={theme} title={loading || !d ? "Khoản vay" : d.lender} sub={d?.code} onClose={onClose}>
+      {loading || !d ? (
+        <div className="dt-empty" style={{ background: "none", border: "none" }}>Đang tải…</div>
+      ) : (
+        <>
+          <div className="dt-sheet-stats">
+            <div><div className="lb">Dư gốc còn lại</div><div className="vl big">{fmtN(d.outstanding)}</div></div>
+            <div><div className="lb">Đã trả gốc</div><div className="vl out">{fmtN(d.principalPaid)}</div></div>
+            <div><div className="lb">Đã trả lãi</div><div className="vl out">{fmtN(d.interestPaid)}</div></div>
+          </div>
+
+          {!edit ? (
+            <div className="dt-info">
+              <div className="dt-kvrow"><span className="lb">Tiền gốc</span><span className="vl">{fmtN(d.principal)}</span></div>
+              <div className="dt-kvrow"><span className="lb">Đã nhận vay</span><span className="vl in">{fmtN(d.disbursed)}</span></div>
+              <div className="dt-kvrow"><span className="lb">Lãi suất</span><span className="vl">{d.interestRate != null ? `${d.interestRate}%/năm` : "—"}</span></div>
+              <div className="dt-kvrow"><span className="lb">Ngày vay</span><span className="vl">{fmtDate(d.disbursedAt)}</span></div>
+              <div className="dt-kvrow"><span className="lb">Hạn trả</span><span className="vl">{fmtDate(d.dueDate)}</span></div>
+              {d.note && <div className="dt-kv"><span className="lb">Ghi chú: </span>{d.note}</div>}
+              {isAdmin && (
+                <button className="dt-mini ok" style={{ marginTop: 4, alignSelf: "flex-start" }} onClick={() => setEdit(true)}>✎ Sửa thông tin</button>
+              )}
+            </div>
+          ) : (
+            <div className="dt-fgrid" style={{ marginTop: 12 }}>
+              <div className="dt-fld full"><label className="dt-lbl">Bên cho vay</label><input className="dt-ctrl" value={lender} onChange={(e) => setLender(e.target.value)} /></div>
+              <div className="dt-fld"><label className="dt-lbl">Lãi suất %/năm</label><input className="dt-ctrl" type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="vd 12" /></div>
+              <div className="dt-fld"><label className="dt-lbl">Hạn trả</label><input className="dt-ctrl" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+              <div className="dt-fld full"><label className="dt-lbl">Ghi chú</label><textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div className="dt-fld full" style={{ flexDirection: "row", gap: 9 }}>
+                <button className="dt-btn ghost block" onClick={() => setEdit(false)}>Huỷ</button>
+                <button className="dt-btn primary block" disabled={busy} onClick={saveInfo}>{busy ? "Đang lưu…" : "Lưu thông tin"}</button>
+              </div>
+            </div>
+          )}
+
+          <TxnList expense={d.expenseTxns} receipt={d.receiptTxns} />
+
+          {canCreate && d.status === "active" && (
+            <div className="dt-txn-acts">
+              <button className="dt-chip go" onClick={() => onTxn("loan-disburse", d.code)}>+ Nhận tiền vay</button>
+              <button className="dt-chip" onClick={() => onTxn("loan-principal", d.code)}>+ Trả gốc</button>
+              <button className="dt-chip" onClick={() => onTxn("loan-interest", d.code)}>+ Trả lãi</button>
+            </div>
+          )}
+          {isAdmin && (
+            <div className="dt-txn-acts">
+              {d.status === "active"
+                ? <button className="dt-chip ok" onClick={() => setStatus("paid")}>✓ Đánh dấu trả xong</button>
+                : <button className="dt-chip" onClick={() => setStatus("active")}>↺ Mở lại</button>}
+              <button className="dt-chip dn" onClick={del}>Xoá</button>
+            </div>
+          )}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/* ── Popup chi tiết Tạm ứng ──────────────────────────────── */
+function AdvanceDetailSheet({ theme, id, reloadKey, isAdmin, canCreate, onClose, onChanged, onClosed, onTxn }: {
+  theme: string; id: string; reloadKey: number; isAdmin: boolean; canCreate: boolean;
+  onClose: () => void; onChanged: () => void; onClosed: () => void; onTxn: (t: TxnType, code: string) => void;
+}) {
+  const [d, setD] = useState<AdvanceDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [edit, setEdit] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    fetch(`/api/advances/${id}`)
+      .then((r) => r.json())
+      .then((x) => {
+        if (!alive) return;
+        setD(x);
+        setRecipient(x.recipient ?? "");
+        setPurpose(x.purpose ?? "");
+        setNote(x.note ?? "");
+      })
+      .catch(() => toast.error("Không tải được chi tiết"))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [id, reloadKey]);
+
+  const saveInfo = async () => {
+    setBusy(true);
+    const res = await fetch(`/api/advances/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient, purpose: purpose || null, note: note || null }),
+    });
+    setBusy(false);
+    if (res.ok) { toast.success("Đã lưu thông tin"); setEdit(false); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
+  };
+  const setStatus = async (status: "open" | "settled") => {
+    const res = await fetch(`/api/advances/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    if (res.ok) { toast.success(status === "settled" ? "Đã tất toán" : "Đã mở lại"); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
+  };
+  const del = async () => {
+    if (!(await confirmDialog({ title: "Xoá phiếu tạm ứng?", message: `${d?.code} — ${d?.recipient}` }))) return;
+    const res = await fetch(`/api/advances/${id}`, { method: "DELETE" });
+    if (res.ok) { toast.success("Đã xoá"); onClosed(); onChanged(); }
+    else toast.error((await res.json().catch(() => ({}))).message || "Không xoá được");
+  };
+
+  return (
+    <Sheet theme={theme} title={loading || !d ? "Tạm ứng" : d.recipient} sub={d?.code} onClose={onClose}>
+      {loading || !d ? (
+        <div className="dt-empty" style={{ background: "none", border: "none" }}>Đang tải…</div>
+      ) : (
+        <>
+          <div className="dt-sheet-stats">
+            <div><div className="lb">Dư ứng chưa hoàn</div><div className="vl big">{fmtN(d.outstanding)}</div></div>
+            <div><div className="lb">Đã chi ứng</div><div className="vl out">{fmtN(d.paidOut)}</div></div>
+            <div><div className="lb">Đã hoàn</div><div className="vl in">{fmtN(d.returned)}</div></div>
+          </div>
+
+          {!edit ? (
+            <div className="dt-info">
+              <div className="dt-kvrow"><span className="lb">Số tiền ứng</span><span className="vl">{fmtN(d.amount)}</span></div>
+              <div className="dt-kvrow"><span className="lb">Ngày ứng</span><span className="vl">{fmtDate(d.advancedAt)}</span></div>
+              {d.purpose && <div className="dt-kv"><span className="lb">Mục đích: </span>{d.purpose}</div>}
+              {d.note && <div className="dt-kv"><span className="lb">Ghi chú: </span>{d.note}</div>}
+              {isAdmin && (
+                <button className="dt-mini ok" style={{ marginTop: 4, alignSelf: "flex-start" }} onClick={() => setEdit(true)}>✎ Sửa thông tin</button>
+              )}
+            </div>
+          ) : (
+            <div className="dt-fgrid" style={{ marginTop: 12 }}>
+              <div className="dt-fld full"><label className="dt-lbl">Người nhận</label><input className="dt-ctrl" value={recipient} onChange={(e) => setRecipient(e.target.value)} /></div>
+              <div className="dt-fld full"><label className="dt-lbl">Mục đích</label><input className="dt-ctrl" value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
+              <div className="dt-fld full"><label className="dt-lbl">Ghi chú</label><textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div className="dt-fld full" style={{ flexDirection: "row", gap: 9 }}>
+                <button className="dt-btn ghost block" onClick={() => setEdit(false)}>Huỷ</button>
+                <button className="dt-btn primary block" disabled={busy} onClick={saveInfo}>{busy ? "Đang lưu…" : "Lưu thông tin"}</button>
+              </div>
+            </div>
+          )}
+
+          <TxnList expense={d.expenseTxns} receipt={d.receiptTxns} />
+
+          {canCreate && d.status === "open" && (
+            <div className="dt-txn-acts">
+              <button className="dt-chip go" onClick={() => onTxn("advance-out", d.code)}>+ Chi tạm ứng</button>
+              <button className="dt-chip" onClick={() => onTxn("advance-return", d.code)}>+ Hoàn ứng</button>
+            </div>
+          )}
+          {isAdmin && (
+            <div className="dt-txn-acts">
+              {d.status === "open"
+                ? <button className="dt-chip ok" onClick={() => setStatus("settled")}>✓ Tất toán</button>
+                : <button className="dt-chip" onClick={() => setStatus("open")}>↺ Mở lại</button>}
+              <button className="dt-chip dn" onClick={del}>Xoá</button>
+            </div>
+          )}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/* ── Form: Khoản vay mới ─────────────────────────────────── */
 function LoanForm({ theme, onClose, onSaved }: { theme: string; onClose: () => void; onSaved: () => void }) {
   const [lender, setLender] = useState("");
   const [principal, setPrincipal] = useState("");
@@ -594,13 +604,8 @@ function LoanForm({ theme, onClose, onSaved }: { theme: string; onClose: () => v
     if (!lender.trim() || !principal) { toast.error("Nhập bên cho vay và số tiền"); return; }
     setBusy(true);
     const res = await fetch("/api/loans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lender, principal: Number(principal),
-        interestRate: rate ? Number(rate) : null,
-        disbursedAt: disbursedAt || null, dueDate: dueDate || null, note: note || null,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lender, principal: Number(principal), interestRate: rate ? Number(rate) : null, disbursedAt: disbursedAt || null, dueDate: dueDate || null, note: note || null }),
     });
     setBusy(false);
     if (res.ok) { toast.success("Đã tạo khoản vay"); onSaved(); }
@@ -611,32 +616,14 @@ function LoanForm({ theme, onClose, onSaved }: { theme: string; onClose: () => v
     <Sheet theme={theme} title="Khoản vay mới" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="dt-fgrid">
-          <div className="dt-fld full">
-            <label className="dt-lbl">Bên cho vay <span className="req">*</span></label>
-            <input className="dt-ctrl" value={lender} onChange={(e) => setLender(e.target.value)} placeholder="Ngân hàng / cá nhân…" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Tiền gốc <span className="req">*</span></label>
-            <MoneyInput className="dt-ctrl" value={principal} onChange={setPrincipal} placeholder="0" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Lãi suất %/năm</label>
-            <input className="dt-ctrl" type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="vd 12" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Ngày vay</label>
-            <input className="dt-ctrl" type="date" value={disbursedAt} onChange={(e) => setDisbursedAt(e.target.value)} />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Hạn trả</label>
-            <input className="dt-ctrl" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </div>
-          <div className="dt-fld full">
-            <label className="dt-lbl">Ghi chú</label>
-            <textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+          <div className="dt-fld full"><label className="dt-lbl">Bên cho vay <span className="req">*</span></label><input className="dt-ctrl" value={lender} onChange={(e) => setLender(e.target.value)} placeholder="Ngân hàng / cá nhân…" /></div>
+          <div className="dt-fld"><label className="dt-lbl">Tiền gốc <span className="req">*</span></label><MoneyInput className="dt-ctrl" value={principal} onChange={setPrincipal} placeholder="0" /></div>
+          <div className="dt-fld"><label className="dt-lbl">Lãi suất %/năm</label><input className="dt-ctrl" type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="vd 12" /></div>
+          <div className="dt-fld"><label className="dt-lbl">Ngày vay</label><input className="dt-ctrl" type="date" value={disbursedAt} onChange={(e) => setDisbursedAt(e.target.value)} /></div>
+          <div className="dt-fld"><label className="dt-lbl">Hạn trả</label><input className="dt-ctrl" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+          <div className="dt-fld full"><label className="dt-lbl">Ghi chú</label><textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
-        <div className="dt-callout">Tạo khoản vay chỉ lập hồ sơ theo dõi. Ghi tiền vào/ra bằng nút <b>Nhận tiền vay / Trả gốc / Trả lãi</b> — các lệnh này qua duyệt và ghi sổ quỹ.</div>
+        <div className="dt-callout">Tạo khoản vay chỉ lập hồ sơ theo dõi. Ghi tiền vào/ra bằng nút <b>Nhận tiền vay / Trả gốc / Trả lãi</b> trong chi tiết — các lệnh này qua duyệt và ghi sổ quỹ.</div>
         <div className="dt-acts">
           <button type="button" className="dt-btn ghost block" onClick={onClose}>Huỷ</button>
           <button type="submit" className="dt-btn primary block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
@@ -646,7 +633,7 @@ function LoanForm({ theme, onClose, onSaved }: { theme: string; onClose: () => v
   );
 }
 
-/* ── Form: Tạm ứng ───────────────────────────────────────── */
+/* ── Form: Tạm ứng mới ───────────────────────────────────── */
 function AdvanceForm({ theme, onClose, onSaved }: { theme: string; onClose: () => void; onSaved: () => void }) {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -660,12 +647,8 @@ function AdvanceForm({ theme, onClose, onSaved }: { theme: string; onClose: () =
     if (!recipient.trim() || !amount) { toast.error("Nhập người nhận và số tiền"); return; }
     setBusy(true);
     const res = await fetch("/api/advances", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient, amount: Number(amount),
-        advancedAt: advancedAt || null, purpose: purpose || null, note: note || null,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient, amount: Number(amount), advancedAt: advancedAt || null, purpose: purpose || null, note: note || null }),
     });
     setBusy(false);
     if (res.ok) { toast.success("Đã tạo phiếu tạm ứng"); onSaved(); }
@@ -676,28 +659,13 @@ function AdvanceForm({ theme, onClose, onSaved }: { theme: string; onClose: () =
     <Sheet theme={theme} title="Tạm ứng mới" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="dt-fgrid">
-          <div className="dt-fld full">
-            <label className="dt-lbl">Người nhận tạm ứng <span className="req">*</span></label>
-            <input className="dt-ctrl" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Nhân viên / đơn vị…" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Số tiền <span className="req">*</span></label>
-            <MoneyInput className="dt-ctrl" value={amount} onChange={setAmount} placeholder="0" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">Ngày ứng</label>
-            <input className="dt-ctrl" type="date" value={advancedAt} onChange={(e) => setAdvancedAt(e.target.value)} />
-          </div>
-          <div className="dt-fld full">
-            <label className="dt-lbl">Mục đích</label>
-            <input className="dt-ctrl" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="vd ứng mua vật tư…" />
-          </div>
-          <div className="dt-fld full">
-            <label className="dt-lbl">Ghi chú</label>
-            <textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+          <div className="dt-fld full"><label className="dt-lbl">Người nhận tạm ứng <span className="req">*</span></label><input className="dt-ctrl" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Nhân viên / đơn vị…" /></div>
+          <div className="dt-fld"><label className="dt-lbl">Số tiền <span className="req">*</span></label><MoneyInput className="dt-ctrl" value={amount} onChange={setAmount} placeholder="0" /></div>
+          <div className="dt-fld"><label className="dt-lbl">Ngày ứng</label><input className="dt-ctrl" type="date" value={advancedAt} onChange={(e) => setAdvancedAt(e.target.value)} /></div>
+          <div className="dt-fld full"><label className="dt-lbl">Mục đích</label><input className="dt-ctrl" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="vd ứng mua vật tư…" /></div>
+          <div className="dt-fld full"><label className="dt-lbl">Ghi chú</label><textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
-        <div className="dt-callout">Tạo phiếu ứng chỉ lập hồ sơ. Ghi tiền bằng nút <b>Chi tạm ứng / Hoàn ứng</b> — qua duyệt và ghi sổ quỹ.</div>
+        <div className="dt-callout">Tạo phiếu ứng chỉ lập hồ sơ. Ghi tiền bằng nút <b>Chi tạm ứng / Hoàn ứng</b> trong chi tiết — qua duyệt và ghi sổ quỹ.</div>
         <div className="dt-acts">
           <button type="button" className="dt-btn ghost block" onClick={onClose}>Huỷ</button>
           <button type="submit" className="dt-btn primary block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
@@ -709,12 +677,8 @@ function AdvanceForm({ theme, onClose, onSaved }: { theme: string; onClose: () =
 
 /* ── Form: Giao dịch (chi/thu gắn khoản) ─────────────────── */
 function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
-  theme: string;
-  ctx: { type: TxnType; refId: string; refCode: string };
-  categoryIds: CategoryIds;
-  isKt: boolean;
-  onClose: () => void;
-  onSaved: () => void;
+  theme: string; ctx: { type: TxnType; refId: string; refCode: string }; categoryIds: CategoryIds; isKt: boolean;
+  onClose: () => void; onSaved: () => void;
 }) {
   const meta = TXN_META[ctx.type];
   const [amount, setAmount] = useState("");
@@ -730,33 +694,22 @@ function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
     let url = "";
     let body: Record<string, unknown> = {};
     if (ctx.type === "loan-disburse") {
-      url = "/api/receipts";
-      body = { source: "loan", amount: Number(amount), payer: who || null, note: note || null, loanId: ctx.refId };
+      url = "/api/receipts"; body = { source: "loan", amount: Number(amount), payer: who || null, note: note || null, loanId: ctx.refId };
     } else if (ctx.type === "advance-return") {
-      url = "/api/receipts";
-      body = { source: "advance_return", amount: Number(amount), payer: who || null, note: note || null, advanceId: ctx.refId };
+      url = "/api/receipts"; body = { source: "advance_return", amount: Number(amount), payer: who || null, note: note || null, advanceId: ctx.refId };
     } else if (ctx.type === "loan-principal") {
-      url = "/api/expenses";
-      body = { categoryId: categoryIds.TRANOGOC, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, loanId: ctx.refId };
+      url = "/api/expenses"; body = { categoryId: categoryIds.TRANOGOC, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, loanId: ctx.refId };
     } else if (ctx.type === "loan-interest") {
-      url = "/api/expenses";
-      body = { categoryId: categoryIds.LAIVAY, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, loanId: ctx.refId };
+      url = "/api/expenses"; body = { categoryId: categoryIds.LAIVAY, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, loanId: ctx.refId };
     } else {
-      url = "/api/expenses";
-      body = { categoryId: categoryIds.TAMUNG, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, advanceId: ctx.refId };
+      url = "/api/expenses"; body = { categoryId: categoryIds.TAMUNG, amount: Number(amount), payee: who || null, paymentMethod: method, note: note || null, advanceId: ctx.refId };
     }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setBusy(false);
     if (res.ok) {
       toast.success(isKt ? "Đã tạo, chờ admin duyệt" : "Đã tạo lệnh — vào Lệnh chi/thu để chi/thu");
       onSaved();
-    } else {
-      toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
-    }
+    } else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
   };
 
   const isExpense = meta.dir === "out";
@@ -764,14 +717,8 @@ function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
     <Sheet theme={theme} title={meta.title} sub={ctx.refCode} onClose={onClose}>
       <form onSubmit={submit}>
         <div className="dt-fgrid">
-          <div className="dt-fld">
-            <label className="dt-lbl">Số tiền <span className="req">*</span></label>
-            <MoneyInput className="dt-ctrl" value={amount} onChange={setAmount} placeholder="0" />
-          </div>
-          <div className="dt-fld">
-            <label className="dt-lbl">{meta.whoLabel}</label>
-            <input className="dt-ctrl" value={who} onChange={(e) => setWho(e.target.value)} />
-          </div>
+          <div className="dt-fld"><label className="dt-lbl">Số tiền <span className="req">*</span></label><MoneyInput className="dt-ctrl" value={amount} onChange={setAmount} placeholder="0" /></div>
+          <div className="dt-fld"><label className="dt-lbl">{meta.whoLabel}</label><input className="dt-ctrl" value={who} onChange={(e) => setWho(e.target.value)} /></div>
           {isExpense && (
             <div className="dt-fld full">
               <label className="dt-lbl">Hình thức</label>
@@ -781,14 +728,11 @@ function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
               </div>
             </div>
           )}
-          <div className="dt-fld full">
-            <label className="dt-lbl">Ghi chú</label>
-            <textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+          <div className="dt-fld full"><label className="dt-lbl">Ghi chú</label><textarea className="dt-ctrl" value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <div className="dt-callout">
-          {isExpense ? "Tạo lệnh chi" : "Tạo lệnh thu"} gắn vào {ctx.refCode}.
-          {" "}{isKt ? "KT tạo → admin duyệt → ghi sổ quỹ." : "Sau khi tạo, vào màn Lệnh chi/Lệnh thu để xác nhận chi/thu (ghi sổ quỹ)."}
+          {isExpense ? "Tạo lệnh chi" : "Tạo lệnh thu"} gắn vào {ctx.refCode}.{" "}
+          {isKt ? "KT tạo → admin duyệt → ghi sổ quỹ." : "Sau khi tạo, vào màn Lệnh chi/Lệnh thu để xác nhận chi/thu (ghi sổ quỹ)."}
         </div>
         <div className="dt-acts">
           <button type="button" className="dt-btn ghost block" onClick={onClose}>Huỷ</button>
