@@ -1554,6 +1554,12 @@ function EditSheet({
     return () => cancelAnimationFrame(id);
   }, []);
 
+  // Đóng mượt: trượt sheet xuống trước rồi mới unmount (khớp transition 0.44s).
+  const close = useCallback(() => {
+    setShow(false);
+    window.setTimeout(onClose, 440);
+  }, [onClose]);
+
   // Đổi NCC → tải bảng giá hàng của NCC đó (nếu khớp tên trong danh mục).
   const supplierId = suppliers.find((s) => s.name.trim().toLowerCase() === supplierName.trim().toLowerCase())?.id ?? null;
   useEffect(() => {
@@ -1627,7 +1633,7 @@ function EditSheet({
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className={`mhdoc mhp ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
-      <div className={`scrim${show ? " show" : ""}`} onClick={onClose} />
+      <div className={`scrim${show ? " show" : ""}`} onClick={close} />
       <div className={`sheet${show ? " show" : ""}`} role="dialog" aria-modal="true">
         <div className="grip" />
         <div className="shead">
@@ -1666,7 +1672,7 @@ function EditSheet({
               </>
             )}
           </div>
-          <button type="button" className="xclose" onClick={onClose} aria-label="Đóng">
+          <button type="button" className="xclose" onClick={close} aria-label="Đóng">
             ✕
           </button>
         </div>
@@ -1849,7 +1855,7 @@ function EditSheet({
           )}
 
           <div className="sactions">
-            <button type="button" className="btn ghost" onClick={onClose}>
+            <button type="button" className="btn ghost" onClick={close}>
               {readOnly ? "Đóng" : "Huỷ"}
             </button>
             {!lockedPaid && (

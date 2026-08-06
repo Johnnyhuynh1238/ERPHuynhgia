@@ -383,17 +383,18 @@
 
 
 /* ═══ EditSheet đơn hàng — FULL MÀN · PHẲNG · khớp mockup duyệt ═══ */
-.mhp .scrim, .mhp .grip { display: none; }
-.mhp .sheet { inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; box-shadow: none; background: var(--bg); transform: none; opacity: 0; transition: opacity 0.16s; }
-.mhp .sheet.show { opacity: 1; }
+/* Popup đơn = bottom sheet gần full màn, trượt lên mượt (easeOutExpo). */
+.mhp .scrim { transition: opacity 0.4s ease; }
+.mhp .sheet { inset: auto 0 0; width: 100%; max-width: 600px; margin: 0 auto; height: auto; max-height: 94dvh; border-radius: 22px 22px 0 0; background: var(--bg); box-shadow: 0 -10px 44px rgba(20, 8, 3, 0.28); transform: translateY(103%); transition: transform 0.44s cubic-bezier(0.16, 1, 0.3, 1); opacity: 1; }
+.mhp .sheet.show { transform: translateY(0); }
 
-.mhp .shead { max-width: 680px; width: 100%; margin: 0 auto; align-items: center; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--line2); }
+.mhp .shead { width: 100%; margin: 0; align-items: center; gap: 12px; padding: 4px 18px 14px; border-bottom: 1px solid var(--line2); }
 .mhp .shead .se { font-size: 10px; letter-spacing: 0.16em; }
 .mhp .shead .st { font-size: 19px; margin-top: 2px; }
 .mhp .xclose { border-radius: 9px; }
 .mhp .spill { margin-left: auto; flex: none; font-size: 11px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 999px; padding: 5px 11px; }
 
-.mhp .sbody { max-width: 680px; width: 100%; margin: 0 auto; padding: 0 18px 118px; }
+.mhp .sbody { width: 100%; margin: 0; padding: 0 18px 0; flex: 1 1 auto; min-height: 0; }
 .mhp .esh { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mut); font-weight: 700; padding: 18px 0 4px; }
 
 /* info rows: label trái · value phải, thẳng cột */
@@ -467,4 +468,4 @@
 
 /* ảnh nhận hàng phẳng + footer dính đáy */
 .mhp .rcpt { background: transparent; border: none; border-top: 1px solid var(--line2); border-radius: 0; padding: 14px 0 2px; margin-top: 8px; }
-.mhp .sactions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; margin: 0 auto; max-width: 680px; padding: 11px 18px calc(11px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line2); }
+.mhp .sactions { position: sticky; bottom: 0; z-index: 6; display: flex; gap: 9px; margin: 8px -18px 0; padding: 11px 18px calc(11px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line2); }
