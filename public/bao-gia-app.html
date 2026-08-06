@@ -199,8 +199,8 @@ function toggleEdit(){EDIT=!EDIT;document.getElementById('editBtn').classList.to
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
 const R=h=>document.getElementById('root').innerHTML=h;
 
-function pageTQ(){const g=grand();const PAY=[["Khi ký hợp đồng — tạm ứng",.10],["Đổ bê tông móng & đà kiềng",.20],["Đổ bê tông sàn tầng 2",.15],["80% xây tô trát",.15],["80% lợp mái tôn",.15],["80% ốp lát & sơn nước",.15],["Nghiệm thu bàn giao",.09],["Bảo hành 1 năm",.01]];
- let pr=PAY.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${p[0]}</td><td class="n">${fmt(g*p[1])}</td><td class="n">${(p[1]*100).toFixed(0)}%</td></tr>`).join('');
+function pageTQ(){const g=grand();const PAY=DATA.thanhToan||[];const sumTy=PAY.reduce((s,p)=>s+(+p.ty||0),0);
+ let pr=PAY.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${txt('thanhToan.'+i+'.label',p.label)}</td><td class="n">${fmt(g*(+p.ty||0)/100)}</td><td class="n">${num('thanhToan.'+i+'.ty',p.ty)}%</td></tr>`).join('');
  let ar=DATA.dienTich.map((a,i)=>`<tr><td class="n">${i+1}</td><td>${txt('dienTich.'+i+'.ten',a.ten)}</td><td class="n">${num('dienTich.'+i+'.dt',a.dt)}</td><td class="n">${num('dienTich.'+i+'.hs',a.hs)}</td><td class="n">${((+a.dt||0)*(+a.hs||0)).toFixed(2)}</td></tr>`).join('');
  R(`<div class="letterhead">
    <a href="https://huynhgia6.com" target="_blank" rel="noopener" title="Về trang chủ Huỳnh Gia"><img class="lh-logo" src="${LOGO}" alt="Huỳnh Gia"></a>
@@ -221,7 +221,7 @@ function pageTQ(){const g=grand();const PAY=[["Khi ký hợp đồng — tạm �
  <div class="hero"><div class="lab">Tổng giá trị hợp đồng (chưa VAT)</div><div class="big"><span data-c="grand">${fmt(g)}</span> đ</div>
   <div class="split"><div><div class="k">Phần thô</div><div class="v"><span data-c="thoBan">${fmt(thoBan())}</span></div></div>
   <div><div class="k">Hoàn thiện</div><div class="v"><span data-c="htTot">${fmt(htTotal())}</span></div></div>
-  <div><div class="k">Thời gian</div><div class="v">120 ngày</div></div></div></div>
+  <div><div class="k">Thời gian</div><div class="v">${txt('duan.tg',DATA.duan.tg)}</div></div></div></div>
  <div class="card"><div class="hd"><span class="nm">Tính toán diện tích xây dựng</span><span class="amt">${dtTong().toFixed(2)} m²</span></div><div class="bd">
   <table class="fx"><colgroup><col style="width:8%"><col><col style="width:22%"><col style="width:12%"><col style="width:18%"></colgroup>
   <thead><tr><th class="n">#</th><th>Hạng mục</th><th class="n">DT thiết kế</th><th class="n">Hệ số</th><th class="n">DT tính</th></tr></thead><tbody>${ar}
@@ -229,19 +229,19 @@ function pageTQ(){const g=grand();const PAY=[["Khi ký hợp đồng — tạm �
  <div class="card"><div class="hd"><span class="nm">Phương thức thanh toán</span></div><div class="bd">
   <table class="fx"><colgroup><col style="width:8%"><col><col style="width:24%"><col style="width:12%"></colgroup>
   <thead><tr><th class="n">#</th><th>Đợt thanh toán</th><th class="n">Số tiền</th><th class="n">Tỷ lệ</th></tr></thead><tbody>${pr}
-  <tr class="tot"><td></td><td>TỔNG CỘNG</td><td class="n">${fmt(g)}</td><td class="n">100%</td></tr></tbody></table></div></div>`);}
+  <tr class="tot"><td></td><td>TỔNG CỘNG</td><td class="n">${fmt(g*sumTy/100)}</td><td class="n">${sumTy}%</td></tr></tbody></table></div></div>`);}
 
 function pageTho(){const DTMAP=[0,4,2,6,6,5];let hm=DATA.thoHangMuc.map((h,i)=>`<div class="card mucCard" onclick="dtTho(${i})"><div class="hd"><span class="nm">${i+1}. ${h.ten}<span class="go">› Chi tiết vốn</span></span><span class="amt">${fmt(hmTotal(i))}</span></div></div>`).join('');
- let ph=DATA.thoPhanBaoGia.map((p,i)=>{let r=p.vt.map(v=>`<tr><td>${v.ten}</td><td class="lo">${v.loai}</td><td class="mo">${v.quycach||''}</td></tr>`).join('');
-  return `<div class="card"><div class="hd" style="cursor:pointer" onclick="dtTho(${DTMAP[i]})" title="Xem dự toán"><span class="nm">${i+1}. ${p.name}</span></div><div class="bd"><div class="dg">${p.dienGiai}</div>
+ let ph=DATA.thoPhanBaoGia.map((p,i)=>{const PB='thoPhanBaoGia.'+i;let r=p.vt.map((v,j)=>`<tr><td>${txt(PB+'.vt.'+j+'.ten',v.ten)}</td><td class="lo">${txt(PB+'.vt.'+j+'.loai',v.loai)}</td><td class="mo">${txt(PB+'.vt.'+j+'.quycach',v.quycach||'')}</td></tr>`).join('');
+  return `<div class="card"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtTho(${DTMAP[i]})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt(PB+'.name',p.name)}</span></div><div class="bd"><div class="dg">${txt(PB+'.dienGiai',p.dienGiai)}</div>
    ${r?`<div class="vt-h">Vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Quy cách</th></tr></thead><tbody>${r}</tbody></table>`:''}</div></div>`}).join('');
  R(`<div class="sec-title">Phần thô — xây thô — ${DATA.thoPhanBaoGia.length} hạng mục</div>
  <div class="hero"><div class="lab">Giá trọn gói phần thô (chưa gồm VAT)</div><div class="big"><span data-c="thoBan">${fmt(thoBan())}</span> đ</div>
-  <div class="mini">Khoán ${fmt(DATA.donGiaTho)} đ/m² × ${dtTong().toFixed(2)} m² diện tích xây dựng.</div></div>
+  <div class="mini">Khoán ${num('donGiaTho',DATA.donGiaTho)} đ/m² × ${dtTong().toFixed(2)} m² diện tích xây dựng.</div></div>
  <div class="sec-title" style="font-size:16px">Hạng mục thi công &amp; vật tư cung cấp</div>${ph}`);}
 
 function dtTho(i){if(RO)return;const h=DATA.thoHangMuc[i];window.scrollTo(0,0);
- let rows=h.vt.map((v,j)=>`<tr><td>${v.ten}</td><td class="n">${v.dvt||''}</td><td class="n">${v.kl!=null?v.kl:''}</td><td class="n">${v.gia!=null?fmt(v.gia):(v.note||'')}</td><td class="n">${num('thoHangMuc.'+i+'.vt.'+j+'.tt',v.tt)}</td></tr>`).join('');
+ let rows=h.vt.map((v,j)=>{const P='thoHangMuc.'+i+'.vt.'+j;return `<tr><td>${txt(P+'.ten',v.ten)}</td><td class="n">${txt(P+'.dvt',v.dvt||'')}</td><td class="n">${v.kl!=null?num(P+'.kl',v.kl):''}</td><td class="n">${v.gia!=null?num(P+'.gia',v.gia):(v.note!=null?txt(P+'.note',v.note):'')}</td><td class="n">${num(P+'.tt',v.tt)}</td></tr>`}).join('');
  R(`<div class="back" onclick="nav('tho')">‹ Về phần thô</div><div class="sec-title">Dự toán vốn · ${h.ten}</div>
  <div class="card"><div class="hd"><span class="nm">Vật tư mua (giá vốn)</span><span class="amt"><span data-c="hm${i}">${fmt(hmTotal(i))}</span></span></div><div class="bd">
   <table class="fx"><colgroup><col style="width:34%"><col style="width:10%"><col style="width:16%"><col style="width:18%"><col style="width:22%"></colgroup>
@@ -254,23 +254,24 @@ function dtTho(i){if(RO)return;const h=DATA.thoHangMuc[i];window.scrollTo(0,0);
   <div class="r2"><span class="k">Giá bán thô</span><span class="v"><span data-c="thoBan">${fmt(thoBan())}</span></span></div></div></div>
  ${klBlock(KLTHO[i],h.ten)}
  <div class="profit"><div><div class="mini">Lợi nhuận phần thô</div><div class="amt"><span data-c="thoLoi">${fmt(thoLoi())}</span> đ</div></div><div class="pill g" style="font-size:15px">${pct(thoLoi(),thoBan()).toFixed(1)}%</div></div>`);
- window.scrollTo(0,0);}
+ CALC['hm'+i]=()=>fmt(hmTotal(i));window.scrollTo(0,0);}
 
 function costTable(m,mi){let r=m.costs.map((c,ci)=>{const hasKG=c.kl!=null&&c.gia!=null;const P='hoanThien.'+mi+'.costs.'+ci;
    const klC=c.kl!=null?(EDIT?`<input class="e num" value="${fmt(c.kl)}" oninput="setD('${P}.kl',pn(this.value));ttKG(${mi},${ci})">`:`<span>${fmt(c.kl)}</span>`):'';
    const giaC=c.gia!=null?(EDIT?`<input class="e num" value="${fmt(c.gia)}" oninput="setD('${P}.gia',pn(this.value));ttKG(${mi},${ci})">`:`<span>${fmt(c.gia)}</span>`):'';
    const tt=hasKG?`<span id="ctt_${mi}_${ci}">${fmt((+c.kl||0)*(+c.gia||0))}</span>`:num(P+'.tt',c.tt);
-   return `<tr><td>${c.stt!=null?c.stt+'. ':''}${txt(P+'.label',c.label)}</td><td class="n">${c.dvt||''}</td><td class="n">${klC}</td><td class="n">${giaC}</td><td class="n">${tt}</td></tr>`}).join('');
+   return `<tr><td>${c.stt!=null?c.stt+'. ':''}${txt(P+'.label',c.label)}</td><td class="n">${txt(P+'.dvt',c.dvt||'')}</td><td class="n">${klC}</td><td class="n">${giaC}</td><td class="n">${tt}</td></tr>`}).join('');
  return `<table class="fx"><colgroup><col style="width:42%"><col style="width:9%"><col style="width:11%"><col style="width:18%"><col style="width:20%"></colgroup>
  <thead><tr><th>Khoản mục chi phí</th><th class="n">ĐVT</th><th class="n">KL</th><th class="n">Đơn giá</th><th class="n">Thành tiền</th></tr></thead>
  <tbody>${r}<tr class="tot"><td>CỘNG HẠNG MỤC</td><td></td><td></td><td></td><td class="n"><span data-c="mc${mi}">${fmt(htCong(mi))}</span></td></tr></tbody></table>`;}
-function vtBlock(m){if(!m.vt.length)return'';
- if(m.priced){let r=m.vt.map((v,i)=>`<tr><td class="n">${i+1}</td><td>${v.ten}</td><td class="lo">${v.loai}</td><td class="n">${v.sl!=null?v.sl:''}</td><td class="n">${v.gia!=null?fmt(v.gia):''}</td><td class="n">${typeof v.tt==='number'?fmt(v.tt):(v.tt||'')}</td></tr>`).join('');
+function vtBlock(m,mi){if(!m.vt.length)return'';
+ if(m.priced){let r=m.vt.map((v,j)=>{const P='hoanThien.'+mi+'.vt.'+j;return `<tr><td class="n">${j+1}</td><td>${txt(P+'.ten',v.ten)}</td><td class="lo">${txt(P+'.loai',v.loai)}</td><td class="n">${v.sl!=null?num(P+'.sl',v.sl):''}</td><td class="n">${v.gia!=null?num(P+'.gia',v.gia):''}</td><td class="n">${typeof v.tt==='number'?num(P+'.tt',v.tt):(v.tt!=null?txt(P+'.tt',v.tt):'')}</td></tr>`}).join('');
   return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:6%"><col style="width:24%"><col style="width:26%"><col style="width:9%"><col style="width:16%"><col style="width:19%"></colgroup><thead><tr><th class="n">#</th><th>Tên</th><th>Chủng loại</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Thành tiền</th></tr></thead><tbody>${r}</tbody></table>`;}
- let r=m.vt.map(v=>`<tr><td>${v.ten}</td><td class="lo">${v.loai}</td><td class="mo">${v.mota||''}</td></tr>`).join('');
+ let r=m.vt.map((v,j)=>{const P='hoanThien.'+mi+'.vt.'+j;return `<tr><td>${txt(P+'.ten',v.ten)}</td><td class="lo">${txt(P+'.loai',v.loai)}</td><td class="mo">${txt(P+'.mota',v.mota||'')}</td></tr>`}).join('');
  return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Mô tả</th></tr></thead><tbody>${r}</tbody></table>`;}
 function ttKG(mi,ci){const c=DATA.hoanThien[mi].costs[ci];const el=document.getElementById('ctt_'+mi+'_'+ci);if(el)el.textContent=fmt((+c.kl||0)*(+c.gia||0));calc();if(document.getElementById('pf'))drawPf(mi);}
-function pageHT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard"><div class="hd" style="cursor:pointer" onclick="dtHT(${i})" title="Xem dự toán"><span class="nm">${i+1}. ${m.name}</span><span class="amt"><span data-c="mc${i}">${fmt(htCong(i))}</span></span></div><div class="bd">${costTable(m,i)}${vtBlock(m)}${m.ghi?`<div class="ghi">${m.ghi}</div>`:''}</div></div>`).join('');
+function pageHT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtHT(${i})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="mc${i}">${fmt(htCong(i))}</span></span></div><div class="bd">${costTable(m,i)}${vtBlock(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
+ DATA.hoanThien.forEach((m,i)=>{CALC['mc'+i]=()=>fmt(htCong(i));});
  R(`<div class="sec-title">Phần hoàn thiện — ${DATA.hoanThien.length} hạng mục</div><div class="hero"><div class="lab">Tổng hoàn thiện</div><div class="big"><span data-c="htTot">${fmt(htTotal())}</span> đ</div></div><div class="sec-title" style="font-size:16px">Hạng mục thi công &amp; vật tư cung cấp</div>${c}`);}
 function dtHT(i){if(RO)return;const m=DATA.hoanThien[i];const ban=htCong(i);const v=m.von;
  R(`<div class="back" onclick="nav('ht')">‹ Về hoàn thiện</div><div class="sec-title">Dự toán · ${m.name}</div>
@@ -312,6 +313,7 @@ async function saveFile(){if(CONTRACT){await postVersion();toast('✓ Đã lưu 
  const b=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='He thong Bao gia - Du toan (a6).html';a.click();toast('Đã tải file — kéo đè lên file cũ');}
 function initMeta(){
 {const _c={full:"CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG VÀ NỘI THẤT HUỲNH GIA",slogan:"Xây Dựng Huỳnh Gia - Yên Tâm Nhận Nhà",diaChi:"2157 QL51, Phước Bình 1, Xã Phước Thái, TP. Đồng Nai",hotline:"0931.316.513",mst:"3604008952",web:"huynhgia6.com"};DATA.congty=DATA.congty||{};for(const k in _c){if(!DATA.congty[k]||String(DATA.congty[k]).charAt(0)==="[")DATA.congty[k]=_c[k];}}{const _d={cdt:"Anh Tâm",ct:"Nhà ở gia đình",dd:"Phước Thái, Long Thành, Đồng Nai",tang:"2 tầng",tg:"120 ngày"};DATA.duan=DATA.duan||{};for(const k in _d){if(!DATA.duan[k])DATA.duan[k]=_d[k];}}
+if(!DATA.thanhToan||!DATA.thanhToan.length){DATA.thanhToan=[["Khi ký hợp đồng — tạm ứng",10],["Đổ bê tông móng & đà kiềng",20],["Đổ bê tông sàn tầng 2",15],["80% xây tô trát",15],["80% lợp mái tôn",15],["80% ốp lát & sơn nước",15],["Nghiệm thu bàn giao",9],["Bảo hành 1 năm",1]].map(function(p){return{label:p[0],ty:p[1]};});}
 if(DATA._matSpec!==1&&DATA.thoHangMuc){DATA.thoHangMuc.forEach(function(h){(h.vt||[]).forEach(function(v){var t=v.ten||'';
  if(/^Cát/i.test(t))t='Cát vàng';
  else if(/^Gạch/i.test(t))t='Gạch tuynel';
