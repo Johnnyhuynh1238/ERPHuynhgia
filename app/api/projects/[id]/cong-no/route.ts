@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     supplierIds.length
       ? prisma.supplier.findMany({
           where: { id: { in: supplierIds } },
-          select: { id: true, name: true, phone: true, bankName: true, bankAccount: true },
+          select: { id: true, name: true, phone: true, bankName: true, bankAccount: true, bankAccountName: true },
         })
       : Promise.resolve([]),
     supplierIds.length
@@ -71,6 +71,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       phone: string | null;
       bankName: string | null;
       bankAccount: string | null;
+      bankAccountName: string | null;
       tongNo: number;
       daTra: number;
       orders: unknown[];
@@ -88,6 +89,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         phone: s?.phone ?? null,
         bankName: s?.bankName ?? null,
         bankAccount: s?.bankAccount ?? null,
+        bankAccountName: s?.bankAccountName ?? null,
         tongNo: 0,
         daTra: 0,
         orders: [],

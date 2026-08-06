@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { SubContractStatus, SubPaymentStatus } from "@prisma/client";
 import { toast } from "sonner";
+import { findBankByName } from "@/lib/vn-banks";
 import {
   formatDate,
   formatMoney,
@@ -397,6 +398,8 @@ export function SubDetailPopup({
     if (sub.phone) q.set("payeePhone", sub.phone);
     if (sub.bankAccount) q.set("payeeAccountNumber", sub.bankAccount);
     if (sub.bankAccountName || sub.name) q.set("payeeAccountName", sub.bankAccountName || sub.name);
+    const bin = findBankByName(sub.bankName)?.bin;
+    if (bin) q.set("payeeBankBin", bin);
     router.push(`/expenses?${q.toString()}`);
   }
 

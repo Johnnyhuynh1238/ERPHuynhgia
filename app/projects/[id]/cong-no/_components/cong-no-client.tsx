@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SubContractsTab } from "./sub-tab";
+import { findBankByName } from "@/lib/vn-banks";
 import "./cong-no.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -31,6 +32,7 @@ type Supplier = {
   phone: string | null;
   bankName: string | null;
   bankAccount: string | null;
+  bankAccountName: string | null;
   tongNo: number;
   daTra: number;
   conLai: number;
@@ -369,6 +371,11 @@ function NccPopup({
       sourceType: "ncc_congno",
       sourceId: sup.supplierId,
     });
+    // Điền sẵn thông tin chuyển khoản để lệnh chi tự hiện hộp NH + tạo QR.
+    if (sup.bankAccount) qs.set("payeeAccountNumber", sup.bankAccount);
+    qs.set("payeeAccountName", sup.bankAccountName || sup.supplierName);
+    const bin = findBankByName(sup.bankName)?.bin;
+    if (bin) qs.set("payeeBankBin", bin);
     window.location.href = `/expenses?${qs.toString()}`;
   };
 

@@ -250,6 +250,7 @@ export function ExpensesClient({
         note: sp.get("note") || "",
         payee: sp.get("payee") || "",
         payeePhone: sp.get("payeePhone") || "",
+        payeeBankBin: sp.get("payeeBankBin") || "",
         payeeAccountNumber: sp.get("payeeAccountNumber") || "",
         payeeAccountName: sp.get("payeeAccountName") || "",
         paymentMethod: method,
