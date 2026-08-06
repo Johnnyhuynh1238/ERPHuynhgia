@@ -52,8 +52,9 @@ tr.tot td{font-weight:800;border-top:2px solid var(--line)}
 .profit{margin-top:13px;padding:15px 17px;border-radius:14px;background:var(--greenbg);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .profit.loss{background:var(--redbg)}.profit .amt{font-size:24px;font-weight:800;color:var(--green)}.profit.loss .amt{color:var(--red)}
 .hint{font-size:12px;color:var(--mute);font-style:italic;margin-top:9px}
-input.e{font:inherit;border:1px solid #e2cdb4;border-radius:7px;padding:3px 7px;background:#fffdf7;color:var(--ink);font-variant-numeric:tabular-nums}
-input.e.num{text-align:right;width:120px}
+input.e{font:inherit;border:1px solid #e2cdb4;border-radius:7px;padding:3px 7px;background:#fffdf7;color:var(--ink);font-variant-numeric:tabular-nums;box-sizing:border-box;max-width:100%}
+input.e.num{text-align:right;width:100%;max-width:120px}
+input.e.num.sm{max-width:66px}
 [contenteditable]{outline:none}
 .editing [data-t]{background:#fff8ef;border-bottom:1px dashed #e2b98c;cursor:text}
 .foot{color:var(--mute);font-size:11.5px;text-align:center;margin-top:26px}
@@ -167,6 +168,9 @@ function klTable(k){if(!k)return'';const R=klRoles(k);
  return o+'</tbody></table>';}
 function klBlock(sheet,label){const k=KL[sheet];if(!k)return'';return `<details class="kl"><summary>Bảng khối lượng chi tiết — ${label||('sheet '+sheet)}</summary><div class="klwrap">${klTable(k)}</div></details>`;}
 const fmt=n=>(Math.round(+n||0)).toLocaleString('vi-VN');const pct=(a,b)=>b?a/b*100:0;const pn=s=>+(String(s).replace(/[^\d-]/g,''))||0;
+// Số thập phân (hệ số, diện tích): hiện giữ số lẻ, parse chấp cả "0,3" và "0.3" + phân cách nghìn.
+const fmtF=n=>(+n||0).toLocaleString('vi-VN',{maximumFractionDigits:3});
+function pnf(s){s=String(s).trim().replace(/[^\d.,-]/g,'');const lc=Math.max(s.lastIndexOf('.'),s.lastIndexOf(','));if(lc<0)return +s||0;const ip=s.slice(0,lc).replace(/[.,]/g,''),dp=s.slice(lc+1).replace(/[.,]/g,'');return +((ip||'0')+'.'+dp)||0;}
 let _saveT=null;
 function saveLS(){if(CONTRACT){clearTimeout(_saveT);_saveT=setTimeout(putQuote,600);return;}try{localStorage.setItem('a6db',JSON.stringify(DATA))}catch(e){}}
 async function putQuote(){if(!CONTRACT||VERSION||RO)return;try{await fetch('/api/admin/design-contracts/'+CONTRACT+'/quote',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({quoteData:DATA})})}catch(e){}}
@@ -185,6 +189,7 @@ const htVonTot=()=>DATA.hoanThien.reduce((s,_,i)=>s+htVon(i),0);
 const grand=()=>Math.round((thoBan()+htTotal())/1e6)*1e6;
 // ---- editable helpers ----
 function num(path,val,cls){return EDIT?`<input class="e num ${cls||''}" value="${fmt(val)}" oninput="setD('${path}',pn(this.value));calc()">`:`<span>${fmt(val)}</span>`;}
+function numf(path,val,cls){return EDIT?`<input class="e num ${cls||''}" value="${fmtF(val)}" oninput="setD('${path}',pnf(this.value));calc()">`:`<span>${fmtF(val)}</span>`;}
 function txt(path,val){return EDIT?`<span contenteditable data-t oninput="setD('${path}',this.textContent)">${val||''}</span>`:`${val||''}`;}
 function setD(path,val){let o=DATA,k=path.split('.');for(let i=0;i<k.length-1;i++)o=o[k[i]];o[k[k.length-1]]=val;saveLS();}
 function calc(){document.querySelectorAll('[data-c]').forEach(el=>{el.textContent=CALC[el.dataset.c]?CALC[el.dataset.c]():'';});}
@@ -200,8 +205,8 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 const R=h=>document.getElementById('root').innerHTML=h;
 
 function pageTQ(){const g=grand();const PAY=DATA.thanhToan||[];const sumTy=PAY.reduce((s,p)=>s+(+p.ty||0),0);
- let pr=PAY.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${txt('thanhToan.'+i+'.label',p.label)}</td><td class="n">${fmt(g*(+p.ty||0)/100)}</td><td class="n">${num('thanhToan.'+i+'.ty',p.ty)}%</td></tr>`).join('');
- let ar=DATA.dienTich.map((a,i)=>`<tr><td class="n">${i+1}</td><td>${txt('dienTich.'+i+'.ten',a.ten)}</td><td class="n">${num('dienTich.'+i+'.dt',a.dt)}</td><td class="n">${num('dienTich.'+i+'.hs',a.hs)}</td><td class="n">${((+a.dt||0)*(+a.hs||0)).toFixed(2)}</td></tr>`).join('');
+ let pr=PAY.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${txt('thanhToan.'+i+'.label',p.label)}</td><td class="n">${fmt(g*(+p.ty||0)/100)}</td><td class="n">${num('thanhToan.'+i+'.ty',p.ty,'sm')}%</td></tr>`).join('');
+ let ar=DATA.dienTich.map((a,i)=>`<tr><td class="n">${i+1}</td><td>${txt('dienTich.'+i+'.ten',a.ten)}</td><td class="n">${numf('dienTich.'+i+'.dt',a.dt)}</td><td class="n">${numf('dienTich.'+i+'.hs',a.hs,'sm')}</td><td class="n">${((+a.dt||0)*(+a.hs||0)).toFixed(2)}</td></tr>`).join('');
  R(`<div class="letterhead">
    <a href="https://huynhgia6.com" target="_blank" rel="noopener" title="Về trang chủ Huỳnh Gia"><img class="lh-logo" src="${LOGO}" alt="Huỳnh Gia"></a>
    <div class="lh-right">Số: BG-${new Date().getFullYear()}<br>Ngày: ${new Date().toLocaleDateString('vi-VN')}</div>
