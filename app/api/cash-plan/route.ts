@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "invalid" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "invalid" }, { status: 400 });
   const b = parsed.data;
 
   if (b.kind === "salary") {
@@ -130,7 +130,7 @@ export async function PATCH(req: Request) {
 
   const parsed = nativeSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "invalid" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "invalid" }, { status: 400 });
   const { sourceType, sourceId, date } = parsed.data;
   const value = date ? new Date(`${date}T00:00:00Z`) : null;
 

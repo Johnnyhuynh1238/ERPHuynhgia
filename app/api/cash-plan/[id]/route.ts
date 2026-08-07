@@ -24,7 +24,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "invalid" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "invalid" }, { status: 400 });
   const b = parsed.data;
 
   const data: Prisma.CashPlanItemUpdateInput = {};

@@ -161,7 +161,7 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     const map = new Map<string, TimelineItem[]>();
     for (const t of timeline) (map.get(t.date) ?? map.set(t.date, []).get(t.date)!).push(t);
     let running = data?.balance ?? 0;
-    return [...map.entries()].map(([date, items]) => {
+    return Array.from(map.entries()).map(([date, items]) => {
       const inSum = items.filter((i) => i.dir === "in").reduce((s, i) => s + i.amount, 0);
       const outSum = items.filter((i) => i.dir === "out").reduce((s, i) => s + i.amount, 0);
       running += inSum - outSum;
@@ -220,9 +220,12 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     return setNativeDate({ sourceType: r.sourceType, sourceId: r.sourceId }, date); // native (đợt thu HĐ)
   };
 
-  const editTimelineDate = (t: TimelineItem, date: string | null) => {
+  const editTimelineDate = (t: TimelineItem, date: string | null): Promise<boolean | void> => {
     if (t.editKind === "native") {
-      if (!date && t.sourceType === "sub_payment") return toast.error("Đợt thầu phụ bắt buộc có ngày");
+      if (!date && t.sourceType === "sub_payment") {
+        toast.error("Đợt thầu phụ bắt buộc có ngày");
+        return Promise.resolve(false);
+      }
       return setNativeDate(t, date);
     }
     return patchItem(t.itemId!, { plannedDate: date });

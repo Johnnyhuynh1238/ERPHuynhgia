@@ -134,7 +134,6 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         deliveryDate: true,
         status: true,
         projectId: true,
-        project: { select: { code: true, name: true } },
       },
     }),
     prisma.loan.findMany({
@@ -231,6 +230,9 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
   const getChunks = (type: string, id: string) => chunksBySource.get(`${type}:${id}`) ?? [];
   const projLabel = (p: { code: string; name: string } | null | undefined) =>
     p ? `${p.code} · ${p.name}` : null;
+  // MhOrder chỉ có projectId scalar (không relation) → map nhãn dự án riêng.
+  const projectList = await prisma.project.findMany({ select: { id: true, code: true, name: true } });
+  const projectMap = new Map(projectList.map((p) => [p.id, p]));
 
   // Dựng 1 khoản source-backed (có tổng + chia đợt).
   function sourceRow(args: {
@@ -300,7 +302,7 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         sourceType: "mh_order",
         sourceId: o.id,
         projectId: o.projectId,
-        projectLabel: projLabel(o.project),
+        projectLabel: projLabel(projectMap.get(o.projectId) ?? null),
         title: `Mua hàng · Đơn #${o.seq}${o.supplierName ? ` · ${o.supplierName}` : ""}`,
         subtitle:
           (o.supplierId ? "Công nợ NCC" : "Trả ngay") + (deposit > EPS ? " · đã cọc" : ""),
