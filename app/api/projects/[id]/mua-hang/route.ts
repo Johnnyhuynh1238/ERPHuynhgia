@@ -104,11 +104,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     supplierName?: string;
     supplierId?: string | null;
     note?: string;
+    deliveryDate?: string | null;
   };
   const items = cleanItems(body.items);
   if (!items.length) {
     return NextResponse.json({ message: "Đơn phải có ít nhất 1 vật tư (SL > 0)" }, { status: 400 });
   }
+
+  // Ngày nhận (tuỳ chọn khi tạo — NCC chọn ở bước sửa đơn; enforce "trả ngay bắt buộc ngày nhận" ở PATCH).
+  const deliveryDate =
+    body.deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(body.deliveryDate)
+      ? new Date(`${body.deliveryDate}T00:00:00Z`)
+      : null;
 
   const project = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!project) return NextResponse.json({ message: "Không thấy dự án" }, { status: 404 });
@@ -197,6 +204,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       supplierName: body.supplierName?.trim() || null,
       supplierId: body.supplierId ? String(body.supplierId) : null,
       note: body.note?.trim() || null,
+      deliveryDate,
       total: money(items),
       items,
       createdBy: user!.id,

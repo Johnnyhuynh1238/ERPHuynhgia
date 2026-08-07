@@ -75,6 +75,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Lệnh thu", href: "/receipts" },
     { label: "Lệnh chi", href: "/expenses" },
     { label: "Sổ quỹ", href: "/treasury" },
+    { label: "Kế hoạch thu-chi", href: "/cash-plan" },
     { label: "Báo cáo", href: "/reports" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Cài đặt KPI", href: "/admin/kpi-settings" },
@@ -120,6 +121,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Lệnh thu", href: "/receipts" },
     { label: "Lệnh chi", href: "/expenses" },
     { label: "Sổ quỹ", href: "/treasury" },
+    { label: "Kế hoạch thu-chi", href: "/cash-plan" },
     { label: "KPI tổng", href: "/admin/kpi" },
     { label: "Chấm công NV", href: "/admin/attendance" },
     { label: "Bảng công thợ", href: "/admin/worker-attendance" },
@@ -179,7 +181,7 @@ function navIcon(href: string, label: string) {
   if (href.includes("kpi")) return Target;
   if (href.includes("users")) return Users;
   if (href.includes("templates")) return Settings;
-  if (href.includes("finance") || href.includes("treasury") || href.includes("expenses")) return Wallet;
+  if (href.includes("finance") || href.includes("treasury") || href.includes("expenses") || href.includes("cash-plan")) return Wallet;
   if (href.includes("receipts")) return Receipt;
   if (href.includes("payments")) return Receipt;
   if (href.includes("subcontractors")) return Users;

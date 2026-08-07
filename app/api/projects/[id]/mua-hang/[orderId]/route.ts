@@ -62,6 +62,18 @@ export async function PATCH(
     }
   }
 
+  // Đơn TRẢ NGAY (không NCC) bắt buộc có ngày nhận (để lên kế hoạch chi ngày nhận hàng).
+  const finalSupplierName =
+    "supplierName" in data ? (data.supplierName as string | null) : order.supplierName;
+  const finalSupplierId = "supplierId" in data ? (data.supplierId as string | null) : order.supplierId;
+  const finalDelivery = "deliveryDate" in data ? (data.deliveryDate as Date | null) : order.deliveryDate;
+  if (!finalSupplierName && !finalSupplierId && !finalDelivery) {
+    return NextResponse.json(
+      { message: "Đơn trả ngay (không NCC) bắt buộc nhập ngày nhận hàng" },
+      { status: 400 },
+    );
+  }
+
   // Sửa vật tư (tên/đvt/SL/đơn giá) — KT + admin đều được. Giữ it.key GỐC để neo dự toán.
   const orig = order.items as unknown as OrderItem[];
   if (Array.isArray(body.items)) {

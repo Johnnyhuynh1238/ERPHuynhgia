@@ -93,6 +93,7 @@ const SECTIONS: MenuSection[] = [
       { label: "Lệnh chi", href: "/expenses", icon: Receipt, desc: "Tạo lệnh chi gửi kế toán" },
       { label: "Công nợ NCC", href: "/projects", icon: Wallet, desc: "Công nợ NCC theo từng dự án (mua hàng)" },
       { label: "Sổ quỹ", href: "/treasury", icon: Wallet, desc: "Nhật ký thu/chi + số dư" },
+      { label: "Kế hoạch thu-chi", href: "/cash-plan", icon: Wallet, desc: "Dòng tiền dự kiến theo ngày + số dư luỹ kế" },
     ],
   },
   {

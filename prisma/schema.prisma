@@ -3950,6 +3950,57 @@ enum AdvanceStatus {
   settled
 }
 
+/// Kế hoạch thu/chi (dòng tiền): mỗi dòng = 1 đợt dự chi/thu (ngày + số tiền) tham chiếu 1 nguồn.
+/// Nguồn có sẵn ngày gốc (thầu phụ đợt `expected_date`, đợt thu HĐ, mua hàng `delivery_date`) đọc thẳng
+/// nguồn — KHÔNG lưu ở đây; sửa ngày ở màn kế hoạch = PATCH thẳng field gốc (đồng bộ 2 chiều).
+/// Bảng này chỉ giữ: đợt admin TỰ CHIA (công nợ NCC, gốc/lãi vay, lương) + khoản NHẬP TAY ngoài hệ thống.
+/// plannedDate NULL = "chưa lên kế hoạch" (nằm cột trái); có ngày = nằm timeline.
+/// projectId/createdBy/sourceId để scalar (FK gắn ở migration) để khỏi thêm back-relation vào User/Project.
+model CashPlanItem {
+  id          String             @id @default(uuid()) @db.Uuid
+  direction   CashPlanDirection
+  sourceType  CashPlanSourceType @map("source_type")
+  sourceId    String?            @map("source_id") @db.Uuid
+  projectId   String?            @map("project_id") @db.Uuid
+  plannedDate DateTime?          @map("planned_date") @db.Date
+  amount      Decimal            @db.Decimal(18, 2)
+  title       String?
+  note        String?            @db.Text
+  status      CashPlanStatus     @default(planned)
+  // Nhóm chuỗi định kỳ (lương cả năm): 12 kỳ cùng recurGroupId → sửa/xoá cả loạt.
+  recurGroupId String?           @map("recur_group_id") @db.Uuid
+  createdBy   String             @map("created_by") @db.Uuid
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@index([direction, plannedDate])
+  @@index([sourceType, sourceId])
+  @@index([projectId])
+  @@index([recurGroupId])
+  @@map("cash_plan_items")
+}
+
+enum CashPlanDirection {
+  out
+  in
+}
+
+/// Loại nguồn của 1 đợt kế hoạch tự chia / nhập tay.
+enum CashPlanSourceType {
+  mh_order       // mua hàng công nợ NCC (chia đợt trả)
+  loan_principal // trả nợ gốc vay
+  loan_interest  // trả lãi vay (nhập tay)
+  salary         // lương KS/NV tháng
+  advance        // hoàn ứng (thu vào)
+  manual         // khoản nhập tay ngoài hệ thống
+}
+
+enum CashPlanStatus {
+  planned
+  done
+  cancelled
+}
+
 /// Nhật ký mọi giao dịch thu/chi.
 /// balanceAfter lưu sẵn để query nhanh + audit (không tính lại từ tổng).
 model CashTransaction {
