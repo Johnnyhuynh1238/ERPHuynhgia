@@ -95,7 +95,10 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
 .letterhead .lh-contact b{color:var(--browntx);font-weight:700}
 .letterhead .lh-right{position:absolute;right:6px;top:10px;text-align:right;color:var(--mute);font-size:11.5px;white-space:nowrap}
 .stage{width:100%}
-@media(max-width:760px){.stage{overflow:hidden}#root.page{margin:0 auto}}
+@media(max-width:760px){.stage{overflow:hidden}#root.page{margin:0 auto}
+ .nav{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin-left:0;width:100%;flex:1 0 100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+ .nav::-webkit-scrollbar{display:none}
+ .nav button{flex:0 0 auto;white-space:nowrap}}
 @media print{#root.page{transform:none!important;width:auto!important}.stage{height:auto!important;overflow:visible!important}.letterhead{border-color:#974706;padding:4px 92px 10px 176px}.letterhead .lh-logo{height:40px;top:5px}.letterhead .lh-right{top:6px}}
 /* Bản in trắng đen: ép chữ đen đậm, nền trắng — rõ trên máy in đen trắng. Bấm nút "In T.Đen". */
 @media print{
