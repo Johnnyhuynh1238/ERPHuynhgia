@@ -94,7 +94,9 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
 .letterhead .lh-contact:first-of-type{margin-top:8px}
 .letterhead .lh-contact b{color:var(--browntx);font-weight:700}
 .letterhead .lh-right{position:absolute;right:6px;top:10px;text-align:right;color:var(--mute);font-size:11.5px;white-space:nowrap}
-@media print{.letterhead{border-color:#974706;padding:4px 92px 10px 176px}.letterhead .lh-logo{height:40px;top:5px}.letterhead .lh-right{top:6px}}
+.stage{width:100%}
+@media(max-width:760px){.stage{overflow:hidden}#root.page{margin:0 auto}}
+@media print{#root.page{transform:none!important;width:auto!important}.stage{height:auto!important;overflow:visible!important}.letterhead{border-color:#974706;padding:4px 92px 10px 176px}.letterhead .lh-logo{height:40px;top:5px}.letterhead .lh-right{top:6px}}
 /* Bản in trắng đen: ép chữ đen đậm, nền trắng — rõ trên máy in đen trắng. Bấm nút "In T.Đen". */
 @media print{
  body.bw *{color:#000!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -125,7 +127,7 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
   <button onclick="printBW()" title="Chữ đen đậm — hợp in giấy đen trắng">🖨️ In T.Đen</button>
  </div>
 </div>
-<div id="root" class="page"></div>
+<div class="stage"><div id="root" class="page"></div></div>
 <div id="toast" class="toast"></div>
 <script>
 const QP=new URLSearchParams(location.search),CONTRACT=QP.get('contract'),VERSION=QP.get('version'),RO=QP.get('ro')==='1'||!!VERSION||(typeof window!=='undefined'&&window.__RO===1);
@@ -202,7 +204,13 @@ function nav(p){if(RO&&p==='pl')p='tq';CUR=p;document.querySelectorAll('.nav but
 function toggleEdit(){EDIT=!EDIT;document.getElementById('editBtn').classList.toggle('act',EDIT);document.body.classList.toggle('editing',EDIT);
  ({tq:pageTQ,tho:pageTho,ht:pageHT,pl:pagePL})[CUR]();toast(EDIT?'Chế độ sửa: bấm vào số/chữ để chỉnh':'Đã tắt chế độ sửa');if(!EDIT)postVersion();}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
-const R=h=>document.getElementById('root').innerHTML=h;
+const R=h=>{document.getElementById('root').innerHTML=h;if(window.requestAnimationFrame)requestAnimationFrame(fitSheet);return h;};
+const FIT_MAX=760,FIT_W=920;
+function fitSheet(){var s=document.getElementById('root');if(!s)return;var st=s.parentElement;
+ if(window.innerWidth>=FIT_MAX){s.style.width='';s.style.transform='';s.style.transformOrigin='';st.style.height='';return;}
+ s.style.transform='none';s.style.width=FIT_W+'px';
+ var avail=st.clientWidth,sc=avail/FIT_W;s.style.transformOrigin='top left';s.style.transform='scale('+sc+')';
+ st.style.height=(s.offsetHeight*sc)+'px';}
 
 function pageTQ(){const g=grand();const PAY=DATA.thanhToan||[];const sumTy=PAY.reduce((s,p)=>s+(+p.ty||0),0);
  let pr=PAY.map((p,i)=>`<tr><td class="n">${i+1}</td><td>${txt('thanhToan.'+i+'.label',p.label)}</td><td class="n">${fmt(g*(+p.ty||0)/100)}</td><td class="n">${num('thanhToan.'+i+'.ty',p.ty,'sm')}%</td></tr>`).join('');
@@ -346,4 +354,7 @@ async function boot(){
   nav('tq');
 }
 boot();
+window.addEventListener('resize',fitSheet);window.addEventListener('orientationchange',fitSheet);
+if(window.ResizeObserver){new ResizeObserver(fitSheet).observe(document.getElementById('root'));}
+fitSheet();
 </script></body></html>
