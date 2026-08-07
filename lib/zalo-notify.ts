@@ -5,16 +5,15 @@
  * với session Zalo đã login sẵn trên host. Không có bridge/token → skip im lặng,
  * không bao giờ làm fail flow tạo/duyệt lệnh (luôn gọi qua fireAndForget).
  *
- * Quy ước tin:
- *  - Lệnh CHI: ảnh VietQR (kế toán quét chuyển khoản) + text kèm link nội bộ /expenses.
- *  - Lệnh THU: chỉ text + link nội bộ /receipts.
+ * Quy ước tin (kế toán không mở được PWA từ webview Zalo → bỏ link ERP):
+ *  - Lệnh CHI: ảnh VietQR (kế toán quét chuyển khoản) + text (mã, số tiền, nội dung). Không kèm STK (đã có trong QR).
+ *  - Lệnh THU: chỉ text (mã, số tiền, người nộp, dự án).
  */
 import { prisma } from "@/lib/prisma";
 import { buildVietQrImageUrl } from "@/lib/vietqr";
 
 const BRIDGE_URL = (process.env.ZALO_BRIDGE_URL || "").replace(/\/$/, "");
 const BRIDGE_TOKEN = process.env.ZALO_BRIDGE_TOKEN || "";
-const SITE_URL = (process.env.NEXTAUTH_URL || "https://erp.huynhgia6.com").replace(/\/$/, "");
 
 function fmtVnd(n: number): string {
   return new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
@@ -61,7 +60,7 @@ function projectLabelOf(r: {
 }
 
 /**
- * Lệnh CHI → gửi kế toán: ảnh VietQR (nếu đủ STK+ngân hàng) + text + link.
+ * Lệnh CHI → gửi kế toán: ảnh VietQR (nếu đủ STK+ngân hàng) + text (mã, số tiền, nội dung).
  * Tự truy DB lấy STK/bank/số tiền để khỏi đổi chữ ký các hàm notify.
  */
 export async function zaloNotifyExpense(expenseId: string): Promise<void> {
@@ -90,10 +89,6 @@ export async function zaloNotifyExpense(expenseId: string): Promise<void> {
     `Nội dung: ${e.category.name}${e.payee ? ` · ${e.payee}` : ""}`,
   ];
   if (where) lines.push(`Dự án: ${where}`);
-  if (e.payeeAccountNumber && e.payeeBankBin) {
-    lines.push(`STK: ${e.payeeAccountNumber}${e.payeeAccountName ? ` (${e.payeeAccountName})` : ""}`);
-  }
-  lines.push(`Mở lệnh: ${SITE_URL}/expenses?id=${expenseId}`);
 
   let imageUrl: string | null = null;
   if (e.payeeBankBin && e.payeeAccountNumber) {
@@ -110,7 +105,7 @@ export async function zaloNotifyExpense(expenseId: string): Promise<void> {
 }
 
 /**
- * Lệnh THU → gửi kế toán: chỉ text + link nội bộ (không QR).
+ * Lệnh THU → gửi kế toán: chỉ text (mã, số tiền, người nộp, dự án). Không QR, không link.
  */
 export async function zaloNotifyReceipt(receiptId: string): Promise<void> {
   if (!BRIDGE_URL || !BRIDGE_TOKEN) return;
@@ -133,7 +128,6 @@ export async function zaloNotifyReceipt(receiptId: string): Promise<void> {
   ];
   if (r.payer) lines.push(`Người nộp: ${r.payer}`);
   if (where) lines.push(`Dự án: ${where}`);
-  lines.push(`Mở lệnh: ${SITE_URL}/receipts?id=${receiptId}`);
 
   await sendZaloAccountant({ text: lines.join("\n"), imageUrl: null });
 }
