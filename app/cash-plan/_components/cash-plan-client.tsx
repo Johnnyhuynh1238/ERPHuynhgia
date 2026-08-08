@@ -67,7 +67,7 @@ type TimelineItem = {
   deletable: boolean;
 };
 
-type View = "unplanned" | "plan" | "thu" | "chi";
+type View = "thu" | "chi";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const EPS = 1;
@@ -83,13 +83,14 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   const [data, setData] = useState<CashPlanData | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<null | "manual" | "salary">(null);
-  const [view, setView] = useState<View>("plan");
+  const [view, setView] = useState<View>("thu");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
 
-  // Bộ lọc ngày cho view Tổng thu / Tổng chi.
+  // Bộ lọc khoảng ngày (global, trên cùng) — 1 ô lịch chọn từ → đến.
   const [fromD, setFromD] = useState<string>("");
   const [toD, setToD] = useState<string>("");
+  const [calOpen, setCalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -210,23 +211,38 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     [data],
   );
 
-  const days = useMemo(() => groupDays(timeline, true), [timeline, groupDays]);
-
-  // Lọc theo khoảng ngày cho view Tổng thu / chi.
+  // Lọc theo khoảng ngày (áp cho phần đã lên kế hoạch).
   const inRange = useCallback(
     (d: string) => (!fromD || d >= fromD) && (!toD || d <= toD),
     [fromD, toD],
   );
-  const flowThu = useMemo(
-    () => groupDays(timeline.filter((t) => t.dir === "in" && inRange(t.date)), false),
-    [timeline, inRange, groupDays],
+
+  const dir: "in" | "out" = view === "thu" ? "in" : "out";
+  // Khoản chưa kế hoạch của tab đang mở → luôn nằm trên cùng.
+  const activeUnplanned = useMemo(
+    () => unplanned.filter((r) => r.direction === dir),
+    [unplanned, dir],
   );
-  const flowChi = useMemo(
-    () => groupDays(timeline.filter((t) => t.dir === "out" && inRange(t.date)), false),
-    [timeline, inRange, groupDays],
+  // Phần đã lên kế hoạch (theo ngày, có lọc khoảng ngày).
+  const activeDays = useMemo(
+    () => groupDays(timeline.filter((t) => t.dir === dir && inRange(t.date)), false),
+    [timeline, dir, inRange, groupDays],
   );
-  const thuTotal = useMemo(() => flowThu.reduce((s, d) => s + d.inSum, 0), [flowThu]);
-  const chiTotal = useMemo(() => flowChi.reduce((s, d) => s + d.outSum, 0), [flowChi]);
+  const activeCount = useMemo(
+    () => activeDays.reduce((s, d) => s + d.items.length, 0),
+    [activeDays],
+  );
+
+  // Tổng thu / chi trong khoảng ngày đã chọn (phần đã lên kế hoạch, có ngày).
+  const rangeThu = useMemo(
+    () => timeline.filter((t) => t.dir === "in" && inRange(t.date)).reduce((s, t) => s + t.amount, 0),
+    [timeline, inRange],
+  );
+  const rangeChi = useMemo(
+    () => timeline.filter((t) => t.dir === "out" && inRange(t.date)).reduce((s, t) => s + t.amount, 0),
+    [timeline, inRange],
+  );
+  const rangeActive = Boolean(fromD || toD);
 
   const totals = useMemo(() => {
     const chi = rows.filter((r) => r.direction === "out").reduce((s, r) => s + r.total, 0);
@@ -297,12 +313,10 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     setToD(addDays(todayStr(), days));
   };
 
-  const TABS: { key: View; label: string; count?: number }[] = [
-    { key: "unplanned", label: "Chưa kế hoạch", count: unplanned.length },
-    { key: "plan", label: "Kế hoạch", count: days.length },
-    { key: "thu", label: "Tổng thu" },
-    { key: "chi", label: "Tổng chi" },
-  ];
+  const clearRange = () => {
+    setFromD("");
+    setToD("");
+  };
 
   return (
     <div className={`cpdoc ${fontVars} -mx-4 -mt-4 md:-mx-6 md:-mt-6`} data-theme={theme}>
@@ -350,86 +364,70 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           <button className="cp-btn" onClick={() => setModal("salary")}>＋ Lương</button>
         </div>
 
-        {/* KPI */}
+        {/* Bộ lọc khoảng ngày — 1 ô lịch, trên cùng */}
+        <DateRange
+          fromD={fromD}
+          toD={toD}
+          open={calOpen}
+          setOpen={setCalOpen}
+          onPick={(f, t) => {
+            setFromD(f);
+            setToD(t);
+          }}
+          setPreset={setPreset}
+          clearRange={clearRange}
+        />
+
+        {/* KPI: số dư + tổng thu + tổng chi (theo khoảng ngày; chưa KH ghi dưới) */}
         <section className="cp-kpis">
           <div className="cp-kpi bal">
             <label>Số dư quỹ hiện tại</label>
             <strong>{fmt(data?.balance ?? 0)}</strong>
           </div>
-          <div className="cp-kpi out">
-            <label>Dự chi</label>
-            <strong>{fmt(totals.chi)}</strong>
-            <em>{fmt(totals.chiChua)} chưa lên KH</em>
-          </div>
           <div className="cp-kpi in">
-            <label>Dự thu</label>
-            <strong>{fmt(totals.thu)}</strong>
+            <label>Tổng thu{rangeActive ? " (trong khoảng)" : ""}</label>
+            <strong>{fmt(rangeThu)}</strong>
             <em>{fmt(totals.thuChua)} chưa lên KH</em>
+          </div>
+          <div className="cp-kpi out">
+            <label>Tổng chi{rangeActive ? " (trong khoảng)" : ""}</label>
+            <strong>{fmt(rangeChi)}</strong>
+            <em>{fmt(totals.chiChua)} chưa lên KH</em>
           </div>
         </section>
 
-        {/* tabs ngang */}
-        <nav className="cp-tabs">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              className={`cp-tab ${view === t.key ? "on" : ""}`}
-              onClick={() => setView(t.key)}
-            >
-              {t.label}
-              {t.count !== undefined && <span className="cp-tabcount">{t.count}</span>}
-            </button>
-          ))}
+        {/* 2 tab lớn: Thu / Chi */}
+        <nav className="cp-tabs big">
+          <button
+            className={`cp-tab in ${view === "thu" ? "on" : ""}`}
+            onClick={() => setView("thu")}
+          >
+            ↓ Thu
+            <span className="cp-tabcount">{fmt(rangeThu)}</span>
+          </button>
+          <button
+            className={`cp-tab out ${view === "chi" ? "on" : ""}`}
+            onClick={() => setView("chi")}
+          >
+            ↑ Chi
+            <span className="cp-tabcount">{fmt(rangeChi)}</span>
+          </button>
         </nav>
 
         {loading && <div className="cp-loading">Đang tải…</div>}
 
-        {/* ── VIEW: Chưa kế hoạch ── */}
-        {view === "unplanned" && (
-          <div className="cp-list">
-            {unplanned.length === 0 && !loading && <p className="cp-empty">Mọi khoản đã có ngày.</p>}
-            {unplanned.map((r) => (
-              <UnplannedCard
-                key={r.key}
-                row={r}
-                onPlan={(d, a) => planLeft(r, d, a)}
-                onInterest={(d, a) => addChunk(r, d, a, true)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ── VIEW: Kế hoạch (dòng tiền) ── */}
-        {view === "plan" && (
-          <div className="cp-list">
-            {days.length === 0 && !loading && <p className="cp-empty">Chưa có khoản nào lên kế hoạch.</p>}
-            {days.map((d) => (
-              <DayBlock key={d.date} d={d} onDate={editTimelineDate} onDelete={delItem} showBalance />
-            ))}
-          </div>
-        )}
-
-        {/* ── VIEW: Tổng thu / Tổng chi (lọc ngày) ── */}
-        {(view === "thu" || view === "chi") && (
-          <FlowView
-            dir={view === "thu" ? "in" : "out"}
-            total={view === "thu" ? thuTotal : chiTotal}
-            count={(view === "thu" ? flowThu : flowChi).reduce((s, d) => s + d.items.length, 0)}
-            days={view === "thu" ? flowThu : flowChi}
-            fromD={fromD}
-            toD={toD}
-            setFromD={setFromD}
-            setToD={setToD}
-            setPreset={setPreset}
-            clearRange={() => {
-              setFromD("");
-              setToD("");
-            }}
-            onDate={editTimelineDate}
-            onDelete={delItem}
-            loading={loading}
-          />
-        )}
+        <FlowView
+          dir={dir}
+          unplanned={activeUnplanned}
+          days={activeDays}
+          count={activeCount}
+          rangeActive={rangeActive}
+          onPlan={planLeft}
+          onInterest={(r, d, a) => addChunk(r, d, a, true)}
+          onDate={editTimelineDate}
+          onDelete={delItem}
+          loading={loading}
+        />
       </div>
 
       {mounted &&
@@ -500,76 +498,204 @@ function DayBlock({
   );
 }
 
-// ── View Tổng thu / Tổng chi ────────────────────────────────────────────────
+// ── Body 1 tab (Thu / Chi): chưa KH lên đầu → đã KH theo ngày ────────────────
 function FlowView({
   dir,
-  total,
-  count,
+  unplanned,
   days,
-  fromD,
-  toD,
-  setFromD,
-  setToD,
-  setPreset,
-  clearRange,
+  count,
+  rangeActive,
+  onPlan,
+  onInterest,
   onDate,
   onDelete,
   loading,
 }: {
   dir: "in" | "out";
-  total: number;
-  count: number;
+  unplanned: CashRow[];
   days: DayData[];
-  fromD: string;
-  toD: string;
-  setFromD: (v: string) => void;
-  setToD: (v: string) => void;
-  setPreset: (days: number) => void;
-  clearRange: () => void;
+  count: number;
+  rangeActive: boolean;
+  onPlan: (r: CashRow, date: string, amount: number) => Promise<boolean | void>;
+  onInterest: (r: CashRow, date: string, amount: number) => Promise<boolean | void>;
   onDate: (t: TimelineItem, date: string | null) => Promise<boolean | void>;
   onDelete: (id: string, series?: boolean) => Promise<boolean | void>;
   loading: boolean;
 }) {
-  const label = dir === "in" ? "Tổng thu" : "Tổng chi";
+  const word = dir === "in" ? "thu" : "chi";
+  const empty = unplanned.length === 0 && days.length === 0 && !loading;
   return (
     <div className="cp-list">
-      <div className="cp-flow-head">
-        <div>
-          <div className="cp-datebar">
-            <label>
-              Từ ngày
-              <input type="date" value={fromD} onChange={(e) => setFromD(e.target.value)} />
-            </label>
-            <label>
-              Đến ngày
-              <input type="date" value={toD} onChange={(e) => setToD(e.target.value)} />
-            </label>
+      {/* ── Chưa lên kế hoạch (luôn trên cùng) ── */}
+      {unplanned.length > 0 && (
+        <>
+          <div className="cp-sec warn">
+            <span>⏳ Chưa lên kế hoạch</span>
+            <span className="cp-sec-n">{unplanned.length}</span>
           </div>
-          <div className="cp-chips" style={{ marginTop: 8 }}>
-            <button className="cp-chip" onClick={() => setPreset(7)}>7 ngày</button>
-            <button className="cp-chip" onClick={() => setPreset(30)}>30 ngày</button>
-            <button className="cp-chip" onClick={() => setPreset(90)}>90 ngày</button>
-            <button className={`cp-chip ${!fromD && !toD ? "on" : ""}`} onClick={clearRange}>
-              Tất cả
-            </button>
-          </div>
-        </div>
-        <div className={`cp-flow-sum ${dir}`}>
-          <label>{label}</label>
-          <strong>
-            {dir === "out" ? "−" : "+"}
-            {fmt(total)}
-          </strong>
-          <em>{count} khoản{fromD || toD ? " · trong khoảng" : " · toàn bộ"}</em>
-        </div>
-      </div>
+          {unplanned.map((r) => (
+            <UnplannedCard
+              key={r.key}
+              row={r}
+              onPlan={(d, a) => onPlan(r, d, a)}
+              onInterest={(d, a) => onInterest(r, d, a)}
+            />
+          ))}
+        </>
+      )}
 
+      {/* ── Đã lên kế hoạch theo ngày (lọc theo khoảng chọn ở trên) ── */}
+      <div className="cp-sec">
+        <span>📅 Theo kế hoạch{rangeActive ? " · trong khoảng" : ""}</span>
+        <span className="cp-sec-n">{count}</span>
+      </div>
       {days.length === 0 && !loading && (
-        <p className="cp-empty">Không có khoản {dir === "in" ? "thu" : "chi"} nào trong khoảng.</p>
+        <p className="cp-empty">Chưa có khoản {word} nào lên kế hoạch{rangeActive ? " trong khoảng" : ""}.</p>
       )}
       {days.map((d) => (
         <DayBlock key={d.date} d={d} onDate={onDate} onDelete={onDelete} />
       ))}
+
+      {empty && <p className="cp-empty">Chưa có khoản {word} nào.</p>}
+    </div>
+  );
+}
+
+// ── Bộ lọc khoảng ngày: nút + popover lịch chọn range ────────────────────────
+const VN_MONTHS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+const VN_DOW = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+const dmy = (s: string) => {
+  const [y, m, d] = s.split("-");
+  return `${d}/${m}/${y}`;
+};
+
+function DateRange({
+  fromD,
+  toD,
+  open,
+  setOpen,
+  onPick,
+  setPreset,
+  clearRange,
+}: {
+  fromD: string;
+  toD: string;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  onPick: (from: string, to: string) => void;
+  setPreset: (days: number) => void;
+  clearRange: () => void;
+}) {
+  const label =
+    !fromD && !toD
+      ? "Toàn bộ thời gian"
+      : fromD && toD && fromD !== toD
+        ? `${dmy(fromD)} → ${dmy(toD)}`
+        : dmy(fromD || toD);
+
+  return (
+    <div className="cp-daterange">
+      <button className={`cp-dr-btn ${fromD || toD ? "on" : ""}`} onClick={() => setOpen(!open)}>
+        <span>📅 {label}</span>
+        <span className="cp-dr-caret">{open ? "▲" : "▼"}</span>
+      </button>
+      {(fromD || toD) && (
+        <button className="cp-dr-clear" onClick={clearRange} title="Xoá lọc">
+          ✕
+        </button>
+      )}
+      {open && (
+        <div className="cp-cal-pop">
+          <RangeCalendar fromD={fromD} toD={toD} onPick={onPick} />
+          <div className="cp-chips cp-cal-presets">
+            <button className="cp-chip" onClick={() => { setPreset(7); }}>7 ngày</button>
+            <button className="cp-chip" onClick={() => { setPreset(30); }}>30 ngày</button>
+            <button className="cp-chip" onClick={() => { setPreset(90); }}>90 ngày</button>
+            <button className="cp-chip" onClick={() => { clearRange(); }}>Xoá</button>
+            <button className="cp-chip on" onClick={() => setOpen(false)}>Xong</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RangeCalendar({
+  fromD,
+  toD,
+  onPick,
+}: {
+  fromD: string;
+  toD: string;
+  onPick: (from: string, to: string) => void;
+}) {
+  const anchor = fromD || toD || todayStr();
+  const [ym, setYm] = useState(() => {
+    const [y, m] = anchor.split("-").map(Number);
+    return { y, m: m - 1 }; // m: 0-based
+  });
+
+  const shift = (delta: number) =>
+    setYm((s) => {
+      const dt = new Date(s.y, s.m + delta, 1);
+      return { y: dt.getFullYear(), m: dt.getMonth() };
+    });
+
+  // Lưới ngày (tuần bắt đầu T2).
+  const first = new Date(ym.y, ym.m, 1);
+  const startDow = (first.getDay() + 6) % 7; // 0=T2
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++)
+    cells.push(`${ym.y}-${String(ym.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+
+  const pick = (d: string) => {
+    // Chưa có / đã đủ cặp → bắt đầu lại. Có mỗi from → set to (đảo nếu cần).
+    if (!fromD || (fromD && toD)) {
+      onPick(d, d);
+    } else if (d < fromD) {
+      onPick(d, fromD);
+    } else {
+      onPick(fromD, d);
+    }
+  };
+
+  const today = todayStr();
+  return (
+    <div className="cp-cal">
+      <div className="cp-cal-head">
+        <button onClick={() => shift(-1)}>‹</button>
+        <b>{VN_MONTHS[ym.m]} {ym.y}</b>
+        <button onClick={() => shift(1)}>›</button>
+      </div>
+      <div className="cp-cal-dow">
+        {VN_DOW.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <div className="cp-cal-grid">
+        {cells.map((d, i) =>
+          d === null ? (
+            <span key={`e${i}`} className="cp-cal-day empty" />
+          ) : (
+            <button
+              key={d}
+              className={[
+                "cp-cal-day",
+                d === today ? "today" : "",
+                fromD && toD && d > fromD && d < toD ? "inrange" : "",
+                d === fromD ? "edge start" : "",
+                d === toD ? "edge end" : "",
+                fromD && d === fromD && d === toD ? "single" : "",
+              ].join(" ")}
+              onClick={() => pick(d)}
+            >
+              {Number(d.slice(-2))}
+            </button>
+          ),
+        )}
+      </div>
     </div>
   );
 }

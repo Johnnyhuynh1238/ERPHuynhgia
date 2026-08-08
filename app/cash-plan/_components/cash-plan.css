@@ -100,10 +100,64 @@
 .cpdoc .cp-tab { flex: 1 1 auto; min-width: max-content; background: none; border: none; color: var(--mut); font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; justify-content: center; }
 .cpdoc .cp-tab:hover { color: var(--text); }
 .cpdoc .cp-tab.on { background: var(--card); color: var(--orange); box-shadow: 0 1px 0 var(--line2); }
-.cpdoc .cp-tab .cp-tabcount { font-size: 10.5px; color: var(--mut); background: var(--track); border-radius: 999px; padding: 1px 7px; font-weight: 600; }
+.cpdoc .cp-tab .cp-tabcount { font-size: 10.5px; color: var(--mut); background: var(--track); border-radius: 999px; padding: 1px 7px; font-weight: 600; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
 .cpdoc .cp-tab.on .cp-tabcount { color: var(--terra); }
 
+/* 2 tab lớn Thu / Chi */
+.cpdoc .cp-tabs.big { padding: 5px; gap: 5px; }
+.cpdoc .cp-tabs.big .cp-tab { flex: 1 1 0; flex-direction: column; gap: 4px; padding: 12px 10px; font-size: 15px; }
+.cpdoc .cp-tabs.big .cp-tab .cp-tabcount { font-size: 12.5px; }
+.cpdoc .cp-tabs.big .cp-tab.in.on { color: var(--ok); box-shadow: inset 0 -2px 0 var(--ok); }
+.cpdoc .cp-tabs.big .cp-tab.out.on { color: var(--red); box-shadow: inset 0 -2px 0 var(--red); }
+
+/* section header trong tab */
+.cpdoc .cp-sec { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); margin-top: 4px; }
+.cpdoc .cp-sec.warn { color: var(--terra); }
+.cpdoc .cp-sec-n { font-size: 10.5px; font-weight: 600; color: var(--mut); background: var(--track); border-radius: 999px; padding: 1px 8px; letter-spacing: 0; }
+
 .cpdoc .cp-loading, .cpdoc .cp-empty { color: var(--mut); font-size: 13px; padding: 16px 2px; text-align: center; }
+
+/* ── bộ lọc khoảng ngày (1 ô lịch) ── */
+.cpdoc .cp-daterange { position: relative; display: flex; gap: 8px; align-items: stretch; }
+.cpdoc .cp-dr-btn {
+  flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1px solid var(--line2); color: var(--text);
+  border-radius: 10px; padding: 10px 14px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.cpdoc .cp-dr-btn.on { border-color: var(--orange); color: var(--orange); }
+.cpdoc .cp-dr-caret { font-size: 9px; color: var(--mut); }
+.cpdoc .cp-dr-clear {
+  width: 40px; flex: none; background: var(--card); border: 1px solid var(--line2);
+  color: var(--mut); border-radius: 10px; cursor: pointer; font-size: 13px;
+}
+.cpdoc .cp-dr-clear:hover { border-color: var(--red); color: var(--red); }
+
+.cpdoc .cp-cal-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  width: min(340px, calc(100vw - 40px));
+  background: var(--card); border: 1px solid var(--line2); border-radius: 14px;
+  padding: 12px; box-shadow: 0 20px 50px -18px rgba(20, 8, 3, 0.55);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.cpdoc .cp-cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cpdoc .cp-cal-head b { font-size: 14px; font-weight: 600; }
+.cpdoc .cp-cal-head button { background: var(--card2); border: 1px solid var(--line2); color: var(--text); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+.cpdoc .cp-cal-dow, .cpdoc .cp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cpdoc .cp-cal-dow span { text-align: center; font-size: 10px; font-weight: 600; color: var(--mut); padding: 2px 0; }
+.cpdoc .cp-cal-day {
+  aspect-ratio: 1; border: none; background: none; color: var(--text);
+  border-radius: 8px; cursor: pointer; font-size: 12.5px; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  display: grid; place-items: center;
+}
+.cpdoc .cp-cal-day.empty { cursor: default; }
+.cpdoc .cp-cal-day:not(.empty):hover { background: var(--track); }
+.cpdoc .cp-cal-day.today { box-shadow: inset 0 0 0 1px var(--gold); }
+.cpdoc .cp-cal-day.inrange { background: var(--track); border-radius: 0; }
+.cpdoc .cp-cal-day.edge { background: var(--orange); color: #fff; font-weight: 700; }
+.cpdoc .cp-cal-day.edge.start { border-radius: 8px 0 0 8px; }
+.cpdoc .cp-cal-day.edge.end { border-radius: 0 8px 8px 0; }
+.cpdoc .cp-cal-day.single, .cpdoc .cp-cal-day.edge.start.end { border-radius: 8px; }
+.cpdoc .cp-cal-presets { padding-top: 2px; }
 
 /* ── danh sách khoản ── */
 .cpdoc .cp-list { display: flex; flex-direction: column; gap: 10px; }
