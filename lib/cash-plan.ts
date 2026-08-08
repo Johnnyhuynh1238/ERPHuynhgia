@@ -79,7 +79,7 @@ const SCHEDULE_OPEN: PaymentStatus[] = [
 ];
 
 // Các sourceType có bản ghi cash_plan_items chia đợt gắn vào nguồn.
-const SPLIT_TYPES = new Set(["mh_order", "loan_principal", "advance"]);
+const SPLIT_TYPES = new Set(["mh_order", "ncc_congno", "sub_debt", "loan_principal", "advance"]);
 // Self-entry: mỗi bản ghi là 1 dòng độc lập.
 const SELF_TYPES = new Set(["loan_interest", "salary", "manual"]);
 
@@ -94,6 +94,8 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
     loans,
     advances,
     schedules,
+    nccDebtRows,
+    subContracts,
   ] = await Promise.all([
     // Số dư = Σ thu − Σ chi (mọi giao dịch đã ghi).
     prisma.cashTransaction
@@ -123,8 +125,13 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         },
       },
     }),
+    // Chỉ đơn TRẢ NGAY (không gắn NCC công nợ) chưa trả đủ. Công nợ NCC lấy ở nguồn riêng.
     prisma.mhOrder.findMany({
-      where: { status: { in: MH_OPEN }, ...(projectFilter ? { projectId: projectFilter } : {}) },
+      where: {
+        status: { in: MH_OPEN },
+        supplierId: null,
+        ...(projectFilter ? { projectId: projectFilter } : {}),
+      },
       select: {
         id: true,
         seq: true,
@@ -171,6 +178,28 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         dueDate: true,
         projectId: true,
         project: { select: { code: true, name: true } },
+      },
+    }),
+    // Công nợ NCC vật tư còn lại (per dự án + NCC) từ view ncc_cong_no_du_an.
+    prisma.$queryRaw<
+      { project_id: string; supplier_id: string; supplier_name: string | null; con_lai: number }[]
+    >`
+      SELECT project_id, supplier_id, supplier_name, con_lai::float8 AS con_lai
+      FROM ncc_cong_no_du_an
+      WHERE con_lai > 0`,
+    // HĐ thầu phụ đang chạy — kèm đếm số đợt để bỏ HĐ đã chia đợt.
+    prisma.subContract.findMany({
+      where: {
+        status: { in: ["active", "completed"] },
+        ...(projectFilter ? { projectId: projectFilter } : {}),
+      },
+      select: {
+        id: true,
+        contractValue: true,
+        projectId: true,
+        project: { select: { code: true, name: true } },
+        subcontractor: { select: { name: true } },
+        _count: { select: { payments: true } },
       },
     }),
   ]);
@@ -335,6 +364,52 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         }),
       );
     }
+  }
+
+  // 4) Công nợ NCC vật tư còn lại (per NCC, chia đợt; không có ngày gốc).
+  for (const r of nccDebtRows) {
+    if (projectFilter && r.project_id !== projectFilter) continue;
+    const owed = num(r.con_lai);
+    if (owed <= EPS) continue;
+    out.push(
+      sourceRow({
+        key: `ncc_congno:${r.project_id}:${r.supplier_id}`,
+        direction: "out",
+        sourceType: "ncc_congno",
+        sourceId: r.supplier_id,
+        projectId: r.project_id,
+        projectLabel: projLabel(projectMap.get(r.project_id) ?? null),
+        title: `Công nợ NCC · ${r.supplier_name ?? "NCC"}`,
+        subtitle: "Vật tư đã nhận, chưa trả",
+        total: owed,
+        nativeDate: null,
+        nativeEditable: false,
+        canSplit: true,
+      }),
+    );
+  }
+
+  // 5) Nợ thầu phụ — chỉ HĐ CHƯA chia đợt (contractValue; chia đợt trong kế hoạch).
+  for (const sc of subContracts) {
+    if (sc._count.payments > 0) continue; // đã có đợt → dùng nguồn "Thầu phụ đợt"
+    const owed = num(sc.contractValue);
+    if (owed <= EPS) continue;
+    out.push(
+      sourceRow({
+        key: `sub_debt:${sc.id}`,
+        direction: "out",
+        sourceType: "sub_debt",
+        sourceId: sc.id,
+        projectId: sc.projectId,
+        projectLabel: projLabel(sc.project),
+        title: `Nợ thầu phụ · ${sc.subcontractor.name}`,
+        subtitle: "HĐ chưa chia đợt",
+        total: owed,
+        nativeDate: null,
+        nativeEditable: false,
+        canSplit: true,
+      }),
+    );
   }
 
   // ── THU ──────────────────────────────────────────────────────────────────

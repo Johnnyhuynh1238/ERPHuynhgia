@@ -3987,7 +3987,9 @@ enum CashPlanDirection {
 
 /// Loại nguồn của 1 đợt kế hoạch tự chia / nhập tay.
 enum CashPlanSourceType {
-  mh_order       // mua hàng công nợ NCC (chia đợt trả)
+  mh_order       // mua hàng TRẢ NGAY chưa trả (đơn không có NCC công nợ)
+  ncc_congno     // công nợ NCC vật tư (còn lại theo view ncc_cong_no_du_an)
+  sub_debt       // nợ thầu phụ HĐ chưa chia đợt (contractValue − đã trả)
   loan_principal // trả nợ gốc vay
   loan_interest  // trả lãi vay (nhập tay)
   salary         // lương KS/NV tháng

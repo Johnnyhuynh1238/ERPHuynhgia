@@ -25,7 +25,7 @@ const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ
 const chunkSchema = z.object({
   kind: z.literal("chunk"),
   direction: z.enum(["out", "in"]),
-  sourceType: z.enum(["mh_order", "loan_principal", "loan_interest", "advance"]),
+  sourceType: z.enum(["mh_order", "ncc_congno", "sub_debt", "loan_principal", "loan_interest", "advance"]),
   sourceId: z.string().uuid(),
   projectId: z.string().uuid().nullable().optional(),
   plannedDate: dateStr,
