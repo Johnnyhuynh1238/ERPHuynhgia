@@ -228,11 +228,6 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     () => groupDays(timeline.filter((t) => t.dir === dir && inRange(t.date)), false),
     [timeline, dir, inRange, groupDays],
   );
-  const activeCount = useMemo(
-    () => activeDays.reduce((s, d) => s + d.items.length, 0),
-    [activeDays],
-  );
-
   // Tổng thu / chi trong khoảng ngày đã chọn (phần đã lên kế hoạch, có ngày).
   const rangeThu = useMemo(
     () => timeline.filter((t) => t.dir === "in" && inRange(t.date)).reduce((s, t) => s + t.amount, 0),
@@ -420,7 +415,6 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           dir={dir}
           unplanned={activeUnplanned}
           days={activeDays}
-          count={activeCount}
           rangeActive={rangeActive}
           onPlan={planLeft}
           onInterest={(r, d, a) => addChunk(r, d, a, true)}
@@ -458,14 +452,16 @@ function DayBlock({
   onDate,
   onDelete,
   showBalance,
+  overdue,
 }: {
   d: DayData;
   onDate: (t: TimelineItem, date: string | null) => Promise<boolean | void>;
   onDelete: (id: string, series?: boolean) => Promise<boolean | void>;
   showBalance?: boolean;
+  overdue?: boolean;
 }) {
   return (
-    <div className={`cp-day ${showBalance && d.balance < 0 ? "neg" : ""}`}>
+    <div className={`cp-day ${(showBalance && d.balance < 0) || overdue ? "neg" : ""}`}>
       <div className="cp-day-head">
         <b>
           {new Date(d.date).toLocaleDateString("vi-VN", {
@@ -474,6 +470,7 @@ function DayBlock({
             month: "2-digit",
             year: "numeric",
           })}
+          {overdue && <span className="cp-badge-over">quá hạn kế hoạch</span>}
         </b>
         {showBalance ? (
           <span className="cp-day-bal">
@@ -503,7 +500,6 @@ function FlowView({
   dir,
   unplanned,
   days,
-  count,
   rangeActive,
   onPlan,
   onInterest,
@@ -514,7 +510,6 @@ function FlowView({
   dir: "in" | "out";
   unplanned: CashRow[];
   days: DayData[];
-  count: number;
   rangeActive: boolean;
   onPlan: (r: CashRow, date: string, amount: number) => Promise<boolean | void>;
   onInterest: (r: CashRow, date: string, amount: number) => Promise<boolean | void>;
@@ -523,6 +518,11 @@ function FlowView({
   loading: boolean;
 }) {
   const word = dir === "in" ? "thu" : "chi";
+  const today = todayStr();
+  const overdueDays = days.filter((d) => d.date < today);
+  const futureDays = days.filter((d) => d.date >= today);
+  const overdueCount = overdueDays.reduce((s, d) => s + d.items.length, 0);
+  const futureCount = futureDays.reduce((s, d) => s + d.items.length, 0);
   const empty = unplanned.length === 0 && days.length === 0 && !loading;
   return (
     <div className="cp-list">
@@ -544,15 +544,28 @@ function FlowView({
         </>
       )}
 
-      {/* ── Đã lên kế hoạch theo ngày (lọc theo khoảng chọn ở trên) ── */}
+      {/* ── Quá hạn kế hoạch (ngày đã qua, chưa chi/thu) — nổi lên trên ── */}
+      {overdueDays.length > 0 && (
+        <>
+          <div className="cp-sec over">
+            <span>⚠ Quá hạn kế hoạch</span>
+            <span className="cp-sec-n">{overdueCount}</span>
+          </div>
+          {overdueDays.map((d) => (
+            <DayBlock key={d.date} d={d} onDate={onDate} onDelete={onDelete} overdue />
+          ))}
+        </>
+      )}
+
+      {/* ── Sắp tới theo ngày (lọc theo khoảng chọn ở trên) ── */}
       <div className="cp-sec">
         <span>📅 Theo kế hoạch{rangeActive ? " · trong khoảng" : ""}</span>
-        <span className="cp-sec-n">{count}</span>
+        <span className="cp-sec-n">{futureCount}</span>
       </div>
-      {days.length === 0 && !loading && (
-        <p className="cp-empty">Chưa có khoản {word} nào lên kế hoạch{rangeActive ? " trong khoảng" : ""}.</p>
+      {futureDays.length === 0 && !loading && (
+        <p className="cp-empty">Chưa có khoản {word} nào sắp tới{rangeActive ? " trong khoảng" : ""}.</p>
       )}
-      {days.map((d) => (
+      {futureDays.map((d) => (
         <DayBlock key={d.date} d={d} onDate={onDate} onDelete={onDelete} />
       ))}
 
@@ -651,13 +664,14 @@ function RangeCalendar({
     cells.push(`${ym.y}-${String(ym.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
 
   const pick = (d: string) => {
-    // Chưa có / đã đủ cặp → bắt đầu lại. Có mỗi from → set to (đảo nếu cần).
-    if (!fromD || (fromD && toD)) {
-      onPick(d, d);
+    // Đang chọn dở = có ngày đầu, chưa có ngày cuối.
+    const picking = Boolean(fromD) && !toD;
+    if (!picking) {
+      onPick(d, ""); // click 1: đặt ngày đầu, chờ ngày cuối
     } else if (d < fromD) {
-      onPick(d, fromD);
+      onPick(d, fromD); // click 2 trước ngày đầu → đảo
     } else {
-      onPick(fromD, d);
+      onPick(fromD, d); // click 2: chốt khoảng
     }
   };
 
