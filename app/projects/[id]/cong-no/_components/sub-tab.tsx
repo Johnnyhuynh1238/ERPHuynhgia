@@ -259,25 +259,29 @@ export function SubContractsTab({
         </div>
       ) : (
         <div className="nlist">
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const remaining = (r.contractValue || 0) - (r.paidTotal || 0);
+            return (
             <button key={r.id} type="button" className="nccrow" onClick={() => setOpenId(r.id)}>
               <div className="nl">
                 <div className="nn">{r.subcontractor.name}</div>
                 <div className="nsub">
                   <span>{r.code}</span>
                   <span>· {subContractUnitLabel(r.unit)}</span>
-                  {r.scopeOfWork && <span>· {r.scopeOfWork.slice(0, 40)}</span>}
+                  <span>· HĐ {fmt(r.contractValue || 0)}</span>
+                  {(r.paidTotal || 0) > 0 && <span>· Đã trả {fmt(r.paidTotal || 0)}</span>}
                 </div>
               </div>
               <div className="nr">
-                <div className="rv num" style={{ color: "var(--terra)" }}>{fmt(r.contractValue || 0)}</div>
+                <div className="rv num" style={{ color: remaining > 0.0001 ? "var(--red)" : "var(--ok)" }}>{fmt(Math.max(0, remaining))}</div>
                 <div className="rk">
-                  <span className={`chip ${statusChip[r.status]}`}>{statusLabel[r.status]}</span>
+                  {remaining > 0.0001 ? "còn phải trả" : <span className={`chip ${statusChip[r.status]}`}>{statusLabel[r.status]}</span>}
                 </div>
               </div>
               <span className="chev">›</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
