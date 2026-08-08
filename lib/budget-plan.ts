@@ -55,7 +55,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
         id: true,
         contractValue: true,
         budgetLineId: true,
-        payments: { select: { status: true, actualAmount: true, expectedAmount: true } },
+        payments: { select: { id: true, status: true, actualAmount: true, expectedAmount: true } },
       },
     }),
     // Chi tay gắn hạng mục (không thuộc mua hàng/thầu phụ) — đã trả.
@@ -105,6 +105,17 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     SELECT supplier_id, da_tra::float8 AS da_tra, con_lai::float8 AS con_lai
     FROM ncc_cong_no_du_an WHERE project_id = ${projectId}::uuid`;
   const nccMap = new Map(nccRows.map((r) => [r.supplier_id, r]));
+
+  // Lệnh chi đã trả cho từng đợt thầu phụ (chi thiếu / tạm ứng cộng dồn cho đợt chưa 'paid').
+  const subPayIds = subContracts.flatMap((sc) => sc.payments.map((p) => p.id));
+  const subPaidRows = subPayIds.length
+    ? await prisma.expense.groupBy({
+        by: ["subPaymentId"],
+        where: { subPaymentId: { in: subPayIds }, status: "paid" },
+        _sum: { paidAmount: true },
+      })
+    : [];
+  const subPaidMap = new Map(subPaidRows.map((r) => [r.subPaymentId, num(r._sum.paidAmount)]));
 
   const spent = new Map<string, number>();
   const debt = new Map<string, number>();
@@ -176,12 +187,14 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     }
   }
 
-  // ── Thầu phụ: đã trả (đợt paid) = đã chi; contractValue − đã trả = công nợ ──
+  // ── Thầu phụ: đã chi = đợt 'paid' (actual) + lệnh chi đã trả cho đợt chưa paid
+  //    (chi thiếu / tạm ứng cộng dồn). Công nợ = contractValue − đã chi. ──
   for (const sc of subContracts) {
     const cv = num(sc.contractValue);
-    const paid = sc.payments
-      .filter((p) => p.status === SUBPAY_PAID)
-      .reduce((s, p) => s + num(p.actualAmount ?? p.expectedAmount), 0);
+    const paid = sc.payments.reduce((s, p) => {
+      if (p.status === SUBPAY_PAID) return s + num(p.actualAmount ?? p.expectedAmount);
+      return s + (subPaidMap.get(p.id) ?? 0);
+    }, 0);
     add(spent, sc.budgetLineId, paid);
     add(debt, sc.budgetLineId, Math.max(0, cv - paid));
   }
