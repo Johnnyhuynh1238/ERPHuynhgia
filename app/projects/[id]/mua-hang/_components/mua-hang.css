@@ -332,7 +332,8 @@
 .vt-box .vt-info .kv > span { color: var(--mut); flex: none; }
 .vt-box .vt-info .kv b { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .vt-box .vt-info .kv b.tsk { font-weight: 500; font-size: 11.5px; color: var(--mut2); }
-.vt-box .vt-form { display: flex; gap: 12px; margin-bottom: 14px; }
+.vt-box .vt-form { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.vt-box .vt-form .fld:has(.hm-sel) { flex-basis: 100%; }
 .vt-box .vt-form .fld { flex: 1 1 0; display: flex; flex-direction: column; gap: 6px; }
 .vt-box .vt-form .fld-hd { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 18px; }
 .vt-box .vt-form .fld-hd > span { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--mut); }
@@ -449,6 +450,19 @@
 .mhp .c-qi .u { flex: none; font-size: 11px; color: var(--mut) !important; }
 .mhp .etr.edit .c-pi { text-align: right !important; font-family: var(--font-plex-mono), monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 500 !important; color: var(--text) !important; }
 .mhp .etr.edit .c-s { text-align: right; font-weight: 700; font-size: 13px; color: var(--text); }
+
+/* mỗi dòng vật tư = 1 dòng chính + 1 dòng hạng mục ngân sách */
+.mhp .etr-wrap { border-bottom: 1px solid var(--line); }
+.mhp .etr-wrap .etr.view, .mhp .etr-wrap .etr.edit { border-bottom: none; }
+.mhp .etr-hm { display: flex; align-items: center; gap: 8px; padding: 0 0 10px; }
+.mhp .etr-hm .hm-lb { font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mut); font-weight: 700; flex: none; }
+.mhp .etr-hm select { flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px; color: var(--text); background: var(--card); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 9px; outline: none; -webkit-appearance: none; }
+.mhp .etr-hm select:focus { border-color: var(--orange); }
+.mhp .etr-hm .hm-badge { flex: 1; font-size: 12px; font-weight: 600; color: var(--terra); }
+.mhp .etr-hm .hm-badge.none { color: var(--red); font-weight: 500; }
+/* dropdown hạng mục trong popup thêm giỏ */
+.vt-box .hm-sel { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
+.vt-box .hm-sel:focus { border-color: var(--orange); }
 
 /* pill trạng thái bấm ra list chọn */
 .mhp .spillw { position: relative; margin-left: auto; flex: none; }

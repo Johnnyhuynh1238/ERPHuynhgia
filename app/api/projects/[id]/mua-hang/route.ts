@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
+import { guessBudgetLineId } from "@/lib/budget-line-match";
 
 export const runtime = "nodejs";
 
 // 1 dòng vật tư trong đơn (snapshot từ dự toán khi tạo — SL khoá).
-type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
+type OrderItem = { key: string; name: string; unit: string; qty: number; price: number; hm?: string | null };
 
 // Tên gốc VT (bỏ phần " (quy cách…)") — khớp cách gộp ở màn mua hàng.
 const baseName = (n: string) => {
@@ -26,7 +27,8 @@ function cleanItems(raw: unknown): OrderItem[] {
     const unit = String(o.unit || "").trim();
     const key = String(o.key || `${name}|${unit}`);
     if (!name || !(qty > 0)) continue;
-    out.push({ key, name, unit, qty, price: price >= 0 ? price : 0 });
+    const hm = o.hm ? String(o.hm) : null;
+    out.push({ key, name, unit, qty, price: price >= 0 ? price : 0, hm });
   }
   return out;
 }
@@ -119,6 +121,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const project = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!project) return NextResponse.json({ message: "Không thấy dự án" }, { status: 404 });
+
+  // Đoán hạng mục cho item còn thiếu (vd AI thêm giỏ không gắn). Chỉ khi dự án có ngân sách.
+  const budgetLines = await prisma.projectBudgetPlanLine.findMany({
+    where: { plan: { projectId: params.id } },
+    select: { id: true, name: true },
+  });
+  if (budgetLines.length) {
+    for (const it of items) if (!it.hm) it.hm = guessBudgetLineId(it.name, budgetLines);
+  }
 
   // ── Kế toán: 1 tường SL theo dự toán (giá KT tự ghi). Admin bỏ qua (tự do). ──
   if (isKeToan) {

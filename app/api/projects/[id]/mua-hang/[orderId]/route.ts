@@ -4,7 +4,7 @@ import { requireMuaHang } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
-type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
+type OrderItem = { key: string; name: string; unit: string; qty: number; price: number; hm?: string | null };
 
 const STATUSES = ["draft", "ordered", "received", "paid"] as const;
 type St = (typeof STATUSES)[number];
@@ -26,10 +26,25 @@ export async function PATCH(
   });
   if (!order) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
 
-  // Đơn ĐÃ TRẢ (paid — đã gắn sổ quỹ) → khoá chặt, không ai sửa (kể cả admin).
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  // Đơn ĐÃ TRẢ (paid — đã gắn sổ quỹ) → khoá. NGOẠI LỆ: admin được sửa RIÊNG hạng
+  // mục (items[].hm) để thống kê ngân sách; giữ nguyên tên/SL/giá/total.
   if (order.status === "paid") {
+    const isAdmin = !isKeToan;
+    if (isAdmin && Array.isArray(body.items)) {
+      const orig = order.items as unknown as OrderItem[];
+      const patch = body.items as unknown[];
+      const items = orig.map((it, i) => {
+        const o = (patch[i] && typeof patch[i] === "object" ? patch[i] : {}) as Record<string, unknown>;
+        const hm = "hm" in o ? (o.hm ? String(o.hm) : null) : it.hm ?? null;
+        return { ...it, hm };
+      });
+      await prisma.mhOrder.update({ where: { id: order.id }, data: { items } });
+      return NextResponse.json({ ok: true });
+    }
     return NextResponse.json(
-      { message: "Đơn đã thanh toán (gắn sổ quỹ) — không sửa được." },
+      { message: "Đơn đã thanh toán (gắn sổ quỹ) — chỉ admin sửa được hạng mục." },
       { status: 403 },
     );
   }
@@ -38,7 +53,6 @@ export async function PATCH(
   // (đổi ghi công nợ ↔ thanh toán ngay), không được đụng vật tư / giá / ngày. Admin sửa mọi thứ.
   const ktNccOnly = isKeToan && order.status === "received";
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
 
   // NCC chuẩn hoá ở DB trigger trg_mh_orders_fill_supplier (đồng bộ id ↔ tên mọi nơi).
@@ -84,12 +98,15 @@ export async function PATCH(
       const price = Math.round(Number(o.price));
       const name = String(o.name ?? base?.name ?? "").trim();
       const unit = String(o.unit ?? base?.unit ?? "").trim();
+      // hm: nhận nếu client gửi (kể cả null để xoá), else giữ nguyên gốc.
+      const hm = "hm" in o ? (o.hm ? String(o.hm) : null) : base?.hm ?? null;
       return {
         key: String(o.key ?? base?.key ?? `${name}|${unit}`),
         name,
         unit,
         qty: Number.isFinite(qty) && qty > 0 ? qty : base?.qty ?? 0,
         price: Number.isFinite(price) && price >= 0 ? price : base?.price ?? 0,
+        hm,
       } as OrderItem;
     });
     data.items = items;

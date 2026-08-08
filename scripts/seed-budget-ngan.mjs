@@ -3,7 +3,11 @@
 //   docker cp scripts/seed-budget-ngan.mjs erp_app_prod:/tmp/seed.mjs
 //   docker exec erp_app_prod node /tmp/seed.mjs
 import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const PROJECT_ID = "3e7328ad-1d1c-45ae-a593-77eaeaf1d922";
 

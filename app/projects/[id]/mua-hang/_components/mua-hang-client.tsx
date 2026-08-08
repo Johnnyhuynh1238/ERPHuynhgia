@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildVtGroups, buildSuperGroups, type VtGroup, type VtItem, type SuperGroup } from "@/lib/estimate-vt-groups";
+import { guessBudgetLineId } from "@/lib/budget-line-match";
 import "./mua-hang.css";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
@@ -23,7 +24,8 @@ type Material = {
   taskName: string | null;
 };
 
-type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
+type OrderItem = { key: string; name: string; unit: string; qty: number; price: number; hm?: string | null };
+type BudgetLine = { id: string; name: string; groupKind: string };
 type Order = {
   id: string;
   seq: number;
@@ -253,7 +255,9 @@ export function MuaHangClient({
   const [blocks, setBlocks] = useState<Block[]>([]);
   // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi, tên/đvt gốc từ server }.
   // name/unit giữ để render được cả VT phụ (không có trong danh mục dự toán allItems).
-  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number; name?: string; unit?: string }>>({});
+  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number; name?: string; unit?: string; hm?: string | null }>>({});
+  // Hạng mục ngân sách dự án (rỗng = dự án chưa lập ngân sách → không bắt gắn).
+  const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([]);
   // VT đang mở popup để nhập SL + giá.
   const [picked, setPicked] = useState<VtItem<Material> | null>(null);
   // Trạng thái xổ 3 siêu nhóm (mặc định thu gọn hết).
@@ -350,9 +354,9 @@ export function MuaHangClient({
       const r = await fetch(`/api/projects/${projectId}/mua-hang/cart`, { cache: "no-store" });
       if (!r.ok) return;
       const j = await r.json();
-      const m: Record<string, { qty: number; price: number; name?: string; unit?: string }> = {};
+      const m: Record<string, { qty: number; price: number; name?: string; unit?: string; hm?: string | null }> = {};
       for (const it of Array.isArray(j.items) ? j.items : [])
-        m[it.key] = { qty: Number(it.qty), price: Number(it.price), name: it.name, unit: it.unit };
+        m[it.key] = { qty: Number(it.qty), price: Number(it.price), name: it.name, unit: it.unit, hm: it.hm ?? null };
       setCartMap(m);
     } catch {
       /* giỏ lỗi → giữ giỏ hiện tại */
@@ -368,6 +372,14 @@ export function MuaHangClient({
   useEffect(() => {
     loadCart();
   }, [loadCart]);
+
+  // Nạp hạng mục ngân sách dự án (cho dropdown popup / sửa đơn).
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/budget-plan`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setBudgetLines(Array.isArray(j?.lines) ? j.lines : []))
+      .catch(() => setBudgetLines([]));
+  }, [projectId]);
 
   useEffect(() => {
     if (tab === "cart") loadCart();
@@ -479,7 +491,7 @@ export function MuaHangClient({
               members: [],
               uniformPrice: v.price,
             };
-          return { it, qty: v.qty, price: v.price };
+          return { it, qty: v.qty, price: v.price, hm: v.hm ?? null };
         }),
     [cartMap, itemByKey],
   );
@@ -488,14 +500,14 @@ export function MuaHangClient({
     [cartEntries],
   );
 
-  const addToCart = (it: VtItem<Material>, qty: number, price: number) => {
+  const addToCart = (it: VtItem<Material>, qty: number, price: number, hm: string | null) => {
     if (!(qty > 0)) return;
     const p = Math.max(0, Math.round(price));
-    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p, name: it.name, unit: it.unit } }));
+    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p, name: it.name, unit: it.unit, hm } }));
     fetch(`/api/projects/${projectId}/mua-hang/cart`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p }),
+      body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p, hm }),
     }).catch(() => {});
   };
   const removeFromCart = (key: string) => {
@@ -530,8 +542,14 @@ export function MuaHangClient({
       unit: e.it.unit,
       qty: e.qty,
       price: Math.round(e.price),
+      hm: e.hm ?? null,
     }));
     if (!items.length) return;
+    // Bắt buộc gắn hạng mục khi dự án đã lập ngân sách.
+    if (budgetLines.length && items.some((it) => !it.hm)) {
+      toast("Còn vật tư chưa gắn hạng mục — mở lại để chọn");
+      return;
+    }
     // NCC chọn ở bước sửa đơn (tab Đơn hàng), không chọn ở màn mua.
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, {
       method: "POST",
@@ -911,10 +929,11 @@ ${(() => {
             item={picked}
             placed={placed[picked.key] || 0}
             existing={cartMap[picked.key]}
+            budgetLines={budgetLines}
             theme={theme}
             onClose={() => setPicked(null)}
-            onAdd={(qty, price) => {
-              addToCart(picked, qty, price);
+            onAdd={(qty, price, hm) => {
+              addToCart(picked, qty, price, hm);
               setPicked(null);
               toast(`Đã thêm ${picked.name} vào giỏ`);
             }}
@@ -936,6 +955,7 @@ ${(() => {
           order={editing}
           projectId={projectId}
           suppliers={suppliers}
+          budgetLines={budgetLines}
           theme={theme}
           isKeToan={isKeToan}
           onClose={() => setEditing(null)}
@@ -1086,6 +1106,7 @@ function VtPopup({
   item,
   placed,
   existing,
+  budgetLines,
   theme,
   onClose,
   onAdd,
@@ -1093,15 +1114,21 @@ function VtPopup({
 }: {
   item: VtItem<Material>;
   placed: number;
-  existing?: { qty: number; price: number };
+  existing?: { qty: number; price: number; hm?: string | null };
+  budgetLines: BudgetLine[];
   theme: "light" | "dark";
   onClose: () => void;
-  onAdd: (qty: number, price: number) => void;
+  onAdd: (qty: number, price: number, hm: string | null) => void;
   onRemove?: () => void;
 }) {
   const suggest = Math.round(upriceOf(item));
   const [qty, setQtyS] = useState<string>(existing ? String(existing.qty) : "");
   const [price, setPriceS] = useState<string>(String(existing ? existing.price : suggest));
+  // Hạng mục: giữ lựa cũ, hoặc gợi ý theo tên vật tư.
+  const [hm, setHm] = useState<string>(
+    existing?.hm ?? guessBudgetLineId(item.name, budgetLines) ?? "",
+  );
+  const needHm = budgetLines.length > 0;
   const rem = item.qty - placed;
   const q = parseFloat(qty) || 0;
   const p = parseFloat(price) || 0;
@@ -1166,6 +1193,19 @@ function VtPopup({
               <span className="u">đ</span>
             </div>
           </label>
+          {needHm && (
+            <label className="fld">
+              <div className="fld-hd">
+                <span>Hạng mục ngân sách *</span>
+              </div>
+              <select className="hm-sel" value={hm} onChange={(e) => setHm(e.target.value)}>
+                <option value="">— Chọn hạng mục —</option>
+                {budgetLines.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <div className="vt-tt">
           Thành tiền <b className="num">{fmt(q * p)} đ</b>
@@ -1176,7 +1216,12 @@ function VtPopup({
               Xoá khỏi giỏ
             </button>
           )}
-          <button type="button" className="btn" disabled={!(q > 0)} onClick={() => onAdd(q, p)}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!(q > 0) || (needHm && !hm)}
+            onClick={() => onAdd(q, p, hm || null)}
+          >
             {existing ? "Cập nhật giỏ" : "🛒 Thêm vào giỏ"}
           </button>
         </div>
@@ -1488,6 +1533,7 @@ function EditSheet({
   onSaved,
   projectId,
   suppliers,
+  budgetLines,
   theme,
   isKeToan,
 }: {
@@ -1496,15 +1542,20 @@ function EditSheet({
   onSaved: () => void;
   projectId: string;
   suppliers: Supplier[];
+  budgetLines: BudgetLine[];
   theme: "light" | "dark";
   isKeToan: boolean;
 }) {
+  const isAdmin = !isKeToan;
+  const needHm = budgetLines.length > 0;
   // Đơn ĐÃ TRẢ (paid — gắn sổ quỹ) → khoá chặt mọi người, không sửa được kể cả NCC.
   const lockedPaid = order.status === "paid";
   // Đơn ĐÃ NHẬN (received — công nợ / chờ thanh toán): NCC quyết định ghi công nợ hay TT ngay.
   const isReceivedOrder = order.status === "received";
   // KT xem đơn đã nhận = khoá vật tư/giá/ngày (nhưng vẫn sửa NCC ở dưới). Đơn đã trả = khoá hết.
   const readOnly = lockedPaid || (isKeToan && isReceivedOrder);
+  // Admin sửa RIÊNG hạng mục kể cả đơn đã trả (dropdown mở dù readOnly).
+  const canEditHm = needHm && isAdmin;
   const [show, setShow] = useState(false);
   const [supplierName, setSupplierName] = useState(order.supplierName || "");
   const [orderDate, setOrderDate] = useState(order.orderDate ? order.orderDate.slice(0, 10) : "");
@@ -1729,7 +1780,7 @@ function EditSheet({
               </div>
             )}
           </div>
-          <fieldset className="efs" disabled={readOnly}>
+          <fieldset className="efs" disabled={readOnly && !canEditHm}>
           <div className="row2">
             <div className="fld">
               <label>Ngày đặt</label>
@@ -1766,48 +1817,70 @@ function EditSheet({
             </div>
             <div className="eitems">
               {items.map((it, i) =>
-                readOnly ? (
-                  <div key={it.key || i} className="etr view">
-                    <span className="c-nm">{it.name}</span>
-                    <span className="c-q num">
-                      {fmtQ(it.qty)} {it.unit}
-                    </span>
-                    <span className="c-p num">{fmt(it.price || 0)}</span>
-                    <span className="c-s num">{fmt(it.qty * (it.price || 0))}</span>
-                  </div>
-                ) : (
-                  <div key={it.key || i} className="etr edit">
-                    <input
-                      className="ein-name"
-                      list="mh-hang-ncc"
-                      value={it.name}
-                      onChange={(e) => patchItem(i, { name: e.target.value })}
-                      placeholder="Tên hàng"
-                    />
-                    <div className="c-qi">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        value={it.qty || ""}
-                        onChange={(e) => patchItem(i, { qty: parseFloat(e.target.value) || 0 })}
-                      />
-                      <span className="u">{it.unit}</span>
+                <div key={it.key || i} className="etr-wrap">
+                  {readOnly ? (
+                    <div className="etr view">
+                      <span className="c-nm">{it.name}</span>
+                      <span className="c-q num">
+                        {fmtQ(it.qty)} {it.unit}
+                      </span>
+                      <span className="c-p num">{fmt(it.price || 0)}</span>
+                      <span className="c-s num">{fmt(it.qty * (it.price || 0))}</span>
                     </div>
-                    <input
-                      className="c-pi num"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={it.price ? fmt(it.price) : ""}
-                      onChange={(e) =>
-                        patchItem(i, { price: Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0) })
-                      }
-                    />
-                    <span className="c-s num">{fmt(it.qty * (it.price || 0))}</span>
-                  </div>
-                ),
+                  ) : (
+                    <div className="etr edit">
+                      <input
+                        className="ein-name"
+                        list="mh-hang-ncc"
+                        value={it.name}
+                        onChange={(e) => patchItem(i, { name: e.target.value })}
+                        placeholder="Tên hàng"
+                      />
+                      <div className="c-qi">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          value={it.qty || ""}
+                          onChange={(e) => patchItem(i, { qty: parseFloat(e.target.value) || 0 })}
+                        />
+                        <span className="u">{it.unit}</span>
+                      </div>
+                      <input
+                        className="c-pi num"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={it.price ? fmt(it.price) : ""}
+                        onChange={(e) =>
+                          patchItem(i, { price: Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0) })
+                        }
+                      />
+                      <span className="c-s num">{fmt(it.qty * (it.price || 0))}</span>
+                    </div>
+                  )}
+                  {needHm && (
+                    <div className="etr-hm">
+                      <span className="hm-lb">Hạng mục</span>
+                      {canEditHm || !readOnly ? (
+                        <select
+                          value={it.hm ?? ""}
+                          onChange={(e) => patchItem(i, { hm: e.target.value || null })}
+                        >
+                          <option value="">— Chọn hạng mục —</option>
+                          {budgetLines.map((l) => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`hm-badge${it.hm ? "" : " none"}`}>
+                          {budgetLines.find((l) => l.id === it.hm)?.name ?? "Chưa gắn"}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <div className="etot">
@@ -1858,10 +1931,16 @@ function EditSheet({
             <button type="button" className="btn ghost" onClick={close}>
               {readOnly ? "Đóng" : "Huỷ"}
             </button>
-            {!lockedPaid && (
+            {!lockedPaid ? (
               <button type="button" className="btn" onClick={save} disabled={saving || !proofOk}>
                 {saving ? "Đang lưu…" : readOnly ? "Lưu NCC" : receiving ? "Xác nhận đã nhận" : "Lưu đơn"}
               </button>
+            ) : (
+              canEditHm && (
+                <button type="button" className="btn" onClick={save} disabled={saving}>
+                  {saving ? "Đang lưu…" : "Lưu hạng mục"}
+                </button>
+              )
             )}
           </div>
         </div>

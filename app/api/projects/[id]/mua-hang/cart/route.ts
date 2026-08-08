@@ -12,13 +12,13 @@ const baseName = (n: string) => {
 };
 const matKey = (name: string, unit: string) => `${baseName(name)}|${unit.trim()}`;
 
-type CartRow = { key: string; name: string; unit: string; qty: number; price: number };
+type CartRow = { key: string; name: string; unit: string; qty: number; price: number; hm: string | null };
 
 async function readCart(projectId: string, userId: string): Promise<CartRow[]> {
   const rows = await prisma.mhCartItem.findMany({
     where: { projectId, userId },
     orderBy: { createdAt: "asc" },
-    select: { key: true, name: true, unit: true, qty: true, price: true },
+    select: { key: true, name: true, unit: true, qty: true, price: true, budgetLineId: true },
   });
   return rows.map((r) => ({
     key: r.key,
@@ -26,6 +26,7 @@ async function readCart(projectId: string, userId: string): Promise<CartRow[]> {
     unit: r.unit,
     qty: Number(r.qty),
     price: Number(r.price),
+    hm: r.budgetLineId,
   }));
 }
 
@@ -47,6 +48,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const unit = String(body.unit || "").trim();
   const qty = Number(body.qty);
   const price = Math.max(0, Math.round(Number(body.price) || 0));
+  const hm = body.hm ? String(body.hm) : null;
   if (!name || !unit) {
     return NextResponse.json({ message: "Thiếu tên hàng / đơn vị" }, { status: 400 });
   }
@@ -57,8 +59,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   } else {
     await prisma.mhCartItem.upsert({
       where: { projectId_userId_key: { projectId: params.id, userId: user!.id, key } },
-      create: { projectId: params.id, userId: user!.id, key, name, unit, qty, price },
-      update: { name, unit, qty, price },
+      create: { projectId: params.id, userId: user!.id, key, name, unit, qty, price, budgetLineId: hm },
+      update: { name, unit, qty, price, budgetLineId: hm },
     });
   }
   const items = await readCart(params.id, user!.id);
