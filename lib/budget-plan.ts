@@ -35,7 +35,6 @@ const num = (d: Prisma.Decimal | number | bigint | null | undefined): number =>
 
 type MhItem = { qty?: number; price?: number; hm?: string | null };
 
-const SUBPAY_PAID: SubPaymentStatus = SubPaymentStatus.paid;
 const MH_ACTIVE: MhOrderStatus[] = [MhOrderStatus.ordered, MhOrderStatus.received, MhOrderStatus.paid];
 
 export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData> {
@@ -105,17 +104,6 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     SELECT supplier_id, da_tra::float8 AS da_tra, con_lai::float8 AS con_lai
     FROM ncc_cong_no_du_an WHERE project_id = ${projectId}::uuid`;
   const nccMap = new Map(nccRows.map((r) => [r.supplier_id, r]));
-
-  // Lệnh chi đã trả cho từng đợt thầu phụ (chi thiếu / tạm ứng cộng dồn cho đợt chưa 'paid').
-  const subPayIds = subContracts.flatMap((sc) => sc.payments.map((p) => p.id));
-  const subPaidRows = subPayIds.length
-    ? await prisma.expense.groupBy({
-        by: ["subPaymentId"],
-        where: { subPaymentId: { in: subPayIds }, status: "paid" },
-        _sum: { paidAmount: true },
-      })
-    : [];
-  const subPaidMap = new Map(subPaidRows.map((r) => [r.subPaymentId, num(r._sum.paidAmount)]));
 
   const spent = new Map<string, number>();
   const debt = new Map<string, number>();
@@ -187,14 +175,14 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     }
   }
 
-  // ── Thầu phụ: đã chi = đợt 'paid' (actual) + lệnh chi đã trả cho đợt chưa paid
-  //    (chi thiếu / tạm ứng cộng dồn). Công nợ = contractValue − đã chi. ──
+  // ── Thầu phụ: đã chi = Σ actualAmount các đợt chưa huỷ (gồm đợt paid + tạm ứng
+  //    dở) — ĐỒNG NHẤT với màn Thầu phụ. Công nợ = contractValue − đã chi. ──
   for (const sc of subContracts) {
     const cv = num(sc.contractValue);
-    const paid = sc.payments.reduce((s, p) => {
-      if (p.status === SUBPAY_PAID) return s + num(p.actualAmount ?? p.expectedAmount);
-      return s + (subPaidMap.get(p.id) ?? 0);
-    }, 0);
+    const paid = sc.payments.reduce(
+      (s, p) => (p.status === SubPaymentStatus.cancelled ? s : s + num(p.actualAmount)),
+      0,
+    );
     add(spent, sc.budgetLineId, paid);
     add(debt, sc.budgetLineId, Math.max(0, cv - paid));
   }
