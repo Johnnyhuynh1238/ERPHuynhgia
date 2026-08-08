@@ -14,6 +14,7 @@ import {
   ListChecks,
   Package,
   Pencil,
+  PiggyBank,
   ShoppingCart,
   ShieldCheck,
   Sunset,
@@ -89,6 +90,9 @@ export function ProjectHubGrid({
   ];
 
   const finance: HubItem[] = [
+    ...(caps.canViewFinance
+      ? [{ href: `${base}/budget-plan`, label: "Ngân sách", icon: PiggyBank, desc: "Hạng mục · đã chi · còn phải chi" } as HubItem]
+      : []),
     ...(caps.canMuaHang
       ? [{ href: `${base}/cong-no`, label: "Công nợ NCC", icon: Wallet, desc: "Nợ · trả · còn lại" } as HubItem]
       : []),

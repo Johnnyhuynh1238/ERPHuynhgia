@@ -559,6 +559,8 @@ model User {
   supplierPricesUpdated            SupplierMaterialPrice[]       @relation("SupplierMaterialPriceUpdater")
   projectBudgetsCreated            ProjectBudget[]               @relation("ProjectBudgetCreator")
   projectBudgetsLocked             ProjectBudget[]               @relation("ProjectBudgetLocker")
+  budgetPlansCreated               ProjectBudgetPlan[]           @relation("BudgetPlanCreator")
+  budgetPlansLocked                ProjectBudgetPlan[]           @relation("BudgetPlanLocker")
   projectBudgetAmendmentsProposed  ProjectBudgetAmendment[]      @relation("ProjectBudgetAmendmentProposer")
   projectBudgetAmendmentsApproved  ProjectBudgetAmendment[]      @relation("ProjectBudgetAmendmentApprover")
   companyCashOpeningSet            CompanyCash[]                 @relation("CompanyCashOpeningSetter")
@@ -741,6 +743,7 @@ model Project {
   constructionDiaries       ConstructionDiary[]
   designContract            DesignContract?
   projectBudget             ProjectBudget?
+  projectBudgetPlan         ProjectBudgetPlan?
   projectComponents         ProjectComponent[]
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
@@ -2218,6 +2221,8 @@ model SubContract {
   actualEndDate   DateTime?         @map("actual_end_date") @db.Date
   status          SubContractStatus @default(draft)
   notes           String?           @db.Text
+  // Hạng mục thi công (project_budget_plan_lines). Scalar, FK ở migration.
+  budgetLineId    String?           @map("budget_line_id") @db.Uuid
   createdAt       DateTime          @default(now()) @map("created_at")
   createdBy       String            @map("created_by") @db.Uuid
   updatedAt       DateTime          @updatedAt @map("updated_at")
@@ -2233,6 +2238,7 @@ model SubContract {
   @@index([projectId])
   @@index([subcontractorId])
   @@index([status])
+  @@index([budgetLineId])
   @@map("sub_contracts")
 }
 
@@ -3205,6 +3211,58 @@ model ProjectBudget {
   @@map("project_budgets")
 }
 
+// ── Ngân sách dòng tiền theo HẠNG MỤC (khoá được, thực chi ăn dần) ────────────
+// Khác ProjectBudget (M2, item NC/VT/MM chi tiết): đây là bảng hạng mục gọn để
+// quản lý dòng tiền — mỗi hạng mục 1 số tổng, phiếu chi gắn hạng mục để thống kê.
+enum BudgetPlanStatus {
+  draft
+  locked
+}
+
+enum BudgetPlanGroup {
+  tho         // phần thô
+  hoan_thien  // hoàn thiện
+  nhan_cong   // nhân công khoán
+  chung       // chi phí chung
+}
+
+model ProjectBudgetPlan {
+  id          String           @id @default(uuid()) @db.Uuid
+  projectId   String           @unique @map("project_id") @db.Uuid
+  status      BudgetPlanStatus @default(draft)
+  totalAmount BigInt           @default(0) @map("total_amount")
+  note        String?          @db.Text
+  createdById String           @map("created_by_id") @db.Uuid
+  lockedById  String?          @map("locked_by_id") @db.Uuid
+  lockedAt    DateTime?        @map("locked_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  project   Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User                    @relation("BudgetPlanCreator", fields: [createdById], references: [id])
+  lockedBy  User?                   @relation("BudgetPlanLocker", fields: [lockedById], references: [id])
+  lines     ProjectBudgetPlanLine[]
+
+  @@index([status])
+  @@map("project_budget_plans")
+}
+
+model ProjectBudgetPlanLine {
+  id        String          @id @default(uuid()) @db.Uuid
+  planId    String          @map("plan_id") @db.Uuid
+  name      String
+  groupKind BudgetPlanGroup @default(tho) @map("group_kind")
+  amount    BigInt          @default(0)
+  sortRank  Float           @default(0) @map("sort_rank")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  plan ProjectBudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("project_budget_plan_lines")
+}
+
 model ProjectBudgetItem {
   id             String         @id @default(uuid()) @db.Uuid
   budgetId       String         @map("budget_id") @db.Uuid
@@ -3816,6 +3874,9 @@ model Expense {
   loanId    String? @map("loan_id") @db.Uuid
   advanceId String? @map("advance_id") @db.Uuid
 
+  // Hạng mục ngân sách (project_budget_plan_lines). Scalar, FK gắn ở migration.
+  budgetLineId String? @map("budget_line_id") @db.Uuid
+
   project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   designContract DesignContract? @relation(fields: [designContractId], references: [id], onDelete: SetNull)
   category     ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -3834,6 +3895,7 @@ model Expense {
   @@index([designContractId])
   @@index([loanId])
   @@index([advanceId])
+  @@index([budgetLineId])
   @@map("expenses")
 }
 
@@ -4018,6 +4080,7 @@ model CashTransaction {
   projectId        String?          @map("project_id") @db.Uuid
   categoryId       String?          @map("category_id") @db.Uuid
   designContractId String?          @map("design_contract_id") @db.Uuid
+  budgetLineId     String?          @map("budget_line_id") @db.Uuid
   note             String?          @db.Text
   attachmentUrls   String[]         @default([]) @map("attachment_urls")
   createdBy        String           @map("created_by") @db.Uuid
@@ -4037,6 +4100,7 @@ model CashTransaction {
   @@index([designContractId])
   @@index([createdAt(sort: Desc)])
   @@index([accountId, occurredAt(sort: Desc)])
+  @@index([budgetLineId])
   @@map("cash_transactions")
 }
 
