@@ -1,171 +1,195 @@
-.cp-wrap {
-  --bg: #141726;
-  --card: #1a1d2e;
-  --card2: #20233a;
-  --line: #2a2e48;
-  --mut: #8892b0;
-  --txt: #e6e9f5;
-  --out: #ff6b6b;
-  --in: #37d39b;
-  --accent: #f6a34a;
-  color: var(--txt);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+/* ============================================================
+   Kế hoạch thu · chi — Design system Huỳnh Gia.
+   Ngà (sáng) / Mahogany (tối). IBM Plex. PHẲNG, kẻ mảnh.
+   Trang scope .cpdoc; overlay portal ra body scope .cpportal
+   (tránh app-shell .slide-up transform neo modal fixed xuống đáy).
+   ============================================================ */
+
+.cpdoc,
+.cpportal {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --card2: #f1e8d6;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b5432e;
+  --track: rgba(46, 20, 10, 0.07);
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  color-scheme: light;
+}
+.cpdoc[data-theme="dark"],
+.cpportal[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --card2: #571f0d;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --gold: #d8b25e;
+  --ok: #89ab78;
+  --red: #e07a5f;
+  --track: rgba(247, 242, 228, 0.09);
 }
 
-.cp-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+.cpdoc {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
 }
-.cp-head h1 { font-size: 20px; font-weight: 700; color: var(--accent); }
-.cp-head p { font-size: 12px; color: var(--mut); margin-top: 2px; max-width: 620px; }
-.cp-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.cp-head-actions select,
-.cp-head-actions button {
-  background: var(--card2);
-  border: 1px solid var(--line);
-  color: var(--txt);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  cursor: pointer;
+.cpdoc *,
+.cpportal * { box-sizing: border-box; margin: 0; padding: 0; }
+:is(.cpdoc, .cpportal) .num {
+  font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
-.cp-head-actions button:hover { border-color: var(--accent); }
+.cpdoc .cp-inner { max-width: 860px; margin: 0 auto; padding: 16px clamp(14px, 4.5vw, 22px) 0; display: flex; flex-direction: column; gap: 14px; }
 
-.cp-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.cp-kpi {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* ── topbar / header ── */
+.cpdoc .cp-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cpdoc .cp-brand { display: flex; align-items: center; gap: 9px; }
+.cpdoc .cp-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; letter-spacing: -0.02em; flex: none; }
+.cpdoc .cp-brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.cpdoc .cp-brand span { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.cpdoc .cp-tbtns { display: flex; align-items: center; gap: 8px; }
+.cpdoc .cp-iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 15px; display: grid; place-items: center; line-height: 1; }
+.cpdoc .cp-iconbtn:active { transform: scale(0.94); }
+
+.cpdoc .cp-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); }
+.cpdoc .cp-h1 { font-size: clamp(20px, 6vw, 26px); font-weight: 600; letter-spacing: -0.022em; margin: 5px 0 4px; line-height: 1.12; }
+.cpdoc .cp-lead { font-size: 12px; color: var(--mut); max-width: 640px; }
+
+.cpdoc .cp-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.cpdoc .cp-controls select,
+.cpdoc .cp-btn {
+  background: var(--card); border: 1px solid var(--line2); color: var(--text);
+  border-radius: 9px; padding: 8px 12px; font-size: 12.5px; cursor: pointer;
+  font-family: inherit;
 }
-.cp-kpi span { font-size: 11px; color: var(--mut); }
-.cp-kpi strong { font-size: 20px; font-weight: 700; }
-.cp-kpi em { font-size: 11px; color: var(--mut); font-style: normal; }
-.cp-kpi.bal strong { color: var(--accent); }
-.cp-kpi.out strong { color: var(--out); }
-.cp-kpi.in strong { color: var(--in); }
+.cpdoc .cp-btn:hover { border-color: var(--orange); }
+.cpdoc .cp-btn.solid { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 600; }
+.cpdoc .cp-btn.solid:hover { filter: brightness(1.05); }
 
-.cp-loading, .cp-empty { color: var(--mut); font-size: 13px; padding: 8px 2px; }
+/* ── KPI strip ── */
+.cpdoc .cp-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cpdoc .cp-kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.cpdoc .cp-kpi label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); }
+.cpdoc .cp-kpi strong { font-size: 21px; font-weight: 600; line-height: 1; }
+.cpdoc .cp-kpi em { font-size: 11px; color: var(--mut); font-style: normal; }
+.cpdoc .cp-kpi.bal strong { color: var(--orange); }
+.cpdoc .cp-kpi.out strong { color: var(--red); }
+.cpdoc .cp-kpi.in strong { color: var(--ok); }
 
-.cp-cols { display: grid; grid-template-columns: 1fr 1.3fr; gap: 14px; align-items: start; }
-.cp-col { display: flex; flex-direction: column; gap: 10px; }
-.cp-col h2 { font-size: 14px; font-weight: 600; color: var(--txt); display: flex; align-items: center; gap: 8px; }
-.cp-count {
-  background: var(--card2);
-  border: 1px solid var(--line);
-  color: var(--mut);
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: 999px;
+/* ── tabs ngang ── */
+.cpdoc .cp-tabs { display: flex; gap: 4px; padding: 4px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+.cpdoc .cp-tab { flex: 1 1 auto; min-width: max-content; background: none; border: none; color: var(--mut); font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; justify-content: center; }
+.cpdoc .cp-tab:hover { color: var(--text); }
+.cpdoc .cp-tab.on { background: var(--card); color: var(--orange); box-shadow: 0 1px 0 var(--line2); }
+.cpdoc .cp-tab .cp-tabcount { font-size: 10.5px; color: var(--mut); background: var(--track); border-radius: 999px; padding: 1px 7px; font-weight: 600; }
+.cpdoc .cp-tab.on .cp-tabcount { color: var(--terra); }
+
+.cpdoc .cp-loading, .cpdoc .cp-empty { color: var(--mut); font-size: 13px; padding: 16px 2px; text-align: center; }
+
+/* ── danh sách khoản ── */
+.cpdoc .cp-list { display: flex; flex-direction: column; gap: 10px; }
+.cpdoc .cp-card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--line2); border-radius: 11px; padding: 11px 13px; display: flex; flex-direction: column; gap: 8px; }
+.cpdoc .cp-card.out { border-left-color: var(--red); }
+.cpdoc .cp-card.in { border-left-color: var(--ok); }
+.cpdoc .cp-card-top { display: flex; justify-content: space-between; gap: 10px; }
+.cpdoc .cp-card-top b { font-size: 13px; display: block; font-weight: 600; }
+.cpdoc .cp-card-top small { font-size: 11px; color: var(--mut); display: block; }
+.cpdoc .cp-card-top small.proj { color: var(--terra); }
+.cpdoc .cp-amt { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.cpdoc .cp-amt.out { color: var(--red); }
+.cpdoc .cp-amt.in { color: var(--ok); }
+.cpdoc .cp-split-note { font-size: 11px; color: var(--terra); background: var(--track); border-radius: 8px; padding: 4px 8px; }
+.cpdoc .cp-card-actions { display: flex; gap: 8px; }
+.cpdoc .cp-card-actions button, .cpdoc .cp-tl-actions button, .cpdoc .cp-inline button {
+  background: var(--card2); border: 1px solid var(--line2); color: var(--text);
+  border-radius: 8px; padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: inherit;
 }
+.cpdoc .cp-card-actions button:hover { border-color: var(--orange); }
+.cpdoc button.ghost { background: transparent; }
+.cpdoc button.del:hover { border-color: var(--red); color: var(--red); }
 
-.cp-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.cpdoc .cp-inline { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.cpdoc .cp-inline.full { margin-top: 6px; }
+.cpdoc .cp-inline input {
+  background: var(--bg); border: 1px solid var(--line2); color: var(--text);
+  border-radius: 8px; padding: 5px 9px; font-size: 12px; max-width: 160px; font-family: inherit;
 }
-.cp-card.out { border-left-color: var(--out); }
-.cp-card.in { border-left-color: var(--in); }
-.cp-card-top { display: flex; justify-content: space-between; gap: 10px; }
-.cp-card-top b { font-size: 13px; display: block; }
-.cp-card-top small { font-size: 11px; color: var(--mut); display: block; }
-.cp-card-top small.proj { color: #7fa9ff; }
-.cp-amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-.cp-amt.out { color: var(--out); }
-.cp-amt.in { color: var(--in); }
-.cp-split-note {
-  font-size: 11px;
-  color: var(--accent);
-  background: rgba(246, 163, 74, 0.08);
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-.cp-card-actions { display: flex; gap: 8px; }
-.cp-card-actions button,
-.cp-tl-actions button,
-.cp-inline button {
-  background: var(--card2);
-  border: 1px solid var(--line);
-  color: var(--txt);
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.cp-card-actions button:hover { border-color: var(--accent); }
-button.ghost { background: transparent; }
-button.del:hover { border-color: var(--out); color: var(--out); }
+.cpdoc .cp-inline input:disabled { opacity: 0.5; }
 
-.cp-inline { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.cp-inline.full { margin-top: 6px; }
-.cp-inline input {
-  background: var(--card2);
-  border: 1px solid var(--line);
-  color: var(--txt);
-  border-radius: 8px;
-  padding: 5px 8px;
-  font-size: 12px;
-  max-width: 150px;
-}
-.cp-inline input:disabled { opacity: 0.5; }
+/* ── timeline theo ngày ── */
+.cpdoc .cp-day { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
+.cpdoc .cp-day.neg { border-color: var(--red); box-shadow: 0 0 0 1px rgba(181, 67, 46, 0.25); }
+.cpdoc .cp-day-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cpdoc .cp-day-head b { font-size: 12px; color: var(--text); font-weight: 600; }
+.cpdoc .cp-day-bal { font-size: 11.5px; color: var(--mut); }
+.cpdoc .cp-day-bal strong { color: var(--text); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.cpdoc .cp-day-bal .warn { color: var(--red); font-style: normal; }
 
-.cp-day {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.cp-day.neg { border-color: var(--out); box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.25); }
-.cp-day-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.cp-day-head b { font-size: 12px; color: var(--txt); }
-.cp-day-bal { font-size: 12px; color: var(--mut); }
-.cp-day-bal strong { color: var(--txt); font-variant-numeric: tabular-nums; }
-.cp-day-bal .warn { color: var(--out); font-style: normal; }
+.cpdoc .cp-tl { display: flex; gap: 8px; align-items: flex-start; padding: 6px 2px; border-top: 1px dashed var(--line2); flex-wrap: wrap; }
+.cpdoc .cp-tl:first-of-type { border-top: none; }
+.cpdoc .cp-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+.cpdoc .cp-dot.out { background: var(--red); }
+.cpdoc .cp-dot.in { background: var(--ok); }
+.cpdoc .cp-tl-body { flex: 1; min-width: 140px; }
+.cpdoc .cp-tl-body b { font-size: 12px; display: block; font-weight: 600; }
+.cpdoc .cp-tl-body small { font-size: 10.5px; color: var(--mut); display: block; }
+.cpdoc .cp-tl-body small.proj { color: var(--terra); }
+.cpdoc .cp-tl-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cpdoc .cp-tl-actions { display: flex; gap: 4px; }
 
-.cp-tl { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-top: 1px dashed var(--line); flex-wrap: wrap; }
-.cp-tl:first-of-type { border-top: none; }
-.cp-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
-.cp-dot.out { background: var(--out); }
-.cp-dot.in { background: var(--in); }
-.cp-tl-body { flex: 1; min-width: 140px; }
-.cp-tl-body b { font-size: 12px; display: block; }
-.cp-tl-body small { font-size: 10.5px; color: var(--mut); display: block; }
-.cp-tl-body small.proj { color: #7fa9ff; }
-.cp-tl-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.cp-tl-actions { display: flex; gap: 4px; }
+/* ── view Tổng thu / chi: thanh lọc ngày + tổng lớn ── */
+.cpdoc .cp-flow-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; }
+.cpdoc .cp-datebar { display: flex; gap: 10px; flex-wrap: wrap; }
+.cpdoc .cp-datebar label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); }
+.cpdoc .cp-datebar input { background: var(--bg); border: 1px solid var(--line2); color: var(--text); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; font-family: inherit; }
+.cpdoc .cp-flow-sum { text-align: right; }
+.cpdoc .cp-flow-sum label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); display: block; }
+.cpdoc .cp-flow-sum strong { font-size: clamp(24px, 7vw, 32px); font-weight: 600; line-height: 1; display: block; margin-top: 4px; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.cpdoc .cp-flow-sum.out strong { color: var(--red); }
+.cpdoc .cp-flow-sum.in strong { color: var(--ok); }
+.cpdoc .cp-flow-sum em { font-size: 11px; color: var(--mut); font-style: normal; }
+.cpdoc .cp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.cpdoc .cp-chip { background: none; border: 1px solid var(--line2); color: var(--mut); border-radius: 999px; padding: 4px 11px; font-size: 11.5px; cursor: pointer; font-family: inherit; }
+.cpdoc .cp-chip:hover { border-color: var(--orange); color: var(--text); }
+.cpdoc .cp-chip.on { background: var(--terra); border-color: var(--terra); color: #fff; }
 
-.cp-seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.cp-seg button { flex: 1; background: var(--card2); border: none; color: var(--mut); padding: 8px; cursor: pointer; font-size: 13px; }
-.cp-seg button.on { background: var(--accent); color: #1a1206; font-weight: 600; }
+/* ── segmented (modal chi/thu) ── */
+.cpportal .cp-seg { display: flex; border: 1px solid var(--line2); border-radius: 10px; overflow: hidden; }
+.cpportal .cp-seg button { flex: 1; background: var(--card2); border: none; color: var(--mut); padding: 8px; cursor: pointer; font-size: 13px; font-family: inherit; }
+.cpportal .cp-seg button.on { background: var(--orange); color: #fff; font-weight: 600; }
 
-.cp-modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
-.cp-modal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 10px; color: var(--txt); }
-.cp-modal-head { display: flex; justify-content: space-between; align-items: center; }
-.cp-modal-head b { font-size: 15px; color: var(--accent); }
-.cp-modal-head button { background: transparent; border: none; color: var(--mut); font-size: 16px; cursor: pointer; }
-.cp-modal label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--mut); }
-.cp-modal label.cp-check { flex-direction: row; align-items: center; gap: 8px; color: var(--txt); font-size: 13px; }
-.cp-modal input, .cp-modal select { background: var(--card2); border: 1px solid var(--line); color: var(--txt); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-.cp-save { background: var(--accent); color: #1a1206; border: none; border-radius: 10px; padding: 10px; font-weight: 600; cursor: pointer; margin-top: 4px; }
-.cp-save:disabled { opacity: 0.6; }
+/* ── modal (portal) ── */
+.cpportal { position: fixed; inset: 0; z-index: 60; }
+.cpportal .cp-modal-bg { position: fixed; inset: 0; background: rgba(20, 8, 3, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cpportal .cp-modal { background: var(--card); border: 1px solid var(--line2); border-radius: 16px; padding: 16px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 11px; color: var(--text); }
+.cpportal .cp-modal-head { display: flex; justify-content: space-between; align-items: center; }
+.cpportal .cp-modal-head b { font-size: 14px; color: var(--terra); font-weight: 600; }
+.cpportal .cp-modal-head button { background: transparent; border: none; color: var(--mut); font-size: 16px; cursor: pointer; }
+.cpportal .cp-modal label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--mut); }
+.cpportal .cp-modal label.cp-check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+.cpportal .cp-modal input, .cpportal .cp-modal select { background: var(--bg); border: 1px solid var(--line2); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+.cpportal .cp-save { background: var(--orange); color: #fff; border: none; border-radius: 10px; padding: 10px; font-weight: 600; cursor: pointer; margin-top: 4px; font-family: inherit; }
+.cpportal .cp-save:disabled { opacity: 0.6; }
 
-@media (max-width: 820px) {
-  .cp-kpis { grid-template-columns: 1fr; }
-  .cp-cols { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .cpdoc .cp-kpis { grid-template-columns: 1fr; }
 }

@@ -1,8 +1,23 @@
 "use client";
 
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "./cash-plan.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
 
 type Project = { id: string; code: string; name: string };
 
@@ -52,15 +67,41 @@ type TimelineItem = {
   deletable: boolean;
 };
 
+type View = "unplanned" | "plan" | "thu" | "chi";
+
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const EPS = 1;
 const todayStr = () => new Date().toISOString().slice(0, 10);
+const addDays = (base: string, d: number) => {
+  const dt = new Date(base);
+  dt.setDate(dt.getDate() + d);
+  return dt.toISOString().slice(0, 10);
+};
 
 export function CashPlanClient({ projects }: { projects: Project[]; role: string }) {
   const [projectId, setProjectId] = useState<string>("");
   const [data, setData] = useState<CashPlanData | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<null | "manual" | "salary">(null);
+  const [view, setView] = useState<View>("plan");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = useState(false);
+
+  // Bộ lọc ngày cho view Tổng thu / Tổng chi.
+  const [fromD, setFromD] = useState<string>("");
+  const [toD, setToD] = useState<string>("");
+
+  useEffect(() => {
+    setMounted(true);
+    const s = localStorage.getItem("cashplan-theme");
+    if (s === "light" || s === "dark") setTheme(s);
+  }, []);
+  const toggleTheme = () =>
+    setTheme((t) => {
+      const n = t === "dark" ? "light" : "dark";
+      localStorage.setItem("cashplan-theme", n);
+      return n;
+    });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,14 +124,13 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
 
   const rows = useMemo(() => (data ? [...data.out, ...data.in] : []), [data]);
 
-  // Cột trái: khoản còn "chưa lên kế hoạch" (còn dư > 0).
+  // Khoản còn "chưa lên kế hoạch" (còn dư > 0).
   const unplanned = useMemo(() => rows.filter((r) => r.unplanned > EPS), [rows]);
 
-  // Cột phải: timeline. Gộp đợt (chunk) + phần-còn-lại-ảo (ở ngày gốc) + self-entry có ngày.
+  // Timeline: gộp đợt (chunk) + phần-còn-lại-ảo (ở ngày gốc) + self-entry có ngày.
   const timeline = useMemo<TimelineItem[]>(() => {
     const out: TimelineItem[] = [];
     for (const r of rows) {
-      // self-entry (lãi/lương/nhập tay) có ngày
       if (r.selfItemId) {
         if (r.nativeDate)
           out.push({
@@ -111,7 +151,6 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           });
         continue;
       }
-      // đợt tự chia
       const chunkSum = r.chunks.reduce((s, c) => s + c.amount, 0);
       for (const c of r.chunks) {
         if (!c.plannedDate) continue;
@@ -132,7 +171,6 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           deletable: true,
         });
       }
-      // phần còn lại ở ngày gốc
       const remaining = r.total - chunkSum;
       if (r.nativeDate && remaining > EPS) {
         out.push({
@@ -156,18 +194,39 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     return out.sort((a, b) => a.date.localeCompare(b.date));
   }, [rows]);
 
-  // Nhóm timeline theo ngày + số dư luỹ kế.
-  const days = useMemo(() => {
-    const map = new Map<string, TimelineItem[]>();
-    for (const t of timeline) (map.get(t.date) ?? map.set(t.date, []).get(t.date)!).push(t);
-    let running = data?.balance ?? 0;
-    return Array.from(map.entries()).map(([date, items]) => {
-      const inSum = items.filter((i) => i.dir === "in").reduce((s, i) => s + i.amount, 0);
-      const outSum = items.filter((i) => i.dir === "out").reduce((s, i) => s + i.amount, 0);
-      running += inSum - outSum;
-      return { date, items, inSum, outSum, balance: running };
-    });
-  }, [timeline, data]);
+  // Nhóm 1 danh sách timeline theo ngày + số dư luỹ kế (bắt đầu từ số dư quỹ).
+  const groupDays = useCallback(
+    (items: TimelineItem[], withBalance: boolean) => {
+      const map = new Map<string, TimelineItem[]>();
+      for (const t of items) (map.get(t.date) ?? map.set(t.date, []).get(t.date)!).push(t);
+      let running = data?.balance ?? 0;
+      return Array.from(map.entries()).map(([date, list]) => {
+        const inSum = list.filter((i) => i.dir === "in").reduce((s, i) => s + i.amount, 0);
+        const outSum = list.filter((i) => i.dir === "out").reduce((s, i) => s + i.amount, 0);
+        running += inSum - outSum;
+        return { date, items: list, inSum, outSum, balance: withBalance ? running : 0 };
+      });
+    },
+    [data],
+  );
+
+  const days = useMemo(() => groupDays(timeline, true), [timeline, groupDays]);
+
+  // Lọc theo khoảng ngày cho view Tổng thu / chi.
+  const inRange = useCallback(
+    (d: string) => (!fromD || d >= fromD) && (!toD || d <= toD),
+    [fromD, toD],
+  );
+  const flowThu = useMemo(
+    () => groupDays(timeline.filter((t) => t.dir === "in" && inRange(t.date)), false),
+    [timeline, inRange, groupDays],
+  );
+  const flowChi = useMemo(
+    () => groupDays(timeline.filter((t) => t.dir === "out" && inRange(t.date)), false),
+    [timeline, inRange, groupDays],
+  );
+  const thuTotal = useMemo(() => flowThu.reduce((s, d) => s + d.inSum, 0), [flowThu]);
+  const chiTotal = useMemo(() => flowChi.reduce((s, d) => s + d.outSum, 0), [flowChi]);
 
   const totals = useMemo(() => {
     const chi = rows.filter((r) => r.direction === "out").reduce((s, r) => s + r.total, 0);
@@ -217,7 +276,7 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     if (r.sourceType === "loan_principal") return addChunk(r, date, amount);
     if (r.canSplit) return addChunk(r, date, amount);
     if (r.selfItemId) return patchItem(r.selfItemId, { plannedDate: date });
-    return setNativeDate({ sourceType: r.sourceType, sourceId: r.sourceId }, date); // native (đợt thu HĐ)
+    return setNativeDate({ sourceType: r.sourceType, sourceId: r.sourceId }, date);
   };
 
   const editTimelineDate = (t: TimelineItem, date: string | null): Promise<boolean | void> => {
@@ -231,14 +290,54 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     return patchItem(t.itemId!, { plannedDate: date });
   };
 
+  const fontVars = `${plexSans.variable} ${plexMono.variable}`;
+
+  const setPreset = (days: number) => {
+    setFromD(todayStr());
+    setToD(addDays(todayStr(), days));
+  };
+
+  const TABS: { key: View; label: string; count?: number }[] = [
+    { key: "unplanned", label: "Chưa kế hoạch", count: unplanned.length },
+    { key: "plan", label: "Kế hoạch", count: days.length },
+    { key: "thu", label: "Tổng thu" },
+    { key: "chi", label: "Tổng chi" },
+  ];
+
   return (
-    <div className="cp-wrap">
-      <header className="cp-head">
-        <div>
-          <h1>Kế hoạch thu · chi</h1>
-          <p>Dòng tiền dự kiến từ các nguồn: thầu phụ, mua hàng, công nợ, nợ vay, lương, HĐ, tạm ứng.</p>
+    <div className={`cpdoc ${fontVars} -mx-4 -mt-4 md:-mx-6 md:-mt-6`} data-theme={theme}>
+      <div className="cp-inner">
+        {/* topbar */}
+        <div className="cp-top">
+          <div className="cp-brand">
+            <span className="cp-mark">HG</span>
+            <div>
+              <b>HUỲNH GIA</b>
+              <span>Dòng tiền</span>
+            </div>
+          </div>
+          <div className="cp-tbtns">
+            <button
+              className="cp-iconbtn"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Nền sáng" : "Nền tối"}
+            >
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+          </div>
         </div>
-        <div className="cp-head-actions">
+
+        {/* header */}
+        <div>
+          <div className="cp-eyebrow">Kế hoạch tài chính</div>
+          <h1 className="cp-h1">Kế hoạch thu · chi</h1>
+          <p className="cp-lead">
+            Dòng tiền dự kiến từ các nguồn: thầu phụ, mua hàng, công nợ, nợ vay, lương, HĐ, tạm ứng.
+          </p>
+        </div>
+
+        {/* controls */}
+        <div className="cp-controls">
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">Tất cả dự án</option>
             {projects.map((p) => (
@@ -247,80 +346,235 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
               </option>
             ))}
           </select>
-          <button onClick={() => setModal("manual")}>＋ Khoản tay</button>
-          <button onClick={() => setModal("salary")}>＋ Lương</button>
+          <button className="cp-btn" onClick={() => setModal("manual")}>＋ Khoản tay</button>
+          <button className="cp-btn" onClick={() => setModal("salary")}>＋ Lương</button>
         </div>
-      </header>
 
-      <section className="cp-kpis">
-        <div className="cp-kpi bal">
-          <span>Số dư quỹ hiện tại</span>
-          <strong>{fmt(data?.balance ?? 0)}</strong>
-        </div>
-        <div className="cp-kpi out">
-          <span>Dự chi · chưa KH</span>
-          <strong>{fmt(totals.chi)}</strong>
-          <em>{fmt(totals.chiChua)} chưa lên KH</em>
-        </div>
-        <div className="cp-kpi in">
-          <span>Dự thu · chưa KH</span>
-          <strong>{fmt(totals.thu)}</strong>
-          <em>{fmt(totals.thuChua)} chưa lên KH</em>
-        </div>
-      </section>
+        {/* KPI */}
+        <section className="cp-kpis">
+          <div className="cp-kpi bal">
+            <label>Số dư quỹ hiện tại</label>
+            <strong>{fmt(data?.balance ?? 0)}</strong>
+          </div>
+          <div className="cp-kpi out">
+            <label>Dự chi</label>
+            <strong>{fmt(totals.chi)}</strong>
+            <em>{fmt(totals.chiChua)} chưa lên KH</em>
+          </div>
+          <div className="cp-kpi in">
+            <label>Dự thu</label>
+            <strong>{fmt(totals.thu)}</strong>
+            <em>{fmt(totals.thuChua)} chưa lên KH</em>
+          </div>
+        </section>
 
-      {loading && <div className="cp-loading">Đang tải…</div>}
-
-      <div className="cp-cols">
-        {/* ── CỘT TRÁI ── */}
-        <div className="cp-col">
-          <h2>⏳ Chưa lên kế hoạch <span className="cp-count">{unplanned.length}</span></h2>
-          {unplanned.length === 0 && !loading && <p className="cp-empty">Mọi khoản đã có ngày.</p>}
-          {unplanned.map((r) => (
-            <UnplannedCard
-              key={r.key}
-              row={r}
-              onPlan={(d, a) => planLeft(r, d, a)}
-              onInterest={(d, a) => addChunk(r, d, a, true)}
-            />
+        {/* tabs ngang */}
+        <nav className="cp-tabs">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`cp-tab ${view === t.key ? "on" : ""}`}
+              onClick={() => setView(t.key)}
+            >
+              {t.label}
+              {t.count !== undefined && <span className="cp-tabcount">{t.count}</span>}
+            </button>
           ))}
-        </div>
+        </nav>
 
-        {/* ── CỘT PHẢI ── */}
-        <div className="cp-col">
-          <h2>📅 Kế hoạch (dòng tiền)</h2>
-          {days.length === 0 && !loading && <p className="cp-empty">Chưa có khoản nào lên kế hoạch.</p>}
-          {days.map((d) => (
-            <div key={d.date} className={`cp-day ${d.balance < 0 ? "neg" : ""}`}>
-              <div className="cp-day-head">
-                <b>{new Date(d.date).toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}</b>
-                <span className="cp-day-bal">
-                  Số dư: <strong>{fmt(d.balance)}</strong>
-                  {d.balance < 0 && <em className="warn"> ⚠ âm</em>}
-                </span>
-              </div>
-              {d.items.map((t) => (
-                <TimelineCard
-                  key={t.id}
-                  item={t}
-                  onDate={(date) => editTimelineDate(t, date)}
-                  onDelete={t.deletable ? (series) => delItem(t.itemId!, series) : undefined}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
+        {loading && <div className="cp-loading">Đang tải…</div>}
+
+        {/* ── VIEW: Chưa kế hoạch ── */}
+        {view === "unplanned" && (
+          <div className="cp-list">
+            {unplanned.length === 0 && !loading && <p className="cp-empty">Mọi khoản đã có ngày.</p>}
+            {unplanned.map((r) => (
+              <UnplannedCard
+                key={r.key}
+                row={r}
+                onPlan={(d, a) => planLeft(r, d, a)}
+                onInterest={(d, a) => addChunk(r, d, a, true)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* ── VIEW: Kế hoạch (dòng tiền) ── */}
+        {view === "plan" && (
+          <div className="cp-list">
+            {days.length === 0 && !loading && <p className="cp-empty">Chưa có khoản nào lên kế hoạch.</p>}
+            {days.map((d) => (
+              <DayBlock key={d.date} d={d} onDate={editTimelineDate} onDelete={delItem} showBalance />
+            ))}
+          </div>
+        )}
+
+        {/* ── VIEW: Tổng thu / Tổng chi (lọc ngày) ── */}
+        {(view === "thu" || view === "chi") && (
+          <FlowView
+            dir={view === "thu" ? "in" : "out"}
+            total={view === "thu" ? thuTotal : chiTotal}
+            count={(view === "thu" ? flowThu : flowChi).reduce((s, d) => s + d.items.length, 0)}
+            days={view === "thu" ? flowThu : flowChi}
+            fromD={fromD}
+            toD={toD}
+            setFromD={setFromD}
+            setToD={setToD}
+            setPreset={setPreset}
+            clearRange={() => {
+              setFromD("");
+              setToD("");
+            }}
+            onDate={editTimelineDate}
+            onDelete={delItem}
+            loading={loading}
+          />
+        )}
       </div>
 
-      {modal === "manual" && (
-        <ManualModal projects={projects} onClose={() => setModal(null)} onSaved={load} />
-      )}
-      {modal === "salary" && <SalaryModal onClose={() => setModal(null)} onSaved={load} />}
+      {mounted &&
+        modal &&
+        createPortal(
+          <div className={`cpportal ${fontVars}`} data-theme={theme}>
+            {modal === "manual" && (
+              <ManualModal projects={projects} onClose={() => setModal(null)} onSaved={load} />
+            )}
+            {modal === "salary" && <SalaryModal onClose={() => setModal(null)} onSaved={load} />}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
-// ── Cột trái: 1 khoản chưa KH ──────────────────────────────────────────────
+// ── 1 ngày trên timeline ────────────────────────────────────────────────────
+type DayData = {
+  date: string;
+  items: TimelineItem[];
+  inSum: number;
+  outSum: number;
+  balance: number;
+};
+function DayBlock({
+  d,
+  onDate,
+  onDelete,
+  showBalance,
+}: {
+  d: DayData;
+  onDate: (t: TimelineItem, date: string | null) => Promise<boolean | void>;
+  onDelete: (id: string, series?: boolean) => Promise<boolean | void>;
+  showBalance?: boolean;
+}) {
+  return (
+    <div className={`cp-day ${showBalance && d.balance < 0 ? "neg" : ""}`}>
+      <div className="cp-day-head">
+        <b>
+          {new Date(d.date).toLocaleDateString("vi-VN", {
+            weekday: "short",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })}
+        </b>
+        {showBalance ? (
+          <span className="cp-day-bal">
+            Số dư: <strong>{fmt(d.balance)}</strong>
+            {d.balance < 0 && <em className="warn"> ⚠ âm</em>}
+          </span>
+        ) : (
+          <span className="cp-day-bal">
+            <strong>{fmt(d.inSum + d.outSum)}</strong>
+          </span>
+        )}
+      </div>
+      {d.items.map((t) => (
+        <TimelineCard
+          key={t.id}
+          item={t}
+          onDate={(date) => onDate(t, date)}
+          onDelete={t.deletable ? (series) => onDelete(t.itemId!, series) : undefined}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── View Tổng thu / Tổng chi ────────────────────────────────────────────────
+function FlowView({
+  dir,
+  total,
+  count,
+  days,
+  fromD,
+  toD,
+  setFromD,
+  setToD,
+  setPreset,
+  clearRange,
+  onDate,
+  onDelete,
+  loading,
+}: {
+  dir: "in" | "out";
+  total: number;
+  count: number;
+  days: DayData[];
+  fromD: string;
+  toD: string;
+  setFromD: (v: string) => void;
+  setToD: (v: string) => void;
+  setPreset: (days: number) => void;
+  clearRange: () => void;
+  onDate: (t: TimelineItem, date: string | null) => Promise<boolean | void>;
+  onDelete: (id: string, series?: boolean) => Promise<boolean | void>;
+  loading: boolean;
+}) {
+  const label = dir === "in" ? "Tổng thu" : "Tổng chi";
+  return (
+    <div className="cp-list">
+      <div className="cp-flow-head">
+        <div>
+          <div className="cp-datebar">
+            <label>
+              Từ ngày
+              <input type="date" value={fromD} onChange={(e) => setFromD(e.target.value)} />
+            </label>
+            <label>
+              Đến ngày
+              <input type="date" value={toD} onChange={(e) => setToD(e.target.value)} />
+            </label>
+          </div>
+          <div className="cp-chips" style={{ marginTop: 8 }}>
+            <button className="cp-chip" onClick={() => setPreset(7)}>7 ngày</button>
+            <button className="cp-chip" onClick={() => setPreset(30)}>30 ngày</button>
+            <button className="cp-chip" onClick={() => setPreset(90)}>90 ngày</button>
+            <button className={`cp-chip ${!fromD && !toD ? "on" : ""}`} onClick={clearRange}>
+              Tất cả
+            </button>
+          </div>
+        </div>
+        <div className={`cp-flow-sum ${dir}`}>
+          <label>{label}</label>
+          <strong>
+            {dir === "out" ? "−" : "+"}
+            {fmt(total)}
+          </strong>
+          <em>{count} khoản{fromD || toD ? " · trong khoảng" : " · toàn bộ"}</em>
+        </div>
+      </div>
+
+      {days.length === 0 && !loading && (
+        <p className="cp-empty">Không có khoản {dir === "in" ? "thu" : "chi"} nào trong khoảng.</p>
+      )}
+      {days.map((d) => (
+        <DayBlock key={d.date} d={d} onDate={onDate} onDelete={onDelete} />
+      ))}
+    </div>
+  );
+}
+
+// ── 1 khoản chưa KH ─────────────────────────────────────────────────────────
 function UnplannedCard({
   row,
   onPlan,
@@ -345,7 +599,7 @@ function UnplannedCard({
           {row.subtitle && <small>{row.subtitle}</small>}
           {row.projectLabel && <small className="proj">{row.projectLabel}</small>}
         </div>
-        <span className="cp-amt">{fmt(row.unplanned)}</span>
+        <span className={`cp-amt ${row.direction}`}>{fmt(row.unplanned)}</span>
       </div>
       {row.hasTotal && row.planned > EPS && (
         <div className="cp-split-note">
@@ -400,7 +654,7 @@ function UnplannedCard({
   );
 }
 
-// ── Cột phải: 1 đợt trên timeline ──────────────────────────────────────────
+// ── 1 đợt trên timeline ─────────────────────────────────────────────────────
 function TimelineCard({
   item,
   onDate,

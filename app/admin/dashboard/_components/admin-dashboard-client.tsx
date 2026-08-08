@@ -80,6 +80,7 @@ type AppKey =
   | "du-an"
   | "thau-phu"
   | "tai-chinh"
+  | "ke-hoach"
   | "vay-tam-ung"
   | "nhan-su"
   | "kpi"
@@ -155,6 +156,12 @@ const APPS: AppDef[] = [
     ],
   },
   {
+    key: "ke-hoach",
+    label: "Kế hoạch thu-chi",
+    Icon: CalendarDays,
+    href: "/cash-plan",
+  },
+  {
     key: "vay-tam-ung",
     label: "Vay & Tạm ứng",
     Icon: Wallet,
@@ -210,6 +217,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "du-an": [],
   "thau-phu": [],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
+  "ke-hoach": [],
   "vay-tam-ung": [],
   "nhan-su": [],
   "kpi": [],
