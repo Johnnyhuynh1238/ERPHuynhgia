@@ -40,6 +40,7 @@ type SubcontractorItem = {
   totalContracts: number;
   evaluationCount: number;
   hireAgainRate: number;
+  outstanding: number;
   specialties: Specialty[];
   updatedAt: string;
 };
@@ -86,6 +87,10 @@ function statusLabel(status: SubcontractorStatus) {
   if (status === "active") return "Hoạt động";
   if (status === "inactive") return "Ngưng";
   return "Blacklist";
+}
+
+function fmtVnd(n: number) {
+  return Math.round(n).toLocaleString("vi-VN");
 }
 
 function typeLabel(type: SubcontractorType) {
@@ -407,6 +412,11 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
                         ))}
                         {item.specialties.length > 2 ? <span className="tag">+{item.specialties.length - 2}</span> : null}
                       </div>
+                      {item.outstanding > 0 ? (
+                        <div className="owe">Còn phải trả: {fmtVnd(item.outstanding)} đ</div>
+                      ) : item.outstanding < 0 ? (
+                        <div className="owe over">Trả dư: {fmtVnd(-item.outstanding)} đ</div>
+                      ) : null}
                     </td>
                     <td className="r">
                       <span className="rate">{item.avgRating ? item.avgRating.toFixed(2) : "-"}<span className="star"> ★</span></span>
@@ -447,6 +457,16 @@ export function SubcontractorsClient({ canWrite, canEditPayment = false }: { can
               <div className="kv"><span className="k">ĐTB / Lượt ĐG</span><span className="val mono">{detail.avgRating ? detail.avgRating.toFixed(2) : "-"} ★ · {detail.evaluationCount}</span></div>
               <div className="kv"><span className="k">Tỉ lệ hire lại</span><span className="val mono">{detail.hireAgainRate}%</span></div>
               <div className="kv"><span className="k">Số HĐ đã ký</span><span className="val mono">{detail.totalContracts}</span></div>
+              <div className="kv">
+                <span className="k">Còn phải trả</span>
+                <span className={`val mono ${detail.outstanding > 0 ? "owe" : detail.outstanding < 0 ? "over" : ""}`}>
+                  {detail.outstanding > 0
+                    ? `${fmtVnd(detail.outstanding)} đ`
+                    : detail.outstanding < 0
+                    ? `Trả dư ${fmtVnd(-detail.outstanding)} đ`
+                    : "Đã thanh toán đủ"}
+                </span>
+              </div>
               {detail.taxCode ? <div className="kv"><span className="k">MST</span><span className="val mono">{detail.taxCode}</span></div> : null}
               {detail.email ? <div className="kv"><span className="k">Email</span><span className="val">{detail.email}</span></div> : null}
               {detail.address ? <div className="kv"><span className="k">Địa chỉ</span><span className="val">{detail.address}</span></div> : null}

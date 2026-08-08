@@ -12,6 +12,7 @@ type SupplierRow = {
   phone: string | null;
   address: string | null;
   isActive: boolean;
+  outstanding: number;
   _count: { groups: number; prices: number };
 };
 
@@ -99,10 +100,19 @@ export function SuppliersClient() {
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex gap-3 text-[11px] text-[#8892b0]">
-                <span>{s._count.groups} nhóm</span>
-                <span>·</span>
-                <span>{s._count.prices} VT</span>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[#8892b0]">
+                <div className="flex gap-3">
+                  <span>{s._count.groups} nhóm</span>
+                  <span>·</span>
+                  <span>{s._count.prices} VT</span>
+                </div>
+                {s.outstanding > 0 ? (
+                  <span className="font-semibold text-[#e0864f]">Còn nợ: {Math.round(s.outstanding).toLocaleString("vi-VN")} đ</span>
+                ) : s.outstanding < 0 ? (
+                  <span className="font-semibold text-[#c9a24b]">Trả dư: {Math.round(-s.outstanding).toLocaleString("vi-VN")} đ</span>
+                ) : (
+                  <span className="text-[#5a627a]">Không nợ</span>
+                )}
               </div>
             </Link>
           ))}

@@ -58,7 +58,27 @@ export async function GET(request: Request) {
     },
   });
 
-  return NextResponse.json({ suppliers });
+  // Công nợ còn lại mỗi NCC = Σ đơn mua đã nhận (mh_orders 'received') − Σ đã trả (ncc_thanh_toan).
+  const outstandingRows = await prisma.$queryRaw<Array<{ supplier_id: string; outstanding: number }>>`
+    SELECT s.id AS supplier_id,
+           COALESCE(o.debt, 0) - COALESCE(t.paid, 0) AS outstanding
+    FROM suppliers s
+    LEFT JOIN (
+      SELECT supplier_id, SUM(total) AS debt
+      FROM mh_orders WHERE status = 'received' AND supplier_id IS NOT NULL
+      GROUP BY supplier_id
+    ) o ON o.supplier_id = s.id
+    LEFT JOIN (
+      SELECT supplier_id, SUM(so_tien) AS paid
+      FROM ncc_thanh_toan
+      GROUP BY supplier_id
+    ) t ON t.supplier_id = s.id
+  `;
+  const outstandingMap = new Map(outstandingRows.map((r) => [r.supplier_id, Number(r.outstanding) || 0]));
+
+  return NextResponse.json({
+    suppliers: suppliers.map((s) => ({ ...s, outstanding: outstandingMap.get(s.id) ?? 0 })),
+  });
 }
 
 export async function POST(request: Request) {

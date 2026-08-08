@@ -91,6 +91,26 @@ export async function GET(request: Request) {
     orderBy: [{ isActive: "desc" }, { status: "asc" }, { createdAt: "desc" }],
   });
 
+  // Số tiền còn phải trả mỗi thầu phụ = Σ giá trị HĐ (active/completed)
+  // − Σ tiền đã chi thực tế của các đợt (mọi trạng thái trừ 'cancelled', gồm cả tạm ứng).
+  const outstandingRows = await prisma.$queryRaw<Array<{ subcontractor_id: string; outstanding: number }>>`
+    SELECT s.id AS subcontractor_id,
+           COALESCE(cv.total, 0) - COALESCE(pd.paid, 0) AS outstanding
+    FROM subcontractors s
+    LEFT JOIN (
+      SELECT subcontractor_id, SUM(contract_value) AS total
+      FROM sub_contracts WHERE status IN ('active', 'completed')
+      GROUP BY subcontractor_id
+    ) cv ON cv.subcontractor_id = s.id
+    LEFT JOIN (
+      SELECT c.subcontractor_id, SUM(p.actual_amount) AS paid
+      FROM sub_payments p JOIN sub_contracts c ON c.id = p.sub_contract_id
+      WHERE p.actual_amount IS NOT NULL AND p.status <> 'cancelled'
+      GROUP BY c.subcontractor_id
+    ) pd ON pd.subcontractor_id = s.id
+  `;
+  const outstandingMap = new Map(outstandingRows.map((r) => [r.subcontractor_id, Number(r.outstanding) || 0]));
+
   return NextResponse.json({
     subcontractors: subcontractors.map((item) => {
       const evaluations = item.contracts.flatMap((contract) => contract.evaluations);
@@ -101,6 +121,7 @@ export async function GET(request: Request) {
         specialties: item.specialties.map((m) => m.specialty),
         evaluationCount,
         hireAgainRate: evaluationCount > 0 ? Math.round((hireAgainCount / evaluationCount) * 100) : 0,
+        outstanding: outstandingMap.get(item.id) ?? 0,
       };
     }),
   });

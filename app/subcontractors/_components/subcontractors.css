@@ -93,6 +93,10 @@
 .subdoc .code { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; color: var(--terra); font-weight: 500; }
 .subdoc .tag { font-size: 10px; padding: 1px 7px; border-radius: 20px; background: rgba(46, 20, 10, 0.06); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; }
 .subdoc[data-theme="dark"] .tag { background: rgba(247, 242, 228, 0.07); }
+.subdoc .owe { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 600; color: var(--red); margin-top: 3px; }
+.subdoc .owe.over { color: var(--gold); }
+.subdoc .val.owe { color: var(--red); }
+.subdoc .val.over { color: var(--gold); }
 .subdoc .rate { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-weight: 600; font-size: 15px; white-space: nowrap; }
 .subdoc .star { color: var(--gold); font-size: 12px; }
 .subdoc .rsub { font-size: 9.5px; color: var(--mut); margin-top: 2px; white-space: nowrap; }
