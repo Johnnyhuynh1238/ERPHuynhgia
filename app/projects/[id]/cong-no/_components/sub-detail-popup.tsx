@@ -265,6 +265,12 @@ export function SubDetailPopup({
   const contractValue = Number(contract?.contractValue || 0);
   const paidTotal = Number(paymentMeta?.totals.paidTotal || 0);
   const remain = contractValue - paidTotal;
+  // Tổng tiền các đợt (bỏ đợt huỷ) để đối chiếu giá trị HĐ. Đổi giá trị HĐ không
+  // tự nắn đợt — chỉ cảnh báo để KT/QLDA tự sửa hoặc thêm đợt cho khớp.
+  const scheduleExpectedTotal = payments
+    .filter((p) => p.status !== SubPaymentStatus.cancelled)
+    .reduce((sum, p) => sum + Number(p.expectedAmount || 0), 0);
+  const scheduleGap = contractValue - scheduleExpectedTotal;
   const progress = contractValue > 0 ? Math.min(100, Math.round((paidTotal / contractValue) * 100)) : 0;
   const canFin = paymentMeta?.contract.canViewFinancial ?? true;
 
@@ -575,6 +581,15 @@ export function SubDetailPopup({
                 <div className="prog">
                   <div className="pl"><span>Tiến độ thanh toán</span><span>{progress}%</span></div>
                   <div className="bar"><div className="fill" style={{ width: `${progress}%` }} /></div>
+                </div>
+              )}
+
+              {/* cảnh báo lệch giữa tổng đợt và giá trị HĐ */}
+              {canFin && payments.length > 0 && Math.abs(scheduleGap) >= 1 && (
+                <div className="schwarn">
+                  ⚠️ Tổng các đợt ({fmt(scheduleExpectedTotal)} đ) {scheduleGap < 0 ? "vượt" : "thiếu"}{" "}
+                  <b>{fmt(Math.abs(scheduleGap))} đ</b> so với giá trị HĐ ({fmt(contractValue)} đ).
+                  Sửa số tiền một đợt hoặc thêm đợt cho khớp — hệ thống không tự đổi đợt đã lập.
                 </div>
               )}
 

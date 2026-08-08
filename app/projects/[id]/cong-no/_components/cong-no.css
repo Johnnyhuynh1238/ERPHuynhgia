@@ -249,6 +249,10 @@
 .cndoc .prog .bar { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; }
 .cndoc .prog .fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--orange)); transition: width 0.4s ease; }
 
+/* cảnh báo lệch tổng đợt vs giá trị HĐ */
+.cndoc .schwarn { margin-top: 12px; padding: 9px 11px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; color: var(--orange); background: color-mix(in srgb, var(--orange) 12%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); }
+.cndoc .schwarn b { font-weight: 700; }
+
 /* nút action HĐ */
 .cndoc .subacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .cndoc .btn.ghost.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }

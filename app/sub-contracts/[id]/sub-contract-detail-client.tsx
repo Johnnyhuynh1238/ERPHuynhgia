@@ -408,6 +408,14 @@ export function SubContractDetailClient({
     return draftRows.reduce((sum, row) => sum + Number(row.percentage || 0), 0);
   }, [draftRows]);
 
+  // Tổng số tiền các đợt đã lập (bỏ đợt huỷ) để đối chiếu với giá trị HĐ.
+  // Không tự nắn đợt khi đổi giá trị HĐ — chỉ cảnh báo để người dùng tự sửa/thêm đợt cho khớp.
+  const scheduleExpectedTotal = useMemo(() => {
+    return payments
+      .filter((p) => p.status !== SubPaymentStatus.cancelled)
+      .reduce((sum, p) => sum + Number(p.expectedAmount || 0), 0);
+  }, [payments]);
+
   async function activateContract() {
     if (!contract) return;
     const res = await fetch(`/api/sub-contracts/${contract.id}/activate`, { method: "POST" });
@@ -879,6 +887,17 @@ export function SubContractDetailClient({
                   <span>Tổng lịch (%): {paymentMeta.totals.percentTotal?.toFixed(2) || "0.00"}%</span>
                   <span>Tổng đã chi: {formatMoney(paymentMeta.totals.paidTotal || 0)}</span>
                 </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span>Tổng các đợt: {formatMoney(scheduleExpectedTotal)}</span>
+                  <span>Giá trị HĐ: {formatMoney(contractValue)}</span>
+                </div>
+                {payments.length > 0 && Math.abs(scheduleExpectedTotal - contractValue) >= 1 ? (
+                  <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-200">
+                    ⚠️ Tổng các đợt {scheduleExpectedTotal > contractValue ? "vượt" : "thiếu"}{" "}
+                    <b>{formatMoney(Math.abs(scheduleExpectedTotal - contractValue))}</b> so với giá trị HĐ.
+                    Sửa số tiền một đợt hoặc thêm đợt mới cho khớp — hệ thống không tự đổi đợt đã lập.
+                  </div>
+                ) : null}
                 {Number(paymentMeta.totals.percentTotal || 0) > 100 ? (
                   <div className="mt-1 text-yellow-300">Cảnh báo: Tổng % đang vượt 100% (vẫn cho phép lưu theo lịch linh hoạt).</div>
                 ) : null}
