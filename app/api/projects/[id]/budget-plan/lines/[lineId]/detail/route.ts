@@ -39,6 +39,7 @@ export async function GET(
         status: true,
         orderDate: true,
         budgetLineId: true,
+        items: true,
       },
       orderBy: { seq: "desc" },
     }),
@@ -85,6 +86,15 @@ export async function GET(
       amount: num(o.total),
       date: o.orderDate ? o.orderDate.toISOString().slice(0, 10) : null,
       budgetLineId: o.budgetLineId,
+      // Hàng hoá trong đơn (popup con). Chỉ mh_order có.
+      goods: Array.isArray(o.items)
+        ? (o.items as { name?: string; unit?: string; qty?: number; price?: number }[]).map((it) => ({
+            name: String(it.name ?? ""),
+            unit: String(it.unit ?? ""),
+            qty: Number(it.qty ?? 0),
+            price: Number(it.price ?? 0),
+          }))
+        : [],
     })),
     ...subs.map((s) => ({
       source: "sub" as const,

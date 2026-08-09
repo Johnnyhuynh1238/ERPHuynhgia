@@ -2,6 +2,7 @@
 
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "./budget-plan.css";
 
@@ -40,6 +41,7 @@ type PlanData = {
 
 type EditLine = { name: string; groupKind: string; amount: string };
 
+type Goods = { name: string; unit: string; qty: number; price: number };
 type DetailItem = {
   source: "mh_order" | "sub" | "expense";
   id: string;
@@ -48,6 +50,7 @@ type DetailItem = {
   amount: number;
   date: string | null;
   budgetLineId: string | null;
+  goods?: Goods[]; // hàng hoá trong đơn (chỉ mh_order)
 };
 type DetailData = { items: DetailItem[]; lines: { id: string; name: string; groupKind: string }[] };
 const SRC_LABEL: Record<DetailItem["source"], string> = {
@@ -91,6 +94,10 @@ export function BudgetPlanClient({
   // key `${source}:${id}` -> lineId đang chọn ("" = bỏ gắn).
   const [changes, setChanges] = useState<Record<string, string>>({});
   const [savingReassign, setSavingReassign] = useState(false);
+  // Popup con: hàng hoá của 1 đơn mua hàng.
+  const [goodsItem, setGoodsItem] = useState<DetailItem | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const s = localStorage.getItem("cashplan-theme");
@@ -241,31 +248,26 @@ export function BudgetPlanClient({
   const fontVars = `${plexSans.variable} ${plexMono.variable}`;
 
   return (
+    <>
     <div className={`bpdoc ${fontVars} -mx-4 -mt-4 md:-mx-6 md:-mt-6`} data-theme={theme}>
       <div className="bp-inner">
-        <div className="bp-top">
-          <div className="bp-brand">
-            <span className="bp-mark">HG</span>
-            <div>
-              <b>{projectCode}</b>
-              <span>Ngân sách dự án</span>
+        <div className="bp-titlebar">
+          <div>
+            <div className="bp-eyebrow">
+              {projectCode} · {projectName}
             </div>
+            <h1 className="bp-h1">
+              Ngân sách theo hạng mục
+              {locked ? (
+                <span className="bp-lock on">🔒 Đã khoá</span>
+              ) : (
+                <span className="bp-lock">✎ Nháp</span>
+              )}
+            </h1>
           </div>
           <button className="bp-iconbtn" onClick={toggleTheme} title="Đổi nền">
             {theme === "dark" ? "☀" : "☾"}
           </button>
-        </div>
-
-        <div>
-          <div className="bp-eyebrow">Quản lý dòng tiền · {projectName}</div>
-          <h1 className="bp-h1">
-            Ngân sách theo hạng mục
-            {locked ? (
-              <span className="bp-lock on">🔒 Đã khoá</span>
-            ) : (
-              <span className="bp-lock">✎ Nháp</span>
-            )}
-          </h1>
         </div>
 
         {/* KPI */}
@@ -421,76 +423,143 @@ export function BudgetPlanClient({
         )}
       </div>
 
-      {/* Popup chi tiết hạng mục: list chi phí + đổi hạng mục từng khoản, Lưu 1 lần. */}
-      {detailLine && (
-        <div className="bp-modal-scrim" onClick={() => !savingReassign && setDetailLine(null)}>
-          <div className="bp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="bp-modal-head">
-              <div>
-                <div className="bp-modal-eyebrow">Chi phí gắn hạng mục</div>
-                <b>{detailLine.name}</b>
-              </div>
-              <button className="bp-iconbtn" onClick={() => setDetailLine(null)} aria-label="Đóng">
-                ✕
-              </button>
-            </div>
-
-            <div className="bp-modal-body">
-              {detailLoading && <p className="bp-empty">Đang tải…</p>}
-              {!detailLoading && detail && detail.items.length === 0 && (
-                <p className="bp-empty">Chưa có chi phí nào gắn hạng mục này.</p>
-              )}
-              {!detailLoading &&
-                detail &&
-                detail.items.map((it) => {
-                  const k = itemKey(it);
-                  const val = k in changes ? changes[k] : it.budgetLineId ?? "";
-                  const dirty = (val || null) !== (it.budgetLineId || null);
-                  return (
-                    <div className={`bp-ditem${dirty ? " dirty" : ""}`} key={k}>
-                      <div className="bp-ditem-main">
-                        <span className="bp-ditem-src">{SRC_LABEL[it.source]}</span>
-                        <span className="bp-ditem-label">{it.label}</span>
-                        <span className="bp-ditem-sub">
-                          {it.sub}
-                          {it.date ? ` · ${it.date}` : ""}
-                        </span>
-                      </div>
-                      <div className="bp-ditem-right">
-                        <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
-                        <select
-                          value={val}
-                          onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}
-                        >
-                          <option value="">— Chưa gắn —</option>
-                          {detail.lines.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="bp-modal-foot">
-              <button className="bp-btn" onClick={() => setDetailLine(null)} disabled={savingReassign}>
-                Huỷ
-              </button>
-              <button
-                className="bp-btn solid"
-                onClick={saveReassign}
-                disabled={savingReassign || pendingChanges.length === 0}
-              >
-                {savingReassign ? "Đang lưu…" : `Lưu${pendingChanges.length ? ` (${pendingChanges.length})` : ""}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+
+      {/* Bottom-sheet chi tiết hạng mục (portal ra body — thoát transform AppShell). */}
+      {mounted &&
+        detailLine &&
+        createPortal(
+          <div className={`bpdoc bp-portal ${fontVars}`} data-theme={theme}>
+            <div className="bp-sheet-scrim" onClick={() => !savingReassign && setDetailLine(null)} />
+            <div className="bp-sheet" role="dialog" aria-modal="true">
+              <div className="bp-sheet-grip" />
+              <div className="bp-sheet-head">
+                <div>
+                  <div className="bp-modal-eyebrow">Chi phí gắn hạng mục</div>
+                  <b>{detailLine.name}</b>
+                </div>
+                <button className="bp-iconbtn" onClick={() => setDetailLine(null)} aria-label="Đóng">
+                  ✕
+                </button>
+              </div>
+
+              <div className="bp-sheet-body">
+                {detailLoading && <p className="bp-empty">Đang tải…</p>}
+                {!detailLoading && detail && detail.items.length === 0 && (
+                  <p className="bp-empty">Chưa có chi phí nào gắn hạng mục này.</p>
+                )}
+                {!detailLoading &&
+                  detail &&
+                  detail.items.map((it) => {
+                    const k = itemKey(it);
+                    const val = k in changes ? changes[k] : it.budgetLineId ?? "";
+                    const dirty = (val || null) !== (it.budgetLineId || null);
+                    const hasGoods = it.source === "mh_order" && (it.goods?.length ?? 0) > 0;
+                    return (
+                      <div className={`bp-ditem${dirty ? " dirty" : ""}`} key={k}>
+                        {hasGoods ? (
+                          <button
+                            type="button"
+                            className="bp-ditem-main as-btn"
+                            onClick={() => setGoodsItem(it)}
+                            title="Xem hàng hoá trong đơn"
+                          >
+                            <span className="bp-ditem-src">{SRC_LABEL[it.source]}</span>
+                            <span className="bp-ditem-label">
+                              {it.label} <span className="bp-ditem-chev">›</span>
+                            </span>
+                            <span className="bp-ditem-sub">
+                              {it.sub}
+                              {it.date ? ` · ${it.date}` : ""} · {it.goods?.length} hàng
+                            </span>
+                          </button>
+                        ) : (
+                          <div className="bp-ditem-main">
+                            <span className="bp-ditem-src">{SRC_LABEL[it.source]}</span>
+                            <span className="bp-ditem-label">{it.label}</span>
+                            <span className="bp-ditem-sub">
+                              {it.sub}
+                              {it.date ? ` · ${it.date}` : ""}
+                            </span>
+                          </div>
+                        )}
+                        <div className="bp-ditem-right">
+                          <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
+                          <select
+                            value={val}
+                            onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}
+                          >
+                            <option value="">— Chưa gắn —</option>
+                            {detail.lines.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="bp-sheet-foot">
+                <button className="bp-btn" onClick={() => setDetailLine(null)} disabled={savingReassign}>
+                  Đóng
+                </button>
+                <button
+                  className="bp-btn solid"
+                  onClick={saveReassign}
+                  disabled={savingReassign || pendingChanges.length === 0}
+                >
+                  {savingReassign ? "Đang lưu…" : `Lưu${pendingChanges.length ? ` (${pendingChanges.length})` : ""}`}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Popup con: hàng hoá của 1 đơn mua hàng. */}
+      {mounted &&
+        goodsItem &&
+        createPortal(
+          <div className={`bpdoc bp-portal ${fontVars}`} data-theme={theme}>
+            <div className="bp-sheet-scrim" onClick={() => setGoodsItem(null)} />
+            <div className="bp-sheet bp-sheet-goods" role="dialog" aria-modal="true">
+              <div className="bp-sheet-grip" />
+              <div className="bp-sheet-head">
+                <div>
+                  <div className="bp-modal-eyebrow">Hàng hoá trong đơn</div>
+                  <b>{goodsItem.label}</b>
+                </div>
+                <button className="bp-iconbtn" onClick={() => setGoodsItem(null)} aria-label="Đóng">
+                  ✕
+                </button>
+              </div>
+              <div className="bp-sheet-body">
+                {(goodsItem.goods ?? []).length === 0 && <p className="bp-empty">Đơn không có hàng.</p>}
+                {(goodsItem.goods ?? []).map((g, i) => (
+                  <div className="bp-good" key={i}>
+                    <div className="bp-good-main">
+                      <span className="bp-good-name">{g.name}</span>
+                      <span className="bp-good-sub num">
+                        {fmt(g.qty)} {g.unit} × {fmt(g.price)}
+                      </span>
+                    </div>
+                    <span className="bp-good-amt num">{fmt(g.qty * g.price)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bp-sheet-foot">
+                <button className="bp-btn solid" onClick={() => setGoodsItem(null)}>
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

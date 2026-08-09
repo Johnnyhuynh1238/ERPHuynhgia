@@ -248,13 +248,26 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   );
   const rangeActive = Boolean(fromD || toD);
 
+  // Ngân sách "còn phải chi" mỗi dự án = khoản CHI chưa có kế hoạch (chưa đặt đơn).
+  const budgetRows = useMemo(
+    () =>
+      (data?.budget?.byProject ?? [])
+        .filter((p) => p.remaining > EPS)
+        .map((p) => ({ key: `budget:${p.projectId}`, label: p.label, amount: p.remaining })),
+    [data],
+  );
+  const budgetChiTotal = useMemo(() => budgetRows.reduce((s, b) => s + b.amount, 0), [budgetRows]);
+
   const totals = useMemo(() => {
     const chi = rows.filter((r) => r.direction === "out").reduce((s, r) => s + r.total, 0);
     const thu = rows.filter((r) => r.direction === "in").reduce((s, r) => s + r.total, 0);
-    const chiChua = unplanned.filter((r) => r.direction === "out").reduce((s, r) => s + r.unplanned, 0);
+    // Chi chưa lên KH gồm: khoản nguồn chưa xếp ngày + hạn mức ngân sách còn phải chi.
+    const chiChua =
+      unplanned.filter((r) => r.direction === "out").reduce((s, r) => s + r.unplanned, 0) +
+      budgetChiTotal;
     const thuChua = unplanned.filter((r) => r.direction === "in").reduce((s, r) => s + r.unplanned, 0);
     return { chi, thu, chiChua, thuChua };
-  }, [rows, unplanned]);
+  }, [rows, unplanned, budgetChiTotal]);
 
   // ── mutations ──────────────────────────────────────────────────────────────
   const api = useCallback(
@@ -418,29 +431,12 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           </button>
         </nav>
 
-        {/* Tab Chi: còn phải chi theo ngân sách — tổng mọi dự án + từng dự án. */}
-        {view === "chi" && data?.budget && (
-          <div className="cp-budget-rem">
-            <div className="cp-budget-head">
-              <span>Còn phải chi (ngân sách tất cả dự án)</span>
-              <strong className={data.budget.total < 0 ? "over" : ""}>{fmt(data.budget.total)}</strong>
-            </div>
-            <ul className="cp-budget-list">
-              {data.budget.byProject.map((p) => (
-                <li key={p.projectId} className={p.remaining < 0 ? "over" : ""}>
-                  <span>{p.label}</span>
-                  <b>{fmt(p.remaining)}</b>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
         {loading && <div className="cp-loading">Đang tải…</div>}
 
         <FlowView
           dir={dir}
           unplanned={activeUnplanned}
+          budgetRows={dir === "out" ? budgetRows : []}
           days={activeDays}
           rangeActive={rangeActive}
           onPlan={planLeft}
@@ -526,6 +522,7 @@ function DayBlock({
 function FlowView({
   dir,
   unplanned,
+  budgetRows,
   days,
   rangeActive,
   onPlan,
@@ -536,6 +533,7 @@ function FlowView({
 }: {
   dir: "in" | "out";
   unplanned: CashRow[];
+  budgetRows: { key: string; label: string; amount: number }[];
   days: DayData[];
   rangeActive: boolean;
   onPlan: (r: CashRow, date: string, amount: number) => Promise<boolean | void>;
@@ -550,16 +548,29 @@ function FlowView({
   const futureDays = days.filter((d) => d.date >= today);
   const overdueCount = overdueDays.reduce((s, d) => s + d.items.length, 0);
   const futureCount = futureDays.reduce((s, d) => s + d.items.length, 0);
-  const empty = unplanned.length === 0 && days.length === 0 && !loading;
+  const empty = unplanned.length === 0 && days.length === 0 && budgetRows.length === 0 && !loading;
   return (
     <div className="cp-list">
       {/* ── Chưa lên kế hoạch (luôn trên cùng) ── */}
-      {unplanned.length > 0 && (
+      {(unplanned.length > 0 || budgetRows.length > 0) && (
         <>
           <div className="cp-sec warn">
             <span>⏳ Chưa lên kế hoạch</span>
-            <span className="cp-sec-n">{unplanned.length}</span>
+            <span className="cp-sec-n">{unplanned.length + budgetRows.length}</span>
           </div>
+          {/* Hạn mức ngân sách còn phải chi (chưa đặt đơn) — chỉ hiển thị, không lên lịch. */}
+          {budgetRows.map((b) => (
+            <div key={b.key} className="cp-card out cp-card-budget">
+              <div className="cp-card-top">
+                <div>
+                  <b>🏦 Ngân sách còn phải chi</b>
+                  <small className="proj">{b.label}</small>
+                  <small>Hạn mức chưa đặt đơn</small>
+                </div>
+                <span className="cp-amt out">{fmt(b.amount)}</span>
+              </div>
+            </div>
+          ))}
           {unplanned.map((r) => (
             <UnplannedCard
               key={r.key}

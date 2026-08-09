@@ -95,17 +95,9 @@
 .cpdoc .cp-kpi.out strong { color: var(--red); }
 .cpdoc .cp-kpi.in strong { color: var(--ok); }
 
-/* ── còn phải chi theo ngân sách (banner đầu tab Chi) ── */
-.cpdoc .cp-budget-rem { margin-top: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 10px; }
-.cpdoc .cp-budget-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cpdoc .cp-budget-head span { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mut); }
-.cpdoc .cp-budget-head strong { font-size: 19px; font-weight: 700; color: var(--ok); font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; }
-.cpdoc .cp-budget-head strong.over { color: var(--red); }
-.cpdoc .cp-budget-list { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 5px; }
-.cpdoc .cp-budget-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; }
-.cpdoc .cp-budget-list li span { color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cpdoc .cp-budget-list li b { color: var(--ok); font-weight: 600; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; flex: none; }
-.cpdoc .cp-budget-list li.over b { color: var(--red); }
+/* ── card "ngân sách còn phải chi" (khoản chi chưa lên kế hoạch, chỉ hiển thị) ── */
+.cpdoc .cp-card-budget { border-style: dashed; }
+.cpdoc .cp-card-budget b { font-weight: 600; }
 
 /* ── tabs ngang ── */
 .cpdoc .cp-tabs { display: flex; gap: 4px; padding: 4px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
