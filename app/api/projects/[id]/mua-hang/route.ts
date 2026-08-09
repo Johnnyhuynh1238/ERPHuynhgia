@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
-import { guessBudgetLineId } from "@/lib/budget-line-match";
 
 export const runtime = "nodejs";
 
 // 1 dòng vật tư trong đơn (snapshot từ dự toán khi tạo — SL khoá).
-type OrderItem = { key: string; name: string; unit: string; qty: number; price: number; hm?: string | null };
+type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 
 // Tên gốc VT (bỏ phần " (quy cách…)") — khớp cách gộp ở màn mua hàng.
 const baseName = (n: string) => {
@@ -27,8 +26,7 @@ function cleanItems(raw: unknown): OrderItem[] {
     const unit = String(o.unit || "").trim();
     const key = String(o.key || `${name}|${unit}`);
     if (!name || !(qty > 0)) continue;
-    const hm = o.hm ? String(o.hm) : null;
-    out.push({ key, name, unit, qty, price: price >= 0 ? price : 0, hm });
+    out.push({ key, name, unit, qty, price: price >= 0 ? price : 0 });
   }
   return out;
 }
@@ -86,6 +84,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       note: o.note,
       total: Number(o.total),
       items: o.items,
+      budgetLineId: o.budgetLineId,
       receiptImages: o.receiptImages,
       receivedAt: o.receivedAt,
       hasInflightExpense: inflightSet.has(o.id),
@@ -107,6 +106,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     supplierId?: string | null;
     note?: string;
     deliveryDate?: string | null;
+    budgetLineId?: string | null;
   };
   const items = cleanItems(body.items);
   if (!items.length) {
@@ -122,13 +122,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const project = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!project) return NextResponse.json({ message: "Không thấy dự án" }, { status: 404 });
 
-  // Đoán hạng mục cho item còn thiếu (vd AI thêm giỏ không gắn). Chỉ khi dự án có ngân sách.
+  // Hạng mục ngân sách gắn cho CẢ ĐƠN — bắt buộc chọn khi dự án đã lập ngân sách.
   const budgetLines = await prisma.projectBudgetPlanLine.findMany({
     where: { plan: { projectId: params.id } },
-    select: { id: true, name: true },
+    select: { id: true },
   });
+  const budgetLineId = body.budgetLineId ? String(body.budgetLineId) : null;
   if (budgetLines.length) {
-    for (const it of items) if (!it.hm) it.hm = guessBudgetLineId(it.name, budgetLines);
+    if (!budgetLineId || !budgetLines.some((l) => l.id === budgetLineId)) {
+      return NextResponse.json(
+        { message: "Chọn hạng mục ngân sách cho đơn trước khi đặt hàng" },
+        { status: 400 },
+      );
+    }
   }
 
   // ── Kế toán: 1 tường SL theo dự toán (giá KT tự ghi). Admin bỏ qua (tự do). ──
@@ -218,6 +224,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       deliveryDate,
       total: money(items),
       items,
+      budgetLineId,
       createdBy: user!.id,
     },
   });

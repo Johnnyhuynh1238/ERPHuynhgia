@@ -4,14 +4,14 @@ import { requireMuaHang } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
-type OrderItem = { key: string; name: string; unit: string; qty: number; price: number; hm?: string | null };
+type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 
 const STATUSES = ["draft", "ordered", "received", "paid"] as const;
 type St = (typeof STATUSES)[number];
 
 // PATCH: sửa đơn. Body có thể có:
 //   supplierName, supplierId, status, orderDate(ISO), deliveryDate("YYYY-MM-DD"|null),
-//   note,
+//   note, budgetLineId(hạng mục ngân sách của CẢ ĐƠN, null = bỏ gắn),
 //   items(OrderItem[] — sửa tên/đvt/SL/đơn giá theo thứ tự, KT+admin đều được, tính lại total),
 //   prices(number[] — legacy, chỉ đổi đơn giá) — dùng khi không gửi items.
 export async function PATCH(
@@ -29,18 +29,14 @@ export async function PATCH(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
   // Đơn ĐÃ TRẢ (paid — đã gắn sổ quỹ) → khoá. NGOẠI LỆ: admin được sửa RIÊNG hạng
-  // mục (items[].hm) để thống kê ngân sách; giữ nguyên tên/SL/giá/total.
+  // mục ngân sách của đơn (budgetLineId) để thống kê; giữ nguyên tên/SL/giá/total.
   if (order.status === "paid") {
     const isAdmin = !isKeToan;
-    if (isAdmin && Array.isArray(body.items)) {
-      const orig = order.items as unknown as OrderItem[];
-      const patch = body.items as unknown[];
-      const items = orig.map((it, i) => {
-        const o = (patch[i] && typeof patch[i] === "object" ? patch[i] : {}) as Record<string, unknown>;
-        const hm = "hm" in o ? (o.hm ? String(o.hm) : null) : it.hm ?? null;
-        return { ...it, hm };
+    if (isAdmin && "budgetLineId" in body) {
+      await prisma.mhOrder.update({
+        where: { id: order.id },
+        data: { budgetLineId: body.budgetLineId ? String(body.budgetLineId) : null },
       });
-      await prisma.mhOrder.update({ where: { id: order.id }, data: { items } });
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json(
@@ -59,6 +55,7 @@ export async function PATCH(
   if ("supplierName" in body) data.supplierName = String(body.supplierName || "").trim() || null;
   if ("supplierId" in body) data.supplierId = body.supplierId ? String(body.supplierId) : null;
   if ("note" in body) data.note = String(body.note || "").trim() || null;
+  if ("budgetLineId" in body) data.budgetLineId = body.budgetLineId ? String(body.budgetLineId) : null;
 
   if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) {
     data.status = body.status as St;
@@ -98,15 +95,12 @@ export async function PATCH(
       const price = Math.round(Number(o.price));
       const name = String(o.name ?? base?.name ?? "").trim();
       const unit = String(o.unit ?? base?.unit ?? "").trim();
-      // hm: nhận nếu client gửi (kể cả null để xoá), else giữ nguyên gốc.
-      const hm = "hm" in o ? (o.hm ? String(o.hm) : null) : base?.hm ?? null;
       return {
         key: String(o.key ?? base?.key ?? `${name}|${unit}`),
         name,
         unit,
         qty: Number.isFinite(qty) && qty > 0 ? qty : base?.qty ?? 0,
         price: Number.isFinite(price) && price >= 0 ? price : base?.price ?? 0,
-        hm,
       } as OrderItem;
     });
     data.items = items;

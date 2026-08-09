@@ -33,8 +33,6 @@ export type BudgetPlanData = {
 const num = (d: Prisma.Decimal | number | bigint | null | undefined): number =>
   d == null ? 0 : Number(d);
 
-type MhItem = { qty?: number; price?: number; hm?: string | null };
-
 const MH_ACTIVE: MhOrderStatus[] = [MhOrderStatus.ordered, MhOrderStatus.received, MhOrderStatus.paid];
 
 export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData> {
@@ -46,7 +44,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     prisma.project.findUnique({ where: { id: projectId }, select: { contractValue: true } }),
     prisma.mhOrder.findMany({
       where: { projectId, status: { in: MH_ACTIVE } },
-      select: { id: true, status: true, total: true, items: true, supplierId: true },
+      select: { id: true, status: true, total: true, supplierId: true, budgetLineId: true },
     }),
     prisma.subContract.findMany({
       where: { projectId, status: { in: ["active", "completed"] }, budgetLineId: { not: null } },
@@ -113,56 +111,46 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
   };
   const unassigned = { spent: 0, debt: 0 };
 
-  const itemsOf = (o: (typeof orders)[number]) =>
-    Array.isArray(o.items) ? (o.items as unknown as MhItem[]) : [];
-
-  // ── Mua hàng TRẢ NGAY: phân bổ đã trả (cọc/paid) & còn nợ theo item ──
+  // ── Mua hàng TRẢ NGAY: phân bổ đã trả (cọc/paid) & còn nợ theo HẠNG MỤC CỦA ĐƠN ──
   for (const o of cashOrders) {
     const total = num(o.total);
     if (total <= 0) continue;
     const paidOrder = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
-    for (const it of itemsOf(o)) {
-      const amt = num(it.qty) * num(it.price);
-      if (amt <= 0) continue;
-      const ratio = amt / total;
-      const itemPaid = paidOrder * ratio;
-      const itemOwed = amt - itemPaid;
-      if (it.hm) {
-        add(spent, it.hm, itemPaid);
-        add(debt, it.hm, itemOwed);
-      } else {
-        unassigned.spent += itemPaid;
-        unassigned.debt += itemOwed;
-      }
+    const owed = total - paidOrder;
+    if (o.budgetLineId) {
+      add(spent, o.budgetLineId, paidOrder);
+      add(debt, o.budgetLineId, owed);
+    } else {
+      unassigned.spent += paidOrder;
+      unassigned.debt += owed;
     }
   }
 
   // ── Mua hàng CÔNG NỢ NCC: gom theo NCC, phân bổ da_tra/con_lai theo tỉ trọng
-  //    hạng mục (từ items các đơn của NCC đó). ──
+  //    HẠNG MỤC CỦA ĐƠN (tổng đơn), không còn theo item. ──
   const debtBySupplier = new Map<string, typeof debtOrders>();
   for (const o of debtOrders) {
     const k = o.supplierId!;
     (debtBySupplier.get(k) ?? debtBySupplier.set(k, []).get(k)!).push(o);
   }
   for (const [supplierId, group] of Array.from(debtBySupplier.entries())) {
-    // tỉ trọng theo hm (null = chưa gắn) trong toàn bộ đơn NCC.
+    // tỉ trọng theo hạng mục đơn (null = chưa gắn) trong toàn bộ đơn NCC.
     const weight = new Map<string | null, number>();
-    let sumItems = 0;
-    for (const o of group)
-      for (const it of itemsOf(o)) {
-        const amt = num(it.qty) * num(it.price);
-        if (amt <= 0) continue;
-        const key = it.hm ?? null;
-        weight.set(key, (weight.get(key) ?? 0) + amt);
-        sumItems += amt;
-      }
-    if (sumItems <= 0) continue;
+    let sumOrders = 0;
+    for (const o of group) {
+      const amt = num(o.total);
+      if (amt <= 0) continue;
+      const key = o.budgetLineId ?? null;
+      weight.set(key, (weight.get(key) ?? 0) + amt);
+      sumOrders += amt;
+    }
+    if (sumOrders <= 0) continue;
     const ncc = nccMap.get(supplierId);
     // Nếu NCC không có trong view (chưa ghi công nợ) → coi toàn bộ là công nợ chưa trả.
     const paidNcc = ncc ? ncc.da_tra : 0;
-    const owedNcc = ncc ? ncc.con_lai : sumItems;
+    const owedNcc = ncc ? ncc.con_lai : sumOrders;
     for (const [key, w] of Array.from(weight.entries())) {
-      const ratio = w / sumItems;
+      const ratio = w / sumOrders;
       const sp = paidNcc * ratio;
       const dt = owedNcc * ratio;
       if (key) {

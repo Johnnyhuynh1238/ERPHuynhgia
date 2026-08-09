@@ -464,6 +464,19 @@
 .vt-box .hm-sel { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
 .vt-box .hm-sel:focus { border-color: var(--orange); }
 
+/* hạng mục ngân sách cho CẢ ĐƠN — giỏ hàng */
+.mhdoc .cart-hm { margin-top: 14px; }
+.mhdoc .cart-hm > label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
+.mhdoc .cart-hm select { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
+.mhdoc .cart-hm select:focus { border-color: var(--orange); }
+.mhdoc .cart-hm-hint { margin-top: 5px; font-size: 11px; color: var(--mut2); }
+
+/* hạng mục ngân sách cho CẢ ĐƠN — sửa đơn (EditSheet) */
+.mhp .sbody .fld > .hm-sel { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
+.mhp .sbody .fld > .hm-sel:focus { border-color: var(--orange); }
+.mhp .sbody .fld > .hm-badge { font-size: 13px; font-weight: 600; color: var(--terra); }
+.mhp .sbody .fld > .hm-badge.none { color: var(--red); font-weight: 500; }
+
 /* pill trạng thái bấm ra list chọn */
 .mhp .spillw { position: relative; margin-left: auto; flex: none; }
 .mhp .spill { display: inline-flex; align-items: center; gap: 5px; border: none; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 999px; padding: 6px 12px; }

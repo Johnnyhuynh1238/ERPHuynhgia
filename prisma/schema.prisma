@@ -4420,6 +4420,8 @@ model MhOrder {
   note         String?       @db.Text
   total        Decimal       @default(0) @db.Decimal(18, 2)
   items        Json          @default("[]")
+  // Hạng mục ngân sách gắn cho CẢ ĐƠN (thống kê vào ProjectBudgetPlanLine). Scalar, FK ở migration.
+  budgetLineId String?       @map("budget_line_id") @db.Uuid
   // Ảnh chứng minh nhận hàng (KT bắt buộc khi mark "đã nhận"): [{url,kind}] kind=phieu|hang
   receiptImages Json         @default("[]") @map("receipt_images")
   receivedAt   DateTime?     @map("received_at")
@@ -4431,6 +4433,7 @@ model MhOrder {
   @@unique([projectId, seq])
   @@index([projectId, status])
   @@index([projectId, createdAt(sort: Desc)])
+  @@index([budgetLineId])
   @@map("mh_orders")
 }
 
