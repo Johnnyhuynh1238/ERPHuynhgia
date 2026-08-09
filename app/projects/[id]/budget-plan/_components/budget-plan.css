@@ -111,3 +111,31 @@
 @media (max-width: 720px) {
   .bpdoc .bp-kpis { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── dòng hạng mục bấm được + popup chi tiết ── */
+.bpdoc .bp-clickable { cursor: pointer; }
+.bpdoc .bp-clickable:hover > td { background: var(--card2); }
+
+.bpdoc .bp-modal-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.5); display: flex; align-items: flex-end; justify-content: center; }
+.bpdoc .bp-modal { width: 100%; max-width: 620px; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line2); border-radius: 16px 16px 0 0; overflow: hidden; }
+.bpdoc .bp-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.bpdoc .bp-modal-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); }
+.bpdoc .bp-modal-head b { font-size: 16px; }
+.bpdoc .bp-modal-body { padding: 4px 16px; overflow-y: auto; flex: 1; }
+.bpdoc .bp-ditem { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.bpdoc .bp-ditem.dirty { background: rgba(227, 97, 34, 0.08); border-radius: 8px; padding: 10px; border-bottom-color: transparent; }
+.bpdoc .bp-ditem-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bpdoc .bp-ditem-src { font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--orange); }
+.bpdoc .bp-ditem-label { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
+.bpdoc .bp-ditem-sub { font-size: 11px; color: var(--mut); }
+.bpdoc .bp-ditem-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: none; }
+.bpdoc .bp-ditem-amt { font-size: 13px; font-weight: 600; }
+.bpdoc .bp-ditem-right select { max-width: 170px; font-family: inherit; font-size: 12px; color: var(--text); background: var(--card); border: 1px solid var(--line2); border-radius: 8px; padding: 5px 7px; outline: none; }
+.bpdoc .bp-ditem-right select:focus { border-color: var(--orange); }
+.bpdoc .bp-modal-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
+.bpdoc .bp-modal-foot .bp-btn { min-width: 92px; text-align: center; }
+
+@media (min-width: 640px) {
+  .bpdoc .bp-modal-scrim { align-items: center; padding: 20px; }
+  .bpdoc .bp-modal { border-radius: 16px; }
+}

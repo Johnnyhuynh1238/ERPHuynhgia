@@ -40,6 +40,23 @@ type PlanData = {
 
 type EditLine = { name: string; groupKind: string; amount: string };
 
+type DetailItem = {
+  source: "mh_order" | "sub" | "expense";
+  id: string;
+  label: string;
+  sub: string;
+  amount: number;
+  date: string | null;
+  budgetLineId: string | null;
+};
+type DetailData = { items: DetailItem[]; lines: { id: string; name: string; groupKind: string }[] };
+const SRC_LABEL: Record<DetailItem["source"], string> = {
+  mh_order: "Mua hàng",
+  sub: "Thầu phụ",
+  expense: "Chi tay",
+};
+const itemKey = (it: DetailItem) => `${it.source}:${it.id}`;
+
 const GROUPS: { key: string; label: string }[] = [
   { key: "tho", label: "Phần thô" },
   { key: "hoan_thien", label: "Hoàn thiện" },
@@ -66,6 +83,14 @@ export function BudgetPlanClient({
   const [edit, setEdit] = useState(false);
   const [rows, setRows] = useState<EditLine[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Popup chi tiết 1 hạng mục: list chi phí gắn vào + đổi hạng mục từng khoản (admin).
+  const [detailLine, setDetailLine] = useState<{ id: string | null; name: string } | null>(null);
+  const [detail, setDetail] = useState<DetailData | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  // key `${source}:${id}` -> lineId đang chọn ("" = bỏ gắn).
+  const [changes, setChanges] = useState<Record<string, string>>({});
+  const [savingReassign, setSavingReassign] = useState(false);
 
   useEffect(() => {
     const s = localStorage.getItem("cashplan-theme");
@@ -94,6 +119,65 @@ export function BudgetPlanClient({
   useEffect(() => {
     load();
   }, [load]);
+
+  const openDetail = useCallback(
+    async (line: { id: string | null; name: string }) => {
+      setDetailLine(line);
+      setDetail(null);
+      setChanges({});
+      setDetailLoading(true);
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/budget-plan/lines/${line.id ?? "unassigned"}/detail`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) throw new Error();
+        setDetail(await res.json());
+      } catch {
+        toast.error("Không tải được chi tiết hạng mục");
+        setDetailLine(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [projectId],
+  );
+
+  const pendingChanges = useMemo(() => {
+    if (!detail) return [];
+    return detail.items
+      .filter((it) => {
+        const k = itemKey(it);
+        return k in changes && (changes[k] || null) !== (it.budgetLineId || null);
+      })
+      .map((it) => ({ source: it.source, id: it.id, budgetLineId: changes[itemKey(it)] || null }));
+  }, [detail, changes]);
+
+  const saveReassign = async () => {
+    if (!pendingChanges.length) {
+      setDetailLine(null);
+      return;
+    }
+    setSavingReassign(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/budget-plan/reassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes: pendingChanges }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error);
+      }
+      toast.success(`Đã đổi hạng mục ${pendingChanges.length} khoản`);
+      setDetailLine(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Lưu lỗi");
+    } finally {
+      setSavingReassign(false);
+    }
+  };
 
   const locked = data?.status === "locked";
   const t = data?.totals ?? { budget: 0, spent: 0, debt: 0, remaining: 0 };
@@ -294,11 +378,21 @@ export function BudgetPlanClient({
                     { b: 0, s: 0, d: 0, r: 0 },
                   );
                   return (
-                    <GroupRows key={g.key} label={g.label} lines={ls} sum={gsum} />
+                    <GroupRows
+                      key={g.key}
+                      label={g.label}
+                      lines={ls}
+                      sum={gsum}
+                      onOpen={canLock ? openDetail : undefined}
+                    />
                   );
                 })}
                 {(data.unassigned.spent > 0 || data.unassigned.debt > 0) && (
-                  <tr className="bp-unassigned">
+                  <tr
+                    className={`bp-unassigned${canLock ? " bp-clickable" : ""}`}
+                    onClick={canLock ? () => openDetail({ id: null, name: "Chưa gắn hạng mục" }) : undefined}
+                    title={canLock ? "Gán hạng mục cho khoản mồ côi" : undefined}
+                  >
                     <td className="l">⚠ Chưa gắn hạng mục</td>
                     <td className="num">—</td>
                     <td className="num">{fmt(data.unassigned.spent)}</td>
@@ -326,6 +420,76 @@ export function BudgetPlanClient({
           <p className="bp-empty">Chưa lập ngân sách. Bấm “Lập ngân sách”.</p>
         )}
       </div>
+
+      {/* Popup chi tiết hạng mục: list chi phí + đổi hạng mục từng khoản, Lưu 1 lần. */}
+      {detailLine && (
+        <div className="bp-modal-scrim" onClick={() => !savingReassign && setDetailLine(null)}>
+          <div className="bp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="bp-modal-head">
+              <div>
+                <div className="bp-modal-eyebrow">Chi phí gắn hạng mục</div>
+                <b>{detailLine.name}</b>
+              </div>
+              <button className="bp-iconbtn" onClick={() => setDetailLine(null)} aria-label="Đóng">
+                ✕
+              </button>
+            </div>
+
+            <div className="bp-modal-body">
+              {detailLoading && <p className="bp-empty">Đang tải…</p>}
+              {!detailLoading && detail && detail.items.length === 0 && (
+                <p className="bp-empty">Chưa có chi phí nào gắn hạng mục này.</p>
+              )}
+              {!detailLoading &&
+                detail &&
+                detail.items.map((it) => {
+                  const k = itemKey(it);
+                  const val = k in changes ? changes[k] : it.budgetLineId ?? "";
+                  const dirty = (val || null) !== (it.budgetLineId || null);
+                  return (
+                    <div className={`bp-ditem${dirty ? " dirty" : ""}`} key={k}>
+                      <div className="bp-ditem-main">
+                        <span className="bp-ditem-src">{SRC_LABEL[it.source]}</span>
+                        <span className="bp-ditem-label">{it.label}</span>
+                        <span className="bp-ditem-sub">
+                          {it.sub}
+                          {it.date ? ` · ${it.date}` : ""}
+                        </span>
+                      </div>
+                      <div className="bp-ditem-right">
+                        <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
+                        <select
+                          value={val}
+                          onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}
+                        >
+                          <option value="">— Chưa gắn —</option>
+                          {detail.lines.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="bp-modal-foot">
+              <button className="bp-btn" onClick={() => setDetailLine(null)} disabled={savingReassign}>
+                Huỷ
+              </button>
+              <button
+                className="bp-btn solid"
+                onClick={saveReassign}
+                disabled={savingReassign || pendingChanges.length === 0}
+              >
+                {savingReassign ? "Đang lưu…" : `Lưu${pendingChanges.length ? ` (${pendingChanges.length})` : ""}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -334,10 +498,12 @@ function GroupRows({
   label,
   lines,
   sum,
+  onOpen,
 }: {
   label: string;
   lines: LineStat[];
   sum: { b: number; s: number; d: number; r: number };
+  onOpen?: (line: { id: string; name: string }) => void;
 }) {
   return (
     <>
@@ -347,7 +513,12 @@ function GroupRows({
       {lines.map((l) => {
         const pct = l.budget ? Math.round(((l.spent + l.debt) / l.budget) * 100) : 0;
         return (
-          <tr key={l.id} className={l.over ? "over-row" : ""}>
+          <tr
+            key={l.id}
+            className={`${l.over ? "over-row" : ""}${onOpen ? " bp-clickable" : ""}`}
+            onClick={onOpen ? () => onOpen({ id: l.id, name: l.name }) : undefined}
+            title={onOpen ? "Xem chi phí & đổi hạng mục" : undefined}
+          >
             <td className="l">{l.name}</td>
             <td className="num">{fmt(l.budget)}</td>
             <td className="num">{fmt(l.spent)}</td>
