@@ -48,7 +48,16 @@ type CashRow = {
   unplanned: number;
   selfItemId: string | null;
 };
-type CashPlanData = { balance: number; out: CashRow[]; in: CashRow[] };
+type BudgetRemain = {
+  total: number; // tổng còn phải chi mọi dự án có ngân sách
+  byProject: { projectId: string; label: string; remaining: number }[];
+};
+type CashPlanData = {
+  balance: number;
+  out: CashRow[];
+  in: CashRow[];
+  budget?: BudgetRemain | null; // còn phải chi theo ngân sách (tổng cty / hoặc dự án đang lọc)
+};
 
 type TimelineItem = {
   id: string;
@@ -408,6 +417,24 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
             <span className="cp-tabcount">{fmt(rangeChi)}</span>
           </button>
         </nav>
+
+        {/* Tab Chi: còn phải chi theo ngân sách — tổng mọi dự án + từng dự án. */}
+        {view === "chi" && data?.budget && (
+          <div className="cp-budget-rem">
+            <div className="cp-budget-head">
+              <span>Còn phải chi (ngân sách tất cả dự án)</span>
+              <strong className={data.budget.total < 0 ? "over" : ""}>{fmt(data.budget.total)}</strong>
+            </div>
+            <ul className="cp-budget-list">
+              {data.budget.byProject.map((p) => (
+                <li key={p.projectId} className={p.remaining < 0 ? "over" : ""}>
+                  <span>{p.label}</span>
+                  <b>{fmt(p.remaining)}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {loading && <div className="cp-loading">Đang tải…</div>}
 

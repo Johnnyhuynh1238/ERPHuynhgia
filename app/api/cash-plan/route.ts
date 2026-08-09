@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildCashPlan } from "@/lib/cash-plan";
+import { buildBudgetPlan } from "@/lib/budget-plan";
 
 function canAccess(role: string | undefined) {
   return role === UserRole.admin || role === UserRole.accountant;
@@ -16,7 +17,35 @@ export async function GET(req: Request) {
   if (!canAccess(user?.role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const projectId = new URL(req.url).searchParams.get("projectId");
   const data = await buildCashPlan({ projectId: projectId || null });
-  return NextResponse.json(data);
+
+  // "Còn phải chi" theo ngân sách — TỔNG mọi dự án (màn tổng quan cả cty), hoặc
+  // riêng 1 dự án nếu đang lọc. Chỉ gồm dự án đã lập ngân sách.
+  const plans = await prisma.projectBudgetPlan.findMany({ select: { projectId: true } });
+  const targetIds = (projectId ? plans.filter((p) => p.projectId === projectId) : plans).map(
+    (p) => p.projectId,
+  );
+  const projMap = targetIds.length
+    ? new Map(
+        (
+          await prisma.project.findMany({
+            where: { id: { in: targetIds } },
+            select: { id: true, code: true, name: true },
+          })
+        ).map((p) => [p.id, `${p.code} · ${p.name}`]),
+      )
+    : new Map<string, string>();
+  const byProject: { projectId: string; label: string; remaining: number }[] = [];
+  for (const id of targetIds) {
+    const bp = await buildBudgetPlan(id);
+    if (!bp.exists) continue;
+    byProject.push({ projectId: id, label: projMap.get(id) ?? id, remaining: bp.totals.remaining });
+  }
+  byProject.sort((a, b) => b.remaining - a.remaining);
+  const budget = byProject.length
+    ? { total: byProject.reduce((s, r) => s + r.remaining, 0), byProject }
+    : null;
+
+  return NextResponse.json({ ...data, budget });
 }
 
 // ── POST: tạo đợt kế hoạch / khoản nhập tay / chuỗi lương định kỳ ─────────────
