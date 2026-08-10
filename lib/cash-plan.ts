@@ -311,7 +311,9 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         projectLabel: projLabel(sp.subContract.project),
         title: `Thầu phụ · ${sp.subContract.subcontractor.name}`,
         subtitle: `Đợt ${sp.stage} · ${sp.description}`,
-        total: num(sp.actualAmount ?? sp.expectedAmount),
+        // Còn phải trả = đợt (expected) − đã trả cộng dồn (actualAmount, tạm ứng).
+        // Đợt trả đủ → status 'paid' (không nằm SUBPAY_OPEN) nên còn lại luôn > 0.
+        total: Math.max(0, num(sp.expectedAmount) - num(sp.actualAmount)),
         nativeDate: toDate(sp.expectedDate),
         nativeEditable: true,
         canSplit: false,

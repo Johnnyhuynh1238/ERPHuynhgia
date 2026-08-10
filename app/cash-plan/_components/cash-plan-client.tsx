@@ -408,8 +408,11 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           </div>
           <div className="cp-kpi out">
             <label>Tổng chi{rangeActive ? " (trong khoảng)" : ""}</label>
-            <strong>{fmt(rangeChi)}</strong>
-            <em>{fmt(totals.chiChua)} chưa lên KH</em>
+            <strong>{fmt(rangeChi + budgetChiTotal)}</strong>
+            <em>
+              {fmt(totals.chiChua)} chưa lên KH
+              {budgetChiTotal > 0 ? ` · gồm ${fmt(budgetChiTotal)} ngân sách` : ""}
+            </em>
           </div>
         </section>
 
@@ -427,7 +430,7 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
             onClick={() => setView("chi")}
           >
             ↑ Chi
-            <span className="cp-tabcount">{fmt(rangeChi)}</span>
+            <span className="cp-tabcount">{fmt(rangeChi + budgetChiTotal)}</span>
           </button>
         </nav>
 
