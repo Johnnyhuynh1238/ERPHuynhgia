@@ -95,10 +95,6 @@
 .cpdoc .cp-kpi.out strong { color: var(--red); }
 .cpdoc .cp-kpi.in strong { color: var(--ok); }
 
-/* ── card "ngân sách còn phải chi" (khoản chi chưa lên kế hoạch, chỉ hiển thị) ── */
-.cpdoc .cp-card-budget { border-style: dashed; }
-.cpdoc .cp-card-budget b { font-weight: 600; }
-
 /* ── tabs ngang ── */
 .cpdoc .cp-tabs { display: flex; gap: 4px; padding: 4px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
 .cpdoc .cp-tab { flex: 1 1 auto; min-width: max-content; background: none; border: none; color: var(--mut); font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; justify-content: center; }

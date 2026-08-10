@@ -24,21 +24,36 @@ export async function GET(req: Request) {
   const targetIds = (projectId ? plans.filter((p) => p.projectId === projectId) : plans).map(
     (p) => p.projectId,
   );
-  const projMap = targetIds.length
+  // Nhãn + ngày bàn giao dự kiến (expectedEndDate) làm ngày kế hoạch mặc định cho khoản ngân sách.
+  const projInfo = targetIds.length
     ? new Map(
         (
           await prisma.project.findMany({
             where: { id: { in: targetIds } },
-            select: { id: true, code: true, name: true },
+            select: { id: true, code: true, name: true, expectedEndDate: true },
           })
-        ).map((p) => [p.id, `${p.code} · ${p.name}`]),
+        ).map((p) => [
+          p.id,
+          { label: `${p.code} · ${p.name}`, plannedDate: p.expectedEndDate.toISOString().slice(0, 10) },
+        ]),
       )
-    : new Map<string, string>();
-  const byProject: { projectId: string; label: string; remaining: number }[] = [];
+    : new Map<string, { label: string; plannedDate: string }>();
+  const byProject: {
+    projectId: string;
+    label: string;
+    remaining: number;
+    plannedDate: string | null;
+  }[] = [];
   for (const id of targetIds) {
     const bp = await buildBudgetPlan(id);
     if (!bp.exists) continue;
-    byProject.push({ projectId: id, label: projMap.get(id) ?? id, remaining: bp.totals.remaining });
+    const info = projInfo.get(id);
+    byProject.push({
+      projectId: id,
+      label: info?.label ?? id,
+      remaining: bp.totals.remaining,
+      plannedDate: info?.plannedDate ?? null,
+    });
   }
   byProject.sort((a, b) => b.remaining - a.remaining);
   const budget = byProject.length
