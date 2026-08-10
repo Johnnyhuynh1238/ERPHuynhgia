@@ -554,11 +554,13 @@ function FlowView({
   const futureDays = days.filter((d) => d.date >= today);
   const overdueCount = overdueDays.reduce((s, d) => s + d.items.length, 0);
   const futureCount = futureDays.reduce((s, d) => s + d.items.length, 0);
-  const empty = unplanned.length === 0 && days.length === 0 && !loading;
+  // Lọc theo khoảng ngày → chỉ hiện khoản có ngày trong khoảng; ẩn "chưa lên kế hoạch" (không ngày).
+  const showUnplanned = !rangeActive && unplanned.length > 0;
+  const empty = days.length === 0 && (rangeActive || unplanned.length === 0) && !loading;
   return (
     <div className="cp-list">
-      {/* ── Chưa lên kế hoạch (luôn trên cùng) ── */}
-      {unplanned.length > 0 && (
+      {/* ── Chưa lên kế hoạch (luôn trên cùng, ẩn khi lọc khoảng ngày) ── */}
+      {showUnplanned && (
         <>
           <div className="cp-sec warn">
             <span>⏳ Chưa lên kế hoạch</span>
@@ -600,7 +602,11 @@ function FlowView({
         <DayBlock key={d.date} d={d} onDate={onDate} onDelete={onDelete} />
       ))}
 
-      {empty && <p className="cp-empty">Chưa có khoản {word} nào.</p>}
+      {empty && (
+        <p className="cp-empty">
+          Chưa có khoản {word} nào{rangeActive ? " trong khoảng ngày đã chọn" : ""}.
+        </p>
+      )}
     </div>
   );
 }
