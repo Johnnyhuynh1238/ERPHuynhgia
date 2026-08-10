@@ -79,6 +79,28 @@ type TimelineItem = {
 
 type View = "thu" | "chi";
 
+// Sub-tab của tab Chi: nhóm khoản chi theo nguồn cho dễ nhìn.
+type ChiGroup = "all" | "congno" | "budget" | "loan" | "other";
+const CHI_GROUP_MAP: Record<string, Exclude<ChiGroup, "all">> = {
+  sub_payment: "congno", // thầu phụ đợt
+  sub_debt: "congno", // công nợ thầu phụ
+  mh_order: "congno", // mua hàng chưa trả
+  ncc_congno: "congno", // công nợ NCC
+  budget: "budget", // còn chi theo ngân sách (khoản ảo)
+  loan_principal: "loan", // nợ gốc vay
+  loan_interest: "loan", // lãi vay
+  // salary / manual / còn lại → "other" (fallback, khỏi rớt khoản nào)
+};
+const chiGroupOf = (sourceType: string): Exclude<ChiGroup, "all"> =>
+  CHI_GROUP_MAP[sourceType] ?? "other";
+const CHI_GROUP_TABS: { key: ChiGroup; label: string }[] = [
+  { key: "all", label: "Tất cả" },
+  { key: "congno", label: "Công nợ dự án" },
+  { key: "budget", label: "Còn chi theo ngân sách" },
+  { key: "loan", label: "Nợ & lãi vay" },
+  { key: "other", label: "Khác" },
+];
+
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const EPS = 1;
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -94,6 +116,7 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<null | "manual" | "salary">(null);
   const [view, setView] = useState<View>("thu");
+  const [chiGroup, setChiGroup] = useState<ChiGroup>("all"); // sub-tab trong tab Chi
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
 
@@ -249,16 +272,32 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   );
 
   const dir: "in" | "out" = view === "thu" ? "in" : "out";
+  // Lọc sub-tab: chỉ áp ở tab Chi; tab Thu / "Tất cả" giữ nguyên.
+  const chiGroupMatch = useCallback(
+    (sourceType: string) =>
+      view !== "chi" || chiGroup === "all" || chiGroupOf(sourceType) === chiGroup,
+    [view, chiGroup],
+  );
   // Khoản chưa kế hoạch của tab đang mở → luôn nằm trên cùng.
   const activeUnplanned = useMemo(
-    () => unplanned.filter((r) => r.direction === dir),
-    [unplanned, dir],
+    () => unplanned.filter((r) => r.direction === dir && chiGroupMatch(r.sourceType)),
+    [unplanned, dir, chiGroupMatch],
   );
   // Phần đã lên kế hoạch (theo ngày, có lọc khoảng ngày).
   const activeDays = useMemo(
-    () => groupDays(timeline.filter((t) => t.dir === dir && inRange(t.date)), false),
-    [timeline, dir, inRange, groupDays],
+    () => groupDays(timeline.filter((t) => t.dir === dir && inRange(t.date) && chiGroupMatch(t.sourceType)), false),
+    [timeline, dir, inRange, groupDays, chiGroupMatch],
   );
+  // Tổng chi mỗi sub-tab (trong khoảng ngày) → hiện số trên nút.
+  const chiGroupSums = useMemo(() => {
+    const m: Record<ChiGroup, number> = { all: 0, congno: 0, budget: 0, loan: 0, other: 0 };
+    for (const t of timeline) {
+      if (t.dir !== "out" || !inRange(t.date)) continue;
+      m.all += t.amount;
+      m[chiGroupOf(t.sourceType)] += t.amount;
+    }
+    return m;
+  }, [timeline, inRange]);
   // Tổng thu / chi trong khoảng ngày đã chọn (phần đã lên kế hoạch, có ngày).
   const rangeThu = useMemo(
     () => timeline.filter((t) => t.dir === "in" && inRange(t.date)).reduce((s, t) => s + t.amount, 0),
@@ -439,6 +478,23 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
             <span className="cp-tabcount">{fmt(rangeChi)}</span>
           </button>
         </nav>
+
+        {/* Sub-tab tab Chi: nhóm khoản chi cho dễ nhìn */}
+        {view === "chi" && (
+          <nav className="cp-subtabs">
+            {CHI_GROUP_TABS.map((g) => (
+              <button
+                key={g.key}
+                type="button"
+                className={`cp-subtab ${chiGroup === g.key ? "on" : ""}`}
+                onClick={() => setChiGroup(g.key)}
+              >
+                {g.label}
+                <span className="cp-subcount">{fmt(chiGroupSums[g.key] ?? 0)}</span>
+              </button>
+            ))}
+          </nav>
+        )}
 
         {loading && <div className="cp-loading">Đang tải…</div>}
 
