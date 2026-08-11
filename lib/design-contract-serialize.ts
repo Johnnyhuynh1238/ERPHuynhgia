@@ -18,6 +18,7 @@ export function serializeDesignContract(c: ContractWithSteps | null) {
     projectId: c.projectId,
     hasQuote: c.quoteData != null,
     quoteUpdatedAt: c.quoteUpdatedAt?.toISOString() ?? null,
+    estimateDetail: (c.estimateDetail ?? {}) as unknown,
     steps: c.steps
       .slice()
       .sort((a, b) => STEP_ORDER.indexOf(a.kind) - STEP_ORDER.indexOf(b.kind))

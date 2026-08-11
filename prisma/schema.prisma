@@ -3031,6 +3031,7 @@ model DesignContract {
   quoteData     Json?                @map("quote_data") // cục DATA báo giá + dự toán (bước cuối)
   quoteUpdatedAt DateTime?           @map("quote_updated_at")
   quoteShareToken String?            @unique @map("quote_share_token") @db.Uuid // link công khai khách xem
+  estimateDetail Json                @default("{}") @map("estimate_detail") @db.JsonB // dự toán chi tiết (có bản vẽ) — nội bộ
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
 

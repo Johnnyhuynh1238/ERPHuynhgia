@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "../../_components/contracts.css";
+import { EstimateDetailSection } from "./estimate-detail-section";
+import { EMPTY_ESTIMATE_DETAIL, type EstimateDetail } from "@/lib/estimate-detail";
 
 const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
@@ -24,6 +26,7 @@ type Contract = {
   totalValue: number | null;
   status: string;
   steps: Step[];
+  estimateDetail?: unknown;
 };
 type Version = { id: string; seq: number; grand: number | null; note: string | null; createdAt: string };
 
@@ -60,6 +63,9 @@ export function DesignContractDetailClient({
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [steps, setSteps] = useState<Step[]>(contract.steps);
   const [openQuote, setOpenQuote] = useState(false);
+  const [openEstimate, setOpenEstimate] = useState(false);
+  const estimateDetail = (contract.estimateDetail ?? EMPTY_ESTIMATE_DETAIL) as EstimateDetail;
+  const hasEstimate = Array.isArray(estimateDetail.items) && estimateDetail.items.length > 0;
   const [viewVersion, setViewVersion] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [busy, setBusy] = useState(false);
@@ -261,6 +267,24 @@ export function DesignContractDetailClient({
             );
           })}
         </div>
+
+        {hasEstimate && (
+          <div style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              className="cx-btn primary"
+              onClick={() => setOpenEstimate((v) => !v)}
+              style={{ fontSize: 14 }}
+            >
+              {openEstimate ? "▲ Ẩn dự toán chi tiết" : "📐 Mở Dự toán chi tiết (có bản vẽ)"}
+            </button>
+            {openEstimate && (
+              <div style={{ marginTop: 12 }}>
+                <EstimateDetailSection contractId={contract.id} detail={estimateDetail} />
+              </div>
+            )}
+          </div>
+        )}
 
         {msg && <div className="cx-warn" style={{ marginTop: 14 }}>{msg}</div>}
 
