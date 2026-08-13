@@ -22,8 +22,8 @@ export default async function PaymentsPage() {
     <ProtectedLayout>
       <div className="space-y-4">
         <div>
-          <h1 className="text-xl font-semibold text-orange-300">Thanh toán & bản vẽ</h1>
-          <p className="text-sm text-[#8b95b7]">KT/Admin tạo lịch thanh toán, đánh dấu đã thu; Admin quản lý bản vẽ PDF cho cổng chủ nhà.</p>
+          <h1 className="text-xl font-semibold text-orange-300">Bản vẽ PDF</h1>
+          <p className="text-sm text-[#8b95b7]">Admin quản lý bản vẽ PDF cho cổng chủ nhà. Lịch thanh toán quản lý trong từng dự án (Dự án → Thanh toán).</p>
         </div>
         <PaymentManagementClient
           isAdmin={user.role === UserRole.admin}

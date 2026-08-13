@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const upd = await tx.paymentSchedule.update({
       where: { id: params.id },
       data: {
-        status: PaymentStatus.paid,
+        status: PaymentStatus.collected,
         paidAt,
         paidAmount: payload.paidAmount,
         receiptUrl: payload.receiptUrl,

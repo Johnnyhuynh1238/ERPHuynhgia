@@ -359,7 +359,7 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
     {
       key: "payment-due",
       label: "Mốc thu KH — trong 7 ngày",
-      href: "/payments",
+      href: "/admin/contracts",
       count: t.paymentDue7d,
       Icon: ClipboardCheck,
     },

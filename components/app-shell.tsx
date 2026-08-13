@@ -117,7 +117,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "HĐ thầu phụ", href: "/sub-contracts" },
     { label: "Chi thầu phụ", href: "/sub-payments" },
     { label: "Hợp đồng & Công nợ", href: "/admin/contracts" },
-    { label: "Thanh toán", href: "/payments" },
+    { label: "Bản vẽ PDF", href: "/payments" },
     { label: "Lệnh thu", href: "/receipts" },
     { label: "Lệnh chi", href: "/expenses" },
     { label: "Sổ quỹ", href: "/treasury" },
