@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { EstimateDetail } from "@/lib/estimate-detail";
 import { EstimateDetailSection } from "./estimate-detail-section";
 import { CostDetailSection } from "./cost-detail-section";
-import { BaoGiaSection } from "./bao-gia-section";
 
 type Tab = "kl" | "gv" | "bg";
 
@@ -42,7 +41,15 @@ export function DuToanTabs({
 
       {tab === "kl" && <EstimateDetailSection contractId={contractId} detail={detail} />}
       {tab === "gv" && <CostDetailSection detail={detail} />}
-      {tab === "bg" && <BaoGiaSection detail={detail} />}
+      {tab === "bg" && (
+        <>
+          <p className="dtm-bgnote">
+            Báo giá đầy đủ (chủng loại vật tư, thanh toán) — dùng chung app báo giá.{" "}
+            <a href={`/bao-gia-app.html?contract=${contractId}`} target="_blank" rel="noopener noreferrer">Mở tab mới ↗</a>
+          </p>
+          <iframe title="Báo giá" src={`/bao-gia-app.html?contract=${contractId}`} className="dtm-frame" />
+        </>
+      )}
 
       <style>{CSS}</style>
     </div>
@@ -57,4 +64,6 @@ const CSS = `
 .dtm-tab:hover{background:#faf4ec}
 .dtm-tab.on{background:#c9622a;color:#fff;border-color:#c9622a}
 .dtm-frame{width:100%;height:82vh;border:1px solid #e7dac9;border-radius:12px;background:#fff}
+.dtm-bgnote{font-size:12.5px;color:#8a7a6b;margin:0 0 8px}
+.dtm-bgnote a{color:#a94e1f;font-weight:700}
 `;
