@@ -71,10 +71,21 @@ export function DesignContractDetailClient({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState<"share" | "edit" | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     const t = (typeof window !== "undefined" && localStorage.getItem("cx-theme")) as "light" | "dark" | null;
     if (t) setTheme(t);
+  }, []);
+
+  // Auto nhận biết PC: màn rộng + con trỏ chuột → hiện nút xem toàn màn hình.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
+    const on = () => setIsDesktop(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
   }, []);
   function toggleTheme() {
     setTheme((p) => {
@@ -270,14 +281,27 @@ export function DesignContractDetailClient({
 
         {hasEstimate && (
           <div style={{ marginTop: 24 }}>
-            <button
-              type="button"
-              className="cx-btn primary"
-              onClick={() => setOpenEstimate((v) => !v)}
-              style={{ fontSize: 14 }}
-            >
-              {openEstimate ? "▲ Ẩn dự toán chi tiết" : "📐 Mở Dự toán chi tiết (có bản vẽ)"}
-            </button>
+            <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="cx-btn primary"
+                onClick={() => setOpenEstimate((v) => !v)}
+                style={{ fontSize: 14 }}
+              >
+                {openEstimate ? "▲ Ẩn dự toán chi tiết" : "📐 Mở Dự toán chi tiết (có bản vẽ)"}
+              </button>
+              {isDesktop && (
+                <button
+                  type="button"
+                  className="cx-btn ghost"
+                  onClick={() => window.open(`/admin/contracts/${contract.id}/du-toan`, "_blank", "noopener")}
+                  style={{ fontSize: 14 }}
+                  title="Mở tab mới, xem toàn màn hình (khuyên dùng trên máy tính)"
+                >
+                  🖥 Xem toàn màn hình
+                </button>
+              )}
+            </div>
             {openEstimate && (
               <div style={{ marginTop: 12 }}>
                 <EstimateDetailSection contractId={contract.id} detail={estimateDetail} />
