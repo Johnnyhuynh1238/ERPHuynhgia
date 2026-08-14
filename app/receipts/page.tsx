@@ -17,9 +17,15 @@ export default async function ReceiptsPage() {
     select: { id: true, code: true, name: true },
   });
 
+  const designContracts = await prisma.designContract.findMany({
+    where: { status: "active" },
+    orderBy: [{ signedAt: "desc" }],
+    select: { id: true, customerName: true, notes: true },
+  });
+
   return (
     <ProtectedLayout>
-      <ReceiptsClient role={user.role} projects={projects} />
+      <ReceiptsClient role={user.role} projects={projects} designContracts={designContracts} />
     </ProtectedLayout>
   );
 }

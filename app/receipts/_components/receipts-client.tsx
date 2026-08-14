@@ -23,6 +23,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 type ProjectOption = { id: string; code: string; name: string };
+type DesignContractOption = { id: string; customerName: string; notes: string | null };
 
 type ReceiptSource = "customer" | "loan" | "advance_return" | "other";
 
@@ -101,6 +102,7 @@ function methodLabel(m: string | null) {
 type CreateForm = {
   source: ReceiptSource;
   projectId: string;
+  designContractId: string;
   amount: string;
   payer: string;
   paymentMethod: "cash" | "transfer";
@@ -111,6 +113,7 @@ type CreateForm = {
 const emptyCreate: CreateForm = {
   source: "customer",
   projectId: "",
+  designContractId: "",
   amount: "",
   payer: "",
   paymentMethod: "transfer",
@@ -121,9 +124,11 @@ const emptyCreate: CreateForm = {
 export function ReceiptsClient({
   role,
   projects,
+  designContracts,
 }: {
   role: string;
   projects: ProjectOption[];
+  designContracts: DesignContractOption[];
 }) {
   const isAdmin = role === "admin";
   const isKt = role === "accountant";
@@ -239,8 +244,8 @@ export function ReceiptsClient({
       toast.error("Nhập số tiền > 0");
       return;
     }
-    if (form.source === "customer" && !form.projectId) {
-      toast.error("Thu từ khách phải chọn dự án");
+    if (form.source === "customer" && !form.projectId && !form.designContractId) {
+      toast.error("Thu từ khách phải chọn dự án hoặc HĐ thiết kế");
       return;
     }
     setCreating(true);
@@ -250,6 +255,7 @@ export function ReceiptsClient({
       body: JSON.stringify({
         source: form.source,
         projectId: form.projectId || null,
+        designContractId: form.designContractId || null,
         amount: amt,
         payer: form.payer.trim() || null,
         paymentMethod: form.paymentMethod,
@@ -621,10 +627,17 @@ export function ReceiptsClient({
                     <MoneyInput value={form.amount} onChange={(raw) => setForm({ ...form, amount: raw })} required className="rt-ctrl num" />
                   </div>
                   <div className="rt-fld full">
-                    <span className="rt-lbl">{form.source === "customer" ? "Dự án *" : "Dự án (tuỳ chọn)"}</span>
-                    <select className="rt-ctrl" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
+                    <span className="rt-lbl">{form.source === "customer" && !form.designContractId ? "Dự án *" : "Dự án (tuỳ chọn)"}</span>
+                    <select className="rt-ctrl" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value, designContractId: e.target.value ? "" : form.designContractId })}>
                       <option value="">— Không gắn dự án —</option>
                       {projects.map((p) => (<option key={p.id} value={p.id}>{p.code} — {p.name}</option>))}
+                    </select>
+                  </div>
+                  <div className="rt-fld full">
+                    <span className="rt-lbl">{form.source === "customer" && !form.projectId ? "HĐ thiết kế *" : "HĐ thiết kế (tuỳ chọn)"}</span>
+                    <select className="rt-ctrl" value={form.designContractId} onChange={(e) => setForm({ ...form, designContractId: e.target.value, projectId: e.target.value ? "" : form.projectId })}>
+                      <option value="">— Không gắn HĐTK —</option>
+                      {designContracts.map((d) => (<option key={d.id} value={d.id}>{d.notes ? `${d.customerName} — ${d.notes}` : d.customerName}</option>))}
                     </select>
                   </div>
                   <div className="rt-fld">
