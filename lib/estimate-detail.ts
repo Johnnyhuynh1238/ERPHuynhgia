@@ -37,9 +37,13 @@ export function itemCost(c?: EDCost): { nc: number; vt: number; total: number } 
   return { nc, vt, total: nc + vt };
 }
 
+// Nhân công trọn gói toàn bộ: 2tr/m² × diện tích bao ngoài (phần chìa ra xa nhất).
+export type EDLabor = { donGia: number; dienTich: number; tien: number };
+
 export type EstimateDetail = {
   fullDrawings: EDDrawing[]; // bản vẽ FULL (PDF HSKC/HSKT) — nút xem ở đầu
   items: EDItem[];
+  labor?: EDLabor; // nhân công trọn gói (màn Giá vốn) — đặt riêng trên cùng
 };
 
 export const EMPTY_ESTIMATE_DETAIL: EstimateDetail = { fullDrawings: [], items: [] };
