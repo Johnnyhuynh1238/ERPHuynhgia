@@ -148,6 +148,11 @@ export function TreasuryClient({
 
   useEffect(() => setCatValue(selectedTxn?.category?.id ?? ""), [selectedTxn]);
   const imgAtts = selectedTxn ? selectedTxn.attachments.filter((a) => a.isImage) : [];
+  // "Chứng từ" chỉ hiện ảnh nguồn (expense/receipt…). Ảnh bổ sung đính thẳng vào phiếu
+  // đã có khu riêng bên dưới → lọc khỏi đây để không hiện 2 lần. Lightbox vẫn dùng imgAtts đầy đủ.
+  const srcAtts = selectedTxn
+    ? selectedTxn.attachments.filter((a) => !a.url.includes("/treasury/transactions/"))
+    : [];
 
   // Danh mục sửa trong sổ quỹ lọc theo ngữ cảnh giao dịch: có dự án → scope "project";
   // chung công ty → scope "company". Giữ thêm danh mục đang gán nếu ngoài scope.
@@ -669,9 +674,9 @@ export function TreasuryClient({
                     </div>
                   ) : null}
 
-                  {selectedTxn.attachments.length > 0 ? (
+                  {srcAtts.length > 0 ? (
                     <div className="atts">
-                      {selectedTxn.attachments.map((att, i) =>
+                      {srcAtts.map((att, i) =>
                         att.isImage ? (
                           <button type="button" className="att" key={`${att.url}-${i}`} onClick={() => setLightboxIdx(imgAtts.findIndex((x) => x.url === att.url))} aria-label="Xem ảnh">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -692,13 +697,18 @@ export function TreasuryClient({
                     <div className="k">Ảnh bổ sung ({(selectedTxn.attachmentUrls ?? []).length}/20)</div>
                     {(selectedTxn.attachmentUrls ?? []).length > 0 ? (
                       <div className="atts">
-                        {(selectedTxn.attachmentUrls ?? []).map((_, i) => (
-                          <div className="att att-mng" key={`extra-${i}`}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={`/api/treasury/transactions/${selectedTxn.id}/file?index=${i}`} alt="Ảnh bổ sung" loading="lazy" />
-                            <button type="button" className="att-del" onClick={() => removeTxnAttachment(i)} aria-label="Xoá ảnh">✕</button>
-                          </div>
-                        ))}
+                        {(selectedTxn.attachmentUrls ?? []).map((_, i) => {
+                          const extraUrl = `/api/treasury/transactions/${selectedTxn.id}/file?index=${i}`;
+                          return (
+                            <div className="att att-mng" key={`extra-${i}`}>
+                              <button type="button" className="att-view" onClick={() => { const idx = imgAtts.findIndex((x) => x.url === extraUrl); if (idx >= 0) setLightboxIdx(idx); }} aria-label="Xem ảnh">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={extraUrl} alt="Ảnh bổ sung" loading="lazy" />
+                              </button>
+                              <button type="button" className="att-del" onClick={() => removeTxnAttachment(i)} aria-label="Xoá ảnh">✕</button>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : null}
                     <input
