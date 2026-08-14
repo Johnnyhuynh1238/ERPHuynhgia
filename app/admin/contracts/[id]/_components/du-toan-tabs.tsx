@@ -57,13 +57,13 @@ export function DuToanTabs({
 }
 
 const CSS = `
-.dtm-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:2px solid #c9622a;padding-bottom:12px;margin-bottom:18px}
-.dtm-title{margin:0;font-size:22px;font-weight:800;color:#a94e1f}
-.dtm-menu{display:flex;gap:8px;flex-wrap:wrap}
-.dtm-tab{border:1px solid #e7dac9;background:#fff;color:#a94e1f;border-radius:999px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer}
-.dtm-tab:hover{background:#faf4ec}
-.dtm-tab.on{background:#c9622a;color:#fff;border-color:#c9622a}
-.dtm-frame{width:100%;height:82vh;border:1px solid #e7dac9;border-radius:12px;background:#fff}
+.dtm-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid #ecdfce;padding-bottom:12px;margin-bottom:18px}
+.dtm-title{margin:0;font-size:22px;font-weight:800;color:#b0561f}
+.dtm-menu{display:flex;gap:6px;flex-wrap:wrap;background:#f6efe4;padding:4px;border-radius:12px}
+.dtm-tab{border:0;background:transparent;color:#8a7a6b;border-radius:9px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer}
+.dtm-tab:hover{background:#fbf5ec}
+.dtm-tab.on{background:#fff;color:#b0561f;box-shadow:0 1px 3px rgba(120,70,20,.12)}
+.dtm-frame{width:100%;height:82vh;border:1px solid #ecdfce;border-radius:12px;background:#fff}
 .dtm-bgnote{font-size:12.5px;color:#8a7a6b;margin:0 0 8px}
-.dtm-bgnote a{color:#a94e1f;font-weight:700}
+.dtm-bgnote a{color:#b0561f;font-weight:700}
 `;
