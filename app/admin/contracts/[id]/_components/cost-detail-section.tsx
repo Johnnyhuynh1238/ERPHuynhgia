@@ -6,74 +6,51 @@ const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
 export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
   const items = (detail?.items ?? []).filter((it) => it.cost);
-  const labor = detail?.labor;
   if (items.length === 0) {
     return <div className="gv-empty">Chưa có dữ liệu giá vốn cho hợp đồng này.</div>;
   }
 
-  const ncTronGoi = labor?.tien ?? 0;
+  let sumNc = 0;
   let sumVt = 0;
   const rows = items.map((it) => {
     const c = itemCost(it.cost);
+    sumNc += c.nc;
     sumVt += c.vt;
-    return { it, vt: c.vt };
+    return { it, c };
   });
-  const grand = ncTronGoi + sumVt;
+  const grand = sumNc + sumVt;
 
   return (
     <div className="gv">
-      {/* Bảng tổng hợp giá vốn — trên cùng */}
       <div className="gv-sum">
-        <div className="gv-sum-t">TỔNG HỢP GIÁ VỐN</div>
+        <div className="gv-sum-t">Tổng hợp giá vốn</div>
         <div className="gv-sum-grid">
-          <div><span className="k">Nhân công trọn gói</span><span className="v">{fmt(ncTronGoi)}</span></div>
+          <div><span className="k">Nhân công</span><span className="v">{fmt(sumNc)}</span></div>
           <div><span className="k">Vật tư (đã +hao hụt)</span><span className="v">{fmt(sumVt)}</span></div>
-          <div className="tot"><span className="k">TỔNG GIÁ VỐN</span><span className="v">{fmt(grand)}</span></div>
+          <div className="tot"><span className="k">Tổng giá vốn</span><span className="v">{fmt(grand)}</span></div>
         </div>
       </div>
 
-      {/* Nhân công trọn gói — 1 cục riêng trên cùng */}
-      {labor && (
-        <div className="gv-card nc">
-          <div className="gv-hd">
-            <span className="gv-nm">NHÂN CÔNG TRỌN GÓI (toàn bộ)</span>
-            <span className="gv-kq">{fmt(labor.tien)} đ</span>
-          </div>
-          <div className="gv-bd">
-            <table>
-              <tbody>
-                <tr>
-                  <td>Nhân công thi công trọn gói toàn nhà</td>
-                  <td className="n">{labor.dienTich.toLocaleString("vi-VN")} m²</td>
-                  <td className="n">{fmt(labor.donGia)}/m²</td>
-                  <td className="n b">{fmt(labor.tien)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="gv-note">
-              Đơn giá {fmt(labor.donGia)}/m² × diện tích bao ngoài (phần chìa ra xa nhất của nhà) = {labor.dienTich.toLocaleString("vi-VN")} m².
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Vật tư từng hạng mục */}
-      {rows.map(({ it, vt }, i) => {
+      {rows.map(({ it, c }, i) => {
         const mats = it.cost?.materials ?? [];
         const hh = Number(it.cost?.haoHutPct) || 0;
         const vtRaw = mats.reduce((s, m) => s + (Number(m.kl) || 0) * (Number(m.gia) || 0), 0);
+        const ncOnly = c.vt === 0 && c.nc > 0;
         return (
-          <div className="gv-card" key={it.id}>
+          <div className={`gv-card${ncOnly ? " nc" : ""}`} key={it.id}>
             <div className="gv-hd">
               <span className="gv-nm">{i + 1} · {it.name}{it.tag && <span className="gv-badge">{it.tag}</span>}</span>
-              <span className="gv-kq">Vật tư: {fmt(vt)} đ</span>
+              <span className="gv-kq">Vốn: {fmt(c.total)} đ</span>
             </div>
             <div className="gv-bd">
               <table>
                 <thead>
-                  <tr><th>Vật tư</th><th className="n">Khối lượng</th><th className="n">Đơn giá</th><th className="n">Thành tiền</th></tr>
+                  <tr><th>Khoản mục</th><th className="n">Khối lượng</th><th className="n">Đơn giá</th><th className="n">Thành tiền</th></tr>
                 </thead>
                 <tbody>
+                  {c.nc > 0 && (
+                    <tr className="ncrow"><td>Nhân công</td><td className="n">—</td><td className="n">—</td><td className="n">{fmt(c.nc)}</td></tr>
+                  )}
                   {mats.map((m, k) => (
                     <tr key={k}>
                       <td>{m.ten}</td>
@@ -83,9 +60,9 @@ export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
                     </tr>
                   ))}
                   {hh > 0 && (
-                    <tr className="hh"><td colSpan={3}>Hao hụt vật tư ({hh}%)</td><td className="n">{fmt(vt - vtRaw)}</td></tr>
+                    <tr className="hh"><td colSpan={3}>Hao hụt vật tư ({hh}%)</td><td className="n">{fmt(c.vt - vtRaw)}</td></tr>
                   )}
-                  <tr className="sum"><td colSpan={3}>Cộng vật tư</td><td className="n">{fmt(vt)}</td></tr>
+                  <tr className="sum"><td colSpan={3}>Cộng giá vốn hạng mục</td><td className="n">{fmt(c.total)}</td></tr>
                 </tbody>
               </table>
             </div>
@@ -121,8 +98,7 @@ const CSS = `
 .gv th,.gv td{text-align:left;padding:8px 8px;border-bottom:1px solid #f0e7d9}
 .gv th{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;font-weight:700}
 .gv td.n,.gv th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.gv td.b{font-weight:800;color:var(--pa2)}
+.gv tr.ncrow td{background:#f2f7f2;font-weight:700;color:#177a42}
 .gv tr.hh td{color:var(--mut);font-style:italic}
 .gv tr.sum td{font-weight:800;background:var(--soft);border-top:1px solid #e7dac9}
-.gv-note{margin-top:8px;font-size:12px;color:var(--mut);font-style:italic}
 `;

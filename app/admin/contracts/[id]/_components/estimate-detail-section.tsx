@@ -14,7 +14,8 @@ export function EstimateDetailSection({
   contractId: string;
   detail: EstimateDetail;
 }) {
-  const items = detail?.items ?? [];
+  // Màn Khối lượng chỉ hiện hạng mục có bảng bóc KL (bỏ mục nhân công thuần).
+  const items = (detail?.items ?? []).filter((it) => (it.rows?.length ?? 0) > 0);
   const fullDrawings = detail?.fullDrawings ?? [];
   // Mặc định hiện bản vẽ từng mục; toggle ẩn/hiện.
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
