@@ -8,6 +8,8 @@
 import { NextResponse } from "next/server";
 import { ExpenseStatus, ReceiptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getProjectFinanceSummary } from "@/lib/project-finance-summary";
+import { computeEstimateProgress } from "@/lib/estimate-progress";
 
 export const runtime = "nodejs";
 
@@ -37,7 +39,9 @@ const HELP =
   "• hôm nay — thu/chi hôm nay\n" +
   "• nợ ncc — công nợ nhà cung cấp\n" +
   "• nợ khách — khách còn phải thu\n" +
-  "• dự án — dự án đang chạy\n" +
+  "• dự án — đếm dự án đang chạy\n" +
+  "• dự án <tên> — số liệu 1 dự án (vd: dự án nhà Cường)\n" +
+  "• tổng hợp dự án — số liệu tất cả dự án\n" +
   "• tổng quan — báo cáo nhanh\n" +
   "• giúp — xem lại danh sách";
 
@@ -104,6 +108,206 @@ async function replyProjects(): Promise<string> {
   return `🏗️ Dự án: ${active} đang chạy (kế hoạch ${map["planning"] || 0}, thi công ${map["in_progress"] || 0}, xong ${map["completed"] || 0}, tạm dừng ${map["paused"] || 0}).`;
 }
 
+const STATUS_VN: Record<string, string> = {
+  planning: "kế hoạch",
+  in_progress: "đang thi công",
+  completed: "đã xong",
+  paused: "tạm dừng",
+};
+
+// Tra số liệu 1 dự án theo TÊN (hoặc mã). Trả null nếu người dùng không nhập tên
+// (chỉ gõ "dự án") → caller fallback về đếm theo status.
+async function replyOneProject(rawText: string): Promise<string | null> {
+  // Bỏ các từ lệnh, giữ lại phần tên dự án.
+  const q = rawText
+    .replace(/\b(du an|cong trinh|project|so lieu|thong tin|bao cao|xem|cho|check|cua|nha)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!q) return null; // không có tên → để caller trả danh sách đếm
+
+  const all = await prisma.project.findMany({ select: { id: true, name: true, code: true, status: true } });
+  const scored = all
+    .map((p) => {
+      const n = deburr(p.name);
+      const c = deburr(p.code || "");
+      let score = 0;
+      if (c && c === q) score = 100;
+      else if (n === q) score = 90;
+      else if (n.includes(q)) score = 60;
+      else if (q.includes(n) && n.length >= 3) score = 40;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) {
+    return `🔎 Không thấy dự án khớp "${q}". Gõ "dự án" để xem danh sách.`;
+  }
+  // Nhiều dự án cùng điểm cao → liệt kê để anh chọn chính xác.
+  const top = scored[0].score;
+  const ties = scored.filter((x) => x.score === top);
+  if (ties.length > 1) {
+    const names = ties.slice(0, 8).map((x) => `• ${x.p.name}${x.p.code ? ` (${x.p.code})` : ""}`);
+    return `🔎 Có ${ties.length} dự án khớp "${q}":\n${names.join("\n")}\nNhắn rõ tên hơn giúp em.`;
+  }
+
+  return buildProjectReport(scored[0].p.id);
+}
+
+function fmtDate(d: Date | null | undefined): string {
+  if (!d) return "—";
+  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(d));
+}
+
+// Báo cáo ĐẦY ĐỦ mọi số của 1 dự án (thông tin + tiến độ + tài chính + đợt thu +
+// mua hàng + thầu phụ + nghiệm thu + nhật ký + cơ cấu chi). Số tài chính tái dùng
+// getProjectFinanceSummary → khớp trang Tài chính dự án.
+async function buildProjectReport(projectId: string): Promise<string> {
+  const [meta, fin, prog] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: projectId },
+      select: { code: true, name: true, address: true, status: true, startDate: true, expectedEndDate: true },
+    }),
+    getProjectFinanceSummary(projectId),
+    computeEstimateProgress(projectId).catch(() => null),
+  ]);
+  if (!meta) return "🔎 Dự án không còn tồn tại.";
+
+  const [schedules, mhRows, subRows, subPaidRows, msRows, diaryRows, catRows, payrollRows] = await Promise.all([
+    prisma.paymentSchedule.findMany({
+      where: { projectId },
+      select: { status: true, amount: true, milestoneDescription: true, expectedDate: true, dueDate: true },
+      orderBy: [{ phaseNumber: "asc" }, { installmentNo: "asc" }],
+    }),
+    prisma.$queryRaw<{ n: number; total: number; received: number }[]>`
+      SELECT count(*)::int n, coalesce(sum(total),0)::float8 total,
+             count(*) FILTER (WHERE status='received')::int received
+      FROM mh_orders WHERE project_id = ${projectId}::uuid`,
+    prisma.$queryRaw<{ n: number; total: number }[]>`
+      SELECT count(*)::int n, coalesce(sum(contract_value),0)::float8 total
+      FROM sub_contracts WHERE project_id = ${projectId}::uuid`,
+    prisma.$queryRaw<{ paid: number }[]>`
+      SELECT coalesce(sum(sp.actual_amount),0)::float8 paid
+      FROM sub_payments sp JOIN sub_contracts sc ON sc.id = sp.sub_contract_id
+      WHERE sc.project_id = ${projectId}::uuid AND sp.status = 'paid'`,
+    prisma.$queryRaw<{ total: number; signed: number }[]>`
+      SELECT count(*)::int total, count(*) FILTER (WHERE status='signed')::int signed
+      FROM acceptance_milestones WHERE project_id = ${projectId}::uuid`,
+    prisma.$queryRaw<{ n: number }[]>`
+      SELECT count(*)::int n FROM construction_diaries WHERE project_id = ${projectId}::uuid`,
+    prisma.$queryRaw<{ name: string; amount: number }[]>`
+      SELECT coalesce(ec.name,'Khác') name, sum(ct.amount)::float8 amount
+      FROM cash_transactions ct LEFT JOIN expense_categories ec ON ec.id = ct.category_id
+      WHERE ct.project_id = ${projectId}::uuid AND ct.direction = 'out'
+      GROUP BY 1 ORDER BY 2 DESC LIMIT 6`,
+    prisma.$queryRaw<{ paid: number }[]>`
+      SELECT coalesce(sum(total_payable),0)::float8 paid
+      FROM weekly_payrolls WHERE project_id = ${projectId}::uuid AND status = 'paid'`,
+  ]);
+
+  // Đợt thu
+  const doneInstallments = schedules.filter((s) => s.status === "collected" || s.status === "paid").length;
+  const nextUnpaid = schedules
+    .filter((s) => !(s.status === "collected" || s.status === "paid") && (s.expectedDate || s.dueDate))
+    .sort((a, b) => new Date(a.expectedDate ?? a.dueDate!).getTime() - new Date(b.expectedDate ?? b.dueDate!).getTime())[0];
+
+  const mh = mhRows[0] ?? { n: 0, total: 0, received: 0 };
+  const sub = subRows[0] ?? { n: 0, total: 0 };
+  const subPaid = Number(subPaidRows[0]?.paid ?? 0);
+  const ms = msRows[0] ?? { total: 0, signed: 0 };
+  const diaryCount = Number(diaryRows[0]?.n ?? 0);
+  const payrollPaid = Number(payrollRows[0]?.paid ?? 0);
+
+  const daysLeft = meta.expectedEndDate
+    ? Math.ceil((new Date(meta.expectedEndDate).getTime() - Date.now()) / 86400000)
+    : null;
+  const grossMargin = fin.budgetTotal != null ? fin.contractValue - fin.budgetTotal : null;
+  const cashFlow = fin.collected - fin.spent;
+
+  const L: string[] = [];
+  L.push(`🏗️ ${meta.name}${meta.code ? ` (${meta.code})` : ""}`);
+  L.push(`Trạng thái: ${STATUS_VN[meta.status] || meta.status}`);
+  if (meta.address) L.push(`Địa chỉ: ${meta.address}`);
+  L.push(`Bắt đầu: ${fmtDate(meta.startDate)} · Dự kiến xong: ${fmtDate(meta.expectedEndDate)}${daysLeft != null ? ` (${daysLeft >= 0 ? `còn ${daysLeft}` : `trễ ${-daysLeft}`} ngày)` : ""}`);
+  if (prog) L.push(`Tiến độ (theo công tác): ${prog.earnedPct}%`);
+
+  L.push(``);
+  L.push(`💰 TÀI CHÍNH`);
+  L.push(`• Giá trị HĐ: ${fmtVnd(fin.contractValue)}`);
+  L.push(`• Đã thu: ${fmtVnd(fin.collected)} (${fin.collectedPct}%)`);
+  L.push(`• Còn phải thu: ${fmtVnd(fin.remaining)}`);
+  L.push(`• Đã chi (sổ quỹ + lương): ${fmtVnd(fin.spent)}`);
+  L.push(`• Nợ NCC còn lại: ${fmtVnd(fin.supplierDebt)}`);
+  L.push(`• Chi phí phát sinh (chi + nợ NCC): ${fmtVnd(fin.incurred)}`);
+  L.push(`• Tổng dự toán (giá vốn): ${fin.budgetTotal != null ? fmtVnd(fin.budgetTotal) : "—"}`);
+  L.push(`• Biên LN dự kiến (HĐ − giá vốn): ${grossMargin != null ? fmtVnd(grossMargin) : "—"}`);
+  L.push(`• Còn phải chi (theo dự toán): ${fin.remainingToSpend != null ? fmtVnd(fin.remainingToSpend) : "—"}`);
+  L.push(`• Dòng tiền (thu − chi): ${fmtVnd(cashFlow)}`);
+  if (payrollPaid > 0) L.push(`• Trong đó lương đã trả: ${fmtVnd(payrollPaid)}`);
+
+  if (catRows.length > 0) {
+    L.push(``);
+    L.push(`📂 Cơ cấu chi (sổ quỹ):`);
+    for (const c of catRows) L.push(`  • ${c.name}: ${fmtVnd(Number(c.amount))}`);
+  }
+
+  L.push(``);
+  L.push(`🧾 ĐỢT THU: ${doneInstallments}/${schedules.length} đợt đã thu`);
+  if (nextUnpaid)
+    L.push(`  • Đợt tới: ${nextUnpaid.milestoneDescription ?? "—"} — ${fmtVnd(Number(nextUnpaid.amount))} (hạn ${fmtDate(nextUnpaid.expectedDate ?? nextUnpaid.dueDate)})`);
+
+  L.push(``);
+  L.push(`🛒 MUA HÀNG: ${mh.n} đơn (${mh.received} đã nhận) — ${fmtVnd(Number(mh.total))}`);
+  L.push(`👷 THẦU PHỤ: ${sub.n} HĐ — giá trị ${fmtVnd(Number(sub.total))}, đã trả ${fmtVnd(subPaid)}, còn ${fmtVnd(Number(sub.total) - subPaid)}`);
+  L.push(`✅ NGHIỆM THU: ${ms.signed}/${ms.total} mốc đã ký`);
+  L.push(`📔 NHẬT KÝ: ${diaryCount} ngày ghi`);
+
+  return L.join("\n");
+}
+
+// Tổng hợp số liệu TỪNG dự án đang chạy (planning + in_progress).
+// Mỗi dự án tái dùng getProjectFinanceSummary → số khớp trang Tài chính dự án.
+async function replyProjectsDetail(): Promise<string> {
+  const projects = await prisma.project.findMany({
+    where: { status: { in: ["planning", "in_progress"] } },
+    select: { id: true, name: true, code: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (projects.length === 0) return "🏗️ Không có dự án nào đang chạy.";
+
+  const CAP = 12;
+  const shown = projects.slice(0, CAP);
+  const sums = await Promise.all(shown.map((p) => getProjectFinanceSummary(p.id)));
+
+  let totCollected = 0, totRemaining = 0, totSpent = 0, totDebt = 0;
+  const blocks = shown.map((p, i) => {
+    const s = sums[i];
+    totCollected += s.collected;
+    totRemaining += s.remaining;
+    totSpent += s.spent;
+    totDebt += s.supplierDebt;
+    const lines = [
+      `🏗️ ${p.name}${p.code ? ` (${p.code})` : ""}`,
+      `  • Thu: ${fmtVnd(s.collected)}/${fmtVnd(s.contractValue)} (${s.collectedPct}%)`,
+      `  • Còn phải thu: ${fmtVnd(s.remaining)}`,
+      `  • Đã chi: ${fmtVnd(s.spent)}`,
+      `  • Nợ NCC: ${fmtVnd(s.supplierDebt)}`,
+    ];
+    if (s.remainingToSpend != null) lines.push(`  • Còn phải chi: ${fmtVnd(s.remainingToSpend)}`);
+    return lines.join("\n");
+  });
+
+  let out = `📋 Tổng hợp ${projects.length} dự án đang chạy:\n\n${blocks.join("\n\n")}`;
+  if (projects.length > shown.length) out += `\n\n… và ${projects.length - shown.length} dự án nữa`;
+  out +=
+    `\n\n— TỔNG:\n` +
+    `  • Đã thu: ${fmtVnd(totCollected)}\n` +
+    `  • Còn phải thu: ${fmtVnd(totRemaining)}\n` +
+    `  • Đã chi: ${fmtVnd(totSpent)}\n` +
+    `  • Nợ NCC: ${fmtVnd(totDebt)}`;
+  return out;
+}
+
 async function replyOverview(): Promise<string> {
   const [bal, chiThang, thuThang, noNcc, noKhach, pendCount] = await Promise.all([
     prisma.cashAccount.aggregate({ where: { active: true }, _sum: { currentBalance: true } }),
@@ -158,8 +362,11 @@ export async function POST(request: Request) {
     } else if (/(cong no)/.test(text)) {
       const [ncc, khach] = await Promise.all([sumRaw(SQL_NO_NCC), sumRaw(SQL_NO_KHACH)]);
       reply = `💼 Công nợ:\n• Nợ NCC: ${fmtVnd(ncc)}\n• Khách phải thu: ${fmtVnd(khach)}`;
+    } else if (/(tong hop du an|chi tiet du an|tung du an|du an chi tiet|so lieu du an)/.test(text)) {
+      reply = await replyProjectsDetail();
     } else if (/(du an|cong trinh|project)/.test(text)) {
-      reply = await replyProjects();
+      reply = await replyOneProject(text);
+      if (reply === null) reply = await replyProjects(); // chỉ gõ "dự án" → đếm theo status
     } else if (/(giup|help|huong dan|lenh gi|menu|^\?$)/.test(text)) {
       reply = HELP;
     }
