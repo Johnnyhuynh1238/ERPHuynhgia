@@ -3,31 +3,9 @@ import { getToken } from "next-auth/jwt";
 
 type SessionToken = {
   userId?: string;
-  role?: string;
   mustChangePassword?: boolean;
   iat?: number;
 };
-
-// SSO webterminal: mint cookie claude_code_session (đồng dạng /usr/local/bin/claude-web-auth:
-// value = `${expiry}.${hmac_sha256_hex(SECRET, expiry)}`) cho parent domain .huynhgia6.com
-// để iframe AI (huynhgia6.com/claude) nhận diện admin/accountant đã đăng nhập ERP — khỏi mật khẩu riêng.
-const CLAUDE_COOKIE = "claude_code_session";
-const CLAUDE_COOKIE_TTL = 30 * 24 * 60 * 60;
-
-async function hmacHex(secret: string, msg: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(msg));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 function isStaticAsset(pathname: string) {
   return (
@@ -37,8 +15,6 @@ function isStaticAsset(pathname: string) {
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/manifest") ||
     pathname.startsWith("/cn-manifest") ||
-    pathname === "/pay-logo.png" ||
-    pathname === "/pay-og.png" ||
     pathname === "/sw-push.js"
   );
 }
@@ -95,6 +71,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // Zalo bridge đẩy bill kế toán vào — tự auth bằng Bearer ZALO_INBOUND_SECRET.
+  // Không đi qua NextAuth (bridge nội mạng host↔container, không có session).
+  if (pathname.startsWith("/api/zalo/")) {
+    return applySecurityHeaders(NextResponse.next(), false);
+  }
+
   // Public lead capture + pricing API từ huynhgia6.com (form báo giá). Route tự
   // xử lý CORS + validation. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị
   // redirect 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
@@ -116,23 +98,10 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
-  // Dữ liệu dự toán CÔNG KHAI cho trang tĩnh /du-toan-ngan (chỉ đọc).
-  // projectId trên URL = khoá chia sẻ; route tự giới hạn field trả về.
-  if (pathname.startsWith("/api/public/")) {
-    return applySecurityHeaders(NextResponse.next(), true);
-  }
-
   // Trang theo dõi thanh toán công khai cho NCC (lệnh chi). Tự auth bằng
   // publicToken random trên URL — không gắn user, không đi qua NextAuth.
   // Gồm trang /pay/[token] và proxy ảnh CK /pay/[token]/receipt.
   if (pathname.startsWith("/pay/")) {
-    return applySecurityHeaders(NextResponse.next(), true);
-  }
-
-  // Trang công khai khách xem báo giá (chỉ đọc). Tự auth bằng quoteShareToken
-  // trên URL /bao-gia/<token>. Không gắn user, không đi qua NextAuth.
-  // Lưu ý: file tĩnh /bao-gia-app.html KHÔNG khớp prefix "/bao-gia/" → vẫn auth-gated.
-  if (pathname.startsWith("/bao-gia/")) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
@@ -191,32 +160,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/change-password", nextUrl.origin));
   }
 
-  const res = applySecurityHeaders(NextResponse.next(), false);
-
-  // SSO cho iframe AI: admin/accountant đã đăng nhập ERP → tự có cookie webterminal
-  // (same-site .huynhgia6.com). Chỉ set khi thiếu + đúng domain prod + có secret.
-  const secret = process.env.CLAUDE_WEB_SECRET;
-  if (
-    secret &&
-    (token?.role === "admin" || token?.role === "accountant") &&
-    !req.cookies.get(CLAUDE_COOKIE) &&
-    nextUrl.hostname.endsWith("huynhgia6.com")
-  ) {
-    const expiry = Math.floor(Date.now() / 1000) + CLAUDE_COOKIE_TTL;
-    const value = `${expiry}.${await hmacHex(secret, String(expiry))}`;
-    res.cookies.set({
-      name: CLAUDE_COOKIE,
-      value,
-      domain: ".huynhgia6.com",
-      path: "/",
-      maxAge: CLAUDE_COOKIE_TTL,
-      secure: true,
-      httpOnly: true,
-      sameSite: "lax",
-    });
-  }
-
-  return res;
+  return applySecurityHeaders(NextResponse.next(), false);
 }
 
 export const config = {
