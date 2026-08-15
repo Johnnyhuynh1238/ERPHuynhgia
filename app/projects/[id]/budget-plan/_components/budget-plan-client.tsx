@@ -207,7 +207,7 @@ export function BudgetPlanClient({
   const profitRt = cvRt - t.budget; // lãi gộp realtime = HĐ (gồm PL) − ngân sách hiện hành
   const totalCost = t.spent + t.debt; // tổng chi phí realtime (đã chi + công nợ)
   const projectedCost = totalCost + t.remaining; // chi phí dự kiến khi hoàn thành
-  const grossRealtime = cv - projectedCost; // lãi gộp realtime = HĐ − chi phí dự kiến
+  const grossRealtime = cvRt - projectedCost; // lãi gộp realtime = HĐ (gồm PL) − chi phí dự kiến
 
   const startEdit = () => {
     setRows(
