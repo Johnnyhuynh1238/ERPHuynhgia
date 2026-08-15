@@ -119,11 +119,24 @@
 /* ── dòng hạng mục bấm được ── */
 .bpdoc .bp-clickable { cursor: pointer; }
 .bpdoc .bp-clickable:hover > td { background: var(--card2); }
+/* ── ô chi phí bấm được (tổng/đã chi/công nợ) ── */
+.bpdoc .bp-cellbtn { cursor: pointer; position: relative; transition: background 0.14s ease, box-shadow 0.14s ease; text-decoration: underline dotted var(--line2); text-underline-offset: 3px; }
+.bpdoc .bp-cellbtn:hover { background: var(--card2); box-shadow: inset 0 0 0 1.5px var(--line2); text-decoration-color: var(--orange); }
+.bpdoc .bp-cellbtn:active { background: var(--card); }
 
 /* ── bottom-sheet chi tiết (portal ra body) ── */
 .bpdoc.bp-portal { position: fixed; inset: 0; z-index: 200; background: none; min-height: 0; padding: 0; display: flex; flex-direction: column; justify-content: flex-end; }
-.bpdoc .bp-sheet-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); }
-.bpdoc .bp-sheet { position: relative; z-index: 1; width: 100%; max-width: 640px; margin: 0 auto; max-height: 92vh; min-height: 60vh; display: flex; flex-direction: column; background: var(--bg); border-top: 1px solid var(--line2); border-radius: 18px 18px 0 0; overflow: hidden; box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
+.bpdoc .bp-sheet-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); animation: bp-scrim-in 0.22s ease both; }
+.bpdoc .bp-sheet { position: relative; z-index: 1; width: 100%; max-width: 640px; margin: 0 auto; max-height: 92vh; min-height: 60vh; display: flex; flex-direction: column; background: var(--bg); border-top: 1px solid var(--line2); border-radius: 18px 18px 0 0; overflow: hidden; box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); animation: bp-sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes bp-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bp-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .bpdoc .bp-sheet-scrim, .bpdoc .bp-sheet { animation-duration: 0.01ms; }
+}
+/* ── dòng tổng trong popup đã chi / công nợ ── */
+.bpdoc .bp-ditotal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; margin-bottom: 4px; border-bottom: 2px solid var(--line2); }
+.bpdoc .bp-ditotal span { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); }
+.bpdoc .bp-ditotal b { font-size: 16px; color: var(--terra); }
 .bpdoc .bp-sheet.bp-sheet-goods { min-height: 40vh; }
 .bpdoc .bp-sheet-grip { width: 40px; height: 4px; border-radius: 2px; background: var(--line2); margin: 8px auto 2px; flex: none; }
 .bpdoc .bp-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px 12px; border-bottom: 1px solid var(--line); }

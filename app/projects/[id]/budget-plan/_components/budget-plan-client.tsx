@@ -42,8 +42,10 @@ type PlanData = {
 type EditLine = { name: string; groupKind: string; amount: string };
 
 type Goods = { name: string; unit: string; qty: number; price: number };
+// Cột nào của hàng được bấm: tổng chi phí (mọi nguồn) / đã chi (sổ quỹ) / công nợ.
+type DetailKind = "total" | "spent" | "debt";
 type DetailItem = {
-  source: "mh_order" | "sub" | "expense";
+  source: "mh_order" | "sub" | "expense" | "ncc";
   id: string;
   label: string;
   sub: string;
@@ -57,6 +59,12 @@ const SRC_LABEL: Record<DetailItem["source"], string> = {
   mh_order: "Mua hàng",
   sub: "Thầu phụ",
   expense: "Chi tay",
+  ncc: "Công nợ NCC",
+};
+const KIND_TITLE: Record<DetailKind, string> = {
+  total: "Chi phí gắn hạng mục",
+  spent: "Đã chi — sổ quỹ",
+  debt: "Công nợ còn lại",
 };
 const itemKey = (it: DetailItem) => `${it.source}:${it.id}`;
 
@@ -89,6 +97,7 @@ export function BudgetPlanClient({
 
   // Popup chi tiết 1 hạng mục: list chi phí gắn vào + đổi hạng mục từng khoản (admin).
   const [detailLine, setDetailLine] = useState<{ id: string | null; name: string } | null>(null);
+  const [detailKind, setDetailKind] = useState<DetailKind>("total");
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   // key `${source}:${id}` -> lineId đang chọn ("" = bỏ gắn).
@@ -128,14 +137,15 @@ export function BudgetPlanClient({
   }, [load]);
 
   const openDetail = useCallback(
-    async (line: { id: string | null; name: string }) => {
+    async (line: { id: string | null; name: string }, kind: DetailKind = "total") => {
       setDetailLine(line);
+      setDetailKind(kind);
       setDetail(null);
       setChanges({});
       setDetailLoading(true);
       try {
         const res = await fetch(
-          `/api/projects/${projectId}/budget-plan/lines/${line.id ?? "unassigned"}/detail`,
+          `/api/projects/${projectId}/budget-plan/lines/${line.id ?? "unassigned"}/detail?kind=${kind}`,
           { cache: "no-store" },
         );
         if (!res.ok) throw new Error();
@@ -376,7 +386,8 @@ export function BudgetPlanClient({
                       b: a.b + l.budget,
                       s: a.s + l.spent,
                       d: a.d + l.debt,
-                      r: a.r + l.remaining,
+                      // Vượt (âm) không bù ngược — khớp tổng ở server.
+                      r: a.r + Math.max(0, l.remaining),
                     }),
                     { b: 0, s: 0, d: 0, r: 0 },
                   );
@@ -390,21 +401,32 @@ export function BudgetPlanClient({
                     />
                   );
                 })}
-                {(data.unassigned.spent > 0 || data.unassigned.debt > 0) && (
-                  <tr
-                    className={`bp-unassigned${canLock ? " bp-clickable" : ""}`}
-                    onClick={canLock ? () => openDetail({ id: null, name: "Chưa gắn hạng mục" }) : undefined}
-                    title={canLock ? "Gán hạng mục cho khoản mồ côi" : undefined}
-                  >
-                    <td className="l">⚠ Chưa gắn hạng mục</td>
-                    <td className="num">—</td>
-                    <td className="num strong">{fmt(data.unassigned.spent + data.unassigned.debt)}</td>
-                    <td className="num">{fmt(data.unassigned.spent)}</td>
-                    <td className="num">{fmt(data.unassigned.debt)}</td>
-                    <td className="num">—</td>
-                    <td className="num">—</td>
-                  </tr>
-                )}
+                {(data.unassigned.spent > 0 || data.unassigned.debt > 0) &&
+                  (() => {
+                    const ua = { id: null, name: "Chưa gắn hạng mục" };
+                    const cell = canLock
+                      ? (kind: DetailKind) => ({
+                          className: "num strong bp-cellbtn",
+                          onClick: () => openDetail(ua, kind),
+                          title: "Gán hạng mục cho khoản mồ côi",
+                        })
+                      : () => ({ className: "num strong" });
+                    return (
+                      <tr className="bp-unassigned">
+                        <td className="l">⚠ Chưa gắn hạng mục</td>
+                        <td className="num">—</td>
+                        <td {...cell("total")}>{fmt(data.unassigned.spent + data.unassigned.debt)}</td>
+                        <td {...cell("spent")} className={canLock ? "num bp-cellbtn" : "num"}>
+                          {fmt(data.unassigned.spent)}
+                        </td>
+                        <td {...cell("debt")} className={canLock ? "num warn bp-cellbtn" : "num warn"}>
+                          {fmt(data.unassigned.debt)}
+                        </td>
+                        <td className="num">—</td>
+                        <td className="num">—</td>
+                      </tr>
+                    );
+                  })()}
               </tbody>
               <tfoot>
                 <tr>
@@ -438,7 +460,7 @@ export function BudgetPlanClient({
               <div className="bp-sheet-grip" />
               <div className="bp-sheet-head">
                 <div>
-                  <div className="bp-modal-eyebrow">Chi phí gắn hạng mục</div>
+                  <div className="bp-modal-eyebrow">{KIND_TITLE[detailKind]}</div>
                   <b>{detailLine.name}</b>
                 </div>
                 <button className="bp-iconbtn" onClick={() => setDetailLine(null)} aria-label="Đóng">
@@ -449,7 +471,19 @@ export function BudgetPlanClient({
               <div className="bp-sheet-body">
                 {detailLoading && <p className="bp-empty">Đang tải…</p>}
                 {!detailLoading && detail && detail.items.length === 0 && (
-                  <p className="bp-empty">Chưa có chi phí nào gắn hạng mục này.</p>
+                  <p className="bp-empty">
+                    {detailKind === "spent"
+                      ? "Chưa chi khoản nào cho hạng mục này."
+                      : detailKind === "debt"
+                        ? "Không còn công nợ cho hạng mục này."
+                        : "Chưa có chi phí nào gắn hạng mục này."}
+                  </p>
+                )}
+                {!detailLoading && detail && detail.items.length > 0 && detailKind !== "total" && (
+                  <div className="bp-ditotal">
+                    <span>Tổng {detailKind === "spent" ? "đã chi" : "công nợ"}</span>
+                    <b className="num">{fmt(detail.items.reduce((s, it) => s + it.amount, 0))}</b>
+                  </div>
                 )}
                 {!detailLoading &&
                   detail &&
@@ -488,17 +522,19 @@ export function BudgetPlanClient({
                         )}
                         <div className="bp-ditem-right">
                           <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
-                          <select
-                            value={val}
-                            onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}
-                          >
-                            <option value="">— Chưa gắn —</option>
-                            {detail.lines.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </select>
+                          {detailKind === "total" && (
+                            <select
+                              value={val}
+                              onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}
+                            >
+                              <option value="">— Chưa gắn —</option>
+                              {detail.lines.map((l) => (
+                                <option key={l.id} value={l.id}>
+                                  {l.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       </div>
                     );
@@ -509,13 +545,15 @@ export function BudgetPlanClient({
                 <button className="bp-btn" onClick={() => setDetailLine(null)} disabled={savingReassign}>
                   Đóng
                 </button>
-                <button
-                  className="bp-btn solid"
-                  onClick={saveReassign}
-                  disabled={savingReassign || pendingChanges.length === 0}
-                >
-                  {savingReassign ? "Đang lưu…" : `Lưu${pendingChanges.length ? ` (${pendingChanges.length})` : ""}`}
-                </button>
+                {detailKind === "total" && (
+                  <button
+                    className="bp-btn solid"
+                    onClick={saveReassign}
+                    disabled={savingReassign || pendingChanges.length === 0}
+                  >
+                    {savingReassign ? "Đang lưu…" : `Lưu${pendingChanges.length ? ` (${pendingChanges.length})` : ""}`}
+                  </button>
+                )}
               </div>
             </div>
           </div>,
@@ -575,7 +613,7 @@ function GroupRows({
   label: string;
   lines: LineStat[];
   sum: { b: number; s: number; d: number; r: number };
-  onOpen?: (line: { id: string; name: string }) => void;
+  onOpen?: (line: { id: string; name: string }, kind: DetailKind) => void;
 }) {
   return (
     <>
@@ -584,18 +622,27 @@ function GroupRows({
       </tr>
       {lines.map((l) => {
         const pct = l.budget ? Math.round(((l.spent + l.debt) / l.budget) * 100) : 0;
+        // Cell chi phí bấm được: mở popup đúng loại (tổng/đã chi/công nợ).
+        const cell = (kind: DetailKind, extra: string) =>
+          onOpen
+            ? {
+                className: `num ${extra} bp-cellbtn`.trim(),
+                onClick: () => onOpen({ id: l.id, name: l.name }, kind),
+                title:
+                  kind === "total"
+                    ? "Xem chi phí & đổi hạng mục"
+                    : kind === "spent"
+                      ? "Xem sổ quỹ đã chi"
+                      : "Xem công nợ còn lại",
+              }
+            : { className: `num ${extra}`.trim() };
         return (
-          <tr
-            key={l.id}
-            className={`${l.over ? "over-row" : ""}${onOpen ? " bp-clickable" : ""}`}
-            onClick={onOpen ? () => onOpen({ id: l.id, name: l.name }) : undefined}
-            title={onOpen ? "Xem chi phí & đổi hạng mục" : undefined}
-          >
+          <tr key={l.id} className={l.over ? "over-row" : ""}>
             <td className="l">{l.name}</td>
             <td className="num">{fmt(l.budget)}</td>
-            <td className="num strong">{fmt(l.spent + l.debt)}</td>
-            <td className="num">{fmt(l.spent)}</td>
-            <td className="num warn">{fmt(l.debt)}</td>
+            <td {...cell("total", "strong")}>{fmt(l.spent + l.debt)}</td>
+            <td {...cell("spent", "")}>{fmt(l.spent)}</td>
+            <td {...cell("debt", "warn")}>{fmt(l.debt)}</td>
             <td className={`num ${l.remaining < 0 ? "over" : ""}`}>{fmt(l.remaining)}</td>
             <td className="num">
               {pct}%{l.over && <span className="bp-over-tag">vượt</span>}

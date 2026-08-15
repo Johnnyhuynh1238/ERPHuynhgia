@@ -200,7 +200,8 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       budget: a.budget + l.budget,
       spent: a.spent + l.spent,
       debt: a.debt + l.debt,
-      remaining: a.remaining + l.remaining,
+      // Chỉ cộng phần CHƯA chi đủ; hạng mục vượt (âm) không bù ngược vào tổng.
+      remaining: a.remaining + Math.max(0, l.remaining),
     }),
     { budget: 0, spent: 0, debt: 0, remaining: 0 },
   );
