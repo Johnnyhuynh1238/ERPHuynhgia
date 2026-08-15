@@ -1,15 +1,14 @@
 /**
  * Zalo inbound — kế toán gửi ảnh bill chuyển khoản vào thread Zalo → bridge OCR
- * đọc mã lệnh chi (CHI-YYMM-NNNN, đã nhét vào nội dung VietQR) + text → POST vào đây.
+ * đọc text bill → POST vào đây. Nội dung CK có mã lệnh chi (VietQR nhét addInfo=code),
+ * NHƯNG ngân hàng bỏ dấu gạch nối (vd lệnh CHI-2608-0058 → bill hiện "CHI26080058").
+ * Vì vậy match mã theo dạng ĐÃ BỎ GẠCH: so UPPER(REPLACE(code,'-','')).
  *
- * Endpoint tự: tra lệnh chi theo mã → verify số tiền có trong OCR text → nếu khớp
- * thì sao y luồng mark-paid (status=paid + lưu bill + recordCashTxn ghi sổ quỹ),
- * ghi dưới danh nghĩa user "Zalo Bot", mặc định tài khoản Tiền mặt.
+ * Nếu khớp mã + số tiền lệnh có trong OCR text → sao y luồng mark-paid (status=paid +
+ * lưu bill + recordCashTxn ghi sổ quỹ), danh nghĩa user "Zalo Bot", tài khoản Tiền mặt.
  *
- * Bảo mật: chỉ nhận khi header Authorization: Bearer <ZALO_INBOUND_SECRET> khớp
- * (bridge nội mạng host↔container). Không có secret → 503, không xử lý.
- *
- * Trả { status, reply } — bridge gửi `reply` trở lại thread kế toán.
+ * Bảo mật: chỉ nhận khi Authorization: Bearer <ZALO_INBOUND_SECRET> khớp.
+ * Trả { status, reply } — bridge gửi `reply` lại thread kế toán.
  */
 import { NextResponse } from "next/server";
 import { ExpenseStatus, Prisma, SubPaymentStatus } from "@prisma/client";
@@ -19,8 +18,6 @@ import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
 
 const SECRET = process.env.ZALO_INBOUND_SECRET || "";
 const BOT_EMAIL = "zalo-bot@huynhgia6.local";
-// Cho phép khoảng trắng + các loại gạch nối OCR hay nhận nhầm.
-const CODE_RE = /CHI\s*[-–—]\s*(\d{4})\s*[-–—]\s*(\d+)/i;
 
 function fmtVnd(n: number): string {
   return new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
@@ -29,7 +26,7 @@ function fmtVnd(n: number): string {
 /** Cắt mọi token số trong OCR text → set chuỗi chỉ chữ số (đã bỏ dấu ngăn cách). */
 function amountTokens(text: string): Set<string> {
   const set = new Set<string>();
-  for (const m of text.matchAll(/\d[\d.,\s]*\d|\d/g)) {
+  for (const m of Array.from(text.matchAll(/\d[\d.,\s]*\d|\d/g))) {
     const digits = m[0].replace(/\D/g, "").replace(/^0+/, "");
     if (digits) set.add(digits);
   }
@@ -50,14 +47,25 @@ export async function POST(request: Request) {
   const ocrText = (body.ocrText || "").toString();
   const imageUrl = (body.imageUrl || "").toString().trim() || null;
 
-  const cm = CODE_RE.exec(ocrText);
+  // Blob chữ+số (bỏ mọi ký tự khác) → bắt mã "CHI" + chuỗi số (đã mất gạch nối do bank).
+  const norm = ocrText.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const cm = /CHI(\d{5,})/.exec(norm);
   if (!cm) {
     return NextResponse.json({
       status: "no_code",
       reply: "⚠️ Không đọc được mã lệnh chi trong ảnh. Vui lòng gửi lại ảnh bill rõ hơn.",
     });
   }
-  const code = `CHI-${cm[1]}-${cm[2]}`;
+  const codeStripped = `CHI${cm[1]}`;
+
+  // Tra lệnh chi theo mã đã bỏ gạch nối.
+  const found = await prisma.$queryRaw<Array<{ code: string }>>`
+    SELECT code FROM expenses WHERE UPPER(REPLACE(code, '-', '')) = ${codeStripped} LIMIT 1
+  `;
+  if (found.length === 0) {
+    return NextResponse.json({ status: "notfound", reply: `⚠️ Không tìm thấy lệnh chi khớp mã "${codeStripped}" trong hệ thống.` });
+  }
+  const code = found[0].code;
 
   const expense = await prisma.expense.findUnique({
     where: { code },
