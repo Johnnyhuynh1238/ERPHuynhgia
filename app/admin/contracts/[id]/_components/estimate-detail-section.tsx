@@ -16,6 +16,22 @@ export function EstimateDetailSection({
 }) {
   // Màn Khối lượng chỉ hiện hạng mục có bảng bóc KL (bỏ mục nhân công thuần).
   const items = (detail?.items ?? []).filter((it) => (it.rows?.length ?? 0) > 0);
+  // Đánh số dồn nhóm: cùng group → 1-1, 1-2…; không group → số đơn.
+  const labels: string[] = [];
+  let g = 0;
+  let sub = 0;
+  let lastGroup: string | null = null;
+  for (const it of items) {
+    if (it.noNum) { labels.push(""); continue; }
+    if (it.group) {
+      if (it.group !== lastGroup) { g++; sub = 1; lastGroup = it.group; }
+      else { sub++; }
+      labels.push(`${g}-${sub}`);
+    } else {
+      g++; sub = 0; lastGroup = null;
+      labels.push(`${g}`);
+    }
+  }
   const fullDrawings = detail?.fullDrawings ?? [];
   // Mặc định hiện bản vẽ từng mục; toggle ẩn/hiện.
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
@@ -57,7 +73,7 @@ export function EstimateDetailSection({
           <div className="edt-card" key={it.id}>
             <div className="edt-hd">
               <span className="edt-nm">
-                {i + 1} · {it.name}
+                {labels[i] ? `${labels[i]} · ` : ""}{it.name}
                 {it.tag && <span className="edt-badge">{it.tag}</span>}
               </span>
               <span className="edt-hd-right">

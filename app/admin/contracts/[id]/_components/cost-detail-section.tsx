@@ -1,22 +1,43 @@
 "use client";
 
-import { itemCost, type EstimateDetail } from "@/lib/estimate-detail";
+import { itemCost, type EDItem, type EstimateDetail } from "@/lib/estimate-detail";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
+type Block = { key: string; name: string; tag?: string; items: EDItem[]; isGroup: boolean };
+
 export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
-  const items = (detail?.items ?? []).filter((it) => it.cost);
-  if (items.length === 0) {
+  const withCost = (detail?.items ?? []).filter((it) => it.cost);
+  if (withCost.length === 0) {
     return <div className="gv-empty">Chưa có dữ liệu giá vốn cho hợp đồng này.</div>;
+  }
+
+  // Gộp hạng mục cùng group thành 1 block (vd Bê tông); còn lại mỗi mục 1 block.
+  const blocks: Block[] = [];
+  for (const it of withCost) {
+    if (it.group) {
+      const last = blocks[blocks.length - 1];
+      if (last && last.isGroup && last.key === it.group) {
+        last.items.push(it);
+      } else {
+        blocks.push({ key: it.group, name: it.groupName || it.name, tag: it.tag, items: [it], isGroup: true });
+      }
+    } else {
+      blocks.push({ key: it.id, name: it.name, tag: it.tag, items: [it], isGroup: false });
+    }
   }
 
   let sumNc = 0;
   let sumVt = 0;
-  const rows = items.map((it) => {
-    const c = itemCost(it.cost);
-    sumNc += c.nc;
-    sumVt += c.vt;
-    return { it, c };
+  const rows = blocks.map((b) => {
+    const mats = b.items.flatMap((it) => it.cost?.materials ?? []);
+    const nc = b.items.reduce((s, it) => s + (Number(it.cost?.nc) || 0), 0);
+    const vtRaw = mats.reduce((s, m) => s + (Number(m.kl) || 0) * (Number(m.gia) || 0), 0);
+    const hh = Number(b.items[0]?.cost?.haoHutPct) || 0;
+    const vt = Math.round(vtRaw * (1 + hh / 100));
+    sumNc += nc;
+    sumVt += vt;
+    return { b, mats, nc, vtRaw, vt, hh, total: nc + vt };
   });
   const grand = sumNc + sumVt;
 
@@ -31,16 +52,13 @@ export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
         </div>
       </div>
 
-      {rows.map(({ it, c }, i) => {
-        const mats = it.cost?.materials ?? [];
-        const hh = Number(it.cost?.haoHutPct) || 0;
-        const vtRaw = mats.reduce((s, m) => s + (Number(m.kl) || 0) * (Number(m.gia) || 0), 0);
-        const ncOnly = c.vt === 0 && c.nc > 0;
+      {rows.map(({ b, mats, nc, vtRaw, vt, hh, total }, i) => {
+        const ncOnly = vt === 0 && nc > 0;
         return (
-          <div className={`gv-card${ncOnly ? " nc" : ""}`} key={it.id}>
+          <div className={`gv-card${ncOnly ? " nc" : ""}`} key={b.key}>
             <div className="gv-hd">
-              <span className="gv-nm">{i + 1} · {it.name}{it.tag && <span className="gv-badge">{it.tag}</span>}</span>
-              <span className="gv-kq">Vốn: {fmt(c.total)} đ</span>
+              <span className="gv-nm">{i + 1} · {b.name}{b.tag && <span className="gv-badge">{b.tag}</span>}</span>
+              <span className="gv-kq">Vốn: {fmt(total)} đ</span>
             </div>
             <div className="gv-bd">
               <table>
@@ -48,8 +66,8 @@ export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
                   <tr><th>Khoản mục</th><th className="n">Khối lượng</th><th className="n">Đơn giá</th><th className="n">Thành tiền</th></tr>
                 </thead>
                 <tbody>
-                  {c.nc > 0 && (
-                    <tr className="ncrow"><td>Nhân công</td><td className="n">—</td><td className="n">—</td><td className="n">{fmt(c.nc)}</td></tr>
+                  {nc > 0 && (
+                    <tr className="ncrow"><td>Nhân công</td><td className="n">—</td><td className="n">—</td><td className="n">{fmt(nc)}</td></tr>
                   )}
                   {mats.map((m, k) => (
                     <tr key={k}>
@@ -60,9 +78,9 @@ export function CostDetailSection({ detail }: { detail: EstimateDetail }) {
                     </tr>
                   ))}
                   {hh > 0 && (
-                    <tr className="hh"><td colSpan={3}>Hao hụt vật tư ({hh}%)</td><td className="n">{fmt(c.vt - vtRaw)}</td></tr>
+                    <tr className="hh"><td colSpan={3}>Hao hụt vật tư ({hh}%)</td><td className="n">{fmt(vt - vtRaw)}</td></tr>
                   )}
-                  <tr className="sum"><td colSpan={3}>Cộng giá vốn hạng mục</td><td className="n">{fmt(c.total)}</td></tr>
+                  <tr className="sum"><td colSpan={3}>Cộng giá vốn hạng mục</td><td className="n">{fmt(total)}</td></tr>
                 </tbody>
               </table>
             </div>

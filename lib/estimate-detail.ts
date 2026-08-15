@@ -26,6 +26,9 @@ export type EDItem = {
   note?: string;
   drawings: EDDrawing[]; // 1 mục có thể nhiều bản vẽ — không được thiếu
   cost?: EDCost; // dữ liệu màn Giá vốn (cùng hạng mục xuyên suốt 3 màn)
+  group?: string; // nhóm hạng mục (vd "betong"): KL đánh số 1-1/1-2, Giá vốn dồn 1 card
+  groupName?: string; // tên hiển thị của nhóm ở màn Giá vốn (vd "Bê tông")
+  noNum?: boolean; // không đánh số ở màn Khối lượng (vd mục cơ sở diện tích nhân công)
 };
 
 // Giá vốn 1 hạng mục (nhân công + vật tư + hao hụt).
