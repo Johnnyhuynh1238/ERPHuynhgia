@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -34,6 +35,7 @@ type PlanData = {
   status: "draft" | "locked" | null;
   lockedAt: string | null;
   contractValue: number;
+  addendumRevenue: number;
   lines: LineStat[];
   unassigned: { spent: number; debt: number };
   totals: { budget: number; spent: number; debt: number; remaining: number };
@@ -199,7 +201,10 @@ export function BudgetPlanClient({
   const locked = data?.status === "locked";
   const t = data?.totals ?? { budget: 0, spent: 0, debt: 0, remaining: 0 };
   const cv = data?.contractValue ?? 0;
+  const addRev = data?.addendumRevenue ?? 0; // doanh thu phụ lục (Σ đợt thu addendum)
+  const cvRt = cv + addRev; // giá trị HĐ realtime = gốc + phụ lục phát sinh
   const profit = cv - t.budget; // lãi gộp dự kiến (chốt ban đầu) = HĐ − ngân sách
+  const profitRt = cvRt - t.budget; // lãi gộp realtime = HĐ (gồm PL) − ngân sách hiện hành
   const totalCost = t.spent + t.debt; // tổng chi phí realtime (đã chi + công nợ)
   const projectedCost = totalCost + t.remaining; // chi phí dự kiến khi hoàn thành
   const grossRealtime = cv - projectedCost; // lãi gộp realtime = HĐ − chi phí dự kiến
@@ -266,6 +271,9 @@ export function BudgetPlanClient({
       <div className="bp-inner">
         <div className="bp-titlebar">
           <div>
+            <Link href={`/projects/${projectId}`} className="bp-back">
+              ← {projectName}
+            </Link>
             <div className="bp-eyebrow">
               {projectCode} · {projectName}
             </div>
@@ -298,6 +306,23 @@ export function BudgetPlanClient({
             <label>Lãi gộp dự kiến</label>
             <strong className={`num ${profit < 0 ? "over" : "ok"}`}>{fmt(profit)}</strong>
           </div>
+          {/* Hàng 1b — realtime gồm phụ lục phát sinh (chỉ hiện khi có PL) */}
+          {addRev > 0 && (
+            <>
+              <div className="bp-kpi">
+                <label>Giá trị HĐ (gồm PL)</label>
+                <strong className="num">{fmt(cvRt)}</strong>
+              </div>
+              <div className="bp-kpi">
+                <label>Ngân sách hiện hành</label>
+                <strong className="num accent">{fmt(t.budget)}</strong>
+              </div>
+              <div className="bp-kpi">
+                <label>Lãi gộp (gồm PL)</label>
+                <strong className={`num ${profitRt < 0 ? "over" : "ok"}`}>{fmt(profitRt)}</strong>
+              </div>
+            </>
+          )}
           {/* Hàng 2 — realtime */}
           <div className="bp-kpi">
             <label>Tổng chi phí</label>

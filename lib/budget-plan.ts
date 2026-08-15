@@ -24,6 +24,8 @@ export type BudgetPlanData = {
   status: "draft" | "locked" | null;
   lockedAt: string | null;
   contractValue: number;
+  // Doanh thu phụ lục phát sinh = Σ đợt thu type=addendum (giá bán khách đã duyệt).
+  addendumRevenue: number;
   lines: BudgetLineStat[];
   // phần chi/nợ chưa gắn hạng mục (item thiếu hm / HĐ chưa gắn) — cần soát.
   unassigned: { spent: number; debt: number };
@@ -36,7 +38,7 @@ const num = (d: Prisma.Decimal | number | bigint | null | undefined): number =>
 const MH_ACTIVE: MhOrderStatus[] = [MhOrderStatus.ordered, MhOrderStatus.received, MhOrderStatus.paid];
 
 export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData> {
-  const [plan, project, orders, subContracts, expenses] = await Promise.all([
+  const [plan, project, orders, subContracts, expenses, addendumAgg] = await Promise.all([
     prisma.projectBudgetPlan.findUnique({
       where: { projectId },
       include: { lines: { orderBy: { sortRank: "asc" } } },
@@ -65,7 +67,14 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       },
       select: { budgetLineId: true, paidAmount: true, amount: true },
     }),
+    // Doanh thu phụ lục = tổng đợt thu type=addendum (mọi trạng thái đã lên lịch).
+    prisma.paymentSchedule.aggregate({
+      where: { projectId, type: "addendum" },
+      _sum: { amount: true },
+    }),
   ]);
+
+  const addendumRevenue = num(addendumAgg._sum.amount);
 
   if (!plan) {
     return {
@@ -73,6 +82,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       status: null,
       lockedAt: null,
       contractValue: num(project?.contractValue),
+      addendumRevenue,
       lines: [],
       unassigned: { spent: 0, debt: 0 },
       totals: { budget: 0, spent: 0, debt: 0, remaining: 0 },
@@ -211,6 +221,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     status: plan.status,
     lockedAt: plan.lockedAt ? plan.lockedAt.toISOString() : null,
     contractValue: num(project?.contractValue),
+    addendumRevenue,
     lines,
     unassigned: { spent: Math.round(unassigned.spent), debt: Math.round(unassigned.debt) },
     totals,
