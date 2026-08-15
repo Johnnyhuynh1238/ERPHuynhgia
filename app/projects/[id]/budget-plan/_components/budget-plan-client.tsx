@@ -79,11 +79,13 @@ const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
 export function BudgetPlanClient({
   projectId,
+  projectCode,
+  projectName,
   canLock,
 }: {
   projectId: string;
-  projectCode?: string;
-  projectName?: string;
+  projectCode: string;
+  projectName: string;
   canLock: boolean;
 }) {
   const [data, setData] = useState<PlanData | null>(null);
@@ -262,12 +264,20 @@ export function BudgetPlanClient({
     <>
     <div className={`bpdoc ${fontVars} -mx-4 -mt-4 md:-mx-6 md:-mt-6`} data-theme={theme}>
       <div className="bp-inner">
-        <div className="bp-toolbar">
-          {locked ? (
-            <span className="bp-lock on">🔒 Đã khoá</span>
-          ) : (
-            <span className="bp-lock">✎ Nháp</span>
-          )}
+        <div className="bp-titlebar">
+          <div>
+            <div className="bp-eyebrow">
+              {projectCode} · {projectName}
+            </div>
+            <h1 className="bp-h1">
+              Ngân sách theo hạng mục
+              {locked ? (
+                <span className="bp-lock on">🔒 Đã khoá</span>
+              ) : (
+                <span className="bp-lock">✎ Nháp</span>
+              )}
+            </h1>
+          </div>
           <button className="bp-iconbtn" onClick={toggleTheme} title="Đổi nền">
             {theme === "dark" ? "☀" : "☾"}
           </button>

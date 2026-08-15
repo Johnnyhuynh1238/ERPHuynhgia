@@ -117,8 +117,8 @@
   .bpdoc .bp-kpi strong { font-size: 13.5px; }
 }
 
-/* ── thanh công cụ (thay header cũ: chỉ trạng thái khoá + đổi nền) ── */
-.bpdoc .bp-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+/* ── hàng tiêu đề brand (header riêng của màn) ── */
+.bpdoc .bp-titlebar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
 /* ── dòng hạng mục bấm được ── */
 .bpdoc .bp-clickable { cursor: pointer; }
