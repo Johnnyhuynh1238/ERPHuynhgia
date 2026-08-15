@@ -266,8 +266,14 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   );
 
   // Lọc theo khoảng ngày (áp cho phần đã lên kế hoạch).
+  // Chỉ chọn 1 đầu (click 1 ngày, chưa chốt ngày cuối) → coi như lọc đúng 1 ngày,
+  // tránh nửa hở làm mất chặn trên → lòi khoản ngoài khoảng.
   const inRange = useCallback(
-    (d: string) => (!fromD || d >= fromD) && (!toD || d <= toD),
+    (d: string) => {
+      const lo = fromD || toD;
+      const hi = toD || fromD;
+      return (!lo || d >= lo) && (!hi || d <= hi);
+    },
     [fromD, toD],
   );
 
