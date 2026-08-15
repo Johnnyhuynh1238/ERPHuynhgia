@@ -60,6 +60,7 @@ type Txn = {
   createdAt: string;
   project: ProjectOption | null;
   category: CategoryOption | null;
+  designContract: { id: string; customerName: string } | null;
   creator: { id: string; fullName: string };
   account: TxnAccount | null;
   counterAccount: TxnAccount | null;
@@ -556,7 +557,14 @@ export function TreasuryClient({
                           : r.account.name}
                       </span>
                     ) : null}
-                    <span className="proj">· {r.project ? r.project.code : "Chung công ty"}</span>
+                    <span className="proj">
+                      ·{" "}
+                      {r.project
+                        ? r.project.code
+                        : r.designContract
+                          ? `HĐTK ${r.designContract.customerName}`
+                          : "Chung công ty"}
+                    </span>
                     {r.category ? <span>· {r.category.name}</span> : null}
                     {r.attachments.length > 0 ? <span className="clip">· 📎 {r.attachments.length}</span> : null}
                   </div>
@@ -634,7 +642,11 @@ export function TreasuryClient({
                     <div className="kv">
                       <span className="k">Dự án</span>
                       <span className="v">
-                        {selectedTxn.project ? `${selectedTxn.project.code} — ${selectedTxn.project.name}` : "Chung công ty"}
+                        {selectedTxn.project
+                          ? `${selectedTxn.project.code} — ${selectedTxn.project.name}`
+                          : selectedTxn.designContract
+                            ? `HĐTK — ${selectedTxn.designContract.customerName}`
+                            : "Chung công ty"}
                       </span>
                     </div>
                     <div className="kv">

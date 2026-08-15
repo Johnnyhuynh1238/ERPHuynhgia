@@ -75,6 +75,7 @@ export async function GET(request: Request) {
       include: {
         project: { select: { code: true, name: true } },
         category: { select: { name: true } },
+        designContract: { select: { customerName: true } },
         creator: { select: { fullName: true } },
         account: { select: { name: true } },
         counterAccount: { select: { name: true } },
@@ -85,7 +86,11 @@ export async function GET(request: Request) {
     const lines = rows.map((r) => {
       const d = r.occurredAt.toISOString().slice(0, 10);
       const direction = r.direction === "in" ? "Thu" : "Chi";
-      const project = r.project ? `${r.project.code} ${r.project.name}` : "Chi chung";
+      const project = r.project
+        ? `${r.project.code} ${r.project.name}`
+        : r.designContract
+          ? `HĐTK ${r.designContract.customerName}`
+          : "Chi chung";
       const category = r.category?.name ?? "";
       const note = r.note ?? "";
       const amt = Number(r.amount);
@@ -120,6 +125,7 @@ export async function GET(request: Request) {
       include: {
         project: { select: { id: true, code: true, name: true } },
         category: { select: { id: true, code: true, name: true } },
+        designContract: { select: { id: true, customerName: true } },
         creator: { select: { id: true, fullName: true } },
         account: { select: { id: true, name: true, kind: true } },
         counterAccount: { select: { id: true, name: true, kind: true } },
