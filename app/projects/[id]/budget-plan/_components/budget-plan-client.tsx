@@ -79,13 +79,11 @@ const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
 export function BudgetPlanClient({
   projectId,
-  projectCode,
-  projectName,
   canLock,
 }: {
   projectId: string;
-  projectCode: string;
-  projectName: string;
+  projectCode?: string;
+  projectName?: string;
   canLock: boolean;
 }) {
   const [data, setData] = useState<PlanData | null>(null);
@@ -199,7 +197,10 @@ export function BudgetPlanClient({
   const locked = data?.status === "locked";
   const t = data?.totals ?? { budget: 0, spent: 0, debt: 0, remaining: 0 };
   const cv = data?.contractValue ?? 0;
-  const profit = cv - t.budget;
+  const profit = cv - t.budget; // lãi gộp dự kiến (chốt ban đầu) = HĐ − ngân sách
+  const totalCost = t.spent + t.debt; // tổng chi phí realtime (đã chi + công nợ)
+  const projectedCost = totalCost + t.remaining; // chi phí dự kiến khi hoàn thành
+  const grossRealtime = cv - projectedCost; // lãi gộp realtime = HĐ − chi phí dự kiến
 
   const startEdit = () => {
     setRows(
@@ -261,35 +262,46 @@ export function BudgetPlanClient({
     <>
     <div className={`bpdoc ${fontVars} -mx-4 -mt-4 md:-mx-6 md:-mt-6`} data-theme={theme}>
       <div className="bp-inner">
-        <div className="bp-titlebar">
-          <div>
-            <div className="bp-eyebrow">
-              {projectCode} · {projectName}
-            </div>
-            <h1 className="bp-h1">
-              Ngân sách theo hạng mục
-              {locked ? (
-                <span className="bp-lock on">🔒 Đã khoá</span>
-              ) : (
-                <span className="bp-lock">✎ Nháp</span>
-              )}
-            </h1>
-          </div>
+        <div className="bp-toolbar">
+          {locked ? (
+            <span className="bp-lock on">🔒 Đã khoá</span>
+          ) : (
+            <span className="bp-lock">✎ Nháp</span>
+          )}
           <button className="bp-iconbtn" onClick={toggleTheme} title="Đổi nền">
             {theme === "dark" ? "☀" : "☾"}
           </button>
         </div>
 
-        {/* KPI */}
+        {/* KPI — 3 hàng × 3: chốt ban đầu / realtime / chi tiết chi */}
         <section className="bp-kpis">
+          {/* Hàng 1 — chốt ban đầu (cố định) */}
           <div className="bp-kpi">
             <label>Giá trị hợp đồng</label>
             <strong className="num">{fmt(cv)}</strong>
           </div>
           <div className="bp-kpi">
-            <label>Tổng ngân sách</label>
+            <label>Ngân sách (chốt)</label>
             <strong className="num accent">{fmt(t.budget)}</strong>
           </div>
+          <div className="bp-kpi">
+            <label>Lãi gộp dự kiến</label>
+            <strong className={`num ${profit < 0 ? "over" : "ok"}`}>{fmt(profit)}</strong>
+          </div>
+          {/* Hàng 2 — realtime */}
+          <div className="bp-kpi">
+            <label>Tổng chi phí</label>
+            <strong className="num tot">{fmt(totalCost)}</strong>
+          </div>
+          <div className="bp-kpi">
+            <label>Chi phí dự kiến</label>
+            <strong className="num">{fmt(projectedCost)}</strong>
+          </div>
+          <div className="bp-kpi">
+            <label>Lãi gộp hiện tại</label>
+            <strong className={`num ${grossRealtime < 0 ? "over" : "ok"}`}>{fmt(grossRealtime)}</strong>
+          </div>
+          {/* Hàng 3 — chi tiết chi */}
           <div className="bp-kpi">
             <label>Đã chi</label>
             <strong className="num">{fmt(t.spent)}</strong>
@@ -300,11 +312,7 @@ export function BudgetPlanClient({
           </div>
           <div className="bp-kpi">
             <label>Còn phải chi</label>
-            <strong className={`num ${t.remaining < 0 ? "over" : "ok"}`}>{fmt(t.remaining)}</strong>
-          </div>
-          <div className="bp-kpi">
-            <label>Dự kiến lời (HĐ − NS)</label>
-            <strong className={`num ${profit < 0 ? "over" : "ok"}`}>{fmt(profit)}</strong>
+            <strong className="num ok">{fmt(t.remaining)}</strong>
           </div>
         </section>
 
