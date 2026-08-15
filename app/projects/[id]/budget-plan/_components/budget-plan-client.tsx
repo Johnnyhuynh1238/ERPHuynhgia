@@ -361,6 +361,7 @@ export function BudgetPlanClient({
                 <tr>
                   <th className="l">Hạng mục</th>
                   <th>Ngân sách</th>
+                  <th>Tổng chi phí</th>
                   <th>Đã chi</th>
                   <th>Công nợ</th>
                   <th>Còn phải chi</th>
@@ -397,6 +398,7 @@ export function BudgetPlanClient({
                   >
                     <td className="l">⚠ Chưa gắn hạng mục</td>
                     <td className="num">—</td>
+                    <td className="num strong">{fmt(data.unassigned.spent + data.unassigned.debt)}</td>
                     <td className="num">{fmt(data.unassigned.spent)}</td>
                     <td className="num">{fmt(data.unassigned.debt)}</td>
                     <td className="num">—</td>
@@ -408,6 +410,7 @@ export function BudgetPlanClient({
                 <tr>
                   <td className="l">TỔNG</td>
                   <td className="num">{fmt(t.budget)}</td>
+                  <td className="num strong">{fmt(t.spent + t.debt)}</td>
                   <td className="num">{fmt(t.spent)}</td>
                   <td className="num warn">{fmt(t.debt)}</td>
                   <td className={`num ${t.remaining < 0 ? "over" : "ok"}`}>{fmt(t.remaining)}</td>
@@ -577,7 +580,7 @@ function GroupRows({
   return (
     <>
       <tr className="bp-group">
-        <td className="l" colSpan={6}>{label}</td>
+        <td className="l" colSpan={7}>{label}</td>
       </tr>
       {lines.map((l) => {
         const pct = l.budget ? Math.round(((l.spent + l.debt) / l.budget) * 100) : 0;
@@ -590,6 +593,7 @@ function GroupRows({
           >
             <td className="l">{l.name}</td>
             <td className="num">{fmt(l.budget)}</td>
+            <td className="num strong">{fmt(l.spent + l.debt)}</td>
             <td className="num">{fmt(l.spent)}</td>
             <td className="num warn">{fmt(l.debt)}</td>
             <td className={`num ${l.remaining < 0 ? "over" : ""}`}>{fmt(l.remaining)}</td>
@@ -602,6 +606,7 @@ function GroupRows({
       <tr className="bp-gsum">
         <td className="l">∑ {label}</td>
         <td className="num">{fmt(sum.b)}</td>
+        <td className="num strong">{fmt(sum.s + sum.d)}</td>
         <td className="num">{fmt(sum.s)}</td>
         <td className="num">{fmt(sum.d)}</td>
         <td className={`num ${sum.r < 0 ? "over" : ""}`}>{fmt(sum.r)}</td>

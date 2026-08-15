@@ -97,6 +97,7 @@
 .bpdoc .bp-table .num { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
 .bpdoc .bp-table .warn { color: var(--gold); }
 .bpdoc .bp-table .over { color: var(--red); font-weight: 600; }
+.bpdoc .bp-table .num.strong { font-weight: 700; color: var(--terra); }
 .bpdoc .bp-group td { background: var(--card2); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--terra); padding-top: 7px; padding-bottom: 7px; }
 .bpdoc .bp-gsum td { font-weight: 600; color: var(--mut); border-bottom: 2px solid var(--line2); }
 .bpdoc .bp-gsum td.l { color: var(--text); }
