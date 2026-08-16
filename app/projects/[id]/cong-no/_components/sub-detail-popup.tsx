@@ -4,7 +4,7 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { plexSans, plexMono } from "@/lib/fonts";
 import { SubContractStatus, SubPaymentStatus } from "@prisma/client";
 import { toast } from "sonner";
 import { findBankByName } from "@/lib/vn-banks";
@@ -16,8 +16,6 @@ import {
 } from "@/lib/sub-contract-view";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
-const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 // ── Popup chi tiết Hợp đồng thầu phụ — full màn, tông ngà (.cndoc).
 // Render trong tab Thầu phụ (màn Quản lý NCC). Giữ đủ chức năng của màn cũ.

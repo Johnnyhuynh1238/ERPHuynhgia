@@ -6,21 +6,9 @@ import { createPortal } from "react-dom";
 import { MoneyInput } from "@/components/money-input";
 import { toast } from "sonner";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { plexSans, plexMono } from "@/lib/fonts";
 import "./receipts.css";
 
-const plexSans = IBM_Plex_Sans({
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex-sans",
-  display: "swap",
-});
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
-  display: "swap",
-});
 
 type ProjectOption = { id: string; code: string; name: string };
 type DesignContractOption = { id: string; customerName: string; notes: string | null };

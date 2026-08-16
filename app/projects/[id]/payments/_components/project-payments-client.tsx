@@ -1,14 +1,12 @@
 "use client";
 
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { plexSans, plexMono } from "@/lib/fonts";
 import Link from "next/link";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import "./thanh-toan.css";
 
-const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-mono" });
 
 type PaymentStatus = "not_collected" | "request_sent" | "collected" | "customer_late";
 

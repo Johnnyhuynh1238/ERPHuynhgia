@@ -1,14 +1,12 @@
 "use client";
 
 import "./subcontractors.css";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { plexSans, plexMono } from "@/lib/fonts";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { VN_BANKS } from "@/lib/vn-banks";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-const plexSans = IBM_Plex_Sans({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-plex-sans", display: "swap" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 type Specialty = {
   id: string;
