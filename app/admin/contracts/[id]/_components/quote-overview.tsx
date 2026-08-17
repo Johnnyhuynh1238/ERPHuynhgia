@@ -56,7 +56,7 @@ export function QuoteOverview({
               <tr>
                 <th className="no">#</th>
                 <th>Hạng mục</th>
-                <th className="n">Công tác ›</th>
+                <th className="n">Khối lượng ›</th>
                 <th className="n">Vốn (VT+NC) ›</th>
                 <th className="n">Giá bán ›</th>
               </tr>
@@ -70,7 +70,13 @@ export function QuoteOverview({
                   <td className="no"><b>{i + 1}</b></td>
                   <td className="nm">{r.name}</td>
                   <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl")}>
-                    {r.cong.length > 0 ? `${r.cong.length} công tác` : <span className="warn">chưa bóc</span>}
+                    {r.cong.length === 0 ? (
+                      <span className="warn">chưa bóc</span>
+                    ) : r.cong.length === 1 ? (
+                      r.cong[0].result || "—"
+                    ) : (
+                      `${r.cong.length} công tác`
+                    )}
                   </td>
                   <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv")}>{fmt(r.von)}</td>
                   <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg")}>{fmt(r.ban)}</td>
