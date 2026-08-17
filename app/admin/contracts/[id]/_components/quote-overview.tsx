@@ -49,15 +49,14 @@ export function QuoteOverview({
               <tr>
                 <th className="no">#</th>
                 <th>Hạng mục</th>
-                <th className="n">Khối lượng</th>
-                <th className="n">Vốn (VT+NC)</th>
-                <th className="n">Giá bán</th>
-                <th className="c">Mở màn</th>
+                <th className="n">Khối lượng ›</th>
+                <th className="n">Vốn (VT+NC) ›</th>
+                <th className="n">Giá bán ›</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 && (
-                <tr><td colSpan={6} className="ov-empty">Chưa có hạng mục — thêm ở tab Báo giá khách.</td></tr>
+                <tr><td colSpan={5} className="ov-empty">Chưa có hạng mục — thêm ở tab Báo giá khách.</td></tr>
               )}
               {list.map((it, i) => {
                 const v = rowVals(it);
@@ -65,20 +64,16 @@ export function QuoteOverview({
                   <tr key={it.id}>
                     <td className="no"><b>{i + 1}</b></td>
                     <td className="nm">{it.name}{it.tag && <span className="tag">{it.tag}</span>}</td>
-                    <td className="n mut">{it.result || "—"}</td>
-                    <td className="n von">{fmt(v.von)}</td>
-                    <td className="n ban">{fmt(v.ban)}</td>
-                    <td className="lnk">
-                      <button type="button" className="go kl" onClick={() => onGoto?.("kl")}>📐 KL ›</button>
-                      <button type="button" className="go gv" onClick={() => onGoto?.("gv")}>💰 Vốn ›</button>
-                    </td>
+                    <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl")}>{it.result || "—"}</td>
+                    <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv")}>{fmt(v.von)}</td>
+                    <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg")}>{fmt(v.ban)}</td>
                   </tr>
                 );
               })}
             </tbody>
             {list.length > 0 && (
               <tfoot>
-                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(st.von)}</td><td className="n">{fmt(st.ban)}</td><td /></tr>
+                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(st.von)}</td><td className="n">{fmt(st.ban)}</td></tr>
               </tfoot>
             )}
           </table>
@@ -135,10 +130,9 @@ const CSS = `
 .ov td.mut{color:var(--mute)}
 .ov td.von{font-weight:800;color:var(--brown)}
 .ov td.ban{font-weight:800;color:var(--ink)}
-.ov td.lnk{text-align:right;white-space:nowrap}
-.ov .go{border:1px solid var(--line);background:#fff;color:var(--browntx);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px}
-.ov .go.gv{border-color:#cbe3d1;color:var(--green)}
-.ov .go:hover{background:var(--soft)}
+.ov td.clik{cursor:pointer}
+.ov td.clik:hover{background:var(--soft);text-decoration:underline;text-underline-offset:3px}
+.ov thead th.n{color:var(--brown)}
 .ov .ov-empty{text-align:center;color:var(--mute);font-style:italic;padding:16px}
 .ov tfoot td{padding:11px 14px;background:var(--soft);font-weight:800;border-top:2px solid var(--line)}
 .ov tfoot td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--brown)}
