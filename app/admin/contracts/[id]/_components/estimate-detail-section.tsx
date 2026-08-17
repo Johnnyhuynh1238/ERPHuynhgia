@@ -18,11 +18,23 @@ export function EstimateDetailSection({
 }: {
   contractId: string;
   detail: EstimateDetail;
-  hmTho: string[];
-  hmHt: string[];
+  hmTho?: string[];
+  hmHt?: string[];
   scrollTarget?: string | null;
 }) {
   const items = detail?.items ?? [];
+  // Danh sách hạng mục: ưu tiên tên từ khách; thiếu thì tự suy từ items.hangMuc (thứ tự xuất hiện).
+  const namesFrom = (part: "tho" | "ht") => {
+    const seen: string[] = [];
+    for (const it of items) {
+      if ((it.part ?? "tho") !== part) continue;
+      const h = (it.hangMuc || "").trim();
+      if (h && !seen.some((x) => norm(x) === norm(h))) seen.push(h);
+    }
+    return seen;
+  };
+  const thoNames = hmTho && hmTho.length ? hmTho : namesFrom("tho");
+  const htNames = hmHt && hmHt.length ? hmHt : namesFrom("ht");
   const fullDrawings = detail?.fullDrawings ?? [];
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setHidden((h) => ({ ...h, [id]: !h[id] }));
@@ -121,10 +133,10 @@ export function EstimateDetailSection({
         </div>
       </div>
 
-      {hmTho.length > 0 && <div className="edt-part">PHẦN THÔ</div>}
-      {section(hmTho)}
-      {hmHt.length > 0 && <div className="edt-part">PHẦN HOÀN THIỆN</div>}
-      {section(hmHt)}
+      {thoNames.length > 0 && <div className="edt-part">PHẦN THÔ</div>}
+      {section(thoNames)}
+      {htNames.length > 0 && <div className="edt-part">PHẦN HOÀN THIỆN</div>}
+      {section(htNames)}
 
       <style>{CSS}</style>
     </div>
