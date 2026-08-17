@@ -68,6 +68,8 @@ export function syncQuoteFromDetail(quoteData: unknown, detail: EstimateDetail) 
   const s = thoSummary(detail, dtTong);
   const thoItems = (detail.items ?? []).filter((it) => (it.part ?? "tho") === "tho");
 
+  // Chỉ ĐẨY NGƯỢC số (đơn giá m² + NC + VT breakdown). KHÔNG đụng thoPhanBaoGia:
+  // danh sách hạng mục + chủng loại là NGUỒN của app báo giá khách (1 nguồn).
   d.donGiaTho = s.donGiaM2;
   d.thoNhanCong = s.vonNc;
   d.thoHangMuc = thoItems.map((it) => ({
@@ -80,14 +82,6 @@ export function syncQuoteFromDetail(quoteData: unknown, detail: EstimateDetail) 
       tt: Math.round(num(m.kl) * num(m.gia)),
     })),
   }));
-  // Chủng loại VT khách thấy (loại/quy cách) — chỉ hạng mục có custSpec.
-  d.thoPhanBaoGia = thoItems
-    .filter((it) => Array.isArray(it.custSpec) && it.custSpec.length > 0)
-    .map((it) => ({
-      name: it.name,
-      dienGiai: it.note ?? "",
-      vt: (it.custSpec ?? []).map((v) => ({ ten: v.ten, loai: v.loai ?? "", quycach: v.quycach ?? "" })),
-    }));
   return { quoteData: d, summary: s };
 }
 

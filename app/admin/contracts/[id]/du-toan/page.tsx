@@ -22,6 +22,14 @@ export default async function DuToanFullPage({ params }: { params: { id: string 
   const detail = (c.estimateDetail ?? EMPTY_ESTIMATE_DETAIL) as EstimateDetail;
   const dtTong = quoteSummary(c.quoteData).dtTong; // m² quy đổi — số chảy ngược ra đơn giá m²
 
+  // Danh sách hạng mục = NGUỒN từ báo giá khách (thoPhanBaoGia thô, hoanThien hoàn thiện).
+  const q = (c.quoteData ?? {}) as {
+    thoPhanBaoGia?: { name?: string }[];
+    hoanThien?: { name?: string }[];
+  };
+  const hmTho = (q.thoPhanBaoGia ?? []).map((h) => h.name ?? "").filter(Boolean);
+  const hmHt = (q.hoanThien ?? []).map((h) => h.name ?? "").filter(Boolean);
+
   return (
     <main style={{ background: "#f4ede3", minHeight: "100vh" }}>
       <div style={{ maxWidth: 1560, margin: "0 auto", padding: "22px 22px 90px" }}>
@@ -30,6 +38,8 @@ export default async function DuToanFullPage({ params }: { params: { id: string 
           customerName={c.customerName}
           detail={detail}
           dtTong={dtTong}
+          hmTho={hmTho}
+          hmHt={hmHt}
           locked={c.projectId != null}
         />
       </div>

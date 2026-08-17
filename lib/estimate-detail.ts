@@ -35,6 +35,8 @@ export type EDItem = {
   groupName?: string; // tên hiển thị của nhóm ở màn Giá vốn (vd "Bê tông")
   noNum?: boolean; // không đánh số ở màn Khối lượng (vd mục cơ sở diện tích nhân công)
   part?: EDPart; // thuộc phần thô / hoàn thiện — chia số tổng theo phần
+  // Hạng mục cha (1 NGUỒN = danh sách hạng mục báo giá khách). Công tác gắn vào 1 hạng mục theo tên.
+  hangMuc?: string; // = tên hạng mục trong quoteData.thoPhanBaoGia / hoanThien
   // Chủng loại vật tư khách thấy (loại/quy cách) — chỉ hiển thị ở màn khách, không tính tiền.
   custSpec?: { ten: string; loai?: string; quycach?: string }[];
 };

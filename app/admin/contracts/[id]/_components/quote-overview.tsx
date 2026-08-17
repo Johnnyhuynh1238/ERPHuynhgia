@@ -1,47 +1,54 @@
 "use client";
 
-import { itemCost, thoSummary, DEFAULT_MARKUP_THO, type EDItem, type EstimateDetail } from "@/lib/estimate-detail";
+import { itemCost, thoSummary, DEFAULT_MARKUP_THO, type EstimateDetail } from "@/lib/estimate-detail";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
+const norm = (s: string) => (s || "").trim().toLowerCase();
 
-// Màn Hạng mục = MỤC LỤC tổng quan (không nhập liệu). Mỗi dòng dẫn tới màn Khối lượng / Giá vốn.
-// Giá bán = vốn × (1 + % lãi). Phần thô chảy ngược ra đơn giá m².
+// Màn Hạng mục = MỤC LỤC. NGUỒN hạng mục = báo giá khách (thoPhanBaoGia/hoanThien).
+// Công tác nội bộ gộp vào từng hạng mục theo item.hangMuc. Số chảy ngược → đơn giá m².
 export function QuoteOverview({
   detail,
   dtTong,
+  hmTho,
+  hmHt,
   onGoto,
 }: {
   detail: EstimateDetail;
   dtTong: number;
+  hmTho: string[]; // tên hạng mục thô (từ khách)
+  hmHt: string[]; // tên hạng mục hoàn thiện (từ khách)
   onGoto?: (tab: "kl" | "gv" | "bg") => void;
 }) {
   const markup = detail?.markupTho ?? DEFAULT_MARKUP_THO;
-  const all = detail?.items ?? [];
-  const tho = all.filter((it) => (it.part ?? "tho") === "tho");
-  const ht = all.filter((it) => it.part === "ht");
+  const items = detail?.items ?? [];
   const s = thoSummary(detail, dtTong);
 
-  const rowVals = (it: EDItem) => {
-    const von = itemCost(it.cost).total;
-    const ban = Math.round(von * (1 + markup));
-    return { von, ban, lai: ban - von };
-  };
-  const sum = (list: EDItem[]) =>
-    list.reduce(
-      (a, it) => {
-        const v = rowVals(it);
-        return { von: a.von + v.von, ban: a.ban + v.ban };
-      },
-      { von: 0, ban: 0 },
+  const rollup = (names: string[], part: "tho" | "ht") => {
+    const used = new Set<string>();
+    const rows = names.map((name) => {
+      const cong = items.filter((it) => norm(it.hangMuc || "") === norm(name));
+      cong.forEach((it) => used.add(it.id));
+      const von = cong.reduce((a, it) => a + itemCost(it.cost).total, 0);
+      const ban = Math.round(von * (1 + markup));
+      return { name, cong, von, ban };
+    });
+    // Công tác chưa gắn hạng mục (thuộc phần này) → gom 1 dòng cảnh báo.
+    const orphan = items.filter(
+      (it) => (it.part ?? "tho") === part && !used.has(it.id) && !it.noNum,
     );
+    return { rows, orphan };
+  };
 
-  const tblSection = (label: string, list: EDItem[]) => {
-    const st = sum(list);
+  const section = (label: string, names: string[], part: "tho" | "ht") => {
+    const { rows, orphan } = rollup(names, part);
+    const vonSum = rows.reduce((a, r) => a + r.von, 0) + orphan.reduce((a, it) => a + itemCost(it.cost).total, 0);
+    const banSum = Math.round(vonSum * (1 + markup));
     return (
       <>
         <div className="ov-sec">
           <h2>{label}</h2>
-          <span className="ov-cnt">{list.length} hạng mục · vốn {fmt(st.von)}đ</span>
+          <span className="ov-cnt">{names.length} hạng mục · vốn {fmt(vonSum)}đ</span>
         </div>
         <div className="ov-card">
           <table>
@@ -49,31 +56,39 @@ export function QuoteOverview({
               <tr>
                 <th className="no">#</th>
                 <th>Hạng mục</th>
-                <th className="n">Khối lượng ›</th>
+                <th className="n">Công tác ›</th>
                 <th className="n">Vốn (VT+NC) ›</th>
                 <th className="n">Giá bán ›</th>
               </tr>
             </thead>
             <tbody>
-              {list.length === 0 && (
-                <tr><td colSpan={5} className="ov-empty">Chưa có hạng mục — thêm ở tab Báo giá khách.</td></tr>
+              {names.length === 0 && (
+                <tr><td colSpan={5} className="ov-empty">Chưa có hạng mục — thêm ở tab 🧾 Báo giá khách.</td></tr>
               )}
-              {list.map((it, i) => {
-                const v = rowVals(it);
-                return (
-                  <tr key={it.id}>
-                    <td className="no"><b>{i + 1}</b></td>
-                    <td className="nm">{it.name}{it.tag && <span className="tag">{it.tag}</span>}</td>
-                    <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl")}>{it.result || "—"}</td>
-                    <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv")}>{fmt(v.von)}</td>
-                    <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg")}>{fmt(v.ban)}</td>
-                  </tr>
-                );
-              })}
+              {rows.map((r, i) => (
+                <tr key={r.name}>
+                  <td className="no"><b>{i + 1}</b></td>
+                  <td className="nm">{r.name}</td>
+                  <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl")}>
+                    {r.cong.length > 0 ? `${r.cong.length} công tác` : <span className="warn">chưa bóc</span>}
+                  </td>
+                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv")}>{fmt(r.von)}</td>
+                  <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg")}>{fmt(r.ban)}</td>
+                </tr>
+              ))}
+              {orphan.length > 0 && (
+                <tr className="orphan">
+                  <td className="no">!</td>
+                  <td className="nm">⚠ Công tác chưa gắn hạng mục ({orphan.length})</td>
+                  <td className="n mut">{orphan.map((o) => o.name).join(", ").slice(0, 60)}…</td>
+                  <td className="n von">{fmt(orphan.reduce((a, it) => a + itemCost(it.cost).total, 0))}</td>
+                  <td className="n">—</td>
+                </tr>
+              )}
             </tbody>
-            {list.length > 0 && (
+            {names.length > 0 && (
               <tfoot>
-                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(st.von)}</td><td className="n">{fmt(st.ban)}</td></tr>
+                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(vonSum)}</td><td className="n">{fmt(banSum)}</td></tr>
               </tfoot>
             )}
           </table>
@@ -84,10 +99,12 @@ export function QuoteOverview({
 
   return (
     <div className="ov">
-      <div className="ov-lead">Mục lục hạng mục — tổng quan &amp; dẫn tới các màn. Bóc khối lượng, giá vốn, chủng loại vật tư làm ở tab tương ứng.</div>
+      <div className="ov-lead">
+        Mục lục hạng mục — <b>nguồn từ báo giá khách</b>. Công tác chi tiết bóc ở Khối lượng / Giá vốn. Bấm số ở cột để mở màn.
+      </div>
 
-      {tblSection("PHẦN THÔ", tho)}
-      {tblSection("PHẦN HOÀN THIỆN", ht)}
+      {section("PHẦN THÔ", hmTho, "tho")}
+      {section("PHẦN HOÀN THIỆN", hmHt, "ht")}
 
       <div className="ov-bar">
         <div className="ov-bar-t">Tổng quan phần thô → đơn giá m² khách</div>
@@ -99,7 +116,7 @@ export function QuoteOverview({
           <div className="big"><span className="k">Đơn giá m² khách ({fmt(dtTong)} m²)</span><span className="v">{fmt(s.donGiaM2)} đ/m²</span></div>
         </div>
         <div className="ov-note">
-          Sửa % lãi + giá vốn ở tab <button type="button" className="lk" onClick={() => onGoto?.("gv")}>💰 Giá vốn</button> · Thêm/bớt hạng mục + chủng loại vật tư ở tab <button type="button" className="lk" onClick={() => onGoto?.("bg")}>🧾 Báo giá khách</button>.
+          Sửa % lãi + giá vốn ở tab <button type="button" className="lk" onClick={() => onGoto?.("gv")}>💰 Giá vốn</button> · Thêm/sửa hạng mục + chủng loại ở tab <button type="button" className="lk" onClick={() => onGoto?.("bg")}>🧾 Báo giá khách</button>.
         </div>
       </div>
 
@@ -109,30 +126,30 @@ export function QuoteOverview({
 }
 
 const CSS = `
-.ov{--orange:#cf5a12;--brown:#974706;--browntx:#7a3b08;--ink:#241d18;--mute:#8a7c6f;--line:#eee2d3;--soft:#faf3ea;--titlebg:#fbeada;--green:#1f8a4c;--greenbg:#eaf6ee;color:var(--ink)}
+.ov{--orange:#cf5a12;--brown:#974706;--browntx:#7a3b08;--ink:#241d18;--mute:#8a7c6f;--line:#eee2d3;--soft:#faf3ea;--titlebg:#fbeada;--green:#1f8a4c;--greenbg:#eaf6ee;--red:#b3261e;color:var(--ink)}
 .ov-lead{font-size:13px;color:var(--mute);margin:0 0 20px}
+.ov-lead b{color:var(--brown)}
 .ov-sec{display:flex;align-items:center;gap:10px;margin:0 0 10px}
 .ov-sec h2{font-size:14px;font-weight:800;color:var(--brown);letter-spacing:.4px;margin:0}
 .ov-cnt{font-size:12px;color:var(--mute);font-weight:600}
 .ov-card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(60,40,20,.05);margin-bottom:22px}
 .ov table{width:100%;border-collapse:collapse;font-size:13.5px}
 .ov thead th{background:var(--titlebg);color:var(--browntx);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;font-weight:800;padding:11px 14px;border-bottom:1px solid #efd9bd}
-.ov thead th.n{text-align:right}
-.ov thead th.c{text-align:center}
+.ov thead th.n{text-align:right;color:var(--brown)}
 .ov tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
 .ov tbody tr:last-child td{border-bottom:0}
 .ov tbody tr:hover{background:var(--soft)}
 .ov td.no{width:38px}
 .ov .no b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);color:var(--brown);font-weight:800;font-size:12px}
 .ov td.nm{font-weight:700}
-.ov td.nm .tag{display:inline-block;margin-left:7px;background:var(--greenbg);color:var(--green);font-weight:800;font-size:10.5px;padding:2px 8px;border-radius:999px;vertical-align:middle}
 .ov td.n{text-align:right;font-variant-numeric:tabular-nums}
 .ov td.mut{color:var(--mute)}
 .ov td.von{font-weight:800;color:var(--brown)}
 .ov td.ban{font-weight:800;color:var(--ink)}
 .ov td.clik{cursor:pointer}
 .ov td.clik:hover{background:var(--soft);text-decoration:underline;text-underline-offset:3px}
-.ov thead th.n{color:var(--brown)}
+.ov .warn{color:var(--red);font-style:italic}
+.ov tr.orphan td{background:#fbeceb}
 .ov .ov-empty{text-align:center;color:var(--mute);font-style:italic;padding:16px}
 .ov tfoot td{padding:11px 14px;background:var(--soft);font-weight:800;border-top:2px solid var(--line)}
 .ov tfoot td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--brown)}

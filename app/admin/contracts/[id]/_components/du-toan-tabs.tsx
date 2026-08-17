@@ -14,12 +14,16 @@ export function DuToanTabs({
   customerName,
   detail,
   dtTong,
+  hmTho,
+  hmHt,
   locked,
 }: {
   contractId: string;
   customerName: string;
   detail: EstimateDetail;
   dtTong: number;
+  hmTho: string[];
+  hmHt: string[];
   locked?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("hm");
@@ -45,7 +49,7 @@ export function DuToanTabs({
         </div>
       </div>
 
-      {tab === "hm" && <QuoteOverview detail={detail} dtTong={dtTong} onGoto={setTab} />}
+      {tab === "hm" && <QuoteOverview detail={detail} dtTong={dtTong} hmTho={hmTho} hmHt={hmHt} onGoto={setTab} />}
       {tab === "kl" && <EstimateDetailSection contractId={contractId} detail={detail} />}
       {tab === "gv" && <QuoteItemsEditor contractId={contractId} detail={detail} dtTong={dtTong} locked={locked} />}
       {tab === "bg" && (
