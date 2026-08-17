@@ -3,10 +3,10 @@
 import { useState } from "react";
 import type { EstimateDetail } from "@/lib/estimate-detail";
 import { EstimateDetailSection } from "./estimate-detail-section";
-import { CostDetailSection } from "./cost-detail-section";
 import { QuoteItemsEditor } from "./quote-items-editor";
+import { QuoteOverview } from "./quote-overview";
 
-type Tab = "ed" | "kl" | "gv" | "bg";
+type Tab = "hm" | "kl" | "gv" | "bg";
 
 // Menu 3 màn dùng chung hạng mục: Khối lượng · Giá vốn · Báo giá.
 export function DuToanTabs({
@@ -22,7 +22,7 @@ export function DuToanTabs({
   dtTong: number;
   locked?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>("ed");
+  const [tab, setTab] = useState<Tab>("hm");
   const btn = (t: Tab, label: string) => (
     <button
       type="button"
@@ -38,16 +38,16 @@ export function DuToanTabs({
       <div className="dtm-head">
         <h1 className="dtm-title">Dự toán — {customerName}</h1>
         <div className="dtm-menu">
-          {btn("ed", "✏️ Hạng mục")}
+          {btn("hm", "📋 Hạng mục")}
           {btn("kl", "📐 Khối lượng")}
           {btn("gv", "💰 Giá vốn")}
           {btn("bg", "🧾 Báo giá")}
         </div>
       </div>
 
-      {tab === "ed" && <QuoteItemsEditor contractId={contractId} detail={detail} dtTong={dtTong} locked={locked} />}
+      {tab === "hm" && <QuoteOverview detail={detail} dtTong={dtTong} onGoto={setTab} />}
       {tab === "kl" && <EstimateDetailSection contractId={contractId} detail={detail} />}
-      {tab === "gv" && <CostDetailSection contractId={contractId} detail={detail} dtTong={dtTong} locked={locked} />}
+      {tab === "gv" && <QuoteItemsEditor contractId={contractId} detail={detail} dtTong={dtTong} locked={locked} />}
       {tab === "bg" && (
         <>
           <p className="dtm-bgnote">
