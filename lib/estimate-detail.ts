@@ -7,9 +7,14 @@ export type EDDrawing = { key: string; name: string; type?: string };
 // Vật tư cho màn Giá vốn: khối lượng × đơn giá.
 export type EDMaterial = { ten: string; dvt: string; kl: number; gia: number };
 
-// Giá vốn 1 hạng mục = nhân công + Σ(vật tư × (1 + hao hụt%)).
+// Giá vốn 1 hạng mục = nhân công khoán + Σ(vật tư × (1 + hao hụt%)).
+// Nhân công KHOÁN đội theo khối lượng: nc = ncQty × ncGia (đội tự lo máy/dụng cụ).
+// Nếu thiếu ncQty/ncGia thì dùng nc nhập thẳng (tương thích data cũ / dòng khoán gói).
 export type EDCost = {
-  nc: number; // nhân công (dòng đầu)
+  nc: number; // nhân công (đ) — số chốt; = ncQty×ncGia khi có
+  ncQty?: number; // khối lượng nhân công khoán (m³/m²/kg…)
+  ncGia?: number; // đơn giá NC khoán / đơn vị
+  ncUnit?: string; // đơn vị NC khoán
   materials: EDMaterial[];
   haoHutPct: number; // % hao hụt trên vật tư
 };
@@ -29,12 +34,26 @@ export type EDItem = {
   group?: string; // nhóm hạng mục (vd "betong"): KL đánh số 1-1/1-2, Giá vốn dồn 1 card
   groupName?: string; // tên hiển thị của nhóm ở màn Giá vốn (vd "Bê tông")
   noNum?: boolean; // không đánh số ở màn Khối lượng (vd mục cơ sở diện tích nhân công)
+  part?: EDPart; // thuộc phần thô / hoàn thiện — chia số tổng theo phần
+  // Chủng loại vật tư khách thấy (loại/quy cách) — chỉ hiển thị ở màn khách, không tính tiền.
+  custSpec?: { ten: string; loai?: string; quycach?: string }[];
 };
 
-// Giá vốn 1 hạng mục (nhân công + vật tư + hao hụt).
+export type EDPart = "tho" | "ht";
+
+// NC khoán 1 hạng mục: ưu tiên KL×đơn giá, fallback nc nhập thẳng.
+export function costNc(c?: EDCost): number {
+  if (!c) return 0;
+  const q = Number(c.ncQty);
+  const g = Number(c.ncGia);
+  if (isFinite(q) && isFinite(g) && (c.ncQty != null || c.ncGia != null)) return Math.round(q * g);
+  return Number(c.nc) || 0;
+}
+
+// Giá vốn 1 hạng mục (nhân công khoán + vật tư + hao hụt).
 export function itemCost(c?: EDCost): { nc: number; vt: number; total: number } {
   if (!c) return { nc: 0, vt: 0, total: 0 };
-  const nc = Number(c.nc) || 0;
+  const nc = costNc(c);
   const vtRaw = (c.materials ?? []).reduce((s, m) => s + (Number(m.kl) || 0) * (Number(m.gia) || 0), 0);
   const vt = Math.round(vtRaw * (1 + (Number(c.haoHutPct) || 0) / 100));
   return { nc, vt, total: nc + vt };
@@ -46,10 +65,32 @@ export type EDLabor = { donGia: number; dienTich: number; tien: number };
 export type EstimateDetail = {
   fullDrawings: EDDrawing[]; // bản vẽ FULL (PDF HSKC/HSKT) — nút xem ở đầu
   items: EDItem[];
-  labor?: EDLabor; // nhân công trọn gói (màn Giá vốn) — đặt riêng trên cùng
+  labor?: EDLabor; // (legacy) nhân công trọn gói — giữ để không vỡ HĐ cũ
+  markupTho?: number; // % lãi phần thô (0.30 = 30%) — đổi trên UI
 };
 
 export const EMPTY_ESTIMATE_DETAIL: EstimateDetail = { fullDrawings: [], items: [] };
+
+export const DEFAULT_MARKUP_THO = 0.3; // 30% lãi trên giá vốn thô
+
+// Số chảy NGƯỢC phần thô: gom vốn (VT+NC) mọi hạng mục thô → +lãi → ÷ m² quy đổi = đơn giá m².
+// dtTong = diện tích quy đổi (Σ dt×hs) lấy từ quoteData.dienTich.
+export function thoSummary(detail: EstimateDetail | null | undefined, dtTong: number) {
+  const items = (detail?.items ?? []).filter((it) => (it.part ?? "tho") === "tho");
+  let vonNc = 0;
+  let vonVt = 0;
+  for (const it of items) {
+    const c = itemCost(it.cost);
+    vonNc += c.nc;
+    vonVt += c.vt;
+  }
+  const von = vonNc + vonVt;
+  const markup = detail?.markupTho ?? DEFAULT_MARKUP_THO;
+  const ban = Math.round(von * (1 + markup));
+  const donGiaM2 = dtTong > 0 ? Math.round(ban / dtTong) : 0;
+  const lai = ban - von;
+  return { vonNc, vonVt, von, markup, ban, donGiaM2, lai, dtTong };
+}
 
 // Tiền tố key MinIO hợp lệ cho 1 HĐ — chặn đọc file ngoài phạm vi.
 export function estimateKeyPrefix(contractId: string) {
