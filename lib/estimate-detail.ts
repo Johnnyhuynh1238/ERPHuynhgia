@@ -98,3 +98,15 @@ export function thoSummary(detail: EstimateDetail | null | undefined, dtTong: nu
 export function estimateKeyPrefix(contractId: string) {
   return `estimate/contract/${contractId}/`;
 }
+
+// id neo (anchor) cho 1 hạng mục — dùng chung Hạng mục ↔ Giá vốn ↔ Khối lượng để cuộn tới đúng chỗ.
+export function hangMucAnchor(name: string) {
+  const slug = (name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0111\u0110]/g, "d")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .toLowerCase()
+    .replace(/^-+|-+$/g, "");
+  return "hm-" + (slug || "x");
+}

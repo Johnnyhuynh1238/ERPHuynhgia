@@ -18,7 +18,7 @@ export function QuoteOverview({
   dtTong: number;
   hmTho: string[]; // tên hạng mục thô (từ khách)
   hmHt: string[]; // tên hạng mục hoàn thiện (từ khách)
-  onGoto?: (tab: "kl" | "gv" | "bg") => void;
+  onGoto?: (tab: "kl" | "gv" | "bg", hangMuc?: string) => void;
 }) {
   const markup = detail?.markupTho ?? DEFAULT_MARKUP_THO;
   const items = detail?.items ?? [];
@@ -69,7 +69,7 @@ export function QuoteOverview({
                 <tr key={r.name}>
                   <td className="no"><b>{i + 1}</b></td>
                   <td className="nm">{r.name}</td>
-                  <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl")}>
+                  <td className="n mut clik" title="Mở màn Khối lượng" onClick={() => onGoto?.("kl", r.name)}>
                     {r.cong.length === 0 ? (
                       <span className="warn">chưa bóc</span>
                     ) : r.cong.length === 1 ? (
@@ -78,8 +78,8 @@ export function QuoteOverview({
                       `${r.cong.length} công tác`
                     )}
                   </td>
-                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv")}>{fmt(r.von)}</td>
-                  <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg")}>{fmt(r.ban)}</td>
+                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.von)}</td>
+                  <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg", r.name)}>{fmt(r.ban)}</td>
                 </tr>
               ))}
               {orphan.length > 0 && (
