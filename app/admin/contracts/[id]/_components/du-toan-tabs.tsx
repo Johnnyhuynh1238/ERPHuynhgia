@@ -74,6 +74,11 @@ export function DuToanTabs({
 }
 
 const CSS = `
+.dtm{color-scheme:light}
+/* Ép mọi ô nhập trong dự toán sáng — globals.css là dark theme làm input đen + chữ ẩn */
+.dtm input,.dtm select,.dtm textarea{background:#fff !important;color:#241d18 !important;-webkit-text-fill-color:#241d18 !important;caret-color:#cf5a12;opacity:1 !important;border:1px solid #e6cdae}
+.dtm select option{background:#fff;color:#241d18}
+.dtm input::placeholder{color:#b7a894 !important;-webkit-text-fill-color:#b7a894}
 .dtm-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid #ecdfce;padding-bottom:12px;margin-bottom:18px}
 .dtm-title{margin:0;font-size:22px;font-weight:800;color:#b0561f}
 .dtm-menu{display:flex;gap:6px;flex-wrap:wrap;background:#f6efe4;padding:4px;border-radius:12px}
