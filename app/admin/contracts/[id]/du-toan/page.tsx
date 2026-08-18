@@ -31,7 +31,7 @@ export default async function DuToanFullPage({ params }: { params: { id: string 
   const hmHt = (q.hoanThien ?? []).map((h) => h.name ?? "").filter(Boolean);
 
   return (
-    <main style={{ background: "#f4ede3", minHeight: "100vh" }}>
+    <main style={{ background: "#f4ede3", minHeight: "100vh", colorScheme: "light" }}>
       <div style={{ maxWidth: 1560, margin: "0 auto", padding: "22px 22px 90px" }}>
         <DuToanTabs
           contractId={c.id}

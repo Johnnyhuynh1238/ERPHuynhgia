@@ -181,7 +181,9 @@ export function QuoteItemsEditor({
 }
 
 const CSS = `
-.ge{--orange:#cf5a12;--brown:#974706;--browntx:#7a3b08;--ink:#241d18;--mute:#8a7c6f;--line:#eee2d3;--soft:#faf3ea;--titlebg:#fbeada;--green:#1f8a4c;--red:#b3261e;color:var(--ink);padding-bottom:130px}
+.ge{--orange:#cf5a12;--brown:#974706;--browntx:#7a3b08;--ink:#241d18;--mute:#8a7c6f;--line:#eee2d3;--soft:#faf3ea;--titlebg:#fbeada;--green:#1f8a4c;--red:#b3261e;color:var(--ink);padding-bottom:130px;color-scheme:light}
+.ge input,.ge select,.ge textarea{background:#fff;color:var(--ink);-webkit-text-fill-color:var(--ink)}
+.ge input::placeholder{color:#b7a894}
 .ge-lead{font-size:13px;color:var(--mute);margin:0 0 16px}
 .ge-part{font-size:13px;font-weight:800;color:var(--brown);letter-spacing:.4px;margin:18px 0 10px}
 .ge-part:first-of-type{margin-top:0}
