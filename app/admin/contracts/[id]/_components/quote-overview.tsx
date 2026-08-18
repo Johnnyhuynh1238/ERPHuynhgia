@@ -65,12 +65,13 @@ export function QuoteOverview({
                 <th className="n">Khối lượng ›</th>
                 <th className="n">Nhân công ›</th>
                 <th className="n">Vật tư ›</th>
+                <th className="n">Tổng giá vốn ›</th>
                 <th className="n">Giá bán ›</th>
               </tr>
             </thead>
             <tbody>
               {names.length === 0 && (
-                <tr><td colSpan={6} className="ov-empty">Chưa có hạng mục — thêm ở tab 🧾 Báo giá khách.</td></tr>
+                <tr><td colSpan={7} className="ov-empty">Chưa có hạng mục — thêm ở tab 🧾 Báo giá khách.</td></tr>
               )}
               {rows.map((r, i) => (
                 <tr key={r.name}>
@@ -85,8 +86,9 @@ export function QuoteOverview({
                       `${r.cong.length} công tác`
                     )}
                   </td>
-                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.nc)}</td>
-                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.vt)}</td>
+                  <td className="n clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.nc)}</td>
+                  <td className="n clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.vt)}</td>
+                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.von)}</td>
                   <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg", r.name)}>{fmt(r.ban)}</td>
                 </tr>
               ))}
@@ -95,15 +97,16 @@ export function QuoteOverview({
                   <td className="no">!</td>
                   <td className="nm">⚠ Công tác chưa gắn hạng mục ({orphan.length})</td>
                   <td className="n mut">{orphan.map((o) => o.name).join(", ").slice(0, 40)}…</td>
-                  <td className="n von">{fmt(orphNc)}</td>
-                  <td className="n von">{fmt(orphVt)}</td>
+                  <td className="n">{fmt(orphNc)}</td>
+                  <td className="n">{fmt(orphVt)}</td>
+                  <td className="n von">{fmt(orphNc + orphVt)}</td>
                   <td className="n">—</td>
                 </tr>
               )}
             </tbody>
             {names.length > 0 && (
               <tfoot>
-                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(ncSum)}</td><td className="n">{fmt(vtSum)}</td><td className="n">{fmt(banSum)}</td></tr>
+                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(ncSum)}</td><td className="n">{fmt(vtSum)}</td><td className="n">{fmt(vonSum)}</td><td className="n">{fmt(banSum)}</td></tr>
               </tfoot>
             )}
           </table>
