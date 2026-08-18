@@ -151,6 +151,14 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       const amt = num(o.total);
       if (amt <= 0) continue;
       const key = o.budgetLineId ?? null;
+      // Đơn NCC đã 'paid' (trả ngay/tất toán riêng, không qua 'received') nằm
+      // NGOÀI công nợ NCC — view ncc_cong_no_du_an chỉ theo dõi đơn 'received'.
+      // Coi như đã chi thẳng, không đưa vào phân bổ nợ (nếu không sẽ hiện nợ ảo).
+      if (o.status === MhOrderStatus.paid) {
+        if (key) add(spent, key, amt);
+        else unassigned.spent += amt;
+        continue;
+      }
       weight.set(key, (weight.get(key) ?? 0) + amt);
       sumOrders += amt;
     }
