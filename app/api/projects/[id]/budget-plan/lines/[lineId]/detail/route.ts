@@ -157,8 +157,10 @@ export async function GET(
   }
 
   // ── SPENT / DEBT: tách đã-trả / còn-nợ từng nguồn ──
-  const cashOrders = orders.filter((o) => !o.supplierId); // trả ngay
-  const nccOrders = orders.filter((o) => o.supplierId); // công nợ NCC
+  // Đơn NCC đã 'paid' (trả ngay/tất toán riêng) nằm ngoài công nợ NCC — xử lý
+  // như đơn trả ngay (đã chi = total, nợ 0). Khớp lib/budget-plan.ts.
+  const cashOrders = orders.filter((o) => !o.supplierId || o.status === MhOrderStatus.paid);
+  const nccOrders = orders.filter((o) => o.supplierId && o.status !== MhOrderStatus.paid); // công nợ NCC
 
   // Đã trả cho đơn TRẢ NGAY (cọc/paid) — expense mua_hang_order paid.
   const cashIds = cashOrders.map((o) => o.id);
@@ -178,7 +180,12 @@ export async function GET(
   const viewMap = new Map<string, { da_tra: number; con_lai: number }>();
   if (supplierIds.length) {
     const allOrders = await prisma.mhOrder.findMany({
-      where: { projectId, status: { in: MH_ACTIVE }, supplierId: { in: supplierIds } },
+      where: {
+        projectId,
+        // Loại đơn 'paid' khỏi mẫu số phân bổ công nợ (khớp view + lib/budget-plan.ts).
+        status: { in: [MhOrderStatus.ordered, MhOrderStatus.received] },
+        supplierId: { in: supplierIds },
+      },
       select: { supplierId: true, supplierName: true, total: true },
     });
     for (const o of allOrders) {
@@ -206,7 +213,7 @@ export async function GET(
           source: "mh_order",
           id: o.id,
           label: `Đơn #${o.seq}`,
-          sub: "Đã trả · trả ngay",
+          sub: o.supplierName ? "Đã trả · đơn NCC" : "Đã trả · trả ngay",
           amount: paid,
           date: dstr(o.orderDate),
           budgetLineId: o.budgetLineId,
