@@ -97,8 +97,12 @@ export async function GET(
       where: {
         projectId,
         status: ExpenseStatus.paid,
-        sourceType: { notIn: ["mua_hang_order", "ncc_congno"] },
         budgetLineId: lineFilter,
+        // notIn loại luôn source rỗng (NULL) → OR để giữ chi tay source rỗng.
+        OR: [
+          { sourceType: null },
+          { sourceType: { notIn: ["mua_hang_order", "ncc_congno"] } },
+        ],
       },
       select: {
         id: true,

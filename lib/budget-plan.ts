@@ -63,7 +63,12 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
         projectId,
         status: "paid",
         budgetLineId: { not: null },
-        sourceType: { notIn: ["mua_hang_order", "ncc_congno"] },
+        // Loại lệnh chi mua hàng/công nợ NCC (đã tính qua đơn/view). notIn loại luôn
+        // source rỗng (NULL NOT IN → NULL) nên phải OR để giữ chi tay source rỗng.
+        OR: [
+          { sourceType: null },
+          { sourceType: { notIn: ["mua_hang_order", "ncc_congno"] } },
+        ],
       },
       select: { budgetLineId: true, paidAmount: true, amount: true },
     }),
