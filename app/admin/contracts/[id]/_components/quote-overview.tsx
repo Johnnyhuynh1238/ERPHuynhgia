@@ -29,9 +29,11 @@ export function QuoteOverview({
     const rows = names.map((name) => {
       const cong = items.filter((it) => norm(it.hangMuc || "") === norm(name));
       cong.forEach((it) => used.add(it.id));
-      const von = cong.reduce((a, it) => a + itemCost(it.cost).total, 0);
+      const nc = cong.reduce((a, it) => a + itemCost(it.cost).nc, 0);
+      const vt = cong.reduce((a, it) => a + itemCost(it.cost).vt, 0);
+      const von = nc + vt;
       const ban = Math.round(von * (1 + markup));
-      return { name, cong, von, ban };
+      return { name, cong, nc, vt, von, ban };
     });
     // Công tác chưa gắn hạng mục (thuộc phần này) → gom 1 dòng cảnh báo.
     const orphan = items.filter(
@@ -42,7 +44,11 @@ export function QuoteOverview({
 
   const section = (label: string, names: string[], part: "tho" | "ht") => {
     const { rows, orphan } = rollup(names, part);
-    const vonSum = rows.reduce((a, r) => a + r.von, 0) + orphan.reduce((a, it) => a + itemCost(it.cost).total, 0);
+    const orphNc = orphan.reduce((a, it) => a + itemCost(it.cost).nc, 0);
+    const orphVt = orphan.reduce((a, it) => a + itemCost(it.cost).vt, 0);
+    const ncSum = rows.reduce((a, r) => a + r.nc, 0) + orphNc;
+    const vtSum = rows.reduce((a, r) => a + r.vt, 0) + orphVt;
+    const vonSum = ncSum + vtSum;
     const banSum = Math.round(vonSum * (1 + markup));
     return (
       <>
@@ -57,13 +63,14 @@ export function QuoteOverview({
                 <th className="no">#</th>
                 <th>Hạng mục</th>
                 <th className="n">Khối lượng ›</th>
-                <th className="n">Vốn (VT+NC) ›</th>
+                <th className="n">Nhân công ›</th>
+                <th className="n">Vật tư ›</th>
                 <th className="n">Giá bán ›</th>
               </tr>
             </thead>
             <tbody>
               {names.length === 0 && (
-                <tr><td colSpan={5} className="ov-empty">Chưa có hạng mục — thêm ở tab 🧾 Báo giá khách.</td></tr>
+                <tr><td colSpan={6} className="ov-empty">Chưa có hạng mục — thêm ở tab 🧾 Báo giá khách.</td></tr>
               )}
               {rows.map((r, i) => (
                 <tr key={r.name}>
@@ -78,7 +85,8 @@ export function QuoteOverview({
                       `${r.cong.length} công tác`
                     )}
                   </td>
-                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.von)}</td>
+                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.nc)}</td>
+                  <td className="n von clik" title="Mở màn Giá vốn" onClick={() => onGoto?.("gv", r.name)}>{fmt(r.vt)}</td>
                   <td className="n ban clik" title="Mở màn Báo giá khách" onClick={() => onGoto?.("bg", r.name)}>{fmt(r.ban)}</td>
                 </tr>
               ))}
@@ -86,15 +94,16 @@ export function QuoteOverview({
                 <tr className="orphan">
                   <td className="no">!</td>
                   <td className="nm">⚠ Công tác chưa gắn hạng mục ({orphan.length})</td>
-                  <td className="n mut">{orphan.map((o) => o.name).join(", ").slice(0, 60)}…</td>
-                  <td className="n von">{fmt(orphan.reduce((a, it) => a + itemCost(it.cost).total, 0))}</td>
+                  <td className="n mut">{orphan.map((o) => o.name).join(", ").slice(0, 40)}…</td>
+                  <td className="n von">{fmt(orphNc)}</td>
+                  <td className="n von">{fmt(orphVt)}</td>
                   <td className="n">—</td>
                 </tr>
               )}
             </tbody>
             {names.length > 0 && (
               <tfoot>
-                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(vonSum)}</td><td className="n">{fmt(banSum)}</td></tr>
+                <tr><td /><td>Cộng {label.toLowerCase()}</td><td /><td className="n">{fmt(ncSum)}</td><td className="n">{fmt(vtSum)}</td><td className="n">{fmt(banSum)}</td></tr>
               </tfoot>
             )}
           </table>
