@@ -58,15 +58,14 @@ export function QuoteItemsEditor({
   useEffect(() => {
     if (!scrollTarget) return;
     const anchor = hangMucAnchor(scrollTarget);
-    let tries = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      const el = document.getElementById(anchor);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (++tries < 6) timer = setTimeout(tick, 220);
+    let cancelled = false;
+    const doScroll = () => {
+      if (cancelled) return;
+      document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    tick();
-    return () => clearTimeout(timer);
+    doScroll();
+    const timers = [120, 350, 700, 1200, 2000, 3000].map((ms) => setTimeout(doScroll, ms));
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
   }, [scrollTarget, scrollNonce]);
 
   const set = (id: string, patch: Partial<EDItem>) => { setItems((p) => p.map((it) => (it.id === id ? { ...it, ...patch } : it))); touch(); };

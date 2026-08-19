@@ -41,19 +41,27 @@ export function EstimateDetailSection({
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setHidden((h) => ({ ...h, [id]: !h[id] }));
 
-  // Cuộn tới hạng mục: lặp vài nhịp vì ảnh bản vẽ load sau làm dịch layout (đặc biệt hạng mục cuối như Ốp lát).
+  // Cuộn tới hạng mục. Hạng mục cuối (Ốp lát) hay trượt vì ảnh bản vẽ lazy-load phía trên
+  // load sau → layout xô xuống. Fix: re-scroll theo lịch DÀI + mỗi khi có ảnh trong section load xong.
   useEffect(() => {
     if (!scrollTarget) return;
     const anchor = hangMucAnchor(scrollTarget);
-    let tries = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      const el = document.getElementById(anchor);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (++tries < 6) timer = setTimeout(tick, 220);
+    let cancelled = false;
+    const doScroll = () => {
+      if (cancelled) return;
+      document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    tick();
-    return () => clearTimeout(timer);
+    doScroll();
+    const timers = [120, 350, 700, 1200, 2000, 3000, 4200].map((ms) => setTimeout(doScroll, ms));
+    // Ảnh chưa load xong → nghe 'load' để chỉnh lại vị trí sau khi layout ổn định.
+    const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(".edt img"));
+    const onImg = () => doScroll();
+    imgs.forEach((im) => { if (!im.complete) im.addEventListener("load", onImg); });
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      imgs.forEach((im) => im.removeEventListener("load", onImg));
+    };
   }, [scrollTarget, scrollNonce]);
 
   const hasAny = items.some((it) => (it.rows?.length ?? 0) > 0);
