@@ -28,9 +28,11 @@ export function DuToanTabs({
 }) {
   const [tab, setTab] = useState<Tab>("hm");
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
+  // nonce: bấm lại cùng 1 hạng mục vẫn re-trigger cuộn.
+  const [scrollNonce, setScrollNonce] = useState(0);
   // Từ màn Hạng mục bấm cột → sang màn tương ứng + cuộn tới đúng hạng mục.
   const goto = (t: "kl" | "gv" | "bg", hangMuc?: string) => {
-    if (hangMuc) setScrollTarget(hangMuc);
+    if (hangMuc) { setScrollTarget(hangMuc); setScrollNonce((n) => n + 1); }
     setTab(t);
   };
   const btn = (t: Tab, label: string) => (
@@ -56,8 +58,8 @@ export function DuToanTabs({
       </div>
 
       {tab === "hm" && <QuoteOverview detail={detail} dtTong={dtTong} hmTho={hmTho} hmHt={hmHt} onGoto={goto} />}
-      {tab === "kl" && <EstimateDetailSection contractId={contractId} detail={detail} hmTho={hmTho} hmHt={hmHt} scrollTarget={scrollTarget} />}
-      {tab === "gv" && <QuoteItemsEditor contractId={contractId} detail={detail} dtTong={dtTong} hmTho={hmTho} hmHt={hmHt} locked={locked} scrollTarget={scrollTarget} />}
+      {tab === "kl" && <EstimateDetailSection contractId={contractId} detail={detail} hmTho={hmTho} hmHt={hmHt} scrollTarget={scrollTarget} scrollNonce={scrollNonce} />}
+      {tab === "gv" && <QuoteItemsEditor contractId={contractId} detail={detail} dtTong={dtTong} hmTho={hmTho} hmHt={hmHt} locked={locked} scrollTarget={scrollTarget} scrollNonce={scrollNonce} />}
       {tab === "bg" && (
         <>
           <p className="dtm-bgnote">

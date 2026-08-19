@@ -34,6 +34,7 @@ export function QuoteItemsEditor({
   hmHt,
   locked,
   scrollTarget,
+  scrollNonce,
 }: {
   contractId: string;
   detail: EstimateDetail;
@@ -42,6 +43,7 @@ export function QuoteItemsEditor({
   hmHt: string[];
   locked?: boolean;
   scrollTarget?: string | null;
+  scrollNonce?: number;
 }) {
   const [items, setItems] = useState<EDItem[]>(() =>
     (detail?.items ?? []).map((it) => ({ ...it, cost: it.cost ? { ...it.cost } : { nc: 0, materials: [], haoHutPct: 0 } })),
@@ -55,8 +57,17 @@ export function QuoteItemsEditor({
 
   useEffect(() => {
     if (!scrollTarget) return;
-    document.getElementById(hangMucAnchor(scrollTarget))?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [scrollTarget]);
+    const anchor = hangMucAnchor(scrollTarget);
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (++tries < 6) timer = setTimeout(tick, 220);
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [scrollTarget, scrollNonce]);
 
   const set = (id: string, patch: Partial<EDItem>) => { setItems((p) => p.map((it) => (it.id === id ? { ...it, ...patch } : it))); touch(); };
   const setCost = (id: string, patch: Partial<NonNullable<EDItem["cost"]>>) => {

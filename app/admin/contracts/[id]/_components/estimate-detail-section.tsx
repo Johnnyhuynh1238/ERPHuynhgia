@@ -15,12 +15,14 @@ export function EstimateDetailSection({
   hmTho,
   hmHt,
   scrollTarget,
+  scrollNonce,
 }: {
   contractId: string;
   detail: EstimateDetail;
   hmTho?: string[];
   hmHt?: string[];
   scrollTarget?: string | null;
+  scrollNonce?: number;
 }) {
   const items = detail?.items ?? [];
   // Danh sách hạng mục: ưu tiên tên từ khách; thiếu thì tự suy từ items.hangMuc (thứ tự xuất hiện).
@@ -39,10 +41,20 @@ export function EstimateDetailSection({
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setHidden((h) => ({ ...h, [id]: !h[id] }));
 
+  // Cuộn tới hạng mục: lặp vài nhịp vì ảnh bản vẽ load sau làm dịch layout (đặc biệt hạng mục cuối như Ốp lát).
   useEffect(() => {
     if (!scrollTarget) return;
-    document.getElementById(hangMucAnchor(scrollTarget))?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [scrollTarget]);
+    const anchor = hangMucAnchor(scrollTarget);
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (++tries < 6) timer = setTimeout(tick, 220);
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [scrollTarget, scrollNonce]);
 
   const hasAny = items.some((it) => (it.rows?.length ?? 0) > 0);
   if (!hasAny) {
@@ -65,6 +77,7 @@ export function EstimateDetailSection({
             )}
           </span>
         </div>
+        <div className="edt-scroll">
         <div className={`edt-grid${isHidden || it.drawings.length === 0 ? " nodraw" : ""}`}>
           <div className="edt-calc">
             {hasTbl ? (
@@ -102,6 +115,7 @@ export function EstimateDetailSection({
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     );
@@ -172,12 +186,13 @@ const CSS = `
 .edt-kq{font-weight:800;color:var(--brown);font-variant-numeric:tabular-nums;background:#fff;border:1px solid #e6c8a8;border-radius:999px;padding:4px 13px;white-space:nowrap}
 .edt-toggle{border:1px solid var(--line);background:#fff;color:var(--brown);border-radius:8px;padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 .edt-toggle:hover{background:var(--soft)}
+.edt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .edt-grid{display:grid;grid-template-columns:1.15fr 1fr}
 .edt-grid.nodraw{grid-template-columns:1fr}
-@media(max-width:820px){.edt-grid{grid-template-columns:1fr}}
+/* Điện thoại: giữ layout 2 cột y như PC (bảng + bản vẽ), cuộn ngang trong .edt-scroll */
+@media(max-width:820px){.edt-grid:not(.nodraw){min-width:760px}}
 .edt-calc{padding:14px 16px;border-right:1px solid var(--line)}
 .edt-grid.nodraw .edt-calc{border-right:none}
-@media(max-width:820px){.edt-calc{border-right:none}}
 .edt-calc h4,.edt-dw h4{margin:0 0 9px;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--mute);font-weight:800}
 .edt-lump{color:var(--mute);font-style:italic;font-size:13px}
 .edt-tblwrap{overflow-x:auto}
@@ -190,7 +205,6 @@ const CSS = `
 .edt-ct b{color:var(--brown)}
 .edt-note-in{margin-top:8px;font-size:12px;color:var(--mute);font-style:italic}
 .edt-dw{padding:14px 16px;background:#fdfbf7;border-left:1px solid var(--line)}
-@media(max-width:820px){.edt-dw{border-left:none;border-top:1px solid var(--line)}}
 .edt-fig{margin:0 0 14px}
 .edt-fig img{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;display:block;cursor:zoom-in}
 .edt-fig figcaption{margin-top:6px;font-size:12px;color:var(--mute);font-style:italic}
