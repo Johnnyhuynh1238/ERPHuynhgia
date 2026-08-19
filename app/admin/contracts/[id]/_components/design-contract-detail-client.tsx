@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { plexSans, plexMono } from "@/lib/fonts";
 import "../../_components/contracts.css";
-import { EstimateDetailSection } from "./estimate-detail-section";
 import { EMPTY_ESTIMATE_DETAIL, type EstimateDetail } from "@/lib/estimate-detail";
 
 
@@ -26,7 +25,6 @@ type Contract = {
   steps: Step[];
   estimateDetail?: unknown;
 };
-type Version = { id: string; seq: number; grand: number | null; note: string | null; createdAt: string };
 
 const STEP_LABEL: Record<string, string> = {
   mat_bang: "Mặt bằng",
@@ -42,7 +40,6 @@ const STATUS: { v: Step["status"]; l: string }[] = [
   { v: "approved", l: "Đã duyệt" },
 ];
 const fmt = (n: number) => Math.round(n).toLocaleString("vi-VN");
-const dt = (s: string) => new Date(s).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export function DesignContractDetailClient({
   contract,
@@ -60,31 +57,17 @@ export function DesignContractDetailClient({
   const router = useRouter();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [steps, setSteps] = useState<Step[]>(contract.steps);
-  const [openQuote, setOpenQuote] = useState(false);
-  const [openEstimate, setOpenEstimate] = useState(false);
   const estimateDetail = (contract.estimateDetail ?? EMPTY_ESTIMATE_DETAIL) as EstimateDetail;
   const hasEstimate = Array.isArray(estimateDetail.items) && estimateDetail.items.length > 0;
-  const [viewVersion, setViewVersion] = useState<string | null>(null);
-  const [versions, setVersions] = useState<Version[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState<"share" | "edit" | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     const t = (typeof window !== "undefined" && localStorage.getItem("cx-theme")) as "light" | "dark" | null;
     if (t) setTheme(t);
   }, []);
 
-  // Auto nhận biết PC: màn rộng + con trỏ chuột → hiện nút xem toàn màn hình.
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
-    const on = () => setIsDesktop(mq.matches);
-    on();
-    mq.addEventListener?.("change", on);
-    return () => mq.removeEventListener?.("change", on);
-  }, []);
   function toggleTheme() {
     setTheme((p) => {
       const n = p === "light" ? "dark" : "light";
@@ -96,12 +79,6 @@ export function DesignContractDetailClient({
   const quoteStep = steps.find((s) => s.kind === "du_toan_bao_gia");
   const converted = projectId != null;
   const canConvert = !converted && quoteStep?.status === "approved";
-
-  const loadVersions = useCallback(async () => {
-    const r = await fetch(`/api/admin/design-contracts/${contract.id}/quote/versions`, { cache: "no-store" });
-    if (r.ok) setVersions(await r.json());
-  }, [contract.id]);
-  useEffect(() => { loadVersions(); }, [loadVersions]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   // Link khách qua domain chính huynhgia6.com (/bg proxy sang ERP) — khách còn xem được trang chủ.
@@ -132,26 +109,6 @@ export function DesignContractDetailClient({
     }
   }
 
-  async function restore(v: Version) {
-    if (!confirm(`Khôi phục phiên bản #${v.seq} (${dt(v.createdAt)})? Báo giá hiện tại sẽ bị ghi đè.`)) return;
-    setBusy(true);
-    setMsg(null);
-    const rv = await fetch(`/api/admin/design-contracts/${contract.id}/quote/versions/${v.id}`, { cache: "no-store" });
-    if (!rv.ok) { setBusy(false); setMsg("Không đọc được phiên bản"); return; }
-    const data = (await rv.json()).data;
-    const rp = await fetch(`/api/admin/design-contracts/${contract.id}/quote`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quoteData: data }),
-    });
-    setBusy(false);
-    if (!rp.ok) { setMsg("Khôi phục thất bại"); return; }
-    setViewVersion(null);
-    await loadVersions();
-    router.refresh();
-    setMsg(`Đã khôi phục phiên bản #${v.seq}`);
-  }
-
   async function convert() {
     if (!confirm("Chuyển HĐ thiết kế này sang HĐ thi công? Sẽ tạo dự án mới mang theo khách hàng + báo giá.")) return;
     setBusy(true);
@@ -162,11 +119,6 @@ export function DesignContractDetailClient({
     if (!r.ok) { setMsg(d.message || "Chuyển thất bại"); return; }
     router.push(`/projects/${d.projectId}`);
   }
-
-  const iframeSrc =
-    `/bao-gia-app.html?contract=${contract.id}` +
-    (converted ? "&ro=1" : "") +
-    (viewVersion ? `&version=${viewVersion}` : "");
 
   const STATUS_BADGE: Record<string, { bg: string; fg: string }> = {
     approved: { bg: "color-mix(in srgb,var(--ok) 16%,transparent)", fg: "var(--ok)" },
@@ -237,41 +189,6 @@ export function DesignContractDetailClient({
                   </select>
                 </div>
 
-                {isQuote && (
-                  <div style={{ marginTop: 11 }}>
-                    <button type="button" className="cx-btn primary" onClick={() => { setOpenQuote((v) => !v); setViewVersion(null); }}>
-                      {openQuote ? "▲ Ẩn báo giá" : "📊 Mở Dự toán & Báo giá"}
-                    </button>
-
-                    {openQuote && (
-                      <>
-                        {viewVersion && (
-                          <div style={{ margin: "9px 0", fontSize: 12.5, color: "var(--terra)" }}>
-                            Đang xem phiên bản cũ (chỉ đọc). <button type="button" className="cx-link" onClick={() => setViewVersion(null)} style={{ border: 0, background: "none", cursor: "pointer" }}>← Về bản hiện tại</button>
-                          </div>
-                        )}
-                        <iframe key={iframeSrc} title="Dự toán & Báo giá" src={iframeSrc} style={{ width: "100%", height: "82vh", marginTop: 10, border: "1px solid var(--line2)", borderRadius: 12, background: "#fff" }} />
-                      </>
-                    )}
-
-                    {versions.length > 0 && (
-                      <div style={{ marginTop: 13 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--mut)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 7 }}>🕘 Lịch sử phiên bản ({versions.length})</div>
-                        <div style={{ display: "grid", gap: 6 }}>
-                          {versions.map((v) => (
-                            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, background: "var(--card2)", border: "1px solid var(--line)", borderRadius: 9, padding: "7px 10px", flexWrap: "wrap" }}>
-                              <b className="num">#{v.seq}</b>
-                              <span className="num" style={{ color: "var(--mut)" }}>{dt(v.createdAt)}</span>
-                              {v.grand != null && <span className="num" style={{ marginLeft: "auto", color: "var(--terra)", fontWeight: 600 }}>{fmt(v.grand)}</span>}
-                              <button type="button" className="cx-btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => { setOpenQuote(true); setViewVersion(v.id); }}>Xem</button>
-                              {!converted && <button type="button" className="cx-btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => restore(v)} disabled={busy}>Khôi phục</button>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -279,32 +196,14 @@ export function DesignContractDetailClient({
 
         {hasEstimate && (
           <div style={{ marginTop: 24 }}>
-            <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="cx-btn primary"
-                onClick={() => setOpenEstimate((v) => !v)}
-                style={{ fontSize: 14 }}
-              >
-                {openEstimate ? "▲ Ẩn dự toán chi tiết" : "📐 Mở Dự toán chi tiết (có bản vẽ)"}
-              </button>
-              {isDesktop && (
-                <button
-                  type="button"
-                  className="cx-btn ghost"
-                  onClick={() => window.open(`/admin/contracts/${contract.id}/du-toan`, "_blank", "noopener")}
-                  style={{ fontSize: 14 }}
-                  title="Mở tab mới, xem toàn màn hình (khuyên dùng trên máy tính)"
-                >
-                  🖥 Xem toàn màn hình
-                </button>
-              )}
-            </div>
-            {openEstimate && (
-              <div style={{ marginTop: 12 }}>
-                <EstimateDetailSection contractId={contract.id} detail={estimateDetail} />
-              </div>
-            )}
+            <button
+              type="button"
+              className="cx-btn primary"
+              onClick={() => window.open(`/admin/contracts/${contract.id}/du-toan`, "_blank", "noopener")}
+              style={{ fontSize: 14 }}
+            >
+              📐 Mở Dự toán chi tiết (có bản vẽ)
+            </button>
           </div>
         )}
 
