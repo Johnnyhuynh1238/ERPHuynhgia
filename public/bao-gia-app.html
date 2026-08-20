@@ -134,6 +134,7 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
 <div id="toast" class="toast"></div>
 <script>
 const QP=new URLSearchParams(location.search),CONTRACT=QP.get('contract'),VERSION=QP.get('version'),RO=QP.get('ro')==='1'||!!VERSION||(typeof window!=='undefined'&&window.__RO===1);
+function bgSlug(s){return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,'d').replace(/[^a-zA-Z0-9]+/g,'-').toLowerCase().replace(/^-+|-+$/g,'');}
 let DATA;try{if(!CONTRACT&&!RO)DATA=JSON.parse(localStorage.getItem('a6db'))}catch(e){}
 if(!DATA&&!CONTRACT){try{DATA=JSON.parse(document.getElementById('db').textContent)}catch(e){}}
 if(!DATA){DATA={project:'',donGiaTho:0,dienTich:[],thoNhanCong:0,thoHangMuc:[],hoanThien:[]};}
@@ -286,7 +287,7 @@ function vtBlock(m,mi){if(!m.vt.length)return'';
  let r=m.vt.map((v,j)=>{const P='hoanThien.'+mi+'.vt.'+j;return `<tr><td>${txt(P+'.ten',v.ten)}</td><td class="lo">${txt(P+'.loai',v.loai)}</td><td class="mo">${txt(P+'.mota',v.mota||'')}</td></tr>`}).join('');
  return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Mô tả</th></tr></thead><tbody>${r}</tbody></table>`;}
 function ttKG(mi,ci){const c=DATA.hoanThien[mi].costs[ci];const el=document.getElementById('ctt_'+mi+'_'+ci);if(el)el.textContent=fmt((+c.kl||0)*(+c.gia||0));calc();if(document.getElementById('pf'))drawPf(mi);}
-function pageHT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtHT(${i})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="mc${i}">${fmt(htCong(i))}</span></span></div><div class="bd">${costTable(m,i)}${vtBlock(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
+function pageHT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="bg-${bgSlug(m.name)}"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtHT(${i})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="mc${i}">${fmt(htCong(i))}</span></span></div><div class="bd">${costTable(m,i)}${vtBlock(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
  DATA.hoanThien.forEach((m,i)=>{CALC['mc'+i]=()=>fmt(htCong(i));});
  R(`<div class="sec-title">Phần hoàn thiện — ${DATA.hoanThien.length} hạng mục</div><div class="hero"><div class="lab">Tổng hoàn thiện</div><div class="big"><span data-c="htTot">${fmt(htTotal())}</span> đ</div></div><div class="sec-title" style="font-size:16px">Hạng mục thi công &amp; vật tư cung cấp</div>${c}`);}
 function dtHT(i){if(RO)return;const m=DATA.hoanThien[i];const ban=htCong(i);const v=m.von;
@@ -354,7 +355,9 @@ async function boot(){
   if(RO){document.body.classList.add('ro');
     ['#editBtn','.nav button[data-p="pl"]','.nav button[onclick^="saveFile"]'].forEach(function(sel){var e=document.querySelector(sel);if(e)e.style.display='none';});
   }
-  nav('tq');
+  const GOTO=QP.get('goto');
+  if(GOTO){nav('ht');const id='bg-'+bgSlug(GOTO);let n=0;const jump=()=>{const el=document.getElementById(id);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}if(++n<5)setTimeout(jump,180);};setTimeout(jump,50);}
+  else nav('tq');
 }
 boot();
 window.addEventListener('resize',fitSheet);window.addEventListener('orientationchange',fitSheet);

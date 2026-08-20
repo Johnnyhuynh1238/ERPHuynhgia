@@ -66,7 +66,7 @@ export function DuToanTabs({
             Báo giá đầy đủ (chủng loại vật tư, thanh toán) — dùng chung app báo giá.{" "}
             <a href={`/bao-gia-app.html?contract=${contractId}`} target="_blank" rel="noopener noreferrer">Mở tab mới ↗</a>
           </p>
-          <iframe title="Báo giá" src={`/bao-gia-app.html?contract=${contractId}`} className="dtm-frame" />
+          <iframe key={`bg-${scrollNonce}`} title="Báo giá" src={`/bao-gia-app.html?contract=${contractId}${scrollTarget ? `&goto=${encodeURIComponent(scrollTarget)}` : ""}`} className="dtm-frame" />
         </>
       )}
 
