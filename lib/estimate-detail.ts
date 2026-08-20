@@ -10,11 +10,15 @@ export type EDMaterial = { ten: string; dvt: string; kl: number; gia: number };
 // Giá vốn 1 hạng mục = nhân công khoán + Σ(vật tư × (1 + hao hụt%)).
 // Nhân công KHOÁN đội theo khối lượng: nc = ncQty × ncGia (đội tự lo máy/dụng cụ).
 // Nếu thiếu ncQty/ncGia thì dùng nc nhập thẳng (tương thích data cũ / dòng khoán gói).
+// 1 dòng nhân công khoán (khi NC nhiều mức: lát nền 120k/m², ốp tường 150k/m², len 30k/md…).
+export type EDNcLine = { ten: string; qty: number; unit?: string; gia: number };
+
 export type EDCost = {
   nc: number; // nhân công (đ) — số chốt; = ncQty×ncGia khi có
   ncQty?: number; // khối lượng nhân công khoán (m³/m²/kg…)
   ncGia?: number; // đơn giá NC khoán / đơn vị
   ncUnit?: string; // đơn vị NC khoán
+  ncLines?: EDNcLine[]; // NC nhiều mức — tách dòng + có tổng ở màn Giá vốn
   materials: EDMaterial[];
   haoHutPct: number; // % hao hụt trên vật tư
 };
@@ -46,6 +50,9 @@ export type EDPart = "tho" | "ht";
 // NC khoán 1 hạng mục: ưu tiên KL×đơn giá, fallback nc nhập thẳng.
 export function costNc(c?: EDCost): number {
   if (!c) return 0;
+  if (Array.isArray(c.ncLines) && c.ncLines.length) {
+    return Math.round(c.ncLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.gia) || 0), 0));
+  }
   const q = Number(c.ncQty);
   const g = Number(c.ncGia);
   if (isFinite(q) && isFinite(g) && (c.ncQty != null || c.ncGia != null)) return Math.round(q * g);

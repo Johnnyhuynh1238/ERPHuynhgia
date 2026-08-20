@@ -112,7 +112,22 @@ export function QuoteItemsEditor({
         <div className="grid2">
           <div className="box">
             <div className="box-h">Nhân công khoán</div>
-            {edit ? (
+            {Array.isArray(c.ncLines) && c.ncLines.length ? (
+              <div className="ncl">
+                {c.ncLines.map((l, k) => (
+                  <div className="ncl-row" key={k}>
+                    <span className="ncl-t">{l.ten}</span>
+                    <span className="ncl-q">{klShow(l.qty)} {l.unit ?? ""} × {money(l.gia)}</span>
+                    <span className="ncl-v">{fmt(Math.round((Number(l.qty) || 0) * (Number(l.gia) || 0)))}</span>
+                  </div>
+                ))}
+                <div className="ncl-row ncl-sum">
+                  <span className="ncl-t">Tổng nhân công</span>
+                  <span className="ncl-q" />
+                  <span className="ncl-v"><b>{fmt(nc)}</b></span>
+                </div>
+              </div>
+            ) : edit ? (
               <div className="nc">
                 <input className="c qn" inputMode="decimal" value={klShow(c.ncQty)} placeholder="KL" onChange={(e) => setCost(it.id, { ncQty: parseKl(e.target.value) })} />
                 <select className="c" value={c.ncUnit ?? ""} onChange={(e) => setCost(it.id, { ncUnit: e.target.value })}>
@@ -258,6 +273,13 @@ const CSS = `
 .nc .x{color:var(--mute)}
 .nc .eq{margin-left:auto;color:var(--green);font-variant-numeric:tabular-nums;white-space:nowrap}
 .nc .eq b{color:#177a42}
+.ncl{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:#5c4c3d}
+.ncl-row{display:flex;align-items:baseline;gap:8px}
+.ncl-t{flex:1}
+.ncl-q{color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ncl-v{font-variant-numeric:tabular-nums;white-space:nowrap;min-width:74px;text-align:right}
+.ncl-sum{border-top:1px solid var(--line);margin-top:2px;padding-top:3px;font-weight:700}
+.ncl-sum .ncl-v b{color:#177a42}
 .box table{width:100%;border-collapse:collapse;font-size:12px}
 .box td{padding:2px 3px;border-bottom:1px solid var(--line);vertical-align:middle}
 .box tr:last-child td{border-bottom:0}
