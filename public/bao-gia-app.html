@@ -123,6 +123,7 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
   <button data-p="tq" class="on" onclick="nav('tq')">Tổng quan</button>
   <button data-p="tho" onclick="nav('tho')">Phần thô</button>
   <button data-p="ht" onclick="nav('ht')">Hoàn thiện</button>
+  <button data-p="kbg" onclick="nav('kbg')">Không bao gồm</button>
   <button data-p="pl" onclick="nav('pl')">Lãi/lỗ</button>
   <button class="edit" id="editBtn" onclick="toggleEdit()">✎ Sửa</button>
   <button class="act" onclick="saveFile()">💾 Lưu file</button>
@@ -204,9 +205,9 @@ const CALC={grand:()=>fmt(grand()),thoBan:()=>fmt(thoBan()),thoVt:()=>fmt(thoVt(
  allBan:()=>fmt(thoBan()+htTotal()),allVon:()=>fmt(thoVon()+htVonTot()),allLoi:()=>fmt((thoBan()+htTotal())-(thoVon()+htVonTot()))};
 
 function nav(p){if(RO&&p==='pl')p='tq';CUR=p;document.querySelectorAll('.nav button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
- ({tq:pageTQ,tho:pageTho,ht:pageHT,pl:pagePL})[p]();window.scrollTo(0,0);}
+ ({tq:pageTQ,tho:pageTho,ht:pageHT,kbg:pageKBG,pl:pagePL})[p]();window.scrollTo(0,0);}
 function toggleEdit(){EDIT=!EDIT;document.getElementById('editBtn').classList.toggle('act',EDIT);document.body.classList.toggle('editing',EDIT);
- ({tq:pageTQ,tho:pageTho,ht:pageHT,pl:pagePL})[CUR]();toast(EDIT?'Chế độ sửa: bấm vào số/chữ để chỉnh':'Đã tắt chế độ sửa');if(!EDIT)postVersion();}
+ ({tq:pageTQ,tho:pageTho,ht:pageHT,kbg:pageKBG,pl:pagePL})[CUR]();toast(EDIT?'Chế độ sửa: bấm vào số/chữ để chỉnh':'Đã tắt chế độ sửa');if(!EDIT)postVersion();}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
 const R=h=>{document.getElementById('root').innerHTML=h;if(window.requestAnimationFrame)requestAnimationFrame(fitSheet);return h;};
 const FIT_MAX=760,FIT_W=920;
@@ -285,6 +286,10 @@ function vtBlock(m,mi){if(!m.vt.length)return'';
  let r=m.vt.map((v,j)=>{const P='hoanThien.'+mi+'.vt.'+j;return `<tr><td>${txt(P+'.ten',v.ten)}</td><td class="lo">${txt(P+'.loai',v.loai)}</td><td class="mo">${txt(P+'.mota',v.mota||'')}</td></tr>`}).join('');
  return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Mô tả</th></tr></thead><tbody>${r}</tbody></table>`;}
 function ttKG(mi,ci){const c=DATA.hoanThien[mi].costs[ci];const el=document.getElementById('ctt_'+mi+'_'+ci);if(el)el.textContent=fmt((+c.kl||0)*(+c.gia||0));calc();if(document.getElementById('pf'))drawPf(mi);}
+function pageKBG(){const list=DATA.khongBaoGom||[];
+ const rows=list.map((x,i)=>`<tr><td class="n">${i+1}</td><td><b>${txt('khongBaoGom.'+i+'.ten',x.ten)}</b></td><td class="mo" style="white-space:pre-line">${txt('khongBaoGom.'+i+'.ghi',x.ghi||'')}</td></tr>`).join('');
+ R(`<div class="sec-title">Hạng mục KHÔNG bao gồm</div><div class="dg">Các hạng mục, vật tư không có trong báo giá được hiểu là không bao gồm. Để minh bạch, Huỳnh Gia liệt kê chi tiết trong bảng này.</div>`+
+   (list.length?`<table class="fx"><colgroup><col style="width:6%"><col style="width:30%"><col style="width:64%"></colgroup><thead><tr><th class="n">#</th><th>Hạng mục</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="dg">Chưa có nội dung.</div>'));}
 function pageHT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="bg-${bgSlug(m.name)}"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtHT(${i})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="mc${i}">${fmt(htCong(i))}</span></span></div><div class="bd">${costTable(m,i)}${vtBlock(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
  DATA.hoanThien.forEach((m,i)=>{CALC['mc'+i]=()=>fmt(htCong(i));});
  R(`<div class="sec-title">Phần hoàn thiện — ${DATA.hoanThien.length} hạng mục</div><div class="hero"><div class="lab">Tổng hoàn thiện</div><div class="big"><span data-c="htTot">${fmt(htTotal())}</span> đ</div></div><div class="sec-title" style="font-size:16px">Hạng mục thi công &amp; vật tư cung cấp</div>${c}`);}
