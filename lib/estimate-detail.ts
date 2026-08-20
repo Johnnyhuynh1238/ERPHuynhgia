@@ -95,9 +95,9 @@ export function thoSummary(detail: EstimateDetail | null | undefined, dtTong: nu
   }
   const von = vonNc + vonVt;
   const markup = detail?.markupTho ?? DEFAULT_MARKUP_THO;
-  // Khách thấy đơn giá m² (làm tròn) × diện tích → tổng bán = đúng cách khách tính (khớp màn báo giá).
-  const donGiaM2 = dtTong > 0 ? Math.round((von * (1 + markup)) / dtTong) : 0;
-  const ban = Math.round(donGiaM2 * dtTong);
+  // Bán thô = GIÁ VỐN × (1+markup) — số gốc. Đơn giá m² chỉ là CHIA NGƯỢC để hiển thị (bán ÷ dt).
+  const ban = Math.round(von * (1 + markup));
+  const donGiaM2 = dtTong > 0 ? Math.round(ban / dtTong) : 0;
   const lai = ban - von;
   return { vonNc, vonVt, von, markup, ban, donGiaM2, lai, dtTong };
 }
