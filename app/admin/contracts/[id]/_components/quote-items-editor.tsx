@@ -229,7 +229,7 @@ const CSS = `
 .ge-editbtn.on{background:var(--orange);color:#fff}
 .ge-part{font-size:13px;font-weight:800;color:var(--brown);letter-spacing:.4px;margin:18px 0 10px}
 .ge-part:first-of-type{margin-top:0}
-.hm{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(60,40,20,.05);margin-bottom:16px;scroll-margin-top:14px}
+.hm{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(60,40,20,.05);margin-bottom:16px;scroll-margin-top:72px}
 .hm-hd{display:flex;align-items:center;gap:11px;padding:12px 16px;background:linear-gradient(180deg,#fdf1e0,var(--titlebg));border-bottom:1px solid #efd9bd}
 .hm-no{width:27px;height:27px;border-radius:50%;background:var(--brown);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;flex-shrink:0}
 .hm-nm{font-size:15px;font-weight:800;color:var(--ink)}

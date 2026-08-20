@@ -193,7 +193,7 @@ const CSS = `
 .edt-fullbtn:hover{background:var(--soft)}
 .edt-part{font-size:13px;font-weight:800;color:var(--brown);letter-spacing:.4px;margin:18px 0 10px}
 .edt-part:first-of-type{margin-top:0}
-.edt-hm{margin-bottom:8px;scroll-margin-top:14px}
+.edt-hm{margin-bottom:8px;scroll-margin-top:72px}
 .edt-hm-h{display:flex;align-items:center;gap:10px;margin:6px 0 11px}
 .edt-hm-no{width:26px;height:26px;border-radius:50%;background:var(--brown);color:#fff;font-weight:800;font-size:12.5px;display:grid;place-items:center}
 .edt-hm-h h2{font-size:14.5px;font-weight:800;color:var(--brown);letter-spacing:.3px;margin:0}
