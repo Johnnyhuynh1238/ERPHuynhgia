@@ -40,11 +40,20 @@ export function EstimateDetailSection({
   const fullDrawings = detail?.fullDrawings ?? [];
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setHidden((h) => ({ ...h, [id]: !h[id] }));
+  // Mặc định xếp gọn — bấm tiêu đề card mới mở nội dung.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const toggleOpen = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   // Cuộn tới hạng mục. Hạng mục cuối (Ốp lát) hay trượt vì ảnh bản vẽ lazy-load phía trên
   // load sau → layout xô xuống. Fix: re-scroll theo lịch DÀI + mỗi khi có ảnh trong section load xong.
   useEffect(() => {
     if (!scrollTarget) return;
+    // Nhảy tới hạng mục nào thì tự MỞ card của hạng mục đó (đang xếp gọn mặc định).
+    setOpen((o) => {
+      const n = { ...o };
+      for (const it of items) if (norm(it.hangMuc || "") === norm(scrollTarget)) n[it.id] = true;
+      return n;
+    });
     const anchor = hangMucAnchor(scrollTarget);
     let cancelled = false;
     const doScroll = () => {
@@ -72,19 +81,21 @@ export function EstimateDetailSection({
   const congCard = (it: EDItem, label: string) => {
     const hasTbl = (it.rows?.length ?? 0) > 0;
     const isHidden = !!hidden[it.id];
+    const isOpen = !!open[it.id];
     return (
       <div className="edt-card" key={it.id}>
-        <div className="edt-hd">
-          <span className="edt-nm">{label} · {it.name}{it.tag && <span className="edt-badge">{it.tag}</span>}</span>
+        <div className="edt-hd edt-hd-click" onClick={() => toggleOpen(it.id)} role="button" aria-expanded={isOpen}>
+          <span className="edt-nm"><span className="edt-caret">{isOpen ? "▾" : "▸"}</span> {label} · {it.name}{it.tag && <span className="edt-badge">{it.tag}</span>}</span>
           <span className="edt-hd-right">
             {it.result && <span className="edt-kq">= {it.result}</span>}
-            {it.drawings.length > 0 && (
-              <button type="button" className="edt-toggle" onClick={() => toggle(it.id)}>
+            {isOpen && it.drawings.length > 0 && (
+              <button type="button" className="edt-toggle" onClick={(e) => { e.stopPropagation(); toggle(it.id); }}>
                 {isHidden ? `▸ Bản vẽ (${it.drawings.length})` : "▾ Ẩn bản vẽ"}
               </button>
             )}
           </span>
         </div>
+        {isOpen && (
         <div className="edt-scroll">
         <div className={`edt-grid${isHidden || it.drawings.length === 0 ? " nodraw" : ""}`}>
           <div className="edt-calc">
@@ -125,6 +136,7 @@ export function EstimateDetailSection({
           )}
         </div>
         </div>
+        )}
       </div>
     );
   };
@@ -188,6 +200,9 @@ const CSS = `
 .edt-hm-empty{color:var(--mute);font-style:italic;font-size:12.5px;padding:4px 0 12px}
 .edt-card{background:#fff;border:1px solid var(--line);border-radius:15px;overflow:hidden;margin-bottom:14px;box-shadow:0 3px 12px rgba(60,40,20,.05)}
 .edt-hd{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 16px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.edt-hd-click{cursor:pointer;user-select:none}
+.edt-hd-click:hover{background:var(--soft)}
+.edt-caret{display:inline-block;width:13px;color:var(--brown);font-size:11px}
 .edt-nm{font-weight:700;color:var(--ink);font-size:14.5px}
 .edt-badge{display:inline-block;background:var(--grbg);color:var(--gr);font-weight:800;font-size:11px;padding:2px 9px;border-radius:999px;margin-left:8px}
 .edt-hd-right{display:flex;align-items:center;gap:10px}
