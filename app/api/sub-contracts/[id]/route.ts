@@ -1,4 +1,4 @@
-import { Prisma, SubContractStatus, SubContractUnit, UserRole } from "@prisma/client";
+import { Prisma, SubContractStatus, SubContractUnit, SubPaymentStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -296,13 +296,29 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ message: "Hợp đồng đã hoàn tất/hủy, không thể hủy lại" }, { status: 400 });
   }
 
-  const updated = await prisma.subContract.update({
-    where: { id: params.id },
-    data: {
-      status: SubContractStatus.cancelled,
-      notes: appendCancelReason(existed.notes, parsed.data.reason),
-    },
+  // Huỷ HĐ → đóng luôn các đợt CHƯA chi (pending/requested/approved) để không còn
+  // ghi nợ ảo phần chưa làm. Giữ nguyên contractValue gốc + các đợt đã chi để tra cứu.
+  const { updated, cancelledInstallments } = await prisma.$transaction(async (tx) => {
+    const closed = await tx.subPayment.updateMany({
+      where: {
+        subContractId: params.id,
+        status: { in: [SubPaymentStatus.pending, SubPaymentStatus.requested, SubPaymentStatus.approved] },
+      },
+      data: { status: SubPaymentStatus.cancelled },
+    });
+
+    const row = await tx.subContract.update({
+      where: { id: params.id },
+      data: {
+        status: SubContractStatus.cancelled,
+        notes: appendCancelReason(existed.notes, parsed.data.reason),
+      },
+    });
+
+    return { updated: row, cancelledInstallments: closed.count };
   });
+
+  const installmentNote = cancelledInstallments > 0 ? ` — đã đóng ${cancelledInstallments} đợt chưa chi` : "";
 
   await logProjectActivity(prisma, {
     projectId: existed.projectId,
@@ -310,15 +326,16 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     entity: "sub_contract",
     entityId: existed.id,
     action: "delete",
-    summary: `Hủy HĐ thầu phụ ${existed.code} "${existed.title}" — lý do: ${parsed.data.reason}`,
+    summary: `Hủy HĐ thầu phụ ${existed.code} "${existed.title}"${installmentNote} — lý do: ${parsed.data.reason}`,
     snapshot: existed,
-    metadata: { reason: parsed.data.reason, previousStatus: existed.status },
+    metadata: { reason: parsed.data.reason, previousStatus: existed.status, cancelledInstallments },
   });
 
   const serialized = serializeSubContract(updated, true);
 
   return NextResponse.json({
     contract: serialized,
-    message: "Đã hủy hợp đồng",
+    cancelledInstallments,
+    message: cancelledInstallments > 0 ? `Đã hủy hợp đồng, đóng ${cancelledInstallments} đợt chưa chi` : "Đã hủy hợp đồng",
   });
 }

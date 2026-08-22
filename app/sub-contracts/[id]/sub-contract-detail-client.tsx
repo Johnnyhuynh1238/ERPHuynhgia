@@ -442,6 +442,23 @@ export function SubContractDetailClient({
 
   async function cancelContract() {
     if (!contract) return;
+
+    // Cảnh báo các đợt chưa chi sẽ bị đóng khi huỷ HĐ.
+    const openInstallments = payments.filter(
+      (p) =>
+        p.status === SubPaymentStatus.pending ||
+        p.status === SubPaymentStatus.requested ||
+        p.status === SubPaymentStatus.approved,
+    );
+    if (openInstallments.length > 0) {
+      const openTotal = openInstallments.reduce((s, p) => s + Number(p.expectedAmount || 0), 0);
+      const ok = window.confirm(
+        `Huỷ HĐ sẽ đóng ${openInstallments.length} đợt chưa chi (tổng ${formatMoney(openTotal)}). ` +
+          `Các đợt đã chi và giá trị HĐ vẫn được giữ. Tiếp tục?`,
+      );
+      if (!ok) return;
+    }
+
     const reason = window.prompt("Nhập lý do hủy hợp đồng:");
     if (!reason?.trim()) return;
 
@@ -891,7 +908,7 @@ export function SubContractDetailClient({
                   <span>Tổng các đợt: {formatMoney(scheduleExpectedTotal)}</span>
                   <span>Giá trị HĐ: {formatMoney(contractValue)}</span>
                 </div>
-                {payments.length > 0 && Math.abs(scheduleExpectedTotal - contractValue) >= 1 ? (
+                {contract.status !== SubContractStatus.cancelled && payments.length > 0 && Math.abs(scheduleExpectedTotal - contractValue) >= 1 ? (
                   <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-200">
                     ⚠️ Tổng các đợt {scheduleExpectedTotal > contractValue ? "vượt" : "thiếu"}{" "}
                     <b>{formatMoney(Math.abs(scheduleExpectedTotal - contractValue))}</b> so với giá trị HĐ.

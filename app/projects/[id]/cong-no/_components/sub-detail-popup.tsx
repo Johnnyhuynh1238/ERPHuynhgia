@@ -262,7 +262,9 @@ export function SubDetailPopup({
 
   const contractValue = Number(contract?.contractValue || 0);
   const paidTotal = Number(paymentMeta?.totals.paidTotal || 0);
-  const remain = contractValue - paidTotal;
+  const isCancelled = contract?.status === "cancelled";
+  // HĐ đã huỷ: các đợt chưa chi đã bị đóng → không còn nợ phần chưa làm.
+  const remain = isCancelled ? 0 : contractValue - paidTotal;
   // Tổng tiền các đợt (bỏ đợt huỷ) để đối chiếu giá trị HĐ. Đổi giá trị HĐ không
   // tự nắn đợt — chỉ cảnh báo để KT/QLDA tự sửa hoặc thêm đợt cho khớp.
   const scheduleExpectedTotal = payments
@@ -582,8 +584,8 @@ export function SubDetailPopup({
                 </div>
               )}
 
-              {/* cảnh báo lệch giữa tổng đợt và giá trị HĐ */}
-              {canFin && payments.length > 0 && Math.abs(scheduleGap) >= 1 && (
+              {/* cảnh báo lệch giữa tổng đợt và giá trị HĐ (không áp dụng khi HĐ đã huỷ) */}
+              {canFin && !isCancelled && payments.length > 0 && Math.abs(scheduleGap) >= 1 && (
                 <div className="schwarn">
                   ⚠️ Tổng các đợt ({fmt(scheduleExpectedTotal)} đ) {scheduleGap < 0 ? "vượt" : "thiếu"}{" "}
                   <b>{fmt(Math.abs(scheduleGap))} đ</b> so với giá trị HĐ ({fmt(contractValue)} đ).
