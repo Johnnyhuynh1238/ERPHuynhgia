@@ -117,6 +117,7 @@ enum TaskLogType {
 enum PaymentStatus {
   not_collected
   request_sent
+  partial
   collected
   customer_late
   pending

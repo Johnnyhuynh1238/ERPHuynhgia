@@ -17,12 +17,15 @@ async function nextReceiptCode() {
   return `${prefix}${String(lastNo + 1).padStart(4, "0")}`;
 }
 
-export async function POST(_request: Request, { params }: { params: { id: string; paymentId: string } }) {
+export async function POST(request: Request, { params }: { params: { id: string; paymentId: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
   if (user.role !== UserRole.admin) {
     return NextResponse.json({ message: "Chỉ admin được tạo lệnh thu từ đợt thanh toán" }, { status: 403 });
   }
+
+  const body = await request.json().catch(() => ({}));
+  const rawAmount = (body as { amount?: unknown }).amount;
 
   const schedule = await prisma.paymentSchedule.findFirst({
     where: { id: params.paymentId, projectId: params.id },
@@ -46,20 +49,32 @@ export async function POST(_request: Request, { params }: { params: { id: string
     );
   }
 
-  const alreadyReceived = await prisma.receipt.findFirst({
+  // Đã thu (cộng dồn các phiếu received) → còn lại; cho phép thu tiếp phần còn lại
+  const receivedAgg = await prisma.receipt.aggregate({
     where: { paymentScheduleId: schedule.id, status: ReceiptStatus.received },
-    select: { id: true, code: true },
+    _sum: { receivedAmount: true },
   });
-  if (alreadyReceived) {
-    return NextResponse.json(
-      { message: `Đợt này đã được thu bằng lệnh ${alreadyReceived.code}` },
-      { status: 400 },
-    );
+  const scheduleAmount = Number(schedule.amount);
+  const alreadyCollected = Number(receivedAgg._sum.receivedAmount || 0);
+  const remaining = scheduleAmount - alreadyCollected;
+  if (remaining <= 0) {
+    return NextResponse.json({ message: "Đợt này đã thu đủ" }, { status: 400 });
+  }
+
+  // Số tiền thu: mặc định = phần còn lại, admin được chỉnh (thu thiếu tiếp)
+  const collectAmount =
+    rawAmount == null || rawAmount === "" ? remaining : Number(rawAmount);
+  if (!Number.isFinite(collectAmount) || collectAmount <= 0) {
+    return NextResponse.json({ message: "Số tiền thu không hợp lệ" }, { status: 400 });
   }
 
   const code = await nextReceiptCode();
   const projectLabel = `${schedule.project.code} — ${schedule.project.name}`;
   const scheduleLabel = schedule.milestoneDescription || schedule.description || `Đợt ${schedule.phaseNumber}`;
+  const partialNote =
+    collectAmount !== scheduleAmount
+      ? ` (thu ${Math.round(collectAmount).toLocaleString("vi-VN")}/${Math.round(scheduleAmount).toLocaleString("vi-VN")})`
+      : "";
 
   const receipt = await prisma.$transaction(async (tx) => {
     const created = await tx.receipt.create({
@@ -68,10 +83,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
         source: ReceiptSource.customer,
         projectId: schedule.projectId,
         paymentScheduleId: schedule.id,
-        amount: schedule.amount,
+        amount: new Prisma.Decimal(collectAmount),
         payer: schedule.project.customerName || null,
         paymentMethod: null,
-        note: `Đợt ${schedule.phaseNumber} — ${scheduleLabel}`,
+        note: `Đợt ${schedule.phaseNumber} — ${scheduleLabel}${partialNote}`,
         status: ReceiptStatus.pending,
         createdBy: user.id,
       },
@@ -133,6 +148,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ message: "Không có lệnh thu đang chờ để huỷ" }, { status: 400 });
   }
 
+  // Nếu đã thu 1 phần (có phiếu received) → về 'partial', chưa thu gì → 'not_collected'
+  const receivedCount = await prisma.receipt.count({
+    where: { paymentScheduleId: schedule.id, status: ReceiptStatus.received },
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.receipt.update({
       where: { id: activeReceipt.id },
@@ -145,7 +165,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     });
     await tx.paymentSchedule.update({
       where: { id: schedule.id },
-      data: { status: PaymentStatus.not_collected },
+      data: { status: receivedCount > 0 ? PaymentStatus.partial : PaymentStatus.not_collected },
     });
   });
 

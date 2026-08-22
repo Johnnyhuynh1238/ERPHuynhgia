@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import "./thanh-toan.css";
 
 
-type PaymentStatus = "not_collected" | "request_sent" | "collected" | "customer_late";
+type PaymentStatus = "not_collected" | "request_sent" | "partial" | "collected" | "customer_late";
 
 type ReceiptRefStatus = "pending" | "awaiting_approval" | "received" | "cancelled";
 
@@ -21,6 +21,8 @@ type PaymentRow = {
   expectedDate: string | null;
   actualPaidDate: string | null;
   actualPaidAmount: number | null;
+  collectedAmount: number;
+  remaining: number;
   status: PaymentStatus;
   notes: string | null;
   activeReceipt: { id: string; code: string; status: ReceiptRefStatus } | null;
@@ -37,6 +39,7 @@ type ProjectInfo = {
 const STATUS_LABEL: Record<PaymentStatus, string> = {
   not_collected: "Chưa thu",
   request_sent: "Đã gửi đề nghị",
+  partial: "Thu 1 phần",
   collected: "Đã thu",
   customer_late: "Khách chậm",
 };
@@ -44,6 +47,7 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
 const STATUS_BADGE: Record<PaymentStatus, string> = {
   not_collected: "wait",
   request_sent: "req",
+  partial: "req",
   collected: "ok",
   customer_late: "bad",
 };
@@ -85,6 +89,9 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
+  const [collectRow, setCollectRow] = useState<PaymentRow | null>(null);
+  const [collectAmount, setCollectAmount] = useState("");
+
   const [editing, setEditing] = useState<PaymentRow | null>(null);
   const [status, setStatus] = useState<PaymentStatus>("not_collected");
   const [expectedDate, setExpectedDate] = useState("");
@@ -122,11 +129,23 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
     setIsAdmin(!!json.isAdmin);
   }
 
-  async function requestCollection(row: PaymentRow) {
-    if (!await confirmDialog(`Gửi lệnh thu ${fmtMoney(row.amount)} — Đợt ${row.phaseNumber} cho kế toán?`)) return;
-    setPendingId(row.id);
-    const res = await fetch(`/api/projects/${projectId}/payments/${row.id}/request-collection`, {
+  function openCollect(row: PaymentRow) {
+    setCollectRow(row);
+    setCollectAmount(String(Math.round(row.remaining > 0 ? row.remaining : row.amount)));
+  }
+
+  async function submitCollection() {
+    if (!collectRow) return;
+    const amount = Number(collectAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Số tiền thu không hợp lệ");
+      return;
+    }
+    setPendingId(collectRow.id);
+    const res = await fetch(`/api/projects/${projectId}/payments/${collectRow.id}/request-collection`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount }),
     });
     const json = await res.json().catch(() => ({}));
     setPendingId(null);
@@ -134,6 +153,7 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
       toast.error(json.message || "Gửi lệnh thu thất bại");
       return;
     }
+    setCollectRow(null);
     toast.success(json.message || "Đã gửi cho KT");
     await loadData();
   }
@@ -339,6 +359,9 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
                 ) : null}
               </div>
 
+              {row.collectedAmount > 0 && row.remaining > 0 ? (
+                <div className="preceipt">Đã thu {fmtMoney(row.collectedAmount)} — còn lại {fmtMoney(row.remaining)}</div>
+              ) : null}
               {row.notes ? <div className="pnote">Ghi chú: {row.notes}</div> : null}
               {row.activeReceipt ? (
                 <div className="preceipt">{row.activeReceipt.status === "received" ? "Đã thu" : "Đang chờ KT thu"} — {row.activeReceipt.code}</div>
@@ -347,9 +370,13 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
               {canEdit ? (
                 <div className="pacts">
-                  {isAdmin && !row.activeReceipt && row.status !== "collected" ? (
-                    <button className="btn primary" onClick={() => requestCollection(row)} disabled={pendingId === row.id}>
-                      {pendingId === row.id ? "Đang gửi…" : "Yêu cầu KT thu"}
+                  {isAdmin && !row.activeReceipt && row.remaining > 0 ? (
+                    <button className="btn primary" onClick={() => openCollect(row)} disabled={pendingId === row.id}>
+                      {pendingId === row.id
+                        ? "Đang gửi…"
+                        : row.collectedAmount > 0
+                          ? "Thu tiếp phần còn lại"
+                          : "Yêu cầu KT thu"}
                     </button>
                   ) : null}
                   {isAdmin && row.activeReceipt && row.activeReceipt.status !== "received" ? (
@@ -371,6 +398,42 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
           <div className="t"><label>Số đợt đã thu</label><div>{totals.collectedCount}/{rows.length}</div></div>
         </div>
       </div>
+
+      {collectRow ? (
+        <div className="modal-bg" onClick={() => pendingId !== collectRow.id && setCollectRow(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Yêu cầu KT thu — Đợt {collectRow.phaseNumber}</h3>
+            <div className="hintline">
+              Số tiền đợt {fmtMoney(collectRow.amount)}
+              {collectRow.collectedAmount > 0
+                ? ` · đã thu ${fmtMoney(collectRow.collectedAmount)} · còn lại ${fmtMoney(collectRow.remaining)}`
+                : ""}
+              . Chỉnh nếu thu thiếu, phần còn lại thu tiếp sau.
+            </div>
+            <div className="fld">
+              <label>Số tiền thu lần này</label>
+              <input
+                type="number"
+                min={0}
+                autoFocus
+                value={collectAmount}
+                onChange={(e) => setCollectAmount(e.target.value)}
+              />
+              {Number(collectAmount) < collectRow.remaining ? (
+                <div className="hintline">Thu thiếu — còn lại {fmtMoney(collectRow.remaining - Number(collectAmount))} thu đợt sau.</div>
+              ) : Number(collectAmount) > collectRow.remaining ? (
+                <div className="hintline">Vượt phần còn lại ({fmtMoney(collectRow.remaining)}).</div>
+              ) : null}
+            </div>
+            <div className="modal-acts">
+              <button className="btn" onClick={() => setCollectRow(null)} disabled={pendingId === collectRow.id}>Hủy</button>
+              <button className="btn primary" onClick={submitCollection} disabled={pendingId === collectRow.id}>
+                {pendingId === collectRow.id ? "Đang gửi…" : "Gửi KT"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="modal-bg" onClick={() => !saving && setEditing(null)}>

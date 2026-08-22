@@ -78,14 +78,27 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
 
       if (receipt.paymentScheduleId) {
+        const schedule = await tx.paymentSchedule.findUnique({
+          where: { id: receipt.paymentScheduleId },
+          select: { amount: true },
+        });
+        // Cộng dồn tất cả phiếu đã received của đợt (phiếu này vừa set received ở trên)
+        const agg = await tx.receipt.aggregate({
+          where: { paymentScheduleId: receipt.paymentScheduleId, status: ReceiptStatus.received },
+          _sum: { receivedAmount: true },
+        });
+        const totalCollected = Number(agg._sum.receivedAmount || 0);
+        const scheduleAmount = Number(schedule?.amount || 0);
+        // Đủ (dung sai 1đ) → collected; còn thiếu → mở lại để thu tiếp
+        const isFull = totalCollected >= scheduleAmount - 1;
         await tx.paymentSchedule.update({
           where: { id: receipt.paymentScheduleId },
           data: {
-            status: PaymentStatus.collected,
+            status: isFull ? PaymentStatus.collected : PaymentStatus.partial,
             actualPaidDate: receivedAt,
-            actualPaidAmount: new Prisma.Decimal(data.receivedAmount),
+            actualPaidAmount: new Prisma.Decimal(totalCollected),
             paidAt: receivedAt,
-            paidAmount: new Prisma.Decimal(data.receivedAmount),
+            paidAmount: new Prisma.Decimal(totalCollected),
           },
         });
       }

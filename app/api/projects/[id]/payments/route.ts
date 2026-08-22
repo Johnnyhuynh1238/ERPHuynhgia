@@ -90,8 +90,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       receipts: {
         where: { status: { in: [ReceiptStatus.pending, ReceiptStatus.awaiting_approval, ReceiptStatus.received] } },
         orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { id: true, code: true, status: true },
+        select: { id: true, code: true, status: true, receivedAmount: true },
       },
     },
   });
@@ -106,15 +105,28 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
     payments: rows.map((row) => {
       const normalized = normalizePaymentSchedule(row);
-      const activeReceipt = row.receipts[0] || null;
+      // Phiếu đang chờ KT xử lý (chặn tạo lệnh mới); phiếu received cộng dồn vào đã thu
+      const pending = row.receipts.find(
+        (r) => r.status === ReceiptStatus.pending || r.status === ReceiptStatus.awaiting_approval,
+      );
+      const activeReceipt = pending
+        ? { id: pending.id, code: pending.code, status: pending.status }
+        : null;
+      const collectedAmount = row.receipts
+        .filter((r) => r.status === ReceiptStatus.received)
+        .reduce((s, r) => s + Number(r.receivedAmount || 0), 0);
+      const amount = Number(row.amount);
+      const remaining = Math.max(0, amount - collectedAmount);
       const { receipts, ...rest } = row;
       void receipts;
       return {
         ...rest,
         percent: Number(row.percent),
-        amount: Number(row.amount),
+        amount,
         actualPaidAmount: row.actualPaidAmount ? Number(row.actualPaidAmount) : null,
         paidAmount: row.paidAmount ? Number(row.paidAmount) : null,
+        collectedAmount,
+        remaining,
         normalized,
         activeReceipt,
       };
