@@ -152,7 +152,11 @@ export function SubContractsTab({
     const total = rows.reduce((s, r) => s + (r.contractValue || 0), 0);
     const active = rows.filter((r) => r.status === "active").length;
     const daTra = rows.reduce((s, r) => s + (r.paidTotal || 0), 0);
-    const conLai = Math.max(0, total - daTra);
+    // HĐ đã huỷ không tính nợ còn lại (các đợt chưa chi đã đóng khi huỷ).
+    const conLai = rows.reduce(
+      (s, r) => s + (r.status === "cancelled" ? 0 : Math.max(0, (r.contractValue || 0) - (r.paidTotal || 0))),
+      0,
+    );
     return { count: rows.length, total, active, daTra, conLai };
   }, [rows]);
 
@@ -260,7 +264,7 @@ export function SubContractsTab({
       ) : (
         <div className="nlist">
           {rows.map((r) => {
-            const remaining = (r.contractValue || 0) - (r.paidTotal || 0);
+            const remaining = r.status === "cancelled" ? 0 : (r.contractValue || 0) - (r.paidTotal || 0);
             return (
             <button key={r.id} type="button" className="nccrow" onClick={() => setOpenId(r.id)}>
               <div className="nl">
