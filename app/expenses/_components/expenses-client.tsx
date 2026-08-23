@@ -459,38 +459,47 @@ export function ExpensesClient({
         im.src = dataUrl;
       });
 
-      const jsQR = (await import("jsqr")).default;
+      // zxing-wasm đọc khoẻ hơn jsQR: ăn được QR chụp lại màn hình, logo Napas đè giữa mã, hơi nghiêng/mờ.
+      const { readBarcodesFromImageData, prepareZXingModule } = await import("zxing-wasm/reader");
+      // Self-host wasm ở /public/zxing để né CDN/CSP (mặc định zxing tải từ jsDelivr).
+      prepareZXingModule({
+        overrides: {
+          locateFile: (path: string, prefix: string) =>
+            path.endsWith(".wasm") ? "/zxing/zxing_reader.wasm" : prefix + path,
+        },
+      });
 
-      const tryAt = (targetW: number): { data: string; topY: number } | null => {
-        const scale = Math.min(1, targetW / img.naturalWidth);
-        const w = Math.max(64, Math.round(img.naturalWidth * scale));
-        const h = Math.max(64, Math.round(img.naturalHeight * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return null;
-        ctx.drawImage(img, 0, 0, w, h);
-        const data = ctx.getImageData(0, 0, w, h);
-        const code = jsQR(data.data, data.width, data.height, { inversionAttempts: "attemptBoth" });
-        if (!code?.data) return null;
-        // Mép trên QR quy về toạ độ ảnh gốc (dùng để cắt dải chữ tên phía trên).
-        const topYScaled = Math.min(code.location.topLeftCorner.y, code.location.topRightCorner.y);
-        return { data: code.data, topY: Math.round(topYScaled / scale) };
-      };
-
-      // Thử nhiều scale: ảnh chụp 4K thường fail ở native, nhưng pass khi downscale
-      const targets = [1280, 800, 1920, 2400, img.naturalWidth];
-      let hit: { data: string; topY: number } | null = null;
-      for (const t of targets) {
-        hit = tryAt(t);
-        if (hit) break;
-      }
-
-      if (!hit) {
-        toast.error(`Không đọc được QR (${img.naturalWidth}x${img.naturalHeight}). Thử ảnh cận hơn hoặc screenshot nhé`);
+      // Vẽ ảnh ở độ phân giải cao (cap cạnh dài 2600px) rồi đọc — KHÔNG downscale nhỏ như jsQR cũ.
+      const cap = 2600;
+      const drawScale = Math.min(1, cap / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(64, Math.round(img.naturalWidth * drawScale));
+      const h = Math.max(64, Math.round(img.naturalHeight * drawScale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        toast.error("Trình duyệt không hỗ trợ canvas");
         return;
       }
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+
+      const results = await readBarcodesFromImageData(imageData, {
+        formats: ["QRCode"],
+        tryHarder: true,
+        tryInvert: true,
+        maxNumberOfSymbols: 1,
+      });
+      const found = results.find((r) => r.isValid && r.text);
+      if (!found) {
+        toast.error(`Không đọc được QR (${img.naturalWidth}x${img.naturalHeight}). Thử ảnh rõ hơn hoặc screenshot nhé`);
+        return;
+      }
+      // Mép trên QR quy về toạ độ ảnh gốc (dùng để cắt dải chữ tên phía trên cho OCR).
+      const topYScaled = Math.min(found.position.topLeft.y, found.position.topRight.y);
+      const hit = { data: found.text, topY: Math.round(topYScaled / drawScale) };
+
       const parsed = parseVietQrString(hit.data);
       if (!parsed) {
         toast.error("QR đọc được nhưng không phải chuẩn VietQR. Nhập tay STK nhé");
