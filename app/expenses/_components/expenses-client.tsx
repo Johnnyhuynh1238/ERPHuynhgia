@@ -138,24 +138,19 @@ function pickPayeeName(text: string, accountNumber: string): string | null {
   return null;
 }
 
-// OCR dải chữ PHÍA TRÊN mã QR (tên + STK) — tên chủ TK không nằm trong payload QR.
+// OCR dải chữ quanh mã QR để lấy tên chủ TK (không nằm trong payload QR).
+// Tên có thể ở DƯỚI mã (VietinBank: tên → STK → ngân hàng) hoặc TRÊN mã (vài app khác)
+// → thử cả hai, ưu tiên dải DƯỚI.
 async function ocrPayeeName(
   img: HTMLImageElement,
   qrTopY: number,
+  qrBottomY: number,
   accountNumber: string,
 ): Promise<string | null> {
-  if (qrTopY < 40) return null;
-  const cw = img.naturalWidth;
-  const ch = Math.min(qrTopY, img.naturalHeight);
-  const up = cw < 900 ? Math.min(3, Math.max(1, Math.round(900 / cw))) : 1;
-  const canvas = document.createElement("canvas");
-  canvas.width = cw * up;
-  canvas.height = ch * up;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, cw, ch, 0, 0, canvas.width, canvas.height);
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const qrH = Math.max(0, qrBottomY - qrTopY);
+  const up = iw < 900 ? Math.min(3, Math.max(1, Math.round(900 / iw))) : 1;
 
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng", 1, {
@@ -168,8 +163,34 @@ async function ocrPayeeName(
       tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .",
       preserve_interword_spaces: "1",
     });
-    const { data } = await worker.recognize(canvas);
-    return pickPayeeName(data.text || "", accountNumber);
+    // Đọc 1 dải ngang [top, height] của ảnh, trả tên nếu pick được.
+    const readBand = async (top: number, height: number): Promise<string | null> => {
+      const t = Math.max(0, Math.round(top));
+      const h = Math.min(ih - t, Math.round(height));
+      if (h < 20) return null;
+      const canvas = document.createElement("canvas");
+      canvas.width = iw * up;
+      canvas.height = h * up;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, t, iw, h, 0, 0, canvas.width, canvas.height);
+      const { data } = await worker.recognize(canvas);
+      return pickPayeeName(data.text || "", accountNumber);
+    };
+
+    // 1) Dải NGAY DƯỚI mã QR (layout phổ biến: tên → STK → ngân hàng).
+    const belowH = qrH > 0 ? Math.round(qrH * 1.2) : Math.round(ih * 0.25);
+    const below = await readBand(qrBottomY + 8, belowH);
+    if (below) return below;
+
+    // 2) Dải PHÍA TRÊN mã QR (fallback cho app in tên ở trên).
+    if (qrTopY >= 40) {
+      const above = await readBand(0, qrTopY);
+      if (above) return above;
+    }
+    return null;
   } finally {
     await worker.terminate();
   }
@@ -496,9 +517,14 @@ export function ExpensesClient({
         toast.error(`Không đọc được QR (${img.naturalWidth}x${img.naturalHeight}). Thử ảnh rõ hơn hoặc screenshot nhé`);
         return;
       }
-      // Mép trên QR quy về toạ độ ảnh gốc (dùng để cắt dải chữ tên phía trên cho OCR).
+      // Mép trên/dưới QR quy về toạ độ ảnh gốc (để cắt dải chữ tên trên/dưới mã cho OCR).
       const topYScaled = Math.min(found.position.topLeft.y, found.position.topRight.y);
-      const hit = { data: found.text, topY: Math.round(topYScaled / drawScale) };
+      const botYScaled = Math.max(found.position.bottomLeft.y, found.position.bottomRight.y);
+      const hit = {
+        data: found.text,
+        topY: Math.round(topYScaled / drawScale),
+        bottomY: Math.round(botYScaled / drawScale),
+      };
 
       const parsed = parseVietQrString(hit.data);
       if (!parsed) {
@@ -515,7 +541,7 @@ export function ExpensesClient({
       toast.success(`Đã đọc QR: ${bank?.shortName ?? parsed.bankBin} · ${parsed.accountNumber}`);
 
       // Tên chủ TK in dạng chữ phía trên QR (ko có trong payload) → OCR bù, ko chặn flow.
-      ocrPayeeName(img, hit.topY, parsed.accountNumber)
+      ocrPayeeName(img, hit.topY, hit.bottomY, parsed.accountNumber)
         .then((name) => {
           if (name) {
             setForm((f) => (f.payeeAccountName.trim() ? f : { ...f, payeeAccountName: name }));
