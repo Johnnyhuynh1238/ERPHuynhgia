@@ -15,7 +15,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .nav button.act{border-color:var(--orange);color:var(--orange)}
 .nav button.edit.act{background:var(--orange);color:#fff}
 .printmenu{position:relative;display:inline-block}
-.printmenu>.pm-list{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(60,40,20,.20);padding:6px;display:none;flex-direction:column;gap:2px;z-index:40;min-width:230px}
+.printmenu>button{border:1px solid var(--line);background:#fff;color:var(--browntx);border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:12.5px}
+.printmenu>button:hover{background:var(--soft)}
+.printmenu.open>button{background:var(--brown);color:#fff;border-color:var(--brown)}
+.printmenu>.pm-list{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(60,40,20,.20);padding:6px;display:none;flex-direction:column;gap:2px;z-index:9999;min-width:230px;max-width:calc(100vw - 16px)}
 .printmenu.open>.pm-list{display:flex}
 .printmenu>.pm-list button{border:1px solid transparent;background:#fff;color:var(--browntx);border-radius:8px;padding:9px 12px;font-weight:700;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap;width:100%}
 .printmenu>.pm-list button:hover{background:var(--soft)}
@@ -104,7 +107,8 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
 @media(max-width:760px){.stage{overflow:hidden}#root.page{margin:0 auto}
  .nav{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin-left:0;width:100%;flex:1 0 100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
  .nav::-webkit-scrollbar{display:none}
- .nav button{flex:0 0 auto;white-space:nowrap}}
+ .nav button{flex:0 0 auto;white-space:nowrap}
+ .printmenu{margin-top:2px}.printmenu>.pm-list{left:0;right:auto}}
 @media print{#root.page{transform:none!important;width:auto!important}.stage{height:auto!important;overflow:visible!important}.letterhead{border-color:#974706;padding:4px 92px 10px 176px}.letterhead .lh-logo{height:40px;top:5px}.letterhead .lh-right{top:6px}}
 /* Bản in trắng đen: ép chữ đen đậm, nền trắng — rõ trên máy in đen trắng. Bấm nút "In T.Đen". */
 @media print{
@@ -135,17 +139,17 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
   <button data-p="pl" onclick="nav('pl')">Lãi/lỗ</button>
   <button class="edit" id="editBtn" onclick="toggleEdit()">✎ Sửa</button>
   <button class="act" onclick="saveFile()">💾 Lưu file</button>
-  <span class="printmenu noprint" id="printMenu">
-   <button type="button" onclick="togglePrintMenu(event)" title="Chọn kiểu in">🖨️ In ▾</button>
-   <div class="pm-list">
-    <button type="button" onclick="pmDo(2)">📄 In đầy đủ — màu</button>
-    <button type="button" onclick="pmDo(3)">📄 In đầy đủ — trắng đen</button>
-    <div class="pm-sep"></div>
-    <button type="button" onclick="pmDo(0)">🎨 In mục đang xem — màu</button>
-    <button type="button" onclick="pmDo(1)">🖨️ In mục đang xem — trắng đen</button>
-   </div>
-  </span>
  </div>
+ <span class="printmenu noprint" id="printMenu">
+  <button type="button" onclick="togglePrintMenu(event)" title="Chọn kiểu in">🖨️ In ▾</button>
+  <div class="pm-list">
+   <button type="button" onclick="pmDo(2)">📄 In đầy đủ — màu</button>
+   <button type="button" onclick="pmDo(3)">📄 In đầy đủ — trắng đen</button>
+   <div class="pm-sep"></div>
+   <button type="button" onclick="pmDo(0)">🎨 In mục đang xem — màu</button>
+   <button type="button" onclick="pmDo(1)">🖨️ In mục đang xem — trắng đen</button>
+  </div>
+ </span>
 </div>
 <div class="stage"><div id="root" class="page"></div></div>
 <div id="toast" class="toast"></div>
