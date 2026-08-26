@@ -112,10 +112,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       const activeReceipt = pending
         ? { id: pending.id, code: pending.code, status: pending.status }
         : null;
-      const collectedAmount = row.receipts
+      const receiptCollected = row.receipts
         .filter((r) => r.status === ReceiptStatus.received)
         .reduce((s, r) => s + Number(r.receivedAmount || 0), 0);
       const amount = Number(row.amount);
+      // actualPaidAmount là nguồn chuẩn "đã thu": mark-received đồng bộ nó, và đợt thu
+      // trước khi có luồng phiếu thu chỉ có actualPaidAmount (0 receipts). Lấy max để đợt
+      // collected cũ không bị coi là còn nợ → tránh hiện lại nút "Yêu cầu KT thu".
+      const collectedAmount = Math.max(receiptCollected, Number(row.actualPaidAmount || 0));
       const remaining = Math.max(0, amount - collectedAmount);
       const { receipts, ...rest } = row;
       void receipts;
