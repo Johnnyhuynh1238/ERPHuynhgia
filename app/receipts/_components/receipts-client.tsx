@@ -154,68 +154,8 @@ export function ReceiptsClient({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
-  // Lightbox xem chứng từ + nút tải / chia sẻ ảnh.
+  // Lightbox xem chứng từ (long-press ảnh để lưu / chia sẻ bằng menu native).
   const [viewer, setViewer] = useState<{ url: string; isPdf: boolean } | null>(null);
-  const [imgBusy, setImgBusy] = useState(false);
-
-  function billFileName(src: string) {
-    try {
-      const path = new URL(src, window.location.origin).pathname;
-      const base = path.split("/").pop() || "chung-tu";
-      return /\.[a-z0-9]{2,5}$/i.test(base) ? base : `${base}.jpg`;
-    } catch {
-      return "chung-tu.jpg";
-    }
-  }
-  async function downloadBill(src: string) {
-    setImgBusy(true);
-    try {
-      const res = await fetch(src, { cache: "no-store" });
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = billFileName(src);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-    } catch {
-      window.open(src, "_blank", "noopener");
-    } finally {
-      setImgBusy(false);
-    }
-  }
-  async function shareBill(src: string) {
-    setImgBusy(true);
-    try {
-      try {
-        const res = await fetch(src, { cache: "no-store" });
-        const blob = await res.blob();
-        const file = new File([blob], billFileName(src), { type: blob.type || "image/jpeg" });
-        const navAny = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-        if (navAny.canShare && navAny.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "Chứng từ" });
-          return;
-        }
-      } catch {
-        /* fall through to link share */
-      }
-      const absUrl = new URL(src, window.location.origin).href;
-      if (navigator.share) {
-        await navigator.share({ title: "Chứng từ", url: absUrl });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(absUrl);
-        toast.success("Đã copy link chứng từ");
-      } else {
-        window.open(absUrl, "_blank", "noopener");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-    } finally {
-      setImgBusy(false);
-    }
-  }
 
   // Brand theme (Ngà sáng / Mahogany tối). Mặc định tối, nhớ localStorage.
   const [theme, setTheme] = useState<"light" | "dark">("dark");
@@ -834,28 +774,6 @@ export function ReceiptsClient({
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setViewer(null)}
         >
-          {!viewer.isPdf && (
-            <div className="absolute left-4 top-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                disabled={imgBusy}
-                onClick={() => shareBill(viewer.url)}
-                className="flex h-10 items-center gap-1.5 rounded-full bg-orange-500/90 px-4 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
-                aria-label="Chia sẻ"
-              >
-                📤 Chia sẻ
-              </button>
-              <button
-                type="button"
-                disabled={imgBusy}
-                onClick={() => downloadBill(viewer.url)}
-                className="flex h-10 items-center gap-1.5 rounded-full bg-black/60 px-4 text-sm font-medium text-white hover:bg-black/80 disabled:opacity-50"
-                aria-label="Tải ảnh"
-              >
-                ⬇️ Tải
-              </button>
-            </div>
-          )}
           <button
             type="button"
             onClick={(e) => {

@@ -689,67 +689,6 @@ export function ExpensesClient({
   }
 
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
-  const [imgBusy, setImgBusy] = useState(false);
-
-  // Tải / chia sẻ chính file ảnh chứng từ (bill) đang mở trong lightbox.
-  function billFileName(src: string) {
-    try {
-      const path = new URL(src, window.location.origin).pathname;
-      const base = path.split("/").pop() || "chung-tu";
-      return /\.[a-z0-9]{2,5}$/i.test(base) ? base : `${base}.jpg`;
-    } catch {
-      return "chung-tu.jpg";
-    }
-  }
-  async function downloadBill(src: string) {
-    setImgBusy(true);
-    try {
-      const res = await fetch(src, { cache: "no-store" });
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = billFileName(src);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-    } catch {
-      window.open(src, "_blank", "noopener");
-    } finally {
-      setImgBusy(false);
-    }
-  }
-  async function shareBill(src: string) {
-    setImgBusy(true);
-    try {
-      try {
-        const res = await fetch(src, { cache: "no-store" });
-        const blob = await res.blob();
-        const file = new File([blob], billFileName(src), { type: blob.type || "image/jpeg" });
-        const navAny = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-        if (navAny.canShare && navAny.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "Chứng từ" });
-          return;
-        }
-      } catch {
-        /* fall through to link share */
-      }
-      const absUrl = new URL(src, window.location.origin).href;
-      if (navigator.share) {
-        await navigator.share({ title: "Chứng từ", url: absUrl });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(absUrl);
-        toast.success("Đã copy link chứng từ");
-      } else {
-        window.open(absUrl, "_blank", "noopener");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-    } finally {
-      setImgBusy(false);
-    }
-  }
 
   // Lấy (lazy-tạo) link theo dõi công khai rồi copy để gửi NCC.
   async function sendPublicLink(e: Expense) {
@@ -1880,16 +1819,6 @@ export function ExpensesClient({
         const isPdf = url.toLowerCase().endsWith(".pdf");
         return (
           <div className="lc-doc-viewer" onClick={() => setViewer(null)}>
-            {!isPdf && (
-              <div className="vactions" onClick={(e) => e.stopPropagation()}>
-                <button type="button" className="vbtn vshare" disabled={imgBusy} onClick={() => shareBill(src)} aria-label="Chia sẻ">
-                  📤 Chia sẻ
-                </button>
-                <button type="button" className="vbtn vdl" disabled={imgBusy} onClick={() => downloadBill(src)} aria-label="Tải ảnh">
-                  ⬇️ Tải
-                </button>
-              </div>
-            )}
             <button type="button" className="vbtn vclose" onClick={(e) => { e.stopPropagation(); setViewer(null); }} aria-label="Đóng">
               ✕
             </button>
