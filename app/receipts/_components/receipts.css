@@ -108,7 +108,7 @@
 .rt-copy:hover{background:var(--track)}
 .rt-copy .lb{color:var(--mut)}
 .rt-copy .cp{color:var(--orange)}
-.rt-link{color:var(--orange);font-size:12px;font-weight:600;text-decoration:none}
+.rt-link{color:var(--orange);font-size:12px;font-weight:600;text-decoration:none;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
 .rt-phase{display:inline-block;background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--orange);font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;margin-top:3px}
 .rt-exp-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px}
 .rt-exp-hint{font-size:11px;color:var(--violet)}

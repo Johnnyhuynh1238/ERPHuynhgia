@@ -1198,6 +1198,32 @@
   height: 40px;
   font-size: 20px;
 }
+.lc-doc-viewer .vactions {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.lc-doc-viewer .vactions .vbtn {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.lc-doc-viewer .vactions .vshare {
+  background: rgba(234, 88, 12, 0.92);
+}
+.lc-doc-viewer .vactions .vbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .lc-doc-viewer .vprev,
 .lc-doc-viewer .vnext {
   top: 50%;
