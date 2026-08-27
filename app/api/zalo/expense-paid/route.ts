@@ -185,6 +185,20 @@ export async function POST(request: Request) {
             },
           });
         }
+        // Cập nhật ngược nguồn phát sinh (sao y luồng mark-paid tay). Guard upd.count===0
+        // ở trên đảm bảo chỉ chạy khi lần này mới flip pending→paid → không ghi lặp.
+        if (e.sourceType === "mua_hang_order" && e.sourceId) {
+          // Đơn mua trả ngay: chi xong → đánh dấu đã thanh toán.
+          await tx.mhOrder.updateMany({
+            where: { id: e.sourceId, status: "received" },
+            data: { status: "paid" },
+          });
+        } else if (e.sourceType === "ncc_congno" && e.sourceId && e.projectId) {
+          // Trả công nợ NCC: chi xong → ghi 1 dòng thanh toán NCC (giảm công nợ đúng số đã chi).
+          await tx.$executeRaw`
+            INSERT INTO ncc_thanh_toan (supplier_id, so_tien, ngay, ghi_chu, created_by, project_id)
+            VALUES (${e.sourceId}::uuid, ${amount}, ${paidAt}, ${`Trả qua ${e.code}`}, ${bot.id}::uuid, ${e.projectId}::uuid)`;
+        }
         paid.push({ code: e.code, amount });
       }
       return { paid, balanceAfter };
