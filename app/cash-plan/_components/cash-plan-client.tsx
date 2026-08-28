@@ -90,6 +90,13 @@ const CHI_GROUP_TABS: { key: ChiGroup; label: string }[] = [
 ];
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
+// Rút gọn tiền cho ô lịch (chỗ hẹp): tỷ / tr / k.
+const fmtShort = (n: number) => {
+  if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e10 ? 0 : 1).replace(/\.0$/, "") + "tỷ";
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "tr";
+  if (n >= 1e3) return Math.round(n / 1e3) + "k";
+  return String(Math.round(n));
+};
 const EPS = 1;
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const addDays = (base: string, d: number) => {
@@ -112,6 +119,14 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
   const [fromD, setFromD] = useState<string>("");
   const [toD, setToD] = useState<string>("");
   const [calOpen, setCalOpen] = useState(false);
+
+  // Chế độ xem: danh sách (mặc định) / lịch tháng.
+  const [mode, setMode] = useState<"list" | "cal">("list");
+  const [calYm, setCalYm] = useState(() => {
+    const t = new Date();
+    return { y: t.getFullYear(), m: t.getMonth() };
+  });
+  const [dayOpen, setDayOpen] = useState<string | null>(null); // ngày đang mở chi tiết (lịch)
 
   useEffect(() => {
     setMounted(true);
@@ -282,6 +297,29 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
     () => groupDays(timeline.filter((t) => t.dir === dir && inRange(t.date) && chiGroupMatch(t.sourceType)), false),
     [timeline, dir, inRange, groupDays, chiGroupMatch],
   );
+  // ── Lịch tháng: khoản của tab đang xem (dir + sub-tab), KHÔNG lọc khoảng ngày
+  //    (lịch tự điều hướng theo tháng). Dùng cho lưới + panel chi tiết ngày.
+  const calItems = useMemo(
+    () => timeline.filter((t) => t.dir === dir && chiGroupMatch(t.sourceType)),
+    [timeline, dir, chiGroupMatch],
+  );
+  // Gộp theo ngày: số mục + tổng tiền.
+  const dayAgg = useMemo(() => {
+    const m = new Map<string, { count: number; sum: number }>();
+    for (const t of calItems) {
+      const a = m.get(t.date) ?? { count: 0, sum: 0 };
+      a.count += 1;
+      a.sum += t.amount;
+      m.set(t.date, a);
+    }
+    return m;
+  }, [calItems]);
+  // Khoản của ngày đang mở (sắp xếp sẵn theo ngày trong timeline).
+  const dayItems = useMemo(
+    () => (dayOpen ? calItems.filter((t) => t.date === dayOpen) : []),
+    [calItems, dayOpen],
+  );
+
   // Tổng chi mỗi sub-tab (trong khoảng ngày) → hiện số trên nút.
   const chiGroupSums = useMemo(() => {
     const m: Record<ChiGroup, number> = { all: 0, congno: 0, budget: 0, loan: 0, other: 0 };
@@ -423,19 +461,21 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           <button className="cp-btn" onClick={() => setModal("salary")}>＋ Lương</button>
         </div>
 
-        {/* Bộ lọc khoảng ngày — 1 ô lịch, trên cùng */}
-        <DateRange
-          fromD={fromD}
-          toD={toD}
-          open={calOpen}
-          setOpen={setCalOpen}
-          onPick={(f, t) => {
-            setFromD(f);
-            setToD(t);
-          }}
-          setPreset={setPreset}
-          clearRange={clearRange}
-        />
+        {/* Bộ lọc khoảng ngày — 1 ô lịch, trên cùng (chỉ chế độ danh sách) */}
+        {mode === "list" && (
+          <DateRange
+            fromD={fromD}
+            toD={toD}
+            open={calOpen}
+            setOpen={setCalOpen}
+            onPick={(f, t) => {
+              setFromD(f);
+              setToD(t);
+            }}
+            setPreset={setPreset}
+            clearRange={clearRange}
+          />
+        )}
 
         {/* KPI: số dư + tổng thu + tổng chi (theo khoảng ngày; chưa KH ghi dưới) */}
         <section className="cp-kpis">
@@ -490,19 +530,60 @@ export function CashPlanClient({ projects }: { projects: Project[]; role: string
           </nav>
         )}
 
+        {/* Chuyển chế độ xem: danh sách / lịch tháng */}
+        <div className="cp-viewmode">
+          <button
+            type="button"
+            className={mode === "list" ? "on" : ""}
+            onClick={() => setMode("list")}
+          >
+            📋 Danh sách
+          </button>
+          <button
+            type="button"
+            className={mode === "cal" ? "on" : ""}
+            onClick={() => setMode("cal")}
+          >
+            🗓 Lịch tháng
+          </button>
+        </div>
+
         {loading && <div className="cp-loading">Đang tải…</div>}
 
-        <FlowView
-          dir={dir}
-          unplanned={activeUnplanned}
-          days={activeDays}
-          rangeActive={rangeActive}
-          onPlan={planLeft}
-          onInterest={(r, d, a) => addChunk(r, d, a, true)}
-          onDate={editTimelineDate}
-          onDelete={delItem}
-          loading={loading}
-        />
+        {mode === "list" ? (
+          <FlowView
+            dir={dir}
+            unplanned={activeUnplanned}
+            days={activeDays}
+            rangeActive={rangeActive}
+            onPlan={planLeft}
+            onInterest={(r, d, a) => addChunk(r, d, a, true)}
+            onDate={editTimelineDate}
+            onDelete={delItem}
+            loading={loading}
+          />
+        ) : (
+          <>
+            <MonthCalendar
+              ym={calYm}
+              setYm={setCalYm}
+              dir={dir}
+              agg={dayAgg}
+              selected={dayOpen}
+              onSelect={(d) => setDayOpen((cur) => (cur === d ? null : d))}
+            />
+            {dayOpen && (
+              <DayDetail
+                date={dayOpen}
+                dir={dir}
+                items={dayItems}
+                onClose={() => setDayOpen(null)}
+                onDate={editTimelineDate}
+                onDelete={delItem}
+              />
+            )}
+          </>
+        )}
       </div>
 
       {mounted &&
@@ -661,9 +742,160 @@ function FlowView({
   );
 }
 
-// ── Bộ lọc khoảng ngày: nút + popover lịch chọn range ────────────────────────
 const VN_MONTHS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
 const VN_DOW = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+// ── Lịch tháng: mỗi ô = số mục + tổng tiền; bấm ô mở chi tiết ngày ────────────
+function MonthCalendar({
+  ym,
+  setYm,
+  dir,
+  agg,
+  selected,
+  onSelect,
+}: {
+  ym: { y: number; m: number };
+  setYm: (v: { y: number; m: number }) => void;
+  dir: "in" | "out";
+  agg: Map<string, { count: number; sum: number }>;
+  selected: string | null;
+  onSelect: (date: string) => void;
+}) {
+  const shift = (delta: number) => {
+    const dt = new Date(ym.y, ym.m + delta, 1);
+    setYm({ y: dt.getFullYear(), m: dt.getMonth() });
+  };
+  const first = new Date(ym.y, ym.m, 1);
+  const startDow = (first.getDay() + 6) % 7; // 0 = T2
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++)
+    cells.push(`${ym.y}-${String(ym.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+
+  // Tổng tháng đang xem.
+  let monthCount = 0;
+  let monthSum = 0;
+  for (const c of cells) {
+    if (!c) continue;
+    const a = agg.get(c);
+    if (a) {
+      monthCount += a.count;
+      monthSum += a.sum;
+    }
+  }
+  const today = todayStr();
+  const word = dir === "out" ? "chi" : "thu";
+
+  return (
+    <div className="cp-month">
+      <div className="cp-month-head">
+        <button type="button" onClick={() => shift(-1)}>‹</button>
+        <div className="cp-month-title">
+          <b>{VN_MONTHS[ym.m]} {ym.y}</b>
+          <span>
+            {monthCount} mục {word} · <strong className={dir}>{fmt(monthSum)}</strong>
+          </span>
+        </div>
+        <button type="button" onClick={() => shift(1)}>›</button>
+      </div>
+      <div className="cp-month-dow">
+        {VN_DOW.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <div className="cp-month-grid">
+        {cells.map((d, i) =>
+          d === null ? (
+            <span key={`e${i}`} className="cp-mcell empty" />
+          ) : (
+            (() => {
+              const a = agg.get(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  className={[
+                    "cp-mcell",
+                    dir,
+                    a ? "has" : "",
+                    d === today ? "today" : "",
+                    d === selected ? "sel" : "",
+                  ].join(" ")}
+                  onClick={() => onSelect(d)}
+                  disabled={!a}
+                >
+                  <span className="cp-mday">{Number(d.slice(-2))}</span>
+                  {a && (
+                    <span className="cp-minfo">
+                      <em>{a.count} mục</em>
+                      <b>{fmtShort(a.sum)}</b>
+                    </span>
+                  )}
+                </button>
+              );
+            })()
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Chi tiết 1 ngày (dưới lịch): danh sách khoản + sửa ngày / xoá ────────────
+function DayDetail({
+  date,
+  dir,
+  items,
+  onClose,
+  onDate,
+  onDelete,
+}: {
+  date: string;
+  dir: "in" | "out";
+  items: TimelineItem[];
+  onClose: () => void;
+  onDate: (t: TimelineItem, date: string | null) => Promise<boolean | void>;
+  onDelete: (id: string, series?: boolean) => Promise<boolean | void>;
+}) {
+  const sum = items.reduce((s, t) => s + t.amount, 0);
+  return (
+    <div className="cp-daydetail">
+      <div className="cp-daydetail-head">
+        <div>
+          <b>
+            {new Date(date).toLocaleDateString("vi-VN", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })}
+          </b>
+          <span>
+            {items.length} mục · <strong className={dir}>{fmt(sum)}</strong>
+          </span>
+        </div>
+        <button type="button" className="ghost" onClick={onClose}>✕</button>
+      </div>
+      <div className="cp-day">
+        {items.length === 0 ? (
+          <p className="cp-empty">Không còn khoản nào trong ngày này.</p>
+        ) : (
+          items.map((t) => (
+            <TimelineCard
+              key={t.id}
+              item={t}
+              onDate={(d) => onDate(t, d)}
+              onDelete={t.deletable ? (series) => onDelete(t.itemId!, series) : undefined}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Bộ lọc khoảng ngày: nút + popover lịch chọn range ────────────────────────
 const dmy = (s: string) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
