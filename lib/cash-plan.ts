@@ -108,7 +108,11 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
       orderBy: [{ plannedDate: "asc" }, { createdAt: "asc" }],
     }),
     prisma.subPayment.findMany({
-      where: { status: { in: SUBPAY_OPEN } },
+      // Chỉ đợt của HĐ đang chạy — bỏ HĐ draft/cancelled (đã kết thúc, không còn dự chi).
+      where: {
+        status: { in: SUBPAY_OPEN },
+        subContract: { status: { in: ["active", "completed"] } },
+      },
       select: {
         id: true,
         stage: true,
