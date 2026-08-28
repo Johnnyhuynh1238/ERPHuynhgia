@@ -349,8 +349,9 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
     );
   }
 
-  // 3) Nợ gốc vay (không native, chia đợt).
+  // 3) Nợ gốc vay (không native, chia đợt). Vay là cấp CÔNG TY → ẩn khi lọc dự án.
   for (const l of loans) {
+    if (projectFilter) break;
     const s = summarizeLoan(l);
     if (s.outstanding > EPS) {
       out.push(
@@ -439,8 +440,9 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
     );
   }
 
-  // 2) Tạm ứng — dư ứng chưa hoàn = dự THU.
+  // 2) Tạm ứng — dư ứng chưa hoàn = dự THU. Cấp CÔNG TY → ẩn khi lọc dự án.
   for (const a of advances) {
+    if (projectFilter) break;
     const s = summarizeAdvance(a);
     if (s.outstanding > EPS) {
       inn.push(
@@ -463,7 +465,11 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
   }
 
   // Self-entries (lãi vay / lương / nhập tay) → về đúng cột.
-  for (const r of selfRows) (r.direction === "in" ? inn : out).push(r);
+  // Khi lọc dự án: chỉ giữ khoản gắn đúng dự án (lãi vay/lương cấp cty → ẩn).
+  for (const r of selfRows) {
+    if (projectFilter && r.projectId !== projectFilter) continue;
+    (r.direction === "in" ? inn : out).push(r);
+  }
 
   return { balance, out, in: inn };
 }
