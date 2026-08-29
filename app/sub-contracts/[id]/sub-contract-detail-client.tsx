@@ -10,6 +10,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { MoneyInput } from "@/components/money-input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatDate,
@@ -878,8 +879,10 @@ export function SubContractDetailClient({
                     <Button
                       size="sm"
                       onClick={() => {
-                        setPayContractAmount("");
-                        setPayContractNote("");
+                        // Điền sẵn TOÀN BỘ số còn phải trả + ghi chú (sửa được).
+                        const rest = Math.max(0, Math.round(contractValue - (paymentMeta.totals.paidTotal || 0)));
+                        setPayContractAmount(rest > 0 ? String(rest) : "");
+                        setPayContractNote(`Thanh toán HĐ ${contract.code} — ${contract.subcontractor.name}`);
                         setOpenPay(true);
                       }}
                       disabled={!!paymentMeta.pendingPayment}
@@ -1232,18 +1235,16 @@ export function SubContractDetailClient({
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs text-[#a4acc8]">Số tiền chi</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  autoFocus
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  placeholder="VD: 20000000"
+                {/* Điền sẵn toàn bộ số còn phải trả, hiển thị phân cách ngàn (1.500.000). */}
+                <MoneyInput
                   value={payContractAmount}
-                  onChange={(e) => setPayContractAmount(e.target.value)}
+                  onChange={setPayContractAmount}
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
+                  placeholder="VD: 20.000.000"
                 />
-                {Number(payContractAmount) > 0 ? (
-                  <div className="mt-1 text-xs text-[#8892b0]">{formatMoney(Math.round(Number(payContractAmount)))}</div>
-                ) : null}
+                <div className="mt-1 text-xs text-[#8892b0]">
+                  Còn phải trả: {formatMoney(Math.max(0, contractValue - (paymentMeta?.totals.paidTotal || 0)))}
+                </div>
               </div>
 
               <div>

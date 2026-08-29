@@ -14,6 +14,7 @@ import {
 } from "@/lib/sub-contract-view";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 import { copyText } from "@/lib/copy-text";
+import { MoneyInput } from "@/components/money-input";
 
 
 // ── Popup chi tiết Hợp đồng thầu phụ — full màn, tông ngà (.cndoc).
@@ -279,6 +280,14 @@ export function SubDetailPopup({
     } finally {
       setLinkBusy(false);
     }
+  }
+
+  // Mở sheet Chi: điền sẵn TOÀN BỘ số còn phải trả + ghi chú (admin/KT sửa được).
+  function openPaySheet() {
+    const rest = Math.max(0, Math.round(remain));
+    setPayAmount(rest > 0 ? String(rest) : "");
+    setPayNote2(contract ? `Thanh toán HĐ ${contract.code} — ${contract.subcontractor.name}` : "");
+    setOpenPay(true);
   }
 
   // Chi chung cấp hợp đồng: nhập số tiền → tạo lệnh chi (chờ duyệt/chi).
@@ -701,11 +710,7 @@ export function SubDetailPopup({
                           type="button"
                           className="btn"
                           style={{ padding: "8px 14px", fontSize: 13 }}
-                          onClick={() => {
-                            setPayAmount("");
-                            setPayNote2("");
-                            setOpenPay(true);
-                          }}
+                          onClick={openPaySheet}
                         >
                           Chi
                         </button>
@@ -989,9 +994,11 @@ export function SubDetailPopup({
         </div>
       </div>
 
-      {/* sheet Chi chung cấp hợp đồng */}
+      {/* sheet Chi chung cấp hợp đồng.
+          stopPropagation: sheet nằm trong .subpop-scrim (onClick=close) — không chặn thì
+          chạm vào ô nhập/nút sẽ bubble lên và đóng luôn cả popup hợp đồng. */}
       {openPay && (
-        <>
+        <div onClick={(e) => e.stopPropagation()}>
           <div className="scrim show" onClick={() => setOpenPay(false)} />
           <div className="sheet show" role="dialog" aria-modal="true">
             <div className="grip" />
@@ -1005,12 +1012,12 @@ export function SubDetailPopup({
             <div className="sbody">
               <div className="fld">
                 <label>Số tiền chi</label>
-                <input className="mono" type="number" inputMode="numeric" autoFocus placeholder="VD: 20000000"
-                  value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+                {/* Điền sẵn toàn bộ số còn phải trả; hiển thị phân cách ngàn (1.500.000). */}
+                <MoneyInput value={payAmount} onChange={setPayAmount} className="mono" placeholder="VD: 20.000.000" />
               </div>
-              {Number(payAmount) > 0 && (
-                <div className="proseblk" style={{ color: "var(--mut)" }}>{fmt(Math.round(Number(payAmount)))} đ</div>
-              )}
+              <div className="proseblk" style={{ color: "var(--mut)" }}>
+                Còn phải trả: {fmt(Math.max(0, remain))} đ
+              </div>
               <div className="fld">
                 <label>Ghi chú (tùy chọn)</label>
                 <input placeholder="VD: đợt tuần này" value={payNote2} onChange={(e) => setPayNote2(e.target.value)} />
@@ -1023,12 +1030,12 @@ export function SubDetailPopup({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* sheet Ghi đã chi */}
+      {/* sheet Ghi đã chi — cũng phải chặn bubble như sheet Chi ở trên. */}
       {openMarkPaid && (
-        <>
+        <div onClick={(e) => e.stopPropagation()}>
           <div className={`scrim${markShow ? " show" : ""}`} onClick={closeMarkSheet} />
           <div className={`sheet${markShow ? " show" : ""}`} role="dialog" aria-modal="true">
             <div className="grip" />
@@ -1070,7 +1077,7 @@ export function SubDetailPopup({
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
     </div>,
