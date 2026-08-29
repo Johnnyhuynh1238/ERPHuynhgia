@@ -2181,6 +2181,8 @@ model Subcontractor {
   avgRating       Decimal?            @map("avg_rating") @db.Decimal(3, 2)
   totalContracts  Int                 @default(0) @map("total_contracts")
   isActive        Boolean             @default(true) @map("is_active")
+  // Token link công khai chốt công nợ (/doi-tac/[token]) — random, không gắn user.
+  publicToken     String?             @unique @map("public_token")
   createdAt       DateTime            @default(now()) @map("created_at")
   createdBy       String              @map("created_by") @db.Uuid
   updatedAt       DateTime            @updatedAt @map("updated_at")
@@ -2923,6 +2925,8 @@ model Supplier {
   bankAccountName String?  @map("bank_account_name")
   notes           String?  @db.Text
   isActive        Boolean  @default(true) @map("is_active")
+  // Token link công khai chốt công nợ (/doi-tac/[token]) — random, không gắn user.
+  publicToken     String?  @unique @map("public_token")
   createdAt       DateTime @default(now()) @map("created_at")
   createdBy       String   @map("created_by") @db.Uuid
   updatedAt       DateTime @updatedAt @map("updated_at")

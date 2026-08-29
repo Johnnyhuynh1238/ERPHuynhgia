@@ -347,6 +347,7 @@ function NccPopup({
   onPO: (o: Order) => void;
 }) {
   const [show, setShow] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShow(true));
@@ -354,6 +355,32 @@ function NccPopup({
   }, []);
 
   const off = sup.conLai <= 0.0001;
+
+  // Link công khai CHỐT CÔNG NỢ (gom mọi dự án của NCC này) — gửi cho NCC đối chiếu.
+  const copyDoiTacLink = async () => {
+    setLinkBusy(true);
+    try {
+      const r = await fetch("/api/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "supplier", id: sup.supplierId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(j.message || "Không tạo được link");
+        return;
+      }
+      const url = `${window.location.origin}${j.path}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        alert(`Đã copy link đối chiếu công nợ:\n${url}`);
+      } catch {
+        prompt("Link đối chiếu công nợ (copy thủ công):", url);
+      }
+    } finally {
+      setLinkBusy(false);
+    }
+  };
 
   // Mở màn Lệnh chi điền sẵn số còn phải trả (admin/KT sửa được). Chi xong → tự ghi trả công nợ NCC.
   const goLenhChi = () => {
@@ -423,6 +450,13 @@ function NccPopup({
             )}
           </div>
         )}
+
+        {/* Link công khai để NCC tự đối chiếu, chốt công nợ 2 bên (mọi dự án) */}
+        <div className="npay">
+          <button type="button" className="btn ghost" onClick={copyDoiTacLink} disabled={linkBusy}>
+            {linkBusy ? "Đang tạo link…" : "🔗 Copy link đối chiếu công nợ"}
+          </button>
+        </div>
 
         <div className="nbody">
           {sup.payments.length > 0 && (

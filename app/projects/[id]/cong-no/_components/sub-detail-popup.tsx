@@ -174,6 +174,7 @@ export function SubDetailPopup({
 
   // Tab Thanh toán chia 2 menu ngang: lệnh chi thật | lịch đợt (tham khảo).
   const [payView, setPayView] = useState<"expenses" | "schedule">("expenses");
+  const [linkBusy, setLinkBusy] = useState(false);
 
   // Chi chung cấp hợp đồng (mô hình như trả nợ NCC) — 1 nút Chi, nhập số tiền.
   const [openPay, setOpenPay] = useState(false);
@@ -252,6 +253,30 @@ export function SubDetailPopup({
       capabilities: json.capabilities,
     });
   }, [contractId]);
+
+  // Link công khai CHỐT CÔNG NỢ của thầu phụ (gom mọi dự án) — gửi cho họ đối chiếu.
+  async function copyDoiTacLink() {
+    if (!contract) return;
+    setLinkBusy(true);
+    try {
+      const r = await fetch("/api/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "subcontractor", id: contract.subcontractor.id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return toast.error(j.message || "Không tạo được link");
+      const url = `${window.location.origin}${j.path}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Đã copy link đối chiếu công nợ");
+      } catch {
+        prompt("Link đối chiếu công nợ (copy thủ công):", url);
+      }
+    } finally {
+      setLinkBusy(false);
+    }
+  }
 
   // Chi chung cấp hợp đồng: nhập số tiền → tạo lệnh chi (chờ duyệt/chi).
   // Khi lệnh chi được chi, đợt tự tính lại theo tổng đã trả cộng dồn.
@@ -658,18 +683,30 @@ export function SubDetailPopup({
                   {canFin && (currentRole === "admin" || currentRole === "accountant") && !isCancelled && (
                     <div className="seclabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span>Đã trả {fmt(paidTotal)} · Còn {fmt(Math.max(0, remain))}</span>
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ padding: "8px 14px", fontSize: 13 }}
-                        onClick={() => {
-                          setPayAmount("");
-                          setPayNote2("");
-                          setOpenPay(true);
-                        }}
-                      >
-                        Chi
-                      </button>
+                      <span style={{ display: "flex", gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          style={{ padding: "8px 12px", fontSize: 13 }}
+                          onClick={copyDoiTacLink}
+                          disabled={linkBusy}
+                          title="Link công khai để thầu phụ đối chiếu, chốt công nợ"
+                        >
+                          {linkBusy ? "…" : "🔗 Link chốt"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ padding: "8px 14px", fontSize: 13 }}
+                          onClick={() => {
+                            setPayAmount("");
+                            setPayNote2("");
+                            setOpenPay(true);
+                          }}
+                        >
+                          Chi
+                        </button>
+                      </span>
                     </div>
                   )}
 

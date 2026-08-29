@@ -105,6 +105,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Bảng đối chiếu công nợ công khai cho đối tác (NCC / thầu phụ) — để 2 bên chốt sổ.
+  // Tự auth bằng publicToken random trên URL, CHỈ ĐỌC, không gắn user.
+  if (pathname.startsWith("/doi-tac/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);
