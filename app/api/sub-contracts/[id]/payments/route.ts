@@ -8,6 +8,7 @@ import {
   canCreateOrRequestSubPayment,
   deriveExpectedValues,
   generateNextSubPaymentCode,
+  getSubContractPaidTotal,
   normalizeSubPaymentDate,
   serializeSubPayment,
 } from "@/lib/sub-payment-utils";
@@ -95,10 +96,19 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     }
   }
 
-  // Tổng đã chi = mọi đợt chưa huỷ có actualAmount (gồm đợt paid + đợt tạm ứng dở).
-  const paidTotal = payments
-    .filter((x) => x.status !== SubPaymentStatus.cancelled)
-    .reduce((sum, x) => sum + Number(x.actualAmount || 0), 0);
+  // Mô hình mới: chi CHUNG cấp HĐ. Lệnh chi gắn hợp đồng qua sourceType='sub_contract'.
+  // Tổng đã chi = Σ lệnh chi ĐÃ CHI của HĐ (không cộng theo đợt). Kèm lịch sử + lệnh đang chờ.
+  const contractExpenses = await prisma.expense.findMany({
+    where: {
+      sourceType: "sub_contract",
+      sourceId: params.id,
+      status: { not: ExpenseStatus.cancelled },
+    },
+    select: { id: true, code: true, amount: true, paidAmount: true, status: true, paidAt: true, createdAt: true, note: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const paidTotal = await getSubContractPaidTotal(prisma, params.id);
+  const pendingPayment = contractExpenses.find((e) => e.status !== ExpenseStatus.paid) ?? null;
 
   const percentTotal = payments.reduce((sum, x) => sum + Number(x.percentage || 0), 0);
 
@@ -129,11 +139,30 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       percentTotal: canViewFinancial ? Math.round(percentTotal * 100) / 100 : null,
       paidTotal: canViewFinancial ? Math.round(paidTotal * 100) / 100 : null,
     },
+    // Lệnh chi cấp HĐ đang CHỜ xử lý (chặn gửi trùng) — null nếu không có.
+    pendingPayment:
+      canViewFinancial && pendingPayment
+        ? { id: pendingPayment.id, code: pendingPayment.code, status: pendingPayment.status, amount: Number(pendingPayment.amount) }
+        : null,
+    // Lịch sử lệnh chi của HĐ (mới→cũ) để hiển thị dạng sổ trả nợ.
+    paymentHistory: canViewFinancial
+      ? contractExpenses.map((e) => ({
+          id: e.id,
+          code: e.code,
+          amount: Number(e.amount),
+          paidAmount: e.paidAmount == null ? null : Number(e.paidAmount),
+          status: e.status,
+          paidAt: e.paidAt,
+          createdAt: e.createdAt,
+          note: e.note,
+        }))
+      : [],
     capabilities: {
       canCreate: canCreateOrRequestSubPayment(user.role),
       canRequest: canCreateOrRequestSubPayment(user.role),
       canApprove: user.role === UserRole.admin,
       canMarkPaid: user.role === UserRole.admin || user.role === UserRole.accountant,
+      canPay: user.role === UserRole.admin || user.role === UserRole.accountant,
     },
   });
 }

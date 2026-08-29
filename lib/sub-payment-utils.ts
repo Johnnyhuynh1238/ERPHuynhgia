@@ -204,3 +204,90 @@ export async function settleSubPaymentInstallment(
   });
   return { fullyPaid, newTotal, expected, prevPaid };
 }
+
+// Tổng đã trả 1 hợp đồng thầu phụ = Σ lệnh chi ĐÃ CHI gắn hợp đồng
+// (expenses.source_type='sub_contract', source_id=contract, status='paid').
+// Mô hình mới: chi cộng dồn cấp HĐ (như trả nợ NCC), không chi theo từng đợt.
+export async function getSubContractPaidTotal(
+  tx: Prisma.TransactionClient,
+  contractId: string,
+): Promise<number> {
+  const rows = await tx.$queryRaw<Array<{ total: string }>>`
+    SELECT COALESCE(SUM(paid_amount), 0) AS total
+    FROM expenses
+    WHERE source_type = 'sub_contract' AND source_id = ${contractId}::uuid AND status = 'paid'
+  `;
+  return Number(rows[0]?.total || 0);
+}
+
+// Bản batch của getSubContractPaidTotal — tổng đã trả cho NHIỀU hợp đồng trong 1 query.
+// Dùng cho các màn list/report (công nợ, finance, budget-plan) để mọi nơi khớp sổ quỹ.
+export async function getSubContractPaidTotals(
+  tx: Prisma.TransactionClient,
+  contractIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (contractIds.length === 0) return map;
+  const rows = await tx.$queryRaw<Array<{ source_id: string; total: string }>>`
+    SELECT source_id, COALESCE(SUM(paid_amount), 0) AS total
+    FROM expenses
+    WHERE source_type = 'sub_contract' AND status = 'paid'
+      AND source_id IN (${Prisma.join(contractIds.map((id) => Prisma.sql`${id}::uuid`))})
+    GROUP BY source_id
+  `;
+  for (const r of rows) map.set(r.source_id, Number(r.total || 0));
+  return map;
+}
+
+// Tính lại trạng thái các đợt của 1 hợp đồng theo TỔNG ĐÃ TRẢ cộng dồn cấp HĐ.
+// Đợt = tham khảo (chia sẵn từ hợp đồng). Duyệt theo thứ tự stage: đổ dần tổng đã trả
+// vào từng đợt — đủ dự kiến → 'paid', đang dở → 'approved' (đang trả), chưa tới → 'pending'.
+// Gọi TRONG transaction sau mỗi lần lệnh chi HĐ chuyển sang 'paid' (hoặc bị huỷ/hoàn).
+export async function recomputeSubContractPayments(
+  tx: Prisma.TransactionClient,
+  contractId: string,
+  paidAt?: Date,
+) {
+  let remaining = await getSubContractPaidTotal(tx, contractId);
+
+  const dots = await tx.subPayment.findMany({
+    where: { subContractId: contractId, status: { not: SubPaymentStatus.cancelled } },
+    orderBy: [{ stage: "asc" }, { createdAt: "asc" }],
+    select: { id: true, expectedAmount: true, actualPaidDate: true },
+  });
+
+  for (const d of dots) {
+    const expected = Number(d.expectedAmount || 0);
+    let status: SubPaymentStatus;
+    let actual: number | null;
+    let paidDate: Date | null;
+
+    if (expected > 0 && remaining >= expected - 1) {
+      status = SubPaymentStatus.paid;
+      actual = expected;
+      remaining -= expected;
+      paidDate = d.actualPaidDate ?? paidAt ?? new Date();
+    } else if (remaining > 0) {
+      status = SubPaymentStatus.approved; // đang trả (tạm ứng dở)
+      actual = remaining;
+      remaining = 0;
+      paidDate = null;
+    } else {
+      status = SubPaymentStatus.pending; // chưa trả
+      actual = null;
+      paidDate = null;
+    }
+
+    await tx.subPayment.update({
+      where: { id: d.id },
+      data: {
+        status,
+        actualAmount: actual == null ? null : new Prisma.Decimal(actual),
+        actualPaidDate: paidDate,
+        ...(status === SubPaymentStatus.paid ? {} : { paidBy: null, paidAt: null }),
+      },
+    });
+  }
+
+  return { paidTotal: await getSubContractPaidTotal(tx, contractId) };
+}

@@ -18,7 +18,6 @@ import {
   subContractStatusLabel,
   subContractUnitLabel,
 } from "@/lib/sub-contract-view";
-import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 
 type ContractDetail = {
   id: string;
@@ -103,11 +102,24 @@ type SubPayment = {
   paidAt: string | null;
 };
 
+type PaymentHistoryRow = {
+  id: string;
+  code: string;
+  amount: number;
+  paidAmount: number | null;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+  note: string | null;
+};
+
 type PaymentMeta = {
   contract: { id: string; status: string; contractValue: number | null; canViewFinancial: boolean };
   linkedTasks: Array<{ id: string; code: string; name: string; status: string }>;
   totals: { percentTotal: number | null; paidTotal: number | null };
-  capabilities: { canCreate: boolean; canRequest: boolean; canApprove: boolean; canMarkPaid: boolean };
+  pendingPayment: { id: string; code: string; status: string; amount: number } | null;
+  paymentHistory: PaymentHistoryRow[];
+  capabilities: { canCreate: boolean; canRequest: boolean; canApprove: boolean; canMarkPaid: boolean; canPay: boolean };
 };
 
 type DraftPaymentRow = {
@@ -163,10 +175,11 @@ function statusPill(status: SubPaymentStatus) {
 }
 
 function statusLabel(status: SubPaymentStatus) {
-  if (status === SubPaymentStatus.pending) return "Pending";
-  if (status === SubPaymentStatus.requested) return "Đã đề xuất";
-  if (status === SubPaymentStatus.approved) return "Đã duyệt";
-  if (status === SubPaymentStatus.paid) return "Đã chi";
+  // Mô hình mới: đợt = tham khảo, trạng thái suy từ tổng đã trả cộng dồn cấp HĐ.
+  if (status === SubPaymentStatus.pending) return "Chưa trả";
+  if (status === SubPaymentStatus.requested) return "Chờ chi";
+  if (status === SubPaymentStatus.approved) return "Đang trả";
+  if (status === SubPaymentStatus.paid) return "Đã trả đủ";
   return "Đã hủy";
 }
 
@@ -304,16 +317,12 @@ export function SubContractDetailClient({
   const [payments, setPayments] = useState<SubPayment[]>([]);
   const [paymentMeta, setPaymentMeta] = useState<PaymentMeta | null>(null);
   const [loadingPayment, setLoadingPayment] = useState(false);
-  const [openMarkPaid, setOpenMarkPaid] = useState<string | null>(null);
-  const [markPaidLoading, setMarkPaidLoading] = useState(false);
-  const [receiptUploading, setReceiptUploading] = useState(false);
-  const [receiptUrl, setReceiptUrl] = useState("");
-  const [actualAmount, setActualAmount] = useState("");
-  const [actualDate, setActualDate] = useState(todayStr());
-  const [paymentMethod, setPaymentMethod] = useState("chuyển khoản");
-  const [payNote, setPayNote] = useState("");
-  const [payAccountId, setPayAccountId] = useState("");
-  const { accounts: cashAccounts } = useCashAccounts();
+
+  // Mô hình mới: CHI CHUNG cấp hợp đồng (như trả nợ NCC) — 1 nút Chi, nhập số tiền.
+  const [openPay, setOpenPay] = useState(false);
+  const [payContractAmount, setPayContractAmount] = useState("");
+  const [payContractNote, setPayContractNote] = useState("");
+  const [payContractLoading, setPayContractLoading] = useState(false);
 
   const [draftRows, setDraftRows] = useState<DraftPaymentRow[]>([]);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -365,8 +374,40 @@ export function SubContractDetailClient({
       contract: json.contract,
       linkedTasks: json.linkedTasks || [],
       totals: json.totals,
+      pendingPayment: json.pendingPayment ?? null,
+      paymentHistory: json.paymentHistory || [],
       capabilities: json.capabilities,
     });
+  }
+
+  // CHI CHUNG cấp hợp đồng (mô hình như trả nợ NCC): nhập số tiền → tạo 1 lệnh chi
+  // (chờ duyệt/chi). Khi lệnh chi được chi, đợt tự tính lại theo tổng đã trả cộng dồn.
+  async function submitContractPayment() {
+    const amount = Math.round(Number(payContractAmount || 0));
+    if (!(amount > 0)) {
+      toast.error("Nhập số tiền chi hợp lệ");
+      return;
+    }
+    setPayContractLoading(true);
+    const res = await fetch(`/api/sub-contracts/${contractId}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, note: payContractNote.trim() || null }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setPayContractLoading(false);
+
+    if (!res.ok) {
+      toast.error(json.message || "Không tạo được lệnh chi");
+      return;
+    }
+
+    if (json.willExceed) toast.warning("Lưu ý: tổng đã trả vượt giá trị hợp đồng");
+    toast.success(json.message || "Đã gửi lệnh chi");
+    setOpenPay(false);
+    setPayContractAmount("");
+    setPayContractNote("");
+    await loadPayments();
   }
 
   useEffect(() => {
@@ -555,112 +596,6 @@ export function SubContractDetailClient({
     toast.success(json.message || "Đã lưu lịch thanh toán");
     await loadPayments();
     setDraftRows([]);
-  }
-
-  async function changeStatusAction(paymentId: string, action: "request" | "approve") {
-    const endpoint = action === "request" ? "request" : "approve";
-    const res = await fetch(`/api/sub-payments/${paymentId}/${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ note: null }),
-    });
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      toast.error(json.message || "Thao tác thất bại");
-      return;
-    }
-
-    toast.success(json.message || "Đã cập nhật trạng thái");
-    await loadPayments();
-  }
-
-  async function removePayment(paymentId: string) {
-    if (!await confirmDialog("Xóa/Hủy đợt thanh toán này?")) return;
-
-    const res = await fetch(`/api/sub-payments/${paymentId}`, { method: "DELETE" });
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      toast.error(json.message || "Không thể xóa/hủy đợt");
-      return;
-    }
-
-    toast.success(json.message || "Đã xử lý đợt thanh toán");
-    await loadPayments();
-  }
-
-  async function uploadReceipt(paymentId: string, files: FileList | null) {
-    if (!files || files.length === 0) return;
-    const formData = new FormData();
-    formData.append("receipt", files[0]);
-
-    setReceiptUploading(true);
-    const res = await fetch(`/api/sub-payments/${paymentId}/receipt`, {
-      method: "POST",
-      body: formData,
-    });
-    const json = await res.json().catch(() => ({}));
-    setReceiptUploading(false);
-
-    if (!res.ok) {
-      toast.error(json.message || "Upload phiếu chi thất bại");
-      return;
-    }
-
-    setReceiptUrl(json.receiptUrl || "");
-    toast.success("Đã upload phiếu chi");
-  }
-
-  async function submitMarkPaid() {
-    if (!openMarkPaid) return;
-    if (!payAccountId) {
-      toast.error("Chọn tài khoản chi");
-      return;
-    }
-
-    setMarkPaidLoading(true);
-    const res = await fetch(`/api/sub-payments/${openMarkPaid}/mark-paid`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        actualAmount: Number(actualAmount || 0),
-        actualPaidDate: actualDate,
-        receiptUrl,
-        paymentMethod,
-        note: payNote || null,
-        accountId: payAccountId,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setMarkPaidLoading(false);
-
-    if (!res.ok) {
-      toast.error(json.message || "Mark paid thất bại");
-      return;
-    }
-
-    if (json.warning) toast.warning(json.warning);
-    toast.success(json.message || "Đã mark paid");
-
-    setOpenMarkPaid(null);
-    setReceiptUrl("");
-    setActualAmount("");
-    setActualDate(todayStr());
-    setPaymentMethod("chuyển khoản");
-    setPayNote("");
-    setPayAccountId("");
-    await loadPayments();
-  }
-
-  function openMarkPaidSheet(payment: SubPayment) {
-    setOpenMarkPaid(payment.id);
-    setActualAmount(payment.expectedAmount ? String(payment.expectedAmount) : "");
-    setActualDate(todayStr());
-    setPaymentMethod("chuyển khoản");
-    setPayNote("");
-    setReceiptUrl(payment.receiptUrl || "");
-    setPayAccountId("");
   }
 
   function calcWeightedPreview(scores: Record<string, number>) {
@@ -923,6 +858,63 @@ export function SubContractDetailClient({
               <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-xs text-[#8892b0]">Bạn không có quyền xem số tiền chi tiết.</div>
             )}
 
+            {/* CHI CHUNG cấp hợp đồng (như trả nợ NCC). Đợt bên dưới chỉ để tham khảo. */}
+            {paymentMeta?.contract.canViewFinancial ? (
+              <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-[#f0f2ff]">Thanh toán thầu phụ</div>
+                    <div className="mt-1 text-xs text-[#a4acc8]">
+                      Đã trả <b className="text-emerald-300">{formatMoney(paymentMeta.totals.paidTotal || 0)}</b>
+                      {" • "}Còn lại{" "}
+                      <b className="text-amber-200">{formatMoney(Math.max(0, contractValue - (paymentMeta.totals.paidTotal || 0)))}</b>
+                      {" / "}{formatMoney(contractValue)}
+                    </div>
+                  </div>
+                  {paymentMeta.capabilities.canPay ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setPayContractAmount("");
+                        setPayContractNote("");
+                        setOpenPay(true);
+                      }}
+                      disabled={!!paymentMeta.pendingPayment}
+                    >
+                      Chi
+                    </Button>
+                  ) : null}
+                </div>
+
+                {paymentMeta.pendingPayment ? (
+                  <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
+                    Đang có lệnh chi <b>{paymentMeta.pendingPayment.code}</b> ({formatMoney(paymentMeta.pendingPayment.amount)}) chờ duyệt/chi — xong mới gửi tiếp.
+                  </div>
+                ) : null}
+
+                {paymentMeta.paymentHistory.length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    <div className="text-xs font-semibold text-[#8892b0]">Lịch sử lệnh chi</div>
+                    {paymentMeta.paymentHistory.map((h) => (
+                      <div key={h.id} className="flex items-center justify-between rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-2 py-1 text-xs">
+                        <span className="text-[#a4acc8]">
+                          {h.code} • {formatDate(h.status === "paid" ? h.paidAt : h.createdAt)}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className={h.status === "paid" ? "text-emerald-300" : "text-[#a4acc8]"}>
+                            {formatMoney(h.status === "paid" ? (h.paidAmount ?? h.amount) : h.amount)}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] ${statusPill(h.status === "paid" ? "paid" : "requested")}`}>
+                            {h.status === "paid" ? "Đã chi" : "Chờ chi"}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {paymentMeta?.capabilities.canCreate && paymentMeta.contract.canViewFinancial ? (
               <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -1016,27 +1008,13 @@ export function SubContractDetailClient({
                       <span className={`rounded-full px-2 py-1 text-[11px] ${statusPill(payment.status)}`}>{statusLabel(payment.status)}</span>
                     </div>
 
-                    {payment.status === SubPaymentStatus.paid && paymentMeta?.contract.canViewFinancial ? (
-                      <div className="mt-2 text-xs text-emerald-300">Đã chi: {formatMoney(payment.actualAmount || 0)} • {formatDate(payment.actualPaidDate)}</div>
+                    {(payment.status === SubPaymentStatus.paid || payment.status === SubPaymentStatus.approved) &&
+                    paymentMeta?.contract.canViewFinancial ? (
+                      <div className="mt-2 text-xs text-emerald-300">
+                        {payment.status === SubPaymentStatus.paid ? "Đã trả đủ" : "Đang trả"}: {formatMoney(payment.actualAmount || 0)}
+                        {payment.actualPaidDate ? ` • ${formatDate(payment.actualPaidDate)}` : ""}
+                      </div>
                     ) : null}
-
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(currentRole === "admin" || currentRole === "construction_manager") && payment.status === SubPaymentStatus.pending ? (
-                        <Button size="xs" variant="outline" onClick={() => changeStatusAction(payment.id, "request")}>Đề xuất chi</Button>
-                      ) : null}
-
-                      {currentRole === "admin" && payment.status === SubPaymentStatus.requested ? (
-                        <Button size="xs" variant="outline" onClick={() => changeStatusAction(payment.id, "approve")}>Duyệt</Button>
-                      ) : null}
-
-                      {(currentRole === "admin" || currentRole === "accountant") && payment.status === SubPaymentStatus.approved ? (
-                        <Button size="xs" onClick={() => openMarkPaidSheet(payment)}>Mark paid</Button>
-                      ) : null}
-
-                      {(currentRole === "admin" || currentRole === "construction_manager") && payment.status !== SubPaymentStatus.paid ? (
-                        <Button size="xs" variant="destructive" onClick={() => removePayment(payment.id)}>Xóa/Hủy</Button>
-                      ) : null}
-                    </div>
                   </div>
                 ))
               )}
@@ -1218,82 +1196,47 @@ export function SubContractDetailClient({
         ) : null}
       </div>
 
-      {openMarkPaid ? (
+      {openPay ? (
         <div className="fixed inset-0 z-50 bg-black/60">
-          <button type="button" className="h-full w-full" onClick={() => setOpenMarkPaid(null)} aria-label="Đóng" />
+          <button type="button" className="h-full w-full" onClick={() => setOpenPay(false)} aria-label="Đóng" />
           <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 slide-up">
-            <div className="mb-3 text-lg font-semibold text-[#f0f2ff]">Mark đã chi</div>
+            <div className="mb-1 text-lg font-semibold text-[#f0f2ff]">Chi cho thầu phụ</div>
+            <div className="mb-3 text-xs text-[#a4acc8]">
+              Tạo lệnh chi (chờ duyệt/chi). Đợt theo hợp đồng tự cập nhật khi tiền chi cộng dồn đủ.
+            </div>
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Số tiền thực chi</label>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Số tiền chi</label>
                 <input
                   type="number"
+                  inputMode="numeric"
+                  autoFocus
                   className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  value={actualAmount}
-                  onChange={(e) => setActualAmount(e.target.value)}
+                  placeholder="VD: 20000000"
+                  value={payContractAmount}
+                  onChange={(e) => setPayContractAmount(e.target.value)}
                 />
+                {Number(payContractAmount) > 0 ? (
+                  <div className="mt-1 text-xs text-[#8892b0]">{formatMoney(Math.round(Number(payContractAmount)))}</div>
+                ) : null}
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Ngày chi</label>
-                <input
-                  type="date"
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  value={actualDate}
-                  onChange={(e) => setActualDate(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Phương thức</label>
-                <select
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  <option value="chuyển khoản">Chuyển khoản</option>
-                  <option value="tiền mặt">Tiền mặt</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Tài khoản chi *</label>
-                <select
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  value={payAccountId}
-                  onChange={(e) => setPayAccountId(e.target.value)}
-                >
-                  <option value="">— Chọn tài khoản —</option>
-                  {cashAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>{formatCashAccountLabel(a)}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Upload phiếu chi (bắt buộc)</label>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm text-[#f0f2ff]">
-                  {receiptUploading ? "Đang upload..." : "Chọn ảnh phiếu chi"}
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadReceipt(openMarkPaid, e.target.files)} />
-                </label>
-                {receiptUrl ? <div className="mt-1 text-xs text-emerald-300">Đã có chứng từ — sẽ lưu khi bấm xác nhận.</div> : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Ghi chú (optional)</label>
+                <label className="mb-1 block text-xs text-[#a4acc8]">Ghi chú (tùy chọn)</label>
                 <textarea
                   rows={2}
                   className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  value={payNote}
-                  onChange={(e) => setPayNote(e.target.value)}
+                  placeholder="VD: đợt tuần này"
+                  value={payContractNote}
+                  onChange={(e) => setPayContractNote(e.target.value)}
                 />
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setOpenMarkPaid(null)}>Hủy</Button>
-                <Button onClick={submitMarkPaid} disabled={markPaidLoading || !receiptUrl}>
-                  {markPaidLoading ? "Đang xử lý..." : "Xác nhận đã chi"}
+                <Button variant="outline" onClick={() => setOpenPay(false)}>Hủy</Button>
+                <Button onClick={submitContractPayment} disabled={payContractLoading || !(Number(payContractAmount) > 0)}>
+                  {payContractLoading ? "Đang gửi..." : "Gửi lệnh chi"}
                 </Button>
               </div>
             </div>

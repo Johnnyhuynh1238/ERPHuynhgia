@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     cashOut,
     payrolls,
     subContracts,
-    subPayments,
     budget,
     categories,
   ] = await Promise.all([
@@ -69,10 +69,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     prisma.subContract.findMany({
       where: { projectId: id, status: { in: ["active", "completed"] } },
       select: { id: true, code: true, title: true, contractValue: true, subcontractor: { select: { name: true } } },
-    }),
-    prisma.subPayment.findMany({
-      where: { subContract: { projectId: id, status: { in: ["active", "completed"] } }, status: "paid" },
-      select: { subContractId: true, actualAmount: true, expectedAmount: true },
     }),
     prisma.projectBudget.findUnique({
       where: { projectId: id },
@@ -140,12 +136,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const supplierDebts = supplierDebtRows.map((r) => ({ name: r.supplier_name, amount: Number(r.con_lai) }));
   const supplierDebtTotal = supplierDebts.reduce((s, r) => s + r.amount, 0);
 
-  // Công nợ thầu phụ theo HĐ
-  const paidBySubContract = new Map<string, number>();
-  for (const p of subPayments) {
-    const v = Number(p.actualAmount ?? p.expectedAmount);
-    paidBySubContract.set(p.subContractId, (paidBySubContract.get(p.subContractId) ?? 0) + v);
-  }
+  // Công nợ thầu phụ theo HĐ — đã trả = Σ lệnh chi ĐÃ CHI gắn hợp đồng (khớp sổ quỹ).
+  const paidBySubContract = await getSubContractPaidTotals(prisma, subContracts.map((c) => c.id));
   const subContractRows = subContracts.map((c) => {
     const paid = paidBySubContract.get(c.id) ?? 0;
     return {

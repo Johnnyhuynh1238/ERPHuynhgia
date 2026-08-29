@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
 import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
-import { settleSubPaymentInstallment } from "@/lib/sub-payment-utils";
+import { recomputeSubContractPayments, settleSubPaymentInstallment } from "@/lib/sub-payment-utils";
 
 const PAY_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -99,10 +99,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
           }, ${user.id}::uuid, ${expense.projectId}::uuid)`;
       }
 
-      // Lệnh chi gắn với đợt thanh toán thầu phụ → cộng dồn tạm ứng.
-      // Chi đủ dự kiến → đợt paid; chi thiếu → đợt giữ mở (approved), note tạm ứng,
-      // nút gửi lệnh chi vẫn hiện. Vượt tổng đợt → ném lỗi, rollback cả giao dịch.
-      if (expense.subPaymentId) {
+      // Lệnh chi CHI CHUNG cấp hợp đồng thầu phụ (mô hình mới) → tính lại đợt theo
+      // tổng đã trả cộng dồn (đợt = tham khảo, tự paid khi cộng dồn đủ).
+      if (expense.sourceType === "sub_contract" && expense.sourceId) {
+        await recomputeSubContractPayments(tx, expense.sourceId, paidAt);
+      } else if (expense.subPaymentId) {
+        // Luồng cũ: lệnh chi gắn 1 đợt → cộng dồn tạm ứng vào đợt đó.
         await settleSubPaymentInstallment(tx, {
           subPaymentId: expense.subPaymentId,
           paidAmount: Number(data.paidAmount),

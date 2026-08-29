@@ -3,11 +3,11 @@ import {
   ExpenseStatus,
   MhOrderStatus,
   SubContractStatus,
-  SubPaymentStatus,
   UserRole,
 } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +90,6 @@ export async function GET(
         contractValue: true,
         status: true,
         budgetLineId: true,
-        payments: { select: { status: true, actualAmount: true } },
       },
     }),
     prisma.expense.findMany({
@@ -99,9 +98,10 @@ export async function GET(
         status: ExpenseStatus.paid,
         budgetLineId: lineFilter,
         // notIn loại luôn source rỗng (NULL) → OR để giữ chi tay source rỗng.
+        // Loại cả 'sub_contract': đã tính qua HĐ thầu phụ bên dưới, tránh đếm 2 lần.
         OR: [
           { sourceType: null },
-          { sourceType: { notIn: ["mua_hang_order", "ncc_congno"] } },
+          { sourceType: { notIn: ["mua_hang_order", "ncc_congno", "sub_contract"] } },
         ],
       },
       select: {
@@ -124,6 +124,10 @@ export async function GET(
   ]);
 
   const dstr = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
+
+  // Đã chi từng HĐ thầu phụ = Σ lệnh chi ĐÃ CHI gắn hợp đồng (nguồn thật, khớp sổ quỹ).
+  const subPaidById = await getSubContractPaidTotals(prisma, subs.map((s) => s.id));
+  const subPaidOf = (id: string) => subPaidById.get(id) ?? 0;
 
   // ── TOTAL: mọi nguồn ở giá trị đơn/HĐ (như cũ, giữ để đổi hạng mục) ──
   if (kind === "total") {
@@ -241,10 +245,7 @@ export async function GET(
         });
     }
     for (const s of subs) {
-      const paid = s.payments.reduce(
-        (a, p) => (p.status === SubPaymentStatus.cancelled ? a : a + num(p.actualAmount)),
-        0,
-      );
+      const paid = subPaidOf(s.id);
       if (paid > 0.5)
         items.push({
           source: "sub",
@@ -304,11 +305,7 @@ export async function GET(
     }
     for (const s of subs) {
       const cv = num(s.contractValue);
-      const paid = s.payments.reduce(
-        (a, p) => (p.status === SubPaymentStatus.cancelled ? a : a + num(p.actualAmount)),
-        0,
-      );
-      const owed = Math.max(0, cv - paid);
+      const owed = Math.max(0, cv - subPaidOf(s.id));
       if (owed > 0.5)
         items.push({
           source: "sub",

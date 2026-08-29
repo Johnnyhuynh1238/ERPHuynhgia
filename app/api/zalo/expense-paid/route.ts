@@ -16,11 +16,12 @@
  */
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { ExpenseStatus, Prisma, SubPaymentStatus } from "@prisma/client";
+import { ExpenseStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
 import { putObjectToMinio } from "@/lib/minio";
 import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
+import { recomputeSubContractPayments, settleSubPaymentInstallment } from "@/lib/sub-payment-utils";
 
 export const runtime = "nodejs";
 
@@ -173,18 +174,6 @@ export async function POST(request: Request) {
           createdBy: bot.id,
         });
         balanceAfter = Number(res.balanceAfter);
-        if (e.subPaymentId) {
-          await tx.subPayment.update({
-            where: { id: e.subPaymentId },
-            data: {
-              status: SubPaymentStatus.paid,
-              actualAmount: new Prisma.Decimal(amount),
-              actualPaidDate: paidAt,
-              paidBy: bot.id,
-              paidAt,
-            },
-          });
-        }
         // Cập nhật ngược nguồn phát sinh (sao y luồng mark-paid tay). Guard upd.count===0
         // ở trên đảm bảo chỉ chạy khi lần này mới flip pending→paid → không ghi lặp.
         if (e.sourceType === "mua_hang_order" && e.sourceId) {
@@ -198,6 +187,17 @@ export async function POST(request: Request) {
           await tx.$executeRaw`
             INSERT INTO ncc_thanh_toan (supplier_id, so_tien, ngay, ghi_chu, created_by, project_id)
             VALUES (${e.sourceId}::uuid, ${amount}, ${paidAt}, ${`Trả qua ${e.code}`}, ${bot.id}::uuid, ${e.projectId}::uuid)`;
+        } else if (e.sourceType === "sub_contract" && e.sourceId) {
+          // Chi chung cấp HĐ thầu phụ → tính lại đợt theo tổng đã trả cộng dồn.
+          await recomputeSubContractPayments(tx, e.sourceId, paidAt);
+        } else if (e.subPaymentId) {
+          // Luồng cũ: lệnh chi gắn 1 đợt → cộng dồn tạm ứng (KHÔNG ghi đè như trước).
+          await settleSubPaymentInstallment(tx, {
+            subPaymentId: e.subPaymentId,
+            paidAmount: amount,
+            paidDate: paidAt,
+            userId: bot.id,
+          });
         }
         paid.push({ code: e.code, amount });
       }

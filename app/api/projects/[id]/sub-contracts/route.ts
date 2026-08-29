@@ -1,4 +1,4 @@
-import { Prisma, SubContractStatus, SubContractUnit, SubPaymentStatus, UserRole } from "@prisma/client";
+import { Prisma, SubContractStatus, SubContractUnit, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +10,7 @@ import {
   parseSubContractUnit,
   serializeSubContract,
 } from "@/lib/sub-contract-utils";
+import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
 import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
 
 const createSchema = z.object({
@@ -79,20 +80,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   const canViewFinancial = canViewSubContractFinancial(user.role);
 
-  // Đã thanh toán từng HĐ = Σ actualAmount các đợt (gồm đợt paid + tạm ứng dở), bỏ đợt huỷ.
+  // Đã thanh toán từng HĐ = Σ lệnh chi ĐÃ CHI gắn hợp đồng (nguồn thật, khớp sổ quỹ).
+  // Không cộng theo đợt: đợt chỉ là tham khảo, suy ra từ tổng đã trả cộng dồn.
   const contractIds = rows.map((r) => r.id);
-  const paidAgg = contractIds.length
-    ? await prisma.subPayment.groupBy({
-        by: ["subContractId"],
-        where: {
-          subContractId: { in: contractIds },
-          status: { not: SubPaymentStatus.cancelled },
-          actualAmount: { not: null },
-        },
-        _sum: { actualAmount: true },
-      })
-    : [];
-  const paidByContract = new Map(paidAgg.map((p) => [p.subContractId, Number(p._sum.actualAmount || 0)]));
+  const paidByContract = await getSubContractPaidTotals(prisma, contractIds);
 
   return NextResponse.json({
     contracts: rows.map((row) => {

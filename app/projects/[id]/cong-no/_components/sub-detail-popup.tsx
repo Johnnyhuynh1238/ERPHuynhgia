@@ -1,13 +1,11 @@
 "use client";
 
 import { confirmDialog } from "@/components/confirm-dialog";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { plexSans, plexMono } from "@/lib/fonts";
 import { SubContractStatus, SubPaymentStatus } from "@prisma/client";
 import { toast } from "sonner";
-import { findBankByName } from "@/lib/vn-banks";
 import {
   formatDate,
   formatMoney,
@@ -76,11 +74,24 @@ type SubPayment = {
   linkedExpense: { id: string; code: string; status: string } | null;
 };
 
+type PaymentHistoryRow = {
+  id: string;
+  code: string;
+  amount: number;
+  paidAmount: number | null;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+  note: string | null;
+};
+
 type PaymentMeta = {
   contract: { id: string; status: string; contractValue: number | null; canViewFinancial: boolean };
   linkedTasks: Array<{ id: string; code: string; name: string; status: string }>;
   totals: { percentTotal: number | null; paidTotal: number | null };
-  capabilities: { canCreate: boolean; canRequest: boolean; canApprove: boolean; canMarkPaid: boolean };
+  pendingPayment: { id: string; code: string; status: string; amount: number } | null;
+  paymentHistory: PaymentHistoryRow[];
+  capabilities: { canCreate: boolean; canRequest: boolean; canApprove: boolean; canMarkPaid: boolean; canPay: boolean };
 };
 
 type DraftRow = {
@@ -151,7 +162,6 @@ export function SubDetailPopup({
   onChanged?: () => void;
 }) {
   const canWrite = currentRole === "admin" || currentRole === "construction_manager";
-  const router = useRouter();
 
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -161,6 +171,12 @@ export function SubDetailPopup({
   const [payments, setPayments] = useState<SubPayment[]>([]);
   const [paymentMeta, setPaymentMeta] = useState<PaymentMeta | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Chi chung cấp hợp đồng (mô hình như trả nợ NCC) — 1 nút Chi, nhập số tiền.
+  const [openPay, setOpenPay] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payNote2, setPayNote2] = useState("");
+  const [payLoading, setPayLoading] = useState(false);
 
   // mark-paid sheet
   const [openMarkPaid, setOpenMarkPaid] = useState<string | null>(null);
@@ -228,9 +244,33 @@ export function SubDetailPopup({
       contract: json.contract,
       linkedTasks: json.linkedTasks || [],
       totals: json.totals,
+      pendingPayment: json.pendingPayment ?? null,
+      paymentHistory: json.paymentHistory || [],
       capabilities: json.capabilities,
     });
   }, [contractId]);
+
+  // Chi chung cấp hợp đồng: nhập số tiền → tạo lệnh chi (chờ duyệt/chi).
+  // Khi lệnh chi được chi, đợt tự tính lại theo tổng đã trả cộng dồn.
+  async function submitContractPay() {
+    const amount = Math.round(Number(payAmount || 0));
+    if (!(amount > 0)) return toast.error("Nhập số tiền chi hợp lệ");
+    setPayLoading(true);
+    const res = await fetch(`/api/sub-contracts/${contractId}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, note: payNote2.trim() || null }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setPayLoading(false);
+    if (!res.ok) return toast.error(json.message || "Không tạo được lệnh chi");
+    if (json.willExceed) toast.warning("Lưu ý: tổng đã trả vượt giá trị hợp đồng");
+    toast.success(json.message || "Đã gửi lệnh chi");
+    setOpenPay(false);
+    setPayAmount("");
+    setPayNote2("");
+    await loadPayments();
+  }
 
   const loadEvaluations = useCallback(async () => {
     const res = await fetch(`/api/sub-contracts/${contractId}/evaluations`, { cache: "no-store" });
@@ -375,46 +415,6 @@ export function SubDetailPopup({
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(json.message || "Thao tác thất bại");
     toast.success(json.message || "Đã cập nhật trạng thái");
-    await loadPayments();
-  }
-
-  // Mở màn Lệnh chi. Đã có lệnh chi → deep-link xem lệnh đó; chưa có → mở form
-  // tạo lệnh điền sẵn (số tiền/người nhận/STK/danh mục) để kế toán duyệt & sửa
-  // trước khi gửi. subPaymentId để lệnh chi gắn ngược lại đợt thanh toán.
-  function goToExpense(p: SubPayment) {
-    if (!contract) return;
-    if (p.linkedExpense) {
-      router.push(`/expenses?id=${p.linkedExpense.id}`);
-      return;
-    }
-    const sub = contract.subcontractor;
-    const note = `Thanh toán HĐ thầu phụ ${contract.code} · Đợt ${p.stage}${p.description ? ` — ${p.description}` : ""}`;
-    const remaining = payRemaining(p);
-    const q = new URLSearchParams({
-      create: "1",
-      subPaymentId: p.id,
-      // Fill sẵn phần CÒN LẠI (dự kiến − đã tạm ứng); đợt mới thì = dự kiến.
-      amount: remaining > 0 ? String(Math.round(remaining)) : p.expectedAmount ? String(p.expectedAmount) : "",
-      method: "transfer",
-      categoryName: "Thầu phụ",
-      payee: sub.name || "",
-      note,
-    });
-    if (contract.project?.id) q.set("projectId", contract.project.id);
-    if (sub.phone) q.set("payeePhone", sub.phone);
-    if (sub.bankAccount) q.set("payeeAccountNumber", sub.bankAccount);
-    if (sub.bankAccountName || sub.name) q.set("payeeAccountName", sub.bankAccountName || sub.name);
-    const bin = findBankByName(sub.bankName)?.bin;
-    if (bin) q.set("payeeBankBin", bin);
-    router.push(`/expenses?${q.toString()}`);
-  }
-
-  async function removePayment(paymentId: string) {
-    if (!(await confirmDialog("Xóa/Hủy đợt thanh toán này?"))) return;
-    const res = await fetch(`/api/sub-payments/${paymentId}`, { method: "DELETE" });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) return toast.error(json.message || "Không thể xóa/hủy đợt");
-    toast.success(json.message || "Đã xử lý đợt thanh toán");
     await loadPayments();
   }
 
@@ -651,8 +651,69 @@ export function SubDetailPopup({
               {/* ── TAB Thanh toán ── */}
               {tab === "payment" && (
                 <>
+                  {/* Chi chung cấp hợp đồng — đợt bên dưới chỉ để tham khảo. */}
+                  {canFin && (currentRole === "admin" || currentRole === "accountant") && !isCancelled && (
+                    <div className="seclabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>Đã trả {fmt(paidTotal)} · Còn {fmt(Math.max(0, remain))}</span>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: "8px 14px", fontSize: 13 }}
+                        onClick={() => {
+                          setPayAmount("");
+                          setPayNote2("");
+                          setOpenPay(true);
+                        }}
+                      >
+                        Chi
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Lệnh chi thật của hợp đồng (khớp sổ quỹ) */}
+                  {canFin && (
+                    <>
+                      <div className="seclabel">
+                        Lệnh chi đã gửi{paymentMeta?.paymentHistory.length ? ` · ${paymentMeta.paymentHistory.length}` : ""}
+                      </div>
+                      {paymentMeta?.pendingPayment && (
+                        <div className="proseblk" style={{ color: "var(--orange)" }}>
+                          Đang có lệnh chi {paymentMeta.pendingPayment.code} ({fmt(paymentMeta.pendingPayment.amount)}) chờ duyệt/chi — xong mới gửi tiếp.
+                        </div>
+                      )}
+                      {!paymentMeta?.paymentHistory.length ? (
+                        <div className="empty"><div className="ic">🧾</div>Chưa có lệnh chi nào.</div>
+                      ) : (
+                        <div className="nlist">
+                          {paymentMeta.paymentHistory.map((h) => {
+                            const isPaid = h.status === "paid";
+                            return (
+                              <div key={h.id} className="nccrow" style={{ cursor: "default" }}>
+                                <div className="nl">
+                                  <div className="nn">{h.code}</div>
+                                  <div className="nsub">
+                                    <span>{formatDate(isPaid ? h.paidAt : h.createdAt)}</span>
+                                    {h.note && <span>· {h.note}</span>}
+                                  </div>
+                                </div>
+                                <div className="nr">
+                                  <div className="rv num" style={{ color: isPaid ? "var(--ok)" : "var(--red)" }}>
+                                    {fmt(isPaid ? (h.paidAmount ?? h.amount) : h.amount)}
+                                  </div>
+                                  <div className="rk">
+                                    <span className={`chip ${isPaid ? "paidoff" : "await"}`}>{isPaid ? "Đã chi" : "Chờ chi"}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <div className="seclabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>Lịch thanh toán{payments.length ? ` · ${payments.length} đợt` : ""}</span>
+                    <span>Lịch thanh toán{payments.length ? ` · ${payments.length} đợt (tham khảo)` : ""}</span>
                     {paymentMeta?.capabilities.canCreate && canFin && !showDraft && (
                       <button type="button" className="btn" style={{ padding: "8px 14px", fontSize: 13 }} onClick={openDraft}>＋ Lịch mới</button>
                     )}
@@ -745,18 +806,8 @@ export function SubDetailPopup({
                             <span className="lc-code"> · {p.linkedExpense.code}</span>
                           </div>
                         )}
-                        <div className="prow-acts">
-                          {/* Lệnh chi: KT/admin, mọi đợt chưa chi (kể cả đã có lệnh — mở để xem/sửa) */}
-                          {(currentRole === "admin" || currentRole === "accountant") && p.status !== "paid" && p.status !== "cancelled" && (
-                            <button type="button" className="linkbtn lenhchi" onClick={() => goToExpense(p)}>
-                              🧾 {p.linkedExpense ? "Xem lệnh chi" : "Lập lệnh chi"}
-                            </button>
-                          )}
-                          {/* Xóa/Hủy đợt: chỉ khi chưa có lệnh chi & chưa chi */}
-                          {(currentRole === "admin" || currentRole === "construction_manager") && !p.linkedExpense && p.status !== "paid" && p.status !== "cancelled" && (
-                            <button type="button" className="linkbtn danger" onClick={() => removePayment(p.id)}>Xóa/Hủy</button>
-                          )}
-                        </div>
+                        {/* Đợt chỉ còn là THAM KHẢO (chia sẵn theo HĐ) — chi chung cấp hợp đồng,
+                            trạng thái đợt tự tính theo tổng đã trả cộng dồn. Không còn nút per-đợt. */}
                       </div>
                     ))
                   )}
@@ -871,6 +922,43 @@ export function SubDetailPopup({
           )}
         </div>
       </div>
+
+      {/* sheet Chi chung cấp hợp đồng */}
+      {openPay && (
+        <>
+          <div className="scrim show" onClick={() => setOpenPay(false)} />
+          <div className="sheet show" role="dialog" aria-modal="true">
+            <div className="grip" />
+            <div className="shead">
+              <div>
+                <div className="se">Thanh toán thầu phụ</div>
+                <div className="st">Chi cho hợp đồng</div>
+              </div>
+              <button type="button" className="xclose" onClick={() => setOpenPay(false)} aria-label="Đóng">✕</button>
+            </div>
+            <div className="sbody">
+              <div className="fld">
+                <label>Số tiền chi</label>
+                <input className="mono" type="number" inputMode="numeric" autoFocus placeholder="VD: 20000000"
+                  value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+              </div>
+              {Number(payAmount) > 0 && (
+                <div className="proseblk" style={{ color: "var(--mut)" }}>{fmt(Math.round(Number(payAmount)))} đ</div>
+              )}
+              <div className="fld">
+                <label>Ghi chú (tùy chọn)</label>
+                <input placeholder="VD: đợt tuần này" value={payNote2} onChange={(e) => setPayNote2(e.target.value)} />
+              </div>
+              <div className="proseblk" style={{ color: "var(--mut)" }}>
+                Tạo lệnh chi chờ duyệt/chi. Các đợt theo HĐ tự cập nhật khi tiền chi cộng dồn đủ.
+              </div>
+              <button type="button" className="btn" disabled={payLoading || !(Number(payAmount) > 0)} onClick={submitContractPay}>
+                {payLoading ? "Đang gửi…" : "Gửi lệnh chi"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* sheet Ghi đã chi */}
       {openMarkPaid && (

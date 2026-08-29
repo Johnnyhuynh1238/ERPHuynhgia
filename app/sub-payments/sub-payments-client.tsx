@@ -218,9 +218,13 @@ export function SubPaymentsClient({ currentRole }: { currentRole: string }) {
                 <span className={`rounded-full px-2 py-1 text-[11px] ${statusClass(row.status)}`}>{statusLabel(row.status)}</span>
               </div>
 
+              {/* Bỏ nút chi theo đợt: thầu phụ chi CHUNG cấp hợp đồng (nút "Chi" ở màn HĐ),
+                  đợt chỉ là tham khảo và tự cập nhật theo tổng đã trả cộng dồn. */}
               {row.status === SubPaymentStatus.approved && canMarkPaid ? (
                 <div className="mt-2 flex justify-end">
-                  <Button size="xs" onClick={() => openSheet(row)}>Mark paid</Button>
+                  <Link href={`/sub-contracts/${row.subContract.id}`} className="text-xs text-[#8892b0] underline">
+                    Chi ở màn hợp đồng →
+                  </Link>
                 </div>
               ) : null}
             </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,6 @@ export async function GET() {
     payrollPaid,
     generalExpenseRows,
     subContracts,
-    subPaymentsPaid,
     budgets,
     accounts,
     categories,
@@ -58,11 +58,7 @@ export async function GET() {
     }),
     prisma.subContract.findMany({
       where: { status: { in: ["active", "completed"] } },
-      select: { projectId: true, contractValue: true },
-    }),
-    prisma.subPayment.findMany({
-      where: { status: "paid", subContract: { status: { in: ["active", "completed"] } } },
-      select: { actualAmount: true, expectedAmount: true, subContract: { select: { projectId: true } } },
+      select: { id: true, projectId: true, contractValue: true },
     }),
     prisma.projectBudget.findMany({
       select: { projectId: true, totalAmount: true, status: true },
@@ -105,10 +101,11 @@ export async function GET() {
     add(supplierDebtByProject, r.project_id, v);
   }
 
+  // Nợ thầu phụ = giá trị HĐ − Σ lệnh chi ĐÃ CHI gắn hợp đồng (nguồn thật, khớp sổ quỹ).
+  const subPaidByContract = await getSubContractPaidTotals(prisma, subContracts.map((c) => c.id));
   const subDebtByProject = new Map<string, number>();
-  for (const c of subContracts) add(subDebtByProject, c.projectId, Number(c.contractValue));
-  for (const p of subPaymentsPaid) {
-    add(subDebtByProject, p.subContract.projectId, -Number(p.actualAmount ?? p.expectedAmount));
+  for (const c of subContracts) {
+    add(subDebtByProject, c.projectId, Number(c.contractValue) - (subPaidByContract.get(c.id) ?? 0));
   }
 
   const budgetByProject = new Map<string, number>();

@@ -222,7 +222,7 @@ export function SubContractsTab({
         <div className="c">
           <div className="k">Đã thanh toán</div>
           <div className="v o num">{loading ? "—" : fmt(summary.daTra)}</div>
-          <div className="sp">gồm tạm ứng</div>
+          <div className="sp">theo lệnh chi</div>
         </div>
         <div className="c">
           <div className="k">Còn lại</div>

@@ -1,4 +1,4 @@
-import { SubPaymentStatus, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -20,21 +20,30 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projectId = (searchParams.get("projectId") || "").trim();
 
-  const rows = await prisma.subPayment.findMany({
-    where: {
-      status: SubPaymentStatus.paid,
-      ...(projectId ? { subContract: { projectId } } : {}),
-    },
-    select: {
-      actualAmount: true,
-      expectedAmount: true,
-      subContract: {
+  // Chi tiêu thầu phụ = lệnh chi ĐÃ CHI gắn hợp đồng (source_type='sub_contract'),
+  // nguồn thật khớp sổ quỹ — không cộng theo đợt (đợt chỉ là tham khảo).
+  const paidExpenses = await prisma.expense.findMany({
+    where: { sourceType: "sub_contract", status: "paid", ...(projectId ? { projectId } : {}) },
+    select: { sourceId: true, paidAmount: true, amount: true },
+  });
+  const contractIds = Array.from(
+    new Set(paidExpenses.map((e) => e.sourceId).filter((x): x is string => Boolean(x))),
+  );
+  const contracts = contractIds.length
+    ? await prisma.subContract.findMany({
+        where: { id: { in: contractIds } },
         select: {
+          id: true,
           project: { select: { id: true, code: true, name: true } },
           subcontractor: { select: { id: true, code: true, name: true } },
         },
-      },
-    },
+      })
+    : [];
+  const contractById = new Map(contracts.map((c) => [c.id, c]));
+  const rows = paidExpenses.flatMap((e) => {
+    const c = e.sourceId ? contractById.get(e.sourceId) : null;
+    if (!c) return [];
+    return [{ paid: Number(e.paidAmount ?? e.amount ?? 0), subContract: c }];
   });
 
   const map = new Map<string, {
@@ -63,7 +72,7 @@ export async function GET(request: Request) {
       paymentCount: 0,
     };
 
-    current.totalPaid += Number(row.actualAmount ?? row.expectedAmount ?? 0);
+    current.totalPaid += row.paid;
     current.paymentCount += 1;
 
     map.set(key, current);

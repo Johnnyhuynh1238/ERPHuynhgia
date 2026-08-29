@@ -1,5 +1,6 @@
-import { Prisma, SubPaymentStatus, MhOrderStatus } from "@prisma/client";
+import { Prisma, MhOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
 
 // ── Ngân sách dòng tiền theo HẠNG MỤC ────────────────────────────────────────
 // Mỗi hạng mục: Ngân sách · Đã chi · Công nợ · Còn phải chi.
@@ -54,7 +55,6 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
         id: true,
         contractValue: true,
         budgetLineId: true,
-        payments: { select: { id: true, status: true, actualAmount: true, expectedAmount: true } },
       },
     }),
     // Chi tay gắn hạng mục (không thuộc mua hàng/thầu phụ) — đã trả.
@@ -63,11 +63,11 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
         projectId,
         status: "paid",
         budgetLineId: { not: null },
-        // Loại lệnh chi mua hàng/công nợ NCC (đã tính qua đơn/view). notIn loại luôn
-        // source rỗng (NULL NOT IN → NULL) nên phải OR để giữ chi tay source rỗng.
+        // Loại lệnh chi mua hàng/công nợ NCC/thầu phụ (đã tính qua đơn/view/HĐ). notIn loại
+        // luôn source rỗng (NULL NOT IN → NULL) nên phải OR để giữ chi tay source rỗng.
         OR: [
           { sourceType: null },
-          { sourceType: { notIn: ["mua_hang_order", "ncc_congno"] } },
+          { sourceType: { notIn: ["mua_hang_order", "ncc_congno", "sub_contract"] } },
         ],
       },
       select: { budgetLineId: true, paidAmount: true, amount: true },
@@ -186,14 +186,12 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     }
   }
 
-  // ── Thầu phụ: đã chi = Σ actualAmount các đợt chưa huỷ (gồm đợt paid + tạm ứng
-  //    dở) — ĐỒNG NHẤT với màn Thầu phụ. Công nợ = contractValue − đã chi. ──
+  // ── Thầu phụ: đã chi = Σ lệnh chi ĐÃ CHI gắn hợp đồng (nguồn thật, khớp sổ quỹ)
+  //    — ĐỒNG NHẤT với màn Thầu phụ. Công nợ = contractValue − đã chi. ──
+  const subPaidById = await getSubContractPaidTotals(prisma, subContracts.map((sc) => sc.id));
   for (const sc of subContracts) {
     const cv = num(sc.contractValue);
-    const paid = sc.payments.reduce(
-      (s, p) => (p.status === SubPaymentStatus.cancelled ? s : s + num(p.actualAmount)),
-      0,
-    );
+    const paid = subPaidById.get(sc.id) ?? 0;
     add(spent, sc.budgetLineId, paid);
     add(debt, sc.budgetLineId, Math.max(0, cv - paid));
   }
