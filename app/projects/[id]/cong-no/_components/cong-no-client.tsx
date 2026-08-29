@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SubContractsTab } from "./sub-tab";
 import { findBankByName } from "@/lib/vn-banks";
+import { copyText } from "@/lib/copy-text";
 import "./cong-no.css";
 
 
@@ -348,6 +349,7 @@ function NccPopup({
 }) {
   const [show, setShow] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState<"ok" | "fail" | null>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShow(true));
@@ -357,6 +359,7 @@ function NccPopup({
   const off = sup.conLai <= 0.0001;
 
   // Link công khai CHỐT CÔNG NỢ (gom mọi dự án của NCC này) — gửi cho NCC đối chiếu.
+  // Bấm là copy thẳng, không hiện dialog; nút tự đổi nhãn báo đã copy.
   const copyDoiTacLink = async () => {
     setLinkBusy(true);
     try {
@@ -370,13 +373,9 @@ function NccPopup({
         alert(j.message || "Không tạo được link");
         return;
       }
-      const url = `${window.location.origin}${j.path}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        alert(`Đã copy link đối chiếu công nợ:\n${url}`);
-      } catch {
-        prompt("Link đối chiếu công nợ (copy thủ công):", url);
-      }
+      const ok = await copyText(`${window.location.origin}${j.path}`);
+      setLinkCopied(ok ? "ok" : "fail");
+      setTimeout(() => setLinkCopied(null), 2500);
     } finally {
       setLinkBusy(false);
     }
@@ -454,7 +453,13 @@ function NccPopup({
         {/* Link công khai để NCC tự đối chiếu, chốt công nợ 2 bên (mọi dự án) */}
         <div className="npay">
           <button type="button" className="btn ghost" onClick={copyDoiTacLink} disabled={linkBusy}>
-            {linkBusy ? "Đang tạo link…" : "🔗 Copy link đối chiếu công nợ"}
+            {linkBusy
+              ? "Đang tạo link…"
+              : linkCopied === "ok"
+                ? "✓ Đã copy link"
+                : linkCopied === "fail"
+                  ? "⚠ Copy lỗi — thử lại"
+                  : "🔗 Copy link đối chiếu công nợ"}
           </button>
         </div>
 

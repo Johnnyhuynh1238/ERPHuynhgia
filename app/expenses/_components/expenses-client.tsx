@@ -8,6 +8,7 @@ import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MoneyInput } from "@/components/money-input";
 import { VN_BANKS, findBankByBin, buildVietQrDeepLink } from "@/lib/vn-banks";
+import { copyText } from "@/lib/copy-text";
 import { buildVietQrImageUrl, parseVietQrString } from "@/lib/vietqr";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 import { useCashAccounts, CashAccountOption } from "@/lib/use-cash-accounts";
@@ -712,12 +713,11 @@ export function ExpensesClient({
           if (err instanceof DOMException && err.name === "AbortError") return;
         }
       }
-      // Máy không hỗ trợ share -> fallback copy.
-      try {
-        await navigator.clipboard.writeText(url);
+      // Máy không hỗ trợ share -> fallback copy (không hiện prompt bắt copy tay).
+      if (await copyText(url)) {
         toast.success("Đã copy link theo dõi — gửi cho NCC");
-      } catch {
-        window.prompt("Copy link theo dõi gửi NCC:", url);
+      } else {
+        toast.error("Trình duyệt chặn copy — thử lại");
       }
     } finally {
       setLinkBusyId(null);

@@ -13,6 +13,7 @@ import {
   subContractUnitLabel,
 } from "@/lib/sub-contract-view";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
+import { copyText } from "@/lib/copy-text";
 
 
 // ── Popup chi tiết Hợp đồng thầu phụ — full màn, tông ngà (.cndoc).
@@ -175,6 +176,7 @@ export function SubDetailPopup({
   // Tab Thanh toán chia 2 menu ngang: lệnh chi thật | lịch đợt (tham khảo).
   const [payView, setPayView] = useState<"expenses" | "schedule">("expenses");
   const [linkBusy, setLinkBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Chi chung cấp hợp đồng (mô hình như trả nợ NCC) — 1 nút Chi, nhập số tiền.
   const [openPay, setOpenPay] = useState(false);
@@ -266,12 +268,13 @@ export function SubDetailPopup({
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return toast.error(j.message || "Không tạo được link");
-      const url = `${window.location.origin}${j.path}`;
-      try {
-        await navigator.clipboard.writeText(url);
+      const ok = await copyText(`${window.location.origin}${j.path}`);
+      if (ok) {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2500);
         toast.success("Đã copy link đối chiếu công nợ");
-      } catch {
-        prompt("Link đối chiếu công nợ (copy thủ công):", url);
+      } else {
+        toast.error("Trình duyệt chặn copy — thử lại");
       }
     } finally {
       setLinkBusy(false);
@@ -692,7 +695,7 @@ export function SubDetailPopup({
                           disabled={linkBusy}
                           title="Link công khai để thầu phụ đối chiếu, chốt công nợ"
                         >
-                          {linkBusy ? "…" : "🔗 Link chốt"}
+                          {linkBusy ? "…" : linkCopied ? "✓ Đã copy" : "🔗 Link chốt"}
                         </button>
                         <button
                           type="button"
