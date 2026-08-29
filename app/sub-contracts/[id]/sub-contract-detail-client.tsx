@@ -318,6 +318,9 @@ export function SubContractDetailClient({
   const [paymentMeta, setPaymentMeta] = useState<PaymentMeta | null>(null);
   const [loadingPayment, setLoadingPayment] = useState(false);
 
+  // Tab Thanh toán chia 2 menu ngang: lệnh chi thật | đợt theo HĐ (tham khảo).
+  const [payView, setPayView] = useState<"expenses" | "schedule">("expenses");
+
   // Mô hình mới: CHI CHUNG cấp hợp đồng (như trả nợ NCC) — 1 nút Chi, nhập số tiền.
   const [openPay, setOpenPay] = useState(false);
   const [payContractAmount, setPayContractAmount] = useState("");
@@ -892,9 +895,26 @@ export function SubContractDetailClient({
                   </div>
                 ) : null}
 
-                {paymentMeta.paymentHistory.length > 0 ? (
+                {/* menu ngang: Lệnh chi (thật) | Đợt theo HĐ (tham khảo) */}
+                <div className="mt-3 flex gap-1 rounded-xl border border-[#2d3249] bg-[#1a1d2e] p-1">
+                  <button
+                    type="button"
+                    className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${payView === "expenses" ? "bg-[#f0f2ff] text-[#13151f]" : "text-[#8892b0]"}`}
+                    onClick={() => setPayView("expenses")}
+                  >
+                    Lệnh chi{paymentMeta.paymentHistory.length ? ` (${paymentMeta.paymentHistory.length})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${payView === "schedule" ? "bg-[#f0f2ff] text-[#13151f]" : "text-[#8892b0]"}`}
+                    onClick={() => setPayView("schedule")}
+                  >
+                    Đợt theo HĐ{payments.length ? ` (${payments.length})` : ""}
+                  </button>
+                </div>
+
+                {payView === "expenses" && paymentMeta.paymentHistory.length > 0 ? (
                   <div className="mt-3 space-y-1">
-                    <div className="text-xs font-semibold text-[#8892b0]">Lịch sử lệnh chi</div>
                     {paymentMeta.paymentHistory.map((h) => (
                       <div key={h.id} className="flex items-center justify-between rounded-lg border border-[#2d3249] bg-[#1a1d2e] px-2 py-1 text-xs">
                         <span className="text-[#a4acc8]">
@@ -911,11 +931,15 @@ export function SubContractDetailClient({
                       </div>
                     ))}
                   </div>
+                ) : payView === "expenses" ? (
+                  <div className="mt-3 rounded-lg border border-[#2d3249] bg-[#1a1d2e] p-3 text-center text-xs text-[#8892b0]">
+                    Chưa có lệnh chi nào.
+                  </div>
                 ) : null}
               </div>
             ) : null}
 
-            {paymentMeta?.capabilities.canCreate && paymentMeta.contract.canViewFinancial ? (
+            {payView === "schedule" && paymentMeta?.capabilities.canCreate && paymentMeta.contract.canViewFinancial ? (
               <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="text-sm font-semibold text-[#f0f2ff]">Lịch thanh toán linh hoạt (1-10 đợt)</div>
@@ -990,7 +1014,7 @@ export function SubContractDetailClient({
               </div>
             ) : null}
 
-            <div className="space-y-2">
+            <div className={`space-y-2${payView === "schedule" ? "" : " hidden"}`}>
               {payments.length === 0 ? (
                 <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3 text-sm text-[#8892b0]">Chưa có đợt thanh toán.</div>
               ) : (

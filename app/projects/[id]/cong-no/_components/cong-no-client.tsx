@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SubContractsTab } from "./sub-tab";
-import { SubPaymentsLogTab } from "./sub-payments-log-tab";
 import { findBankByName } from "@/lib/vn-banks";
 import "./cong-no.css";
 
@@ -74,7 +73,7 @@ export function CongNoClient({
   currentRole: string;
   currentUserId: string;
 }) {
-  const [tab, setTab] = useState<"ncc" | "sub" | "sublog">("ncc");
+  const [tab, setTab] = useState<"ncc" | "sub">("ncc");
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -212,7 +211,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         <div className="eyebrow">Quản lý NCC · {projectCode}</div>
         <h1>{projectName}</h1>
 
-        {/* tab menu ngang: Công nợ NCC | Thầu phụ | Lệnh chi TP */}
+        {/* tab menu ngang: Công nợ NCC | Thầu phụ */}
         <div className="cntabs" role="tablist">
           <button type="button" role="tab" className={`cntab${tab === "ncc" ? " on" : ""}`} onClick={() => setTab("ncc")}>
             Công nợ NCC
@@ -220,14 +219,9 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
           <button type="button" role="tab" className={`cntab${tab === "sub" ? " on" : ""}`} onClick={() => setTab("sub")}>
             Thầu phụ
           </button>
-          <button type="button" role="tab" className={`cntab${tab === "sublog" ? " on" : ""}`} onClick={() => setTab("sublog")}>
-            Lệnh chi TP
-          </button>
         </div>
 
-        {tab === "sublog" ? (
-          <SubPaymentsLogTab projectId={projectId} />
-        ) : tab === "sub" ? (
+        {tab === "sub" ? (
           <SubContractsTab projectId={projectId} canManage={canManageSub} currentRole={currentRole} currentUserId={currentUserId} />
         ) : (
         <>

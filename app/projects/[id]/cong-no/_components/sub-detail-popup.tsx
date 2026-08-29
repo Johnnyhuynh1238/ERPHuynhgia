@@ -172,6 +172,9 @@ export function SubDetailPopup({
   const [paymentMeta, setPaymentMeta] = useState<PaymentMeta | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Tab Thanh toán chia 2 menu ngang: lệnh chi thật | lịch đợt (tham khảo).
+  const [payView, setPayView] = useState<"expenses" | "schedule">("expenses");
+
   // Chi chung cấp hợp đồng (mô hình như trả nợ NCC) — 1 nút Chi, nhập số tiền.
   const [openPay, setOpenPay] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -670,12 +673,31 @@ export function SubDetailPopup({
                     </div>
                   )}
 
-                  {/* Lệnh chi thật của hợp đồng (khớp sổ quỹ) */}
+                  {/* menu ngang: Lệnh chi (thật) | Lịch thanh toán (tham khảo) */}
                   {canFin && (
+                    <div className="cntabs" role="tablist">
+                      <button
+                        type="button"
+                        role="tab"
+                        className={`cntab${payView === "expenses" ? " on" : ""}`}
+                        onClick={() => setPayView("expenses")}
+                      >
+                        Lệnh chi{paymentMeta?.paymentHistory.length ? ` (${paymentMeta.paymentHistory.length})` : ""}
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        className={`cntab${payView === "schedule" ? " on" : ""}`}
+                        onClick={() => setPayView("schedule")}
+                      >
+                        Lịch thanh toán{payments.length ? ` (${payments.length})` : ""}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Lệnh chi thật của hợp đồng (khớp sổ quỹ) */}
+                  {canFin && payView === "expenses" && (
                     <>
-                      <div className="seclabel">
-                        Lệnh chi đã gửi{paymentMeta?.paymentHistory.length ? ` · ${paymentMeta.paymentHistory.length}` : ""}
-                      </div>
                       {paymentMeta?.pendingPayment && (
                         <div className="proseblk" style={{ color: "var(--orange)" }}>
                           Đang có lệnh chi {paymentMeta.pendingPayment.code} ({fmt(paymentMeta.pendingPayment.amount)}) chờ duyệt/chi — xong mới gửi tiếp.
@@ -712,8 +734,10 @@ export function SubDetailPopup({
                     </>
                   )}
 
+                  {(!canFin || payView === "schedule") && (
+                  <>
                   <div className="seclabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>Lịch thanh toán{payments.length ? ` · ${payments.length} đợt (tham khảo)` : ""}</span>
+                    <span>Đợt theo hợp đồng (tham khảo)</span>
                     {paymentMeta?.capabilities.canCreate && canFin && !showDraft && (
                       <button type="button" className="btn" style={{ padding: "8px 14px", fontSize: 13 }} onClick={openDraft}>＋ Lịch mới</button>
                     )}
@@ -810,6 +834,8 @@ export function SubDetailPopup({
                             trạng thái đợt tự tính theo tổng đã trả cộng dồn. Không còn nút per-đợt. */}
                       </div>
                     ))
+                  )}
+                  </>
                   )}
                 </>
               )}
