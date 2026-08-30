@@ -350,11 +350,30 @@ function NccPopup({
   const [show, setShow] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState<"ok" | "fail" | null>(null);
+  // Prefetch URL để lúc bấm copy đồng bộ trong user-gesture (fetch trước làm
+  // mất "transient activation" → trình duyệt chặn copy).
+  const [partnerLinkUrl, setPartnerLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShow(true));
     return () => cancelAnimationFrame(id);
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const r = await fetch("/api/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "supplier", id: sup.supplierId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (alive && r.ok && j.path) setPartnerLinkUrl(`${window.location.origin}${j.path}`);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [sup.supplierId]);
 
   const off = sup.conLai <= 0.0001;
 
@@ -363,17 +382,23 @@ function NccPopup({
   const copyDoiTacLink = async () => {
     setLinkBusy(true);
     try {
-      const r = await fetch("/api/partner-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "supplier", id: sup.supplierId }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        alert(j.message || "Không tạo được link");
-        return;
+      // Đã prefetch → copy đồng bộ (giữ user-gesture). Chưa có thì fetch rồi copy.
+      let url = partnerLinkUrl;
+      if (!url) {
+        const r = await fetch("/api/partner-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "supplier", id: sup.supplierId }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.path) {
+          alert(j.message || "Không tạo được link");
+          return;
+        }
+        url = `${window.location.origin}${j.path}`;
+        setPartnerLinkUrl(url);
       }
-      const ok = await copyText(`${window.location.origin}${j.path}`);
+      const ok = await copyText(url);
       setLinkCopied(ok ? "ok" : "fail");
       setTimeout(() => setLinkCopied(null), 2500);
     } finally {

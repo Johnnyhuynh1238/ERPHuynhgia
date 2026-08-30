@@ -10,7 +10,8 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { MoneyInput } from "@/components/money-input";
+import { findBankByName } from "@/lib/vn-banks";
+import { ExpenseCreateModal } from "@/app/expenses/_components/expense-create-modal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatDate,
@@ -324,9 +325,6 @@ export function SubContractDetailClient({
 
   // Mô hình mới: CHI CHUNG cấp hợp đồng (như trả nợ NCC) — 1 nút Chi, nhập số tiền.
   const [openPay, setOpenPay] = useState(false);
-  const [payContractAmount, setPayContractAmount] = useState("");
-  const [payContractNote, setPayContractNote] = useState("");
-  const [payContractLoading, setPayContractLoading] = useState(false);
 
   const [draftRows, setDraftRows] = useState<DraftPaymentRow[]>([]);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -382,36 +380,6 @@ export function SubContractDetailClient({
       paymentHistory: json.paymentHistory || [],
       capabilities: json.capabilities,
     });
-  }
-
-  // CHI CHUNG cấp hợp đồng (mô hình như trả nợ NCC): nhập số tiền → tạo 1 lệnh chi
-  // (chờ duyệt/chi). Khi lệnh chi được chi, đợt tự tính lại theo tổng đã trả cộng dồn.
-  async function submitContractPayment() {
-    const amount = Math.round(Number(payContractAmount || 0));
-    if (!(amount > 0)) {
-      toast.error("Nhập số tiền chi hợp lệ");
-      return;
-    }
-    setPayContractLoading(true);
-    const res = await fetch(`/api/sub-contracts/${contractId}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, note: payContractNote.trim() || null }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setPayContractLoading(false);
-
-    if (!res.ok) {
-      toast.error(json.message || "Không tạo được lệnh chi");
-      return;
-    }
-
-    if (json.willExceed) toast.warning("Lưu ý: tổng đã trả vượt giá trị hợp đồng");
-    toast.success(json.message || "Đã gửi lệnh chi");
-    setOpenPay(false);
-    setPayContractAmount("");
-    setPayContractNote("");
-    await loadPayments();
   }
 
   useEffect(() => {
@@ -878,13 +846,7 @@ export function SubContractDetailClient({
                   {paymentMeta.capabilities.canPay ? (
                     <Button
                       size="sm"
-                      onClick={() => {
-                        // Điền sẵn TOÀN BỘ số còn phải trả + ghi chú (sửa được).
-                        const rest = Math.max(0, Math.round(contractValue - (paymentMeta.totals.paidTotal || 0)));
-                        setPayContractAmount(rest > 0 ? String(rest) : "");
-                        setPayContractNote(`Thanh toán HĐ ${contract.code} — ${contract.subcontractor.name}`);
-                        setOpenPay(true);
-                      }}
+                      onClick={() => setOpenPay(true)}
                       disabled={!!paymentMeta.pendingPayment}
                     >
                       Chi
@@ -1223,51 +1185,36 @@ export function SubContractDetailClient({
         ) : null}
       </div>
 
-      {openPay ? (
-        <div className="fixed inset-0 z-50 bg-black/60">
-          <button type="button" className="h-full w-full" onClick={() => setOpenPay(false)} aria-label="Đóng" />
-          <div className="absolute bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 rounded-t-2xl border border-[#252840] bg-[#13151f] p-4 slide-up">
-            <div className="mb-1 text-lg font-semibold text-[#f0f2ff]">Chi cho thầu phụ</div>
-            <div className="mb-3 text-xs text-[#a4acc8]">
-              Tạo lệnh chi (chờ duyệt/chi). Đợt theo hợp đồng tự cập nhật khi tiền chi cộng dồn đủ.
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Số tiền chi</label>
-                {/* Điền sẵn toàn bộ số còn phải trả, hiển thị phân cách ngàn (1.500.000). */}
-                <MoneyInput
-                  value={payContractAmount}
-                  onChange={setPayContractAmount}
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  placeholder="VD: 20.000.000"
-                />
-                <div className="mt-1 text-xs text-[#8892b0]">
-                  Còn phải trả: {formatMoney(Math.max(0, contractValue - (paymentMeta?.totals.paidTotal || 0)))}
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-[#a4acc8]">Ghi chú (tùy chọn)</label>
-                <textarea
-                  rows={2}
-                  className="w-full rounded-xl border border-[#2d3249] bg-[#1a1d2e] px-3 py-2 text-sm"
-                  placeholder="VD: đợt tuần này"
-                  value={payContractNote}
-                  onChange={(e) => setPayContractNote(e.target.value)}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setOpenPay(false)}>Hủy</Button>
-                <Button onClick={submitContractPayment} disabled={payContractLoading || !(Number(payContractAmount) > 0)}>
-                  {payContractLoading ? "Đang gửi..." : "Gửi lệnh chi"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Popup Lệnh chi dùng chung (portal ra body). Gắn HĐ qua sourceType=sub_contract →
+          tổng đã trả + đợt tự tính lại khi lệnh chi được chi. */}
+      <ExpenseCreateModal
+        open={openPay && !!contract}
+        onClose={() => setOpenPay(false)}
+        onCreated={() => {
+          loadPayments();
+          loadData();
+        }}
+        role={currentRole}
+        lockContext={contract ? `${contract.project.code} — ${contract.project.name}` : null}
+        prefill={
+          contract
+            ? {
+                projectId: contract.project.id,
+                categoryName: "Thầu phụ",
+                amount: String(Math.max(0, Math.round(contractValue - (paymentMeta?.totals.paidTotal || 0)))),
+                payee: contract.subcontractor.name,
+                payeePhone: contract.subcontractor.phone || "",
+                payeeBankBin: findBankByName(contract.subcontractor.bankName)?.bin || "",
+                payeeAccountNumber: contract.subcontractor.bankAccount || "",
+                payeeAccountName: contract.subcontractor.bankAccountName || contract.subcontractor.name,
+                note: `Thanh toán HĐ thầu phụ ${contract.code} — ${contract.subcontractor.name}`,
+                sourceType: "sub_contract",
+                sourceId: contractId,
+                paymentMethod: "transfer",
+              }
+            : {}
+        }
+      />
     </div>
   );
 }

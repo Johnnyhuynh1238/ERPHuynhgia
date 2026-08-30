@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
-import { fireAndForget, notifyExpenseKtRequest } from "@/lib/notifications";
+import { fireAndForget, notifyExpenseCreated, notifyExpenseKtRequest } from "@/lib/notifications";
 import { findBankByName } from "@/lib/vn-banks";
 import { getSubContractPaidTotal } from "@/lib/sub-payment-utils";
 
@@ -129,6 +129,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
         projectLabel: null,
         actorUserId: user.id,
         actorName: user.name || user.email || "Kế toán",
+      }),
+    );
+  } else {
+    // Admin tạo lệnh chi thầu phụ thẳng (status pending) → bắn Zalo kế toán (VietQR + text)
+    // ngay, đồng bộ với /api/expenses. Trước đây nhánh này không notify nên KT không nhận QR.
+    fireAndForget(
+      notifyExpenseCreated({
+        expenseId: expense.id,
+        code: expense.code,
+        amount,
+        categoryName: expense.category.name,
+        payee: expense.payee,
+        projectLabel: null,
+        actorUserId: user.id,
+        actorName: user.name || user.email || "Admin",
       }),
     );
   }

@@ -14,7 +14,8 @@ import {
 } from "@/lib/sub-contract-view";
 import { useCashAccounts, formatCashAccountLabel } from "@/lib/use-cash-accounts";
 import { copyText } from "@/lib/copy-text";
-import { MoneyInput } from "@/components/money-input";
+import { findBankByName } from "@/lib/vn-banks";
+import { ExpenseCreateModal, type ExpenseCreatePrefill } from "@/app/expenses/_components/expense-create-modal";
 
 
 // ── Popup chi tiết Hợp đồng thầu phụ — full màn, tông ngà (.cndoc).
@@ -178,12 +179,12 @@ export function SubDetailPopup({
   const [payView, setPayView] = useState<"expenses" | "schedule">("expenses");
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Prefetch sẵn URL link chốt để lúc bấm copy đồng bộ trong user-gesture
+  // (fetch trước làm mất "transient activation" → trình duyệt chặn copy).
+  const [partnerLinkUrl, setPartnerLinkUrl] = useState<string | null>(null);
 
-  // Chi chung cấp hợp đồng (mô hình như trả nợ NCC) — 1 nút Chi, nhập số tiền.
+  // Chi chung cấp hợp đồng: bấm Chi → mở popup Lệnh chi dùng chung (ExpenseCreateModal).
   const [openPay, setOpenPay] = useState(false);
-  const [payAmount, setPayAmount] = useState("");
-  const [payNote2, setPayNote2] = useState("");
-  const [payLoading, setPayLoading] = useState(false);
 
   // mark-paid sheet
   const [openMarkPaid, setOpenMarkPaid] = useState<string | null>(null);
@@ -258,18 +259,46 @@ export function SubDetailPopup({
   }, [contractId]);
 
   // Link công khai CHỐT CÔNG NỢ của thầu phụ (gom mọi dự án) — gửi cho họ đối chiếu.
+  // Prefetch URL ngay khi có contract → lúc bấm nút chỉ copy (không fetch xen giữa).
+  useEffect(() => {
+    const subId = contract?.subcontractor.id;
+    if (!subId) {
+      setPartnerLinkUrl(null);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const r = await fetch("/api/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "subcontractor", id: subId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (alive && r.ok && j.path) setPartnerLinkUrl(`${window.location.origin}${j.path}`);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [contract?.subcontractor.id]);
+
   async function copyDoiTacLink() {
     if (!contract) return;
     setLinkBusy(true);
     try {
-      const r = await fetch("/api/partner-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "subcontractor", id: contract.subcontractor.id }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) return toast.error(j.message || "Không tạo được link");
-      const ok = await copyText(`${window.location.origin}${j.path}`);
+      // Đã prefetch → copy đồng bộ (giữ user-gesture). Chưa có thì fetch rồi copy.
+      let url = partnerLinkUrl;
+      if (!url) {
+        const r = await fetch("/api/partner-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "subcontractor", id: contract.subcontractor.id }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.path) return toast.error(j.message || "Không tạo được link");
+        url = `${window.location.origin}${j.path}`;
+        setPartnerLinkUrl(url);
+      }
+      const ok = await copyText(url);
       if (ok) {
         setLinkCopied(true);
         setTimeout(() => setLinkCopied(false), 2500);
@@ -284,32 +313,7 @@ export function SubDetailPopup({
 
   // Mở sheet Chi: điền sẵn TOÀN BỘ số còn phải trả + ghi chú (admin/KT sửa được).
   function openPaySheet() {
-    const rest = Math.max(0, Math.round(remain));
-    setPayAmount(rest > 0 ? String(rest) : "");
-    setPayNote2(contract ? `Thanh toán HĐ ${contract.code} — ${contract.subcontractor.name}` : "");
     setOpenPay(true);
-  }
-
-  // Chi chung cấp hợp đồng: nhập số tiền → tạo lệnh chi (chờ duyệt/chi).
-  // Khi lệnh chi được chi, đợt tự tính lại theo tổng đã trả cộng dồn.
-  async function submitContractPay() {
-    const amount = Math.round(Number(payAmount || 0));
-    if (!(amount > 0)) return toast.error("Nhập số tiền chi hợp lệ");
-    setPayLoading(true);
-    const res = await fetch(`/api/sub-contracts/${contractId}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, note: payNote2.trim() || null }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setPayLoading(false);
-    if (!res.ok) return toast.error(json.message || "Không tạo được lệnh chi");
-    if (json.willExceed) toast.warning("Lưu ý: tổng đã trả vượt giá trị hợp đồng");
-    toast.success(json.message || "Đã gửi lệnh chi");
-    setOpenPay(false);
-    setPayAmount("");
-    setPayNote2("");
-    await loadPayments();
   }
 
   const loadEvaluations = useCallback(async () => {
@@ -353,6 +357,25 @@ export function SubDetailPopup({
   const scheduleGap = contractValue - scheduleExpectedTotal;
   const progress = contractValue > 0 ? Math.min(100, Math.round((paidTotal / contractValue) * 100)) : 0;
   const canFin = paymentMeta?.contract.canViewFinancial ?? true;
+
+  // Prefill popup Lệnh chi từ HĐ + thầu phụ (STK/ngân hàng tự lấy, danh mục "Thầu phụ",
+  // gắn HĐ qua sourceType=sub_contract để tổng đã trả + đợt vẫn tính đúng). Sau khai báo remain.
+  const payPrefill: ExpenseCreatePrefill = contract
+    ? {
+        projectId: contract.project.id,
+        categoryName: "Thầu phụ",
+        amount: String(Math.max(0, Math.round(remain))),
+        payee: contract.subcontractor.name,
+        payeePhone: contract.subcontractor.phone || "",
+        payeeBankBin: findBankByName(contract.subcontractor.bankName)?.bin || "",
+        payeeAccountNumber: contract.subcontractor.bankAccount || "",
+        payeeAccountName: contract.subcontractor.bankAccountName || contract.subcontractor.name,
+        note: `Thanh toán HĐ thầu phụ ${contract.code} — ${contract.subcontractor.name}`,
+        sourceType: "sub_contract",
+        sourceId: contractId,
+        paymentMethod: "transfer",
+      }
+    : {};
 
   const totalDraftPercent = useMemo(
     () => draftRows.reduce((s, r) => s + Number(r.percentage || 0), 0),
@@ -711,6 +734,7 @@ export function SubDetailPopup({
                           className="btn"
                           style={{ padding: "8px 14px", fontSize: 13 }}
                           onClick={openPaySheet}
+                          disabled={!!paymentMeta?.pendingPayment}
                         >
                           Chi
                         </button>
@@ -994,44 +1018,19 @@ export function SubDetailPopup({
         </div>
       </div>
 
-      {/* sheet Chi chung cấp hợp đồng.
-          stopPropagation: sheet nằm trong .subpop-scrim (onClick=close) — không chặn thì
-          chạm vào ô nhập/nút sẽ bubble lên và đóng luôn cả popup hợp đồng. */}
-      {openPay && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <div className="scrim show" onClick={() => setOpenPay(false)} />
-          <div className="sheet show" role="dialog" aria-modal="true">
-            <div className="grip" />
-            <div className="shead">
-              <div>
-                <div className="se">Thanh toán thầu phụ</div>
-                <div className="st">Chi cho hợp đồng</div>
-              </div>
-              <button type="button" className="xclose" onClick={() => setOpenPay(false)} aria-label="Đóng">✕</button>
-            </div>
-            <div className="sbody">
-              <div className="fld">
-                <label>Số tiền chi</label>
-                {/* Điền sẵn toàn bộ số còn phải trả; hiển thị phân cách ngàn (1.500.000). */}
-                <MoneyInput value={payAmount} onChange={setPayAmount} className="mono" placeholder="VD: 20.000.000" />
-              </div>
-              <div className="proseblk" style={{ color: "var(--mut)" }}>
-                Còn phải trả: {fmt(Math.max(0, remain))} đ
-              </div>
-              <div className="fld">
-                <label>Ghi chú (tùy chọn)</label>
-                <input placeholder="VD: đợt tuần này" value={payNote2} onChange={(e) => setPayNote2(e.target.value)} />
-              </div>
-              <div className="proseblk" style={{ color: "var(--mut)" }}>
-                Tạo lệnh chi chờ duyệt/chi. Các đợt theo HĐ tự cập nhật khi tiền chi cộng dồn đủ.
-              </div>
-              <button type="button" className="btn" disabled={payLoading || !(Number(payAmount) > 0)} onClick={submitContractPay}>
-                {payLoading ? "Đang gửi…" : "Gửi lệnh chi"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Popup Lệnh chi dùng chung (portal ra body). Gắn HĐ qua sourceType=sub_contract →
+          tổng đã trả + đợt tự tính lại khi lệnh chi được chi. */}
+      <ExpenseCreateModal
+        open={openPay && !!contract}
+        onClose={() => setOpenPay(false)}
+        onCreated={() => {
+          loadPayments();
+          onChanged?.();
+        }}
+        role={currentRole}
+        prefill={payPrefill}
+        lockContext={contract ? `${contract.project.code} — ${contract.project.name}` : null}
+      />
 
       {/* sheet Ghi đã chi — cũng phải chặn bubble như sheet Chi ở trên. */}
       {openMarkPaid && (
