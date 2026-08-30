@@ -456,7 +456,9 @@ export function ExpenseCreateModal({
       toast.error("Nhập số tiền > 0");
       return;
     }
-    if (!form.payeePhone.trim()) {
+    // Chi thầu phụ: nhiều thầu phụ không có SĐT (flow cũ /pay không bắt) → không chặn.
+    // VietQR/Zalo cho kế toán chỉ cần ngân hàng + STK, không cần SĐT người nhận.
+    if (form.sourceType !== "sub_contract" && !form.payeePhone.trim()) {
       toast.error("Nhập SĐT người nhận");
       return;
     }
