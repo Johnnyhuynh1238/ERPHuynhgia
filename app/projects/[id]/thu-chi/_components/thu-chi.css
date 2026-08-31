@@ -78,9 +78,10 @@
 .tcdoc .meta .d { color: var(--line2); }
 
 /* tổng thu/chi — 3 chỉ số phẳng */
-.tcdoc .tot { margin-top: 18px; padding: 15px 0 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tcdoc .tot { margin-top: 18px; padding: 15px 0 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tcdoc .tot > div { min-width: 0; }
 .tcdoc .st-l { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); }
-.tcdoc .st-v { font-size: clamp(15px, 4.4vw, 18px); font-weight: 600; margin-top: 5px; line-height: 1.05; }
+.tcdoc .st-v { font-size: clamp(12px, 3.3vw, 18px); font-weight: 600; margin-top: 5px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tcdoc .st-v.in { color: var(--ok); }
 .tcdoc .st-v.out { color: var(--red); }
 .tcdoc .st-v.net-pos { color: var(--ok); }
