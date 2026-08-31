@@ -137,10 +137,10 @@
 .ovdoc .cost { padding: 15px; }
 .ovdoc .split { display: flex; height: 11px; border-radius: 6px; overflow: hidden; gap: 2px; }
 .ovdoc .split > span { display: block; }
-.ovdoc .lgd { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; margin-top: 14px; }
-.ovdoc .lgd .li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mut); }
+.ovdoc .lgd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px 14px; margin-top: 14px; }
+.ovdoc .lgd .li { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ovdoc .lgd .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-.ovdoc .lgd .li .num { margin-left: auto; color: var(--text); font-size: 12px; font-weight: 600; }
+.ovdoc .lgd .li .num { margin-left: auto; flex: none; padding-left: 6px; color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; }
 
 /* tiles */
 .ovdoc .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
