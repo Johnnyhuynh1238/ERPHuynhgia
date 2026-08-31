@@ -662,8 +662,8 @@ export function ExpenseCreateModal({
           )}
         </div>
 
-        {/* Tài khoản nhận (admin nhập cho KT chuyển) */}
-        {!isKt && (
+        {/* Tài khoản nhận (admin/KT nhập để bật nút "Chuyển khoản") */}
+        {true && (
           <div className="fld">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span className="lbl">Tài khoản nhận (để KT bấm “Chuyển khoản”)</span>

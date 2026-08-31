@@ -207,6 +207,58 @@ export function ExpensesClient({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  // Bổ sung / sửa STK người nhận cho lệnh chi chờ chi (KT + admin)
+  const [openBank, setOpenBank] = useState<Expense | null>(null);
+  const [bankForm, setBankForm] = useState({ payeeBankBin: "", payeeAccountNumber: "", payeeAccountName: "" });
+  const [savingBank, setSavingBank] = useState(false);
+
+  function openBankDialog(exp: Expense) {
+    setBankForm({
+      payeeBankBin: exp.payeeBankBin ?? "",
+      payeeAccountNumber: exp.payeeAccountNumber ?? "",
+      payeeAccountName: exp.payeeAccountName ?? "",
+    });
+    setOpenBank(exp);
+  }
+
+  async function submitBank(e: FormEvent) {
+    e.preventDefault();
+    if (!openBank) return;
+    const bin = bankForm.payeeBankBin;
+    const acc = bankForm.payeeAccountNumber.trim();
+    if ((bin && !acc) || (!bin && acc)) {
+      toast.error("Chọn ngân hàng và nhập STK hoặc bỏ trống cả 2");
+      return;
+    }
+    setSavingBank(true);
+    const res = await fetch(`/api/expenses/${openBank.id}/payee-bank`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        payeeBankBin: bin || null,
+        payeeAccountNumber: acc || null,
+        payeeAccountName: bankForm.payeeAccountName.trim() || null,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setSavingBank(false);
+    if (!res.ok) {
+      toast.error(j.message || "Không cập nhật được tài khoản nhận");
+      return;
+    }
+    toast.success(j.message || "Đã cập nhật tài khoản nhận");
+    // Cập nhật tại chỗ để nút "Chuyển khoản" bật ngay, khỏi chờ load()
+    const patch = {
+      payeeBankBin: bin || null,
+      payeeAccountNumber: acc || null,
+      payeeAccountName: bankForm.payeeAccountName.trim() || null,
+    };
+    setRows((rs) => rs.map((r) => (r.id === openBank.id ? { ...r, ...patch } : r)));
+    setDetailRow((d) => (d && d.id === openBank.id ? { ...d, ...patch } : d));
+    setOpenBank(null);
+    load();
+  }
+
   const [viewer, setViewer] = useState<{ urls: string[]; index: number; expenseId: string; type: "attachment" | "receipt" } | null>(null);
   useEffect(() => {
     if (!viewer) return;
@@ -734,6 +786,11 @@ export function ExpensesClient({
                           💵 Ghi nhận đã chi
                         </button>
                       )}
+                      {r.status === "pending" && canMarkPaid && (
+                        <button className="actbtn a-link" onClick={() => openBankDialog(r)}>
+                          🏦 {r.payeeAccountNumber ? "Sửa STK" : "Thêm STK"}
+                        </button>
+                      )}
                       {r.status === "tptc_pending" && isAdmin && (
                         <>
                           <button className="actbtn a-approve" onClick={() => approveExpense(r)}>
@@ -936,6 +993,11 @@ export function ExpensesClient({
                 {canCreate && dr.status !== "cancelled" && (
                   <button className="actbtn a-link" onClick={() => sendPublicLink(dr)} disabled={linkBusyId === dr.id}>
                     {linkBusyId === dr.id ? "Đang tạo…" : "🔗 Gửi link NCC"}
+                  </button>
+                )}
+                {dr.status === "pending" && canMarkPaid && (
+                  <button className="actbtn a-link" onClick={() => openBankDialog(dr)}>
+                    🏦 {dr.payeeAccountNumber ? "Sửa STK" : "Thêm STK"}
                   </button>
                 )}
                 {dr.status === "pending" && canMarkPaid && (
@@ -1150,6 +1212,70 @@ export function ExpensesClient({
           categories={categories}
           designContracts={designContracts}
         />
+      )}
+
+      {/* ===== POPUP: Thêm / sửa STK người nhận ===== */}
+      {openBank && overlay(
+        <div className="scrim" onClick={(e) => e.target === e.currentTarget && setOpenBank(null)}>
+          <form className="sheet" onSubmit={submitBank}>
+            <div className="sheet-hd">
+              <div>
+                <h3 className="orange">🏦 Tài khoản nhận</h3>
+                <div className="sub">LC · {openBank.code}</div>
+              </div>
+              <button className="iconbtn" type="button" onClick={() => setOpenBank(null)} title="Đóng">
+                ✕
+              </button>
+            </div>
+
+            <div className="fld">
+              <span className="lbl">STK người nhận (để bật nút “Chuyển khoản”)</span>
+              <div className="formgrid">
+                <label className="fld" style={{ marginBottom: 0 }}>
+                  <span className="lbl">Ngân hàng</span>
+                  <select className="ctrl" value={bankForm.payeeBankBin} onChange={(e) => setBankForm({ ...bankForm, payeeBankBin: e.target.value })}>
+                    <option value="">— Chọn ngân hàng —</option>
+                    {VN_BANKS.map((b) => (
+                      <option key={b.bin} value={b.bin}>
+                        {b.shortName} ({b.name})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="fld" style={{ marginBottom: 0 }}>
+                  <span className="lbl">Số tài khoản</span>
+                  <input
+                    className="ctrl"
+                    value={bankForm.payeeAccountNumber}
+                    onChange={(e) => setBankForm({ ...bankForm, payeeAccountNumber: e.target.value.replace(/[^0-9A-Za-z]/g, "") })}
+                    placeholder="VD: 0123456789"
+                  />
+                </label>
+                <label className="fld full" style={{ marginBottom: 0 }}>
+                  <span className="lbl">Tên chủ TK</span>
+                  <input
+                    className="ctrl"
+                    value={bankForm.payeeAccountName}
+                    onChange={(e) => setBankForm({ ...bankForm, payeeAccountName: e.target.value })}
+                    placeholder="Hiện trên QR (tuỳ chọn)"
+                  />
+                </label>
+              </div>
+              {bankForm.payeeBankBin && bankForm.payeeAccountNumber && (
+                <div className="ok-line">✓ Lưu xong sẽ có nút “Chuyển khoản” mở thẳng app ngân hàng</div>
+              )}
+            </div>
+
+            <div className="acts">
+              <button className="btn ghost" type="button" onClick={() => setOpenBank(null)}>
+                Huỷ
+              </button>
+              <button className="btn primary block" type="submit" disabled={savingBank}>
+                {savingBank ? "Đang lưu…" : "Lưu tài khoản nhận"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {/* ===== POPUP: Huỷ ===== */}
