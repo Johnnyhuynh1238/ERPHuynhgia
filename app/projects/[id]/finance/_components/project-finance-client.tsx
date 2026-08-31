@@ -176,9 +176,9 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
       </div>
 
       <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[#8892b0]">Lãi gộp tạm tính (đã thu − đã chi)</span>
-          <span className={`text-lg font-bold tabular-nums ${data.grossProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="min-w-0 text-sm text-[#8892b0]">Lãi gộp tạm tính (đã thu − đã chi)</span>
+          <span className={`shrink-0 whitespace-nowrap text-lg font-bold tabular-nums ${data.grossProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {fmt(data.grossProfit)} đ
           </span>
         </div>
@@ -189,9 +189,9 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
         <h2 className="mb-2 text-sm font-semibold text-orange-300">Chi phí theo nhóm</h2>
         <div className="space-y-1">
           {breakdownRows.map((r) => (
-            <div key={r.label} className="flex items-center justify-between rounded-lg bg-[#171a27] px-3 py-2 text-sm">
-              <span className="text-[#f0f2ff]">{r.label}</span>
-              <span className="tabular-nums text-red-400">{fmt(r.amount)} đ</span>
+            <div key={r.label} className="flex items-center justify-between gap-2 rounded-lg bg-[#171a27] px-3 py-2 text-sm">
+              <span className="min-w-0 text-[#f0f2ff]">{r.label}</span>
+              <span className="shrink-0 whitespace-nowrap tabular-nums text-red-400">{fmt(r.amount)} đ</span>
             </div>
           ))}
           {breakdownRows.length === 0 && <div className="py-3 text-center text-sm text-[#8892b0]">Chưa có khoản chi.</div>}
@@ -201,9 +201,9 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
             <div className="mb-1 text-xs font-medium text-[#8892b0]">Lệnh chi theo danh mục</div>
             <div className="space-y-1">
               {cost.byCategory.map((c) => (
-                <div key={c.name} className="flex items-center justify-between px-3 py-1 text-xs">
-                  <span className="text-[#8892b0]">{c.name}</span>
-                  <span className="tabular-nums text-[#f0f2ff]">{fmt(c.amount)} đ</span>
+                <div key={c.name} className="flex items-center justify-between gap-2 px-3 py-1 text-xs">
+                  <span className="min-w-0 truncate text-[#8892b0]">{c.name}</span>
+                  <span className="shrink-0 whitespace-nowrap tabular-nums text-[#f0f2ff]">{fmt(c.amount)} đ</span>
                 </div>
               ))}
             </div>
@@ -312,9 +312,9 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
         <Modal title="Công nợ NCC vật tư" onClose={() => setModal(null)}>
           <div className="space-y-1.5">
             {debt.suppliers.map((sup) => (
-              <div key={sup.name} className="flex items-center justify-between rounded-lg bg-[#171a27] px-3 py-2 text-sm">
-                <span className="text-[#f0f2ff]">{sup.name}</span>
-                <span className="tabular-nums text-amber-400">{fmt(sup.amount)} đ</span>
+              <div key={sup.name} className="flex items-center justify-between gap-2 rounded-lg bg-[#171a27] px-3 py-2 text-sm">
+                <span className="min-w-0 break-words text-[#f0f2ff]">{sup.name}</span>
+                <span className="shrink-0 whitespace-nowrap tabular-nums text-amber-400">{fmt(sup.amount)} đ</span>
               </div>
             ))}
             {debt.suppliers.length === 0 && <div className="py-4 text-center text-sm text-[#8892b0]">Không còn công nợ NCC.</div>}
@@ -329,10 +329,10 @@ export function ProjectFinanceClient({ projectId }: { projectId: string }) {
             {debt.subContracts.map((c) => (
               <Link key={c.id} href={`/sub-contracts/${c.id}`} className="block rounded-lg bg-[#171a27] px-3 py-2 hover:bg-[#22263a]">
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-[#f0f2ff]">
+                  <span className="min-w-0 break-words text-[#f0f2ff]">
                     {c.code} — {c.subcontractorName}
                   </span>
-                  <span className={`tabular-nums font-semibold ${c.debt > 0 ? "text-amber-400" : "text-emerald-400"}`}>{fmt(c.debt)} đ</span>
+                  <span className={`shrink-0 whitespace-nowrap tabular-nums font-semibold ${c.debt > 0 ? "text-amber-400" : "text-emerald-400"}`}>{fmt(c.debt)} đ</span>
                 </div>
                 <div className="mt-0.5 text-xs text-[#8892b0]">
                   {c.title} • HĐ {fmtShort(c.contractValue)} • đã chi {fmtShort(c.paid)}
