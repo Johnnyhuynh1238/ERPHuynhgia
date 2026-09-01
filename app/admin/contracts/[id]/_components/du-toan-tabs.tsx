@@ -5,10 +5,11 @@ import type { EstimateDetail } from "@/lib/estimate-detail";
 import { EstimateDetailSection } from "./estimate-detail-section";
 import { QuoteItemsEditor } from "./quote-items-editor";
 import { QuoteOverview } from "./quote-overview";
+import { MaterialPriceList } from "./material-price-list";
 
-type Tab = "hm" | "kl" | "gv" | "bg";
+type Tab = "hm" | "kl" | "gv" | "bg" | "vt";
 
-// Menu 3 màn dùng chung hạng mục: Khối lượng · Giá vốn · Báo giá.
+// Menu các màn dùng chung hạng mục: Khối lượng · Giá vốn · Báo giá · Giá vật tư.
 export function DuToanTabs({
   contractId,
   customerName,
@@ -54,6 +55,7 @@ export function DuToanTabs({
           {btn("kl", "📐 Khối lượng")}
           {btn("gv", "💰 Giá vốn")}
           {btn("bg", "🧾 Báo giá")}
+          {btn("vt", "📦 Giá vật tư")}
         </div>
       </div>
 
@@ -69,6 +71,8 @@ export function DuToanTabs({
           <iframe key={`bg-${scrollNonce}`} title="Báo giá" src={`/bao-gia-app.html?contract=${contractId}${scrollTarget ? `&goto=${encodeURIComponent(scrollTarget)}` : ""}`} className="dtm-frame" />
         </>
       )}
+
+      {tab === "vt" && <MaterialPriceList detail={detail} hmTho={hmTho} hmHt={hmHt} />}
 
       <style>{CSS}</style>
     </div>

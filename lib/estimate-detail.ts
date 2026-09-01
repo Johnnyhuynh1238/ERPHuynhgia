@@ -38,14 +38,16 @@ export type EDItem = {
   group?: string; // nhóm hạng mục (vd "betong"): KL đánh số 1-1/1-2, Giá vốn dồn 1 card
   groupName?: string; // tên hiển thị của nhóm ở màn Giá vốn (vd "Bê tông")
   noNum?: boolean; // không đánh số ở màn Khối lượng (vd mục cơ sở diện tích nhân công)
-  part?: EDPart; // thuộc phần thô / hoàn thiện — chia số tổng theo phần
+  part?: EDPart; // thuộc phần thô / hoàn thiện / tùy chọn — chia số tổng theo phần
   // Hạng mục cha (1 NGUỒN = danh sách hạng mục báo giá khách). Công tác gắn vào 1 hạng mục theo tên.
   hangMuc?: string; // = tên hạng mục trong quoteData.thoPhanBaoGia / hoanThien
   // Chủng loại vật tư khách thấy (loại/quy cách) — chỉ hiển thị ở màn khách, không tính tiền.
   custSpec?: { ten: string; loai?: string; quycach?: string }[];
 };
 
-export type EDPart = "tho" | "ht";
+// "opt" = hạng mục TÙY CHỌN (đang cắt khỏi phạm vi, giữ số liệu để bật lại khi cần).
+// Không cộng vào giá vốn thô/hoàn thiện — thoSummary chỉ lọc "tho", màn HT chỉ lọc "ht".
+export type EDPart = "tho" | "ht" | "opt";
 
 // NC khoán 1 hạng mục: ưu tiên KL×đơn giá, fallback nc nhập thẳng.
 export function costNc(c?: EDCost): number {
