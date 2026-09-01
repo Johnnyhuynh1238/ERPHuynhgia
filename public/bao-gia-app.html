@@ -135,6 +135,7 @@ tr.klft td{background:transparent;color:var(--mute);font-size:11px;font-style:it
   <button data-p="tq" class="on" onclick="nav('tq')">Tổng quan</button>
   <button data-p="tho" onclick="nav('tho')">Phần thô</button>
   <button data-p="ht" onclick="nav('ht')">Hoàn thiện</button>
+  <button data-p="htvt" onclick="nav('htvt')">Vật tư hoàn thiện</button>
   <button data-p="kbg" onclick="nav('kbg')">Không bao gồm</button>
   <button data-p="pl" onclick="nav('pl')">Lãi/lỗ</button>
   <button class="edit" id="editBtn" onclick="toggleEdit()">✎ Sửa</button>
@@ -225,9 +226,9 @@ const CALC={grand:()=>fmt(grand()),thoBan:()=>fmt(thoBan()),thoVt:()=>fmt(thoVt(
  allBan:()=>fmt(thoBan()+htTotal()),allVon:()=>fmt(thoVon()+htVonTot()),allLoi:()=>fmt((thoBan()+htTotal())-(thoVon()+htVonTot()))};
 
 function nav(p){if(RO&&p==='pl')p='tq';CUR=p;document.querySelectorAll('.nav button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
- ({tq:pageTQ,tho:pageTho,ht:pageHT,kbg:pageKBG,pl:pagePL})[p]();window.scrollTo(0,0);}
+ ({tq:pageTQ,tho:pageTho,ht:pageHT,htvt:pageHTVT,kbg:pageKBG,pl:pagePL})[p]();window.scrollTo(0,0);}
 function toggleEdit(){EDIT=!EDIT;document.getElementById('editBtn').classList.toggle('act',EDIT);document.body.classList.toggle('editing',EDIT);
- ({tq:pageTQ,tho:pageTho,ht:pageHT,kbg:pageKBG,pl:pagePL})[CUR]();toast(EDIT?'Chế độ sửa: bấm vào số/chữ để chỉnh':'Đã tắt chế độ sửa');if(!EDIT)postVersion();}
+ ({tq:pageTQ,tho:pageTho,ht:pageHT,htvt:pageHTVT,kbg:pageKBG,pl:pagePL})[CUR]();toast(EDIT?'Chế độ sửa: bấm vào số/chữ để chỉnh':'Đã tắt chế độ sửa');if(!EDIT)postVersion();}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
 const R=h=>{document.getElementById('root').innerHTML=h;if(window.requestAnimationFrame)requestAnimationFrame(fitSheet);return h;};
 const FIT_MAX=760,FIT_W=920;
@@ -327,6 +328,29 @@ function dtHT(i){if(RO)return;const m=DATA.hoanThien[i];const ban=htCong(i);cons
  CALC['hv'+i]=()=>fmt(htVon(i));drawPf(i);window.scrollTo(0,0);}
 function drawPf(i){const ban=htCong(i),von=htVon(i),loi=ban-von;const p=document.getElementById('pf');if(!p)return;
  p.className='profit'+(loi<0?' loss':'');p.innerHTML=`<div><div class="mini">Lợi nhuận · bán ${fmt(ban)} − vốn ${fmt(von)}</div><div class="amt">${fmt(loi)} đ</div></div><div class="pill ${loi>=0?'g':'r'}" style="font-size:15px">${pct(loi,ban).toFixed(1)}%</div>`;}
+
+// ===== MAN "VAT TU HOAN THIEN" =====
+// Copy man Hoan thien nhung quy ve GIA VON VAT TU: bo nhan cong va phan quan ly/lai.
+// Dung de chot chung loai vat tu voi chu nha — doi loai nao thi bu tru theo don gia von.
+// Von vat tu 1 hang muc = von.vt + von.vtPhu (khong lay von.nc).
+function htVtVon(i){const v=DATA.hoanThien[i].von||{};return (+v.vt||0)+(+v.vtPhu||0);}
+function htVtTotal(){return DATA.hoanThien.reduce((s,_,i)=>s+htVtVon(i),0);}
+// Rai von vat tu ve tung dong chi phi theo ty trong thanh tien cua dong do.
+function costTableVon(m,mi){const von=htVtVon(mi);
+ const tt=c=>(c.kl!=null&&c.gia!=null?(+c.kl||0)*(+c.gia||0):(+c.tt||0));
+ const tot=m.costs.reduce((s,c)=>s+tt(c),0);
+ let r=m.costs.map(c=>{const share=tot>0?tt(c)/tot:(m.costs.length?1/m.costs.length:0);
+   const vonLine=Math.round(von*share);const kl=(c.kl!=null&&+c.kl)?+c.kl:null;
+   const dg=kl?Math.round(vonLine/kl):null;
+   return `<tr><td>${c.stt!=null?c.stt+'. ':''}${c.label||''}</td><td class="n">${c.dvt||''}</td><td class="n">${c.kl!=null?fmt(c.kl):''}</td><td class="n">${dg!=null?fmt(dg):'—'}</td><td class="n">${fmt(vonLine)}</td></tr>`}).join('');
+ return `<table class="fx"><colgroup><col style="width:42%"><col style="width:9%"><col style="width:11%"><col style="width:18%"><col style="width:20%"></colgroup>
+ <thead><tr><th>Khoản mục vật tư</th><th class="n">ĐVT</th><th class="n">KL</th><th class="n">Đơn giá vốn</th><th class="n">Thành tiền vốn</th></tr></thead>
+ <tbody>${r}<tr class="tot"><td>CỘNG VẬT TƯ HẠNG MỤC</td><td></td><td></td><td></td><td class="n">${fmt(von)}</td></tr></tbody></table>`;}
+function pageHTVT(){let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${m.name}</span><span class="amt">${fmt(htVtVon(i))}</span></div><div class="bd">${costTableVon(m,i)}${vtBlock(m,i)}${m.ghi?`<div class="ghi">${m.ghi}</div>`:''}</div></div>`).join('');
+ R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
+ <div class="hero"><div class="lab">Tổng giá vốn vật tư hoàn thiện</div><div class="big">${fmt(htVtTotal())} đ</div></div>
+ <div class="dg">Bảng này là <b>giá vốn vật tư</b> — đã bỏ nhân công và chi phí quản lý. Dùng làm căn cứ <b>bù trừ khi đổi chủng loại vật tư</b>: lấy khối lượng nhân với chênh lệch đơn giá giữa loại cũ và loại mới.</div>
+ <div class="sec-title" style="font-size:16px">Chi tiết vật tư theo hạng mục</div>${c}`);}
 
 function pagePL(){const tb=thoBan(),tv=thoVon(),hb=htTotal(),hv=htVonTot();const ban=tb+hb,von=tv+hv,loi=ban-von;
  let rows=DATA.hoanThien.map((m,i)=>{const b=htCong(i),vo=htVon(i),l=b-vo;return `<tr><td>${i+1}. ${m.name}</td><td class="n">${fmt(b)}</td><td class="n">${fmt(vo)}</td><td class="n" style="color:${l>=0?'var(--green)':'var(--red)'}">${fmt(l)}</td><td class="n">${pct(l,b).toFixed(0)}%</td></tr>`}).join('');
