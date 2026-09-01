@@ -374,7 +374,7 @@ function costTableVon(m,mi){const von=htVtVon(mi);
    return `<tr><td>${c.stt!=null?c.stt+'. ':''}${c.label||''}</td><td class="n">${c.dvt||''}</td><td class="n">${c.kl!=null?fmt(c.kl):''}</td><td class="n">${dg!=null?fmt(dg):'—'}</td><td class="n">${fmt(vonLine)}</td></tr>`}).join('');
  return `<table class="fx">${cg}${head}<tbody>${r}${foot()}</tbody></table>`;}
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
- let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${vtBlock(m,i)}</div></div>`).join('');
+ let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
  <div class="hero"><div class="lab">Tổng giá vốn vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
  <div class="dg">Bảng này là <b>giá vốn vật tư</b> — đã bỏ nhân công và chi phí quản lý. Dùng làm căn cứ <b>bù trừ khi đổi chủng loại vật tư</b>: lấy khối lượng nhân với chênh lệch đơn giá giữa loại cũ và loại mới.</div>
