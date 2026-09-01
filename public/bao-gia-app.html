@@ -304,7 +304,7 @@ function costTable(m,mi){let r=m.costs.map((c,ci)=>{const hasKG=c.kl!=null&&c.gi
  return `<table class="fx"><colgroup><col style="width:42%"><col style="width:9%"><col style="width:11%"><col style="width:18%"><col style="width:20%"></colgroup>
  <thead><tr><th>Khoản mục chi phí</th><th class="n">ĐVT</th><th class="n">KL</th><th class="n">Đơn giá</th><th class="n">Thành tiền</th></tr></thead>
  <tbody>${r}<tr class="tot"><td>CỘNG HẠNG MỤC</td><td></td><td></td><td></td><td class="n"><span data-c="mc${mi}">${fmt(htCong(mi))}</span></td></tr></tbody></table>`;}
-function vtBlock(m,mi){if(!m.vt.length)return'';
+function vtBlock(m,mi){if(!m.vt||!m.vt.length)return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><tbody><tr><td class="mo">Chưa khai báo chủng loại cho hạng mục này.</td></tr></tbody></table>`;
  let r=m.vt.map((v,j)=>{const P='hoanThien.'+mi+'.vt.'+j;return `<tr><td>${txt(P+'.ten',v.ten)}</td><td class="lo">${txt(P+'.loai',v.loai)}</td><td class="mo">${txt(P+'.mota',v.mota||'')}</td></tr>`}).join('');
  return `<div class="vt-h">Bảng vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Mô tả</th></tr></thead><tbody>${r}</tbody></table>`;}
 function ttKG(mi,ci){const c=DATA.hoanThien[mi].costs[ci];const el=document.getElementById('ctt_'+mi+'_'+ci);if(el)el.textContent=fmt((+c.kl||0)*(+c.gia||0));calc();if(document.getElementById('pf'))drawPf(mi);}
@@ -374,7 +374,7 @@ function costTableVon(m,mi){const von=htVtVon(mi);
    return `<tr><td>${c.stt!=null?c.stt+'. ':''}${c.label||''}</td><td class="n">${c.dvt||''}</td><td class="n">${c.kl!=null?fmt(c.kl):''}</td><td class="n">${dg!=null?fmt(dg):'—'}</td><td class="n">${fmt(vonLine)}</td></tr>`}).join('');
  return `<table class="fx">${cg}${head}<tbody>${r}${foot()}</tbody></table>`;}
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
- let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${vtBlock(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
+ let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${vtBlock(m,i)}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
  <div class="hero"><div class="lab">Tổng giá vốn vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
  <div class="dg">Bảng này là <b>giá vốn vật tư</b> — đã bỏ nhân công và chi phí quản lý. Dùng làm căn cứ <b>bù trừ khi đổi chủng loại vật tư</b>: lấy khối lượng nhân với chênh lệch đơn giá giữa loại cũ và loại mới.</div>
