@@ -260,9 +260,7 @@ function pageTQ(){const g=grand();const PAY=DATA.thanhToan||[];const sumTy=PAY.r
    <tr><td class="k">Thời gian thi công</td><td>${txt('duan.tg',DATA.duan.tg)}</td><td class="k">Ngày báo giá</td><td>${new Date().toLocaleDateString('vi-VN')}</td></tr>
   </tbody></table></div></div>
  <div class="hero"><div class="lab">Tổng giá trị hợp đồng (chưa VAT)</div><div class="big"><span data-c="grand">${fmt(g)}</span> đ</div>
-  <div class="split"><div><div class="k">Phần thô</div><div class="v"><span data-c="thoBan">${fmt(thoBan())}</span></div></div>
-  <div><div class="k">Hoàn thiện</div><div class="v"><span data-c="htTot">${fmt(htTotal())}</span></div></div>
-  <div><div class="k">Thời gian</div><div class="v">${txt('duan.tg',DATA.duan.tg)}</div></div></div></div>
+  <div class="split"><div><div class="k">Thời gian</div><div class="v">${txt('duan.tg',DATA.duan.tg)}</div></div></div></div>
  <div class="card"><div class="hd"><span class="nm">Tính toán diện tích xây dựng</span><span class="amt">${dtTong().toFixed(2)} m²</span></div><div class="bd">
   <table class="fx"><colgroup><col style="width:8%"><col><col style="width:22%"><col style="width:12%"><col style="width:18%"></colgroup>
   <thead><tr><th class="n">#</th><th>Hạng mục</th><th class="n">DT thiết kế</th><th class="n">Hệ số</th><th class="n">DT tính</th></tr></thead><tbody>${ar}
