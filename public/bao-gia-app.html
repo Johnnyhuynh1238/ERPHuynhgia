@@ -348,9 +348,9 @@ function htVtTotal(){return DATA.hoanThien.reduce((s,_,i)=>s+htVtVon(i),0);}
 // can cu bu tru khi khach doi chung loai. Neu hang muc chua co vtGia thi rai von ve
 // tung dong chi phi theo ty trong thanh tien de van co so hien thi.
 function costTableVon(m,mi){const von=htVtVon(mi);
- const head=`<thead><tr><th>Vật tư</th><th class="n">ĐVT</th><th class="n">SL</th><th class="n">Đơn giá vốn</th><th class="n">Thành tiền vốn</th></tr></thead>`;
+ const head=`<thead><tr><th>Vật tư</th><th class="n">ĐVT</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Thành Tiền</th></tr></thead>`;
  const cg=`<colgroup><col style="width:42%"><col style="width:9%"><col style="width:11%"><col style="width:18%"><col style="width:20%"></colgroup>`;
- const foot=()=>`<tr class="tot"><td>CỘNG VẬT TƯ HẠNG MỤC</td><td></td><td></td><td></td><td class="n"><span data-c="vv${mi}">${fmt(htVtVon(mi))}</span></td></tr>`;
+ const foot=()=>`<tr class="tot"><td>CỘNG HẠNG MỤC</td><td></td><td></td><td></td><td class="n"><span data-c="vv${mi}">${fmt(htVtVon(mi))}</span></td></tr>`;
  const vg=Array.isArray(m.vtGia)?m.vtGia:[];
  if(vg.length){
    // Gom nhom theo tien to [TEN NHOM] o dau ten vat tu (vd "[SƠN]", "[CHỐNG THẤM]").
@@ -376,8 +376,8 @@ function costTableVon(m,mi){const von=htVtVon(mi);
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
  let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
- <div class="hero"><div class="lab">Tổng giá vốn vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
- <div class="dg">Bảng này là <b>giá vốn vật tư</b> — đã bỏ nhân công và chi phí quản lý. Dùng làm căn cứ <b>bù trừ khi đổi chủng loại vật tư</b>: lấy khối lượng nhân với chênh lệch đơn giá giữa loại cũ và loại mới.</div>
+ <div class="hero"><div class="lab">Tổng vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
+ 
  <div class="sec-title" style="font-size:16px">Chi tiết vật tư theo hạng mục</div>${c}`);}
 
 function pagePL(){const tb=thoBan(),tv=thoVon(),hb=htTotal(),hv=htVonTot();const ban=tb+hb,von=tv+hv,loi=ban-von;
