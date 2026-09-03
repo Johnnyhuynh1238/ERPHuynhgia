@@ -381,35 +381,20 @@ function costTableVon(m,mi){const von=htVtVon(mi);
    return `<tr><td>${c.stt!=null?c.stt+'. ':''}${c.label||''}</td><td class="n">${c.dvt||''}</td><td class="n">${c.kl!=null?fmt(c.kl):''}</td><td class="n">${dg!=null?fmt(dg):'—'}</td><td class="n">${fmt(vonLine)}</td></tr>`}).join('');
  return `<table class="fx">${cg}${head}<tbody>${r}${foot()}</tbody></table>`;}
 // ===== MAN "VAT TU PHAN THO" =====
-// Gom cac cong tac theo truong thoHangMuc[i].nhom, liet ke vat tu kem don gia.
-function thoVtCong(i){const h=DATA.thoHangMuc[i];return (h.vt||[]).reduce((s,v)=>s+(+v.tt||0),0);}
-function thoVtTotal(){return (DATA.thoHangMuc||[]).reduce((s,_,i)=>s+thoVtCong(i),0);}
-// Sua SL hoac don gia 1 dong vat tu tho -> tinh lai thanh tien + moi tong.
-function ttThoVT(i,j){const v=DATA.thoHangMuc[i].vt[j];
- v.tt=Math.round((+v.kl||0)*(+v.gia||0));
- const el=document.getElementById('tvt_'+i+'_'+j); if(el)el.textContent=fmt(v.tt);
- saveLS(); calc();}
-function pageThoVT(){const HM=DATA.thoHangMuc||[];
- const groups=[];HM.forEach((h,i)=>{const g=h.nhom||'KHÁC';let k=groups.find(x=>x.ten===g);
-   if(!k){k={ten:g,items:[]};groups.push(k);}k.items.push(i);});
- HM.forEach((h,i)=>{CALC['tv'+i]=()=>fmt(thoVtCong(i));});
- groups.forEach((g,gi)=>{CALC['tg'+gi]=()=>fmt(g.items.reduce((s,i)=>s+thoVtCong(i),0));});
- CALC['tvTot']=()=>fmt(thoVtTotal());
- const cg=`<colgroup><col style="width:42%"><col style="width:9%"><col style="width:11%"><col style="width:18%"><col style="width:20%"></colgroup>`;
+// Card dung y het tab Phan tho (bang Ten / Chung loai / Quy cach), chi khac la
+// gom cac hang muc theo truong thoPhanBaoGia[i].nhomVt. Dong vat tu trung ten
+// giua cac hang muc trong cung nhom thi hop nhat, giu ban ghi dau tien.
+function pageThoVT(){const PB=DATA.thoPhanBaoGia||[];
+ const groups=[];
+ PB.forEach((p,i)=>{const g=p.nhomVt||p.name||'KHÁC';let k=groups.find(x=>x.ten===g);
+   if(!k){k={ten:g,rows:[]};groups.push(k);}
+   (p.vt||[]).forEach((v,j)=>{if(!k.rows.some(r=>r.v.ten===v.ten))k.rows.push({v:v,pi:i,vj:j});});});
  let c=groups.map((g,gi)=>{
-   let body=g.items.map(i=>{const h=HM[i];
-     const rows=(h.vt||[]).map((v,j)=>{const P='thoHangMuc.'+i+'.vt.'+j;
-       const cTen=EDIT?txt(P+'.ten',v.ten||''):(v.ten||'');
-       const cDvt=EDIT?txt(P+'.dvt',v.dvt||''):(v.dvt||'');
-       const cKl=EDIT?`<input class="e num" value="${fmt(v.kl)}" oninput="setD('${P}.kl',pn(this.value));ttThoVT(${i},${j})">`:(v.kl!=null?fmt(v.kl):'');
-       const cGia=EDIT?`<input class="e num" value="${fmt(v.gia)}" oninput="setD('${P}.gia',pn(this.value));ttThoVT(${i},${j})">`:(v.gia!=null?fmt(v.gia):'—');
-       return `<tr><td>${cTen}</td><td class="n">${cDvt}</td><td class="n">${cKl}</td><td class="n">${cGia}</td><td class="n"><span id="tvt_${i}_${j}">${fmt(v.tt||0)}</span></td></tr>`;}).join('');
-     return `<tr class="grp"><td colspan="5">${EDIT?txt('thoHangMuc.'+i+'.ten',h.ten):h.ten}<span style="float:right"><span data-c="tv${i}">${fmt(thoVtCong(i))}</span></span></td></tr>${rows}`;}).join('');
-   return `<div class="card mucCard"><div class="hd"><span class="nm">${gi+1}. ${g.ten}</span><span class="amt"><span data-c="tg${gi}">${fmt(g.items.reduce((s,i)=>s+thoVtCong(i),0))}</span></span></div>
-    <div class="bd"><table class="fx">${cg}<thead><tr><th>Vật tư</th><th class="n">ĐVT</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Thành Tiền</th></tr></thead><tbody>${body}</tbody></table></div></div>`;}).join('');
- R(`<div class="sec-title">Vật tư phần thô — ${groups.length} nhóm</div>
- <div class="hero"><div class="lab">Tổng vật tư phần thô</div><div class="big"><span data-c="tvTot">${fmt(thoVtTotal())}</span> đ</div></div>
- ${c}`);}
+   const r=g.rows.map(x=>{const P='thoPhanBaoGia.'+x.pi+'.vt.'+x.vj;
+     return `<tr><td>${txt(P+'.ten',x.v.ten)}</td><td class="lo">${txt(P+'.loai',x.v.loai)}</td><td class="mo">${txt(P+'.quycach',x.v.quycach||'')}</td></tr>`;}).join('');
+   return `<div class="card"><div class="hd"><span class="nm">${gi+1}. ${g.ten}</span></div><div class="bd">${
+     r?`<div class="vt-h">Vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Quy cách</th></tr></thead><tbody>${r}</tbody></table>`:''}</div></div>`;}).join('');
+ R(`<div class="sec-title">Vật tư phần thô — ${groups.length} nhóm</div>${c}`);}
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
  let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
