@@ -338,9 +338,16 @@ function htVtVon(i){const m=DATA.hoanThien[i];
  if(Array.isArray(m.vtGia)&&m.vtGia.length)return m.vtGia.reduce((s,v)=>s+(+v.tt||0),0);
  const v=m.von||{};return (+v.vt||0)+(+v.vtPhu||0);}
 // Sua SL hoac don gia von 1 dong vat tu -> tinh lai thanh tien roi refresh moi tong.
-function ttVT(mi,vj){const v=DATA.hoanThien[mi].vtGia[vj];
+function ttVT(mi,vj){const m=DATA.hoanThien[mi],v=m.vtGia[vj];
  v.tt=Math.round((+v.kl||0)*(+v.gia||0));
  const el=document.getElementById('vtt_'+mi+'_'+vj); if(el)el.textContent=fmt(v.tt);
+ // Sua vat tu -> day nguoc ve gia von va GIA BAN cua hang muc, neu khong hai so se lech nhau.
+ const vt=m.vtGia.reduce((s,x)=>s+(+x.tt||0),0);
+ m.von=m.von||{}; m.von.vt=vt; m.von.vtPhu=0;
+ const ban=Math.round((vt+(+m.von.nc||0))*(1+(DATA._markupHt!=null?+DATA._markupHt:0.3)));
+ m.congTT=ban;
+ if(Array.isArray(m.costs)&&m.costs[0]){const c=m.costs[0];c.tt=ban;
+   if(c.kl!=null&&+c.kl)c.gia=Math.round(ban/(+c.kl));}
  saveLS(); calc();}
 function htVtTotal(){return DATA.hoanThien.reduce((s,_,i)=>s+htVtVon(i),0);}
 // Bang vat tu cua 1 hang muc, quy ve GIA VON.
