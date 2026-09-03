@@ -381,7 +381,9 @@ function ghiRieng(g){if(!g)return'';
    if(!t||t==='Ghi chú:')return false;
    return !BP.some(function(b){return t.indexOf(b)>=0;});}).join('\n');}
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
- let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${(function(g){return g?`<div class="ghi">${g}</div>`:'';})(ghiRieng(m.ghi))}</div></div>`).join('');
+ let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${EDIT
+   ? `<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`
+   : (function(g){return g?`<div class="ghi">${g}</div>`:'';})(ghiRieng(m.ghi))}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
  <div class="hero"><div class="lab">Tổng vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
  
