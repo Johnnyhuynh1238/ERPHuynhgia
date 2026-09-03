@@ -274,8 +274,7 @@ function pageTho(){const DTMAP=[0,4,2,6,6,5];let hm=DATA.thoHangMuc.map((h,i)=>`
  let ph=DATA.thoPhanBaoGia.map((p,i)=>{const PB='thoPhanBaoGia.'+i;let r=p.vt.map((v,j)=>`<tr><td>${txt(PB+'.vt.'+j+'.ten',v.ten)}</td><td class="lo">${txt(PB+'.vt.'+j+'.loai',v.loai)}</td><td class="mo">${txt(PB+'.vt.'+j+'.quycach',v.quycach||'')}</td></tr>`).join('');
   return `<div class="card"><div class="hd"${EDIT?'':` style="cursor:pointer" onclick="dtTho(${DTMAP[i]})" title="Xem dự toán"`}><span class="nm">${i+1}. ${txt(PB+'.name',p.name)}</span></div><div class="bd">${r?`<div class="vt-h">Vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Quy cách</th></tr></thead><tbody>${r}</tbody></table>`:''}</div></div>`}).join('');
  R(`<div class="sec-title">Phần thô — xây thô — ${DATA.thoPhanBaoGia.length} hạng mục</div>
- <div class="hero"><div class="lab">Giá trọn gói phần thô (chưa gồm VAT)</div><div class="big"><span data-c="thoBan">${fmt(thoBan())}</span> đ</div>
-  <div class="mini">Khoán ${num('donGiaTho',DATA.donGiaTho)} đ/m² × ${dtTong().toFixed(2)} m² diện tích xây dựng.</div></div>
+ <div class="hero"><div class="lab">Giá trọn gói phần thô (chưa gồm VAT)</div><div class="big"><span data-c="thoBan">${fmt(thoBan())}</span> đ</div></div>
  <div class="sec-title" style="font-size:16px">Hạng mục thi công &amp; vật tư cung cấp</div>${ph}`);}
 
 function dtTho(i){if(RO)return;const h=DATA.thoHangMuc[i];window.scrollTo(0,0);
