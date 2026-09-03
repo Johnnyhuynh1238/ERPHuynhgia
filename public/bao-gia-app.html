@@ -395,10 +395,9 @@ function pageThoVT(){const PB=DATA.thoPhanBaoGia||[];
    return `<div class="card"><div class="hd"><span class="nm">${gi+1}. ${g.ten}</span></div><div class="bd">${
      r?`<div class="vt-h">Vật tư cung cấp</div><table class="fx vtt"><colgroup><col style="width:26%"><col style="width:36%"><col style="width:38%"></colgroup><thead><tr><th>Tên</th><th>Chủng loại</th><th>Quy cách</th></tr></thead><tbody>${r}</tbody></table>`:''}</div></div>`;}).join('');
  R(`<div class="sec-title">Vật tư phần thô — ${groups.length} nhóm</div>${c}`);}
-function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
+function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});
  let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${(EDIT||m.ghi)?`<div class="ghi">${txt('hoanThien.'+i+'.ghi',m.ghi||'')}</div>`:''}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
- <div class="hero"><div class="lab">Tổng vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
  
  <div class="sec-title" style="font-size:16px">Chi tiết vật tư theo hạng mục</div>${c}`);}
 
