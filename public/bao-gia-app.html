@@ -373,8 +373,15 @@ function costTableVon(m,mi){const von=htVtVon(mi);
    const dg=kl?Math.round(vonLine/kl):null;
    return `<tr><td>${c.stt!=null?c.stt+'. ':''}${c.label||''}</td><td class="n">${c.dvt||''}</td><td class="n">${c.kl!=null?fmt(c.kl):''}</td><td class="n">${dg!=null?fmt(dg):'—'}</td><td class="n">${fmt(vonLine)}</td></tr>`}).join('');
  return `<table class="fx">${cg}${head}<tbody>${r}${foot()}</tbody></table>`;}
+// Ghi chu RIENG cua hang muc: bo dong "Ghi chu:" va 3 gach dau dong dieu khoan chung
+// (da hien o man Hoan thien) — man nay chi can phan noi ve vat tu.
+function ghiRieng(g){if(!g)return'';
+ const BP=['Khối lượng được dự toán từ bản vẽ','Khách hàng được phép thay đổi chủng loại vật tư','Trường hợp khách hàng cắt giảm hạng mục'];
+ return g.split('\n').filter(function(l){const t=l.trim();
+   if(!t||t==='Ghi chú:')return false;
+   return !BP.some(function(b){return t.indexOf(b)>=0;});}).join('\n');}
 function pageHTVT(){DATA.hoanThien.forEach((m,i)=>{CALC['vv'+i]=()=>fmt(htVtVon(i));});CALC['vvTot']=()=>fmt(htVtTotal());
- let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}</div></div>`).join('');
+ let c=DATA.hoanThien.map((m,i)=>`<div class="card mucCard" id="vt-${bgSlug(m.name)}"><div class="hd"><span class="nm">${i+1}. ${txt('hoanThien.'+i+'.name',m.name)}</span><span class="amt"><span data-c="vv${i}">${fmt(htVtVon(i))}</span></span></div><div class="bd">${costTableVon(m,i)}${(function(g){return g?`<div class="ghi">${g}</div>`:'';})(ghiRieng(m.ghi))}</div></div>`).join('');
  R(`<div class="sec-title">Vật tư hoàn thiện — ${DATA.hoanThien.length} hạng mục</div>
  <div class="hero"><div class="lab">Tổng vật tư hoàn thiện</div><div class="big"><span data-c="vvTot">${fmt(htVtTotal())}</span> đ</div></div>
  
