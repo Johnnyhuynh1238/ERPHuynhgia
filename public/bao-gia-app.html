@@ -439,7 +439,7 @@ try{document.getElementById('logoImg').src=LOGO}catch(e){}
 function printAll(bw){
  var root=document.getElementById('root');if(!root)return;
  var keep=root.innerHTML,keepCur=CUR;
- var order=['tq','tho','ht','kbg'],fns={tq:pageTQ,tho:pageTho,ht:pageHT,kbg:pageKBG},parts=[];
+ var order=['tq','tho','thovt','ht','htvt','kbg'],fns={tq:pageTQ,tho:pageTho,thovt:pageThoVT,ht:pageHT,htvt:pageHTVT,kbg:pageKBG},parts=[];
  order.forEach(function(p){try{fns[p]();}catch(e){}parts.push(root.innerHTML);});
  root.innerHTML=parts.map(function(h){return '<section class="print-sheet">'+h+'</section>';}).join('');
  if(bw)document.body.classList.add('bw');
