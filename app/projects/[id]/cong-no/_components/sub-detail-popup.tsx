@@ -1020,17 +1020,22 @@ export function SubDetailPopup({
 
       {/* Popup Lệnh chi dùng chung (portal ra body). Gắn HĐ qua sourceType=sub_contract →
           tổng đã trả + đợt tự tính lại khi lệnh chi được chi. */}
-      <ExpenseCreateModal
-        open={openPay && !!contract}
-        onClose={() => setOpenPay(false)}
-        onCreated={() => {
-          loadPayments();
-          onChanged?.();
-        }}
-        role={currentRole}
-        prefill={payPrefill}
-        lockContext={contract ? `${contract.project.code} — ${contract.project.name}` : null}
-      />
+      {/* Chặn bubble React-tree: modal portal ra body nhưng vẫn là con React của
+          subpop-scrim (onClick=close) → click trong modal (vd ô số tiền) sẽ đóng
+          popup thầu phụ làm modal biến mất. Wrap giống sheet "Ghi đã chi" bên dưới. */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <ExpenseCreateModal
+          open={openPay && !!contract}
+          onClose={() => setOpenPay(false)}
+          onCreated={() => {
+            loadPayments();
+            onChanged?.();
+          }}
+          role={currentRole}
+          prefill={payPrefill}
+          lockContext={contract ? `${contract.project.code} — ${contract.project.name}` : null}
+        />
+      </div>
 
       {/* sheet Ghi đã chi — cũng phải chặn bubble như sheet Chi ở trên. */}
       {openMarkPaid && (
