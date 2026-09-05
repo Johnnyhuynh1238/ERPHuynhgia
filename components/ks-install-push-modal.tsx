@@ -74,7 +74,12 @@ export function KsInstallPushModal({ publicKey }: { publicKey?: string }) {
     const pushOk = isPushSupported() && Notification.permission === "granted";
     if (standalone && pushOk) return;
 
-    setPlatform(detectPlatform(window.navigator.userAgent));
+    const plat = detectPlatform(window.navigator.userAgent);
+    // Desktop dùng nút "Bật thông báo" ở header — KHÔNG bật modal full-màn
+    // (backdrop fixed inset-0 sẽ nuốt hết click của admin trên trang).
+    if (plat === "desktop") return;
+
+    setPlatform(plat);
     setStep(!standalone ? "install" : "push");
     setOpen(true);
 
@@ -146,9 +151,13 @@ export function KsInstallPushModal({ publicKey }: { publicKey?: string }) {
       <div
         role="dialog"
         aria-label="Cài app và bật thông báo"
+        onClick={dismiss}
         className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
       >
-        <div className="relative w-full max-w-sm rounded-2xl border border-[#252840] bg-[#13151f] p-5 text-sm text-[#d9def3] shadow-2xl">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-sm rounded-2xl border border-[#252840] bg-[#13151f] p-5 text-sm text-[#d9def3] shadow-2xl"
+        >
           <button
             type="button"
             onClick={dismiss}
