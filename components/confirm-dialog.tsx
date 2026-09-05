@@ -79,7 +79,7 @@ export function ConfirmHost() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center px-4"
       onClick={() => close(false)}
     >
       <div
