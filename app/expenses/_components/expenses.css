@@ -598,7 +598,9 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 60;
+  /* Trên .cndoc .subpop-scrim (z-index 100): modal Lệnh chi mở từ popup thầu
+     phụ phải nổi lên trên, nếu không sẽ nằm sau popup và tưởng nút không bấm được. */
+  z-index: 200;
   animation: lc-fade 0.2s ease;
 }
 .lc-scope .sheet {
