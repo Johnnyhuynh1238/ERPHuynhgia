@@ -208,7 +208,11 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   return (
     <div className="app-wrapper min-h-screen bg-[var(--bg)] md:max-w-none">
       <div className="bg-glow" />
-      <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+      {/* Modal cài PWA/push chỉ dành cho nhân sự hiện trường (mobile). Admin/kế toán
+          dùng nút "Bật thông báo" ở header — tránh overlay full-màn chặn thao tác. */}
+      {(user.role === "engineer" || user.role === "foreman" || user.role === "construction_manager") && (
+        <KsInstallPushModal publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+      )}
       <PullToRefresh />
       {user.role === "engineer" && pathname !== "/cham-cong" ? (
         <AttendanceReminder />
