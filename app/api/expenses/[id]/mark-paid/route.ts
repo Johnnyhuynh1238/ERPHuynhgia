@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
 import { fireAndForget, notifyExpensePaid } from "@/lib/notifications";
+import { zaloNotifyExpensePaidToAdmin } from "@/lib/zalo-notify";
 import { recomputeSubContractPayments, settleSubPaymentInstallment } from "@/lib/sub-payment-utils";
 
 const PAY_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
@@ -126,6 +127,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         actorName: user.name || user.email || "Kế toán",
       }),
     );
+
+    // KT chi thủ công (kèm bill) → gửi anh Huỳnh Luận ảnh bill + thông tin lệnh qua Zalo.
+    fireAndForget(zaloNotifyExpensePaidToAdmin(updated.id));
 
     return NextResponse.json({
       expense: { ...updated, amount: Number(updated.amount), paidAmount: Number(updated.paidAmount) },
