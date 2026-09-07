@@ -1384,11 +1384,16 @@ function OrdersList({
             <button type="button" className="linkbtn" onClick={() => onPO(o)}>
               📄 Xem PO
             </button>
-            {(o.depositPaid ?? 0) > 0 && (
-              <span className="linkbtn coc" title="Tổng tiền đã đặt cọc cho đơn này">
-                💰 Đã cọc {fmt(o.depositPaid!)}đ
-              </span>
-            )}
+            {(o.depositPaid ?? 0) > 0 &&
+              (o.status === "paid" || remainOf(o) === 0 ? (
+                <span className="linkbtn coc paid-full" title="Đơn đã thanh toán đủ">
+                  ✅ Đã trả đủ {fmt(o.depositPaid!)}đ
+                </span>
+              ) : (
+                <span className="linkbtn coc" title="Tổng tiền đã đặt cọc cho đơn này">
+                  💰 Đã cọc {fmt(o.depositPaid!)}đ
+                </span>
+              ))}
             {/* Đặt cọc: đơn trả ngay chưa nhận — cọc được nhiều lần nên nút luôn hiện. */}
             {canDeposit(o) && (
               <button
