@@ -35,6 +35,7 @@ type ContractDetail = {
   actualEndDate: string | null;
   status: SubContractStatus;
   notes: string | null;
+  budgetLineId: string | null;
   project: { id: string; code: string; name: string };
   subcontractor: {
     id: string;
@@ -165,6 +166,11 @@ export function SubDetailPopup({
   onChanged?: () => void;
 }) {
   const canWrite = currentRole === "admin" || currentRole === "construction_manager";
+  const isAdmin = currentRole === "admin";
+  const canSeeBudgetLines = isAdmin || currentRole === "accountant";
+
+  const [budgetLines, setBudgetLines] = useState<Array<{ id: string; name: string }>>([]);
+  const [savingBudgetLine, setSavingBudgetLine] = useState(false);
 
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -242,6 +248,41 @@ export function SubDetailPopup({
     }
     setContract(json.contract || null);
   }, [contractId]);
+
+  const loadBudgetLines = useCallback(async (projectId: string) => {
+    const res = await fetch(`/api/projects/${projectId}/budget-plan`, { cache: "no-store" });
+    if (!res.ok) return;
+    const json = await res.json().catch(() => null);
+    setBudgetLines(
+      Array.isArray(json?.lines)
+        ? json.lines.map((l: { id: string; name: string }) => ({ id: l.id, name: l.name }))
+        : [],
+    );
+  }, []);
+
+  const assignBudgetLine = useCallback(
+    async (value: string) => {
+      if (!contract) return;
+      const budgetLineId = value || null;
+      if (budgetLineId === (contract.budgetLineId || null)) return;
+      setSavingBudgetLine(true);
+      const res = await fetch(`/api/sub-contracts/${contract.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgetLineId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setSavingBudgetLine(false);
+      if (!res.ok) {
+        toast.error(json.message || "Không gắn được hạng mục ngân sách");
+        return;
+      }
+      toast.success(budgetLineId ? "Đã gắn hạng mục ngân sách" : "Đã bỏ gắn hạng mục");
+      setContract((prev) => (prev ? { ...prev, budgetLineId } : prev));
+      onChanged?.();
+    },
+    [contract, onChanged],
+  );
 
   const loadPayments = useCallback(async () => {
     const res = await fetch(`/api/sub-contracts/${contractId}/payments`, { cache: "no-store" });
@@ -343,6 +384,10 @@ export function SubDetailPopup({
   useEffect(() => {
     if (tab === "evaluation") loadEvaluations();
   }, [tab, loadEvaluations]);
+
+  useEffect(() => {
+    if (canSeeBudgetLines && contract?.project.id) loadBudgetLines(contract.project.id);
+  }, [canSeeBudgetLines, contract?.project.id, loadBudgetLines]);
 
   const contractValue = Number(contract?.contractValue || 0);
   const paidTotal = Number(paymentMeta?.totals.paidTotal || 0);
@@ -694,7 +739,31 @@ export function SubDetailPopup({
                     <div className="irow"><span className="ik">Kết thúc dự kiến</span><span className="iv num">{formatDate(contract.expectedEndDate)}</span></div>
                     {contract.actualEndDate && <div className="irow"><span className="ik">Kết thúc thực tế</span><span className="iv num">{formatDate(contract.actualEndDate)}</span></div>}
                     <div className="irow"><span className="ik">Tạo bởi</span><span className="iv">{contract.creator.fullName}</span></div>
+                    <div className="irow">
+                      <span className="ik">Hạng mục NS</span>
+                      {isAdmin ? (
+                        <select
+                          className="hmsel"
+                          value={contract.budgetLineId ?? ""}
+                          disabled={savingBudgetLine}
+                          onChange={(e) => assignBudgetLine(e.target.value)}
+                        >
+                          <option value="">— Chưa gắn —</option>
+                          {budgetLines.map((l) => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="iv">
+                          {budgetLines.find((l) => l.id === contract.budgetLineId)?.name ??
+                            (contract.budgetLineId ? "Đã gắn" : "Chưa gắn")}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {isAdmin && budgetLines.length === 0 && (
+                    <div className="hmhint">Dự án chưa lập ngân sách hạng mục (màn Ngân sách dự án).</div>
+                  )}
 
                   {contract.scopeOfWork && (
                     <>

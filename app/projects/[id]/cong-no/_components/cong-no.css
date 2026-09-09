@@ -270,6 +270,9 @@
 .cndoc .info .ik { color: var(--mut); font-weight: 500; flex: none; }
 .cndoc .info .iv { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .cndoc .info .iv.num { font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.cndoc .hmsel { max-width: 62%; text-align: right; text-align-last: right; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: none; border: 1px solid var(--line2); border-radius: 8px; padding: 5px 8px; cursor: pointer; }
+.cndoc .hmsel:disabled { opacity: 0.5; }
+.cndoc .hmhint { font-size: 12px; color: var(--mut); padding: 6px 2px 0; }
 
 .cndoc .proseblk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 
