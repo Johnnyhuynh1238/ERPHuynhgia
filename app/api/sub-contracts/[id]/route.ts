@@ -17,6 +17,7 @@ const updateSchema = z.object({
   expectedEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
   taskIds: z.array(z.string().uuid()).optional(),
+  budgetLineId: z.string().uuid().nullable().optional(),
 });
 
 const cancelSchema = z.object({
@@ -170,6 +171,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  if (payload.budgetLineId) {
+    const line = await prisma.projectBudgetPlanLine.findFirst({
+      where: { id: payload.budgetLineId, plan: { projectId: existed.projectId } },
+      select: { id: true },
+    });
+    if (!line) {
+      return NextResponse.json({ message: "Hạng mục ngân sách không thuộc dự án này" }, { status: 400 });
+    }
+  }
+
+  const budgetLineNameById = new Map<string, string>();
+  if (payload.budgetLineId !== undefined) {
+    const ids = [existed.budgetLineId, payload.budgetLineId].filter((x): x is string => !!x);
+    if (ids.length > 0) {
+      const rows = await prisma.projectBudgetPlanLine.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true },
+      });
+      rows.forEach((r) => budgetLineNameById.set(r.id, r.name));
+    }
+  }
+  const budgetLineLabel = (id: string | null) =>
+    id ? (budgetLineNameById.get(id) ?? "—") : "(chưa gắn)";
+
   const nextStartDate = payload.startDate ? normalizeDate(payload.startDate) : existed.startDate;
   const nextExpectedEndDate = payload.expectedEndDate ? normalizeDate(payload.expectedEndDate) : existed.expectedEndDate;
 
@@ -199,6 +224,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ...(payload.startDate !== undefined ? { startDate: nextStartDate } : {}),
         ...(payload.expectedEndDate !== undefined ? { expectedEndDate: nextExpectedEndDate } : {}),
         ...(payload.notes !== undefined ? { notes: payload.notes || null } : {}),
+        ...(payload.budgetLineId !== undefined ? { budgetLineId: payload.budgetLineId } : {}),
       },
       include: {
         project: { select: { id: true, code: true, name: true } },
@@ -220,6 +246,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         expectedEndDate: existed.expectedEndDate,
         notes: existed.notes ?? null,
         linkedTasks: taskIds ? "[changed]" : null,
+        budgetLine: payload.budgetLineId !== undefined ? budgetLineLabel(existed.budgetLineId) : null,
       },
       {
         title: result.title,
@@ -229,6 +256,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         expectedEndDate: result.expectedEndDate,
         notes: result.notes ?? null,
         linkedTasks: taskIds ? `${taskIds.length} task` : null,
+        budgetLine: payload.budgetLineId !== undefined ? budgetLineLabel(result.budgetLineId) : null,
       },
       [
         { key: "title", label: "Tiêu đề" },
@@ -238,6 +266,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         { key: "expectedEndDate", label: "Ngày kết thúc DK", format: fmtDate },
         { key: "notes", label: "Ghi chú" },
         { key: "linkedTasks", label: "Công việc liên kết" },
+        { key: "budgetLine", label: "Hạng mục ngân sách" },
       ],
     );
     if (Object.keys(diff).length > 0) {
