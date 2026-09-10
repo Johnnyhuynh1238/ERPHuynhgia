@@ -563,6 +563,10 @@ export function ExpenseCreateModal({
       toast.error("Nhập số tiền > 0");
       return;
     }
+    if (!form.payee.trim()) {
+      toast.error("Chọn hoặc nhập người/đơn vị nhận");
+      return;
+    }
     // Chi thầu phụ: nhiều thầu phụ không có SĐT (flow cũ /pay không bắt) → không chặn.
     // VietQR/Zalo cho kế toán chỉ cần ngân hàng + STK, không cần SĐT người nhận.
     if (form.sourceType !== "sub_contract" && !form.payeePhone.trim()) {
@@ -695,7 +699,9 @@ export function ExpenseCreateModal({
             </div>
           </label>
           <label className="fld" style={{ marginBottom: 0 }}>
-            <span className="lbl">Người/đơn vị nhận</span>
+            <span className="lbl">
+              Người/đơn vị nhận <span className="req">*</span>
+            </span>
             <div className="payee-combo" ref={payeeComboRef}>
               <input
                 className="ctrl"
@@ -705,8 +711,9 @@ export function ExpenseCreateModal({
                   setPayeeOpen(true);
                 }}
                 onFocus={() => setPayeeOpen(true)}
-                placeholder="VD: Cửa hàng VLXD Minh Anh"
+                placeholder="Bấm để chọn đối tượng đã lưu, hoặc gõ tên mới"
                 autoComplete="off"
+                required
               />
               {payeeOpen && (
                 <div className="payee-panel">
