@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const project = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, code: true, name: true, address: true, contractValue: true, startDate: true, expectedEndDate: true, status: true },
+    select: { id: true, code: true, name: true, address: true, contractValue: true, startDate: true, expectedEndDate: true, status: true, customerPortalToken: true, customerPortalEnabled: true },
   });
   if (!project) return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
@@ -137,6 +137,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       startDate: project.startDate,
       endDate: project.expectedEndDate,
       daysLeft,
+      customerPortalToken: project.customerPortalToken,
+      customerPortalEnabled: project.customerPortalEnabled,
     },
     finance: {
       contract,

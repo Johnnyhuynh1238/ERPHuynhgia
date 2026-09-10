@@ -10,7 +10,7 @@ import "./overview.css";
 
 type Cost = { name: string; amount: number };
 type Overview = {
-  project: { id: string; code: string; name: string; address: string; status: string; startDate: string; endDate: string | null; daysLeft: number | null };
+  project: { id: string; code: string; name: string; address: string; status: string; startDate: string; endDate: string | null; daysLeft: number | null; customerPortalToken?: string | null; customerPortalEnabled?: boolean };
   finance: {
     contract: number; collected: number; remaining: number;
     budgetCost: number; grossMargin: number; spent: number; remainingSpend: number;
@@ -154,7 +154,7 @@ export function OverviewClient({
   const spentTotal = f.spent || 1;
   const isSelf = laborMode === "self";
 
-  type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean };
+  type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean; external?: boolean };
   const tiles: Tile[] = [
     { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
     { href: `${base}/budget-plan`, emoji: "🐖", name: "Ngân sách", sub: "Hạng mục · đã chi · còn phải chi" },
@@ -170,6 +170,15 @@ export function OverviewClient({
     { href: `${base}/diary-approval`, emoji: "📝", name: "Duyệt nhật ký", sub: "Nhật ký KS QL", badge: pendingDiaries ? { cls: "warn", text: `${pendingDiaries} chờ` } : undefined },
     { href: `${base}/documents`, emoji: "📁", name: "Hồ sơ", sub: "File · ảnh · HĐ" },
     { href: `${base}/members`, emoji: "👥", name: "Thành viên", sub: "Đội thi công" },
+    {
+      href: data.project.customerPortalToken ? `/cn/${data.project.customerPortalToken}` : "#",
+      emoji: "🏠",
+      name: "Cổng chủ nhà",
+      sub: data.project.customerPortalEnabled ? "Link theo dõi cho khách" : "Đang tắt",
+      badge: data.project.customerPortalEnabled ? { cls: "ok", text: "Bật" } : { cls: "warn", text: "Tắt" },
+      external: true,
+      show: !!data.project.customerPortalToken,
+    },
     { href: `${base}/edit`, emoji: "✏️", name: "Sửa dự án", sub: "Thông tin chung" },
     { href: `${base}/log`, emoji: "🕘", name: "Log dự án", sub: "Activity log" },
   ].filter((t) => t.show !== false);
@@ -292,12 +301,19 @@ export function OverviewClient({
         {/* ── PHÂN HỆ ── */}
         <div className="phead"><span className="pn">Phân hệ dự án</span></div>
         <div className="tiles">
-          {tiles.map((t) => (
-            <Link className="tile" href={t.href} key={t.href}>
-              <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
-              <div className="nm">{t.name}</div>{t.sub ? <div className="st">{t.sub}</div> : null}
-            </Link>
-          ))}
+          {tiles.map((t) =>
+            t.external ? (
+              <a className="tile" href={t.href} key={t.href} target="_blank" rel="noreferrer">
+                <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
+                <div className="nm">{t.name}</div>{t.sub ? <div className="st">{t.sub}</div> : null}
+              </a>
+            ) : (
+              <Link className="tile" href={t.href} key={t.href}>
+                <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
+                <div className="nm">{t.name}</div>{t.sub ? <div className="st">{t.sub}</div> : null}
+              </Link>
+            ),
+          )}
         </div>
 
         {/* ── NHẬT KÝ ── */}
