@@ -1321,3 +1321,10 @@
   border-radius: 999px;
   font-size: 13px;
 }
+
+/* Popup điều hướng Vay & Tạm ứng (khi chọn nhầm category nợ ở lệnh chi) */
+.lc-scope .lc-confirm-scrim { position: fixed; inset: 0; z-index: 300; background: rgba(46,20,10,.5); display: flex; align-items: center; justify-content: center; padding: 18px; }
+.lc-scope .lc-confirm { width: 100%; max-width: 380px; background: #fbf7ec; border: 1px solid #d9ccb2; border-radius: 16px; padding: 18px; color: #2e140a; }
+.lc-scope .lc-confirm-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.lc-scope .lc-confirm-body { font-size: 13px; color: #6b4c38; line-height: 1.5; }
+.lc-scope .lc-confirm-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

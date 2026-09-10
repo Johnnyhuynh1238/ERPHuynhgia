@@ -81,6 +81,13 @@ type CreateForm = {
   subPaymentId: string;
 };
 
+// 3 danh mục chỉ tạo được từ màn Vay & Tạm ứng (để gắn đúng khoản vay/tạm ứng).
+const DEBT_CAT_LABEL: Record<string, string> = {
+  TAMUNG: "Tạm ứng",
+  TRANOGOC: "Trả nợ gốc",
+  LAIVAY: "Chi phí lãi vay",
+};
+
 const emptyCreate: CreateForm = {
   projectId: "",
   designContractId: "",
@@ -229,6 +236,8 @@ export function ExpenseCreateModal({
   }, []);
 
   const [categories, setCategories] = useState<CategoryOption[]>(categoriesProp ?? []);
+  // 3 danh mục thuộc Vay & Tạm ứng — chọn ở lệnh chi thường sẽ điều hướng sang màn chuyên.
+  const [debtRedirect, setDebtRedirect] = useState<{ code: string; label: string } | null>(null);
   useEffect(() => {
     if (categoriesProp && categoriesProp.length) setCategories(categoriesProp);
   }, [categoriesProp]);
@@ -680,7 +689,22 @@ export function ExpenseCreateModal({
             <span className="lbl">
               Danh mục <span className="req">*</span>
             </span>
-            <select className="ctrl" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required>
+            <select
+              className="ctrl"
+              value={form.categoryId}
+              onChange={(e) => {
+                const id = e.target.value;
+                const cat = categories.find((c) => c.id === id);
+                const debt = cat && DEBT_CAT_LABEL[cat.code];
+                if (debt) {
+                  // Không set category — hỏi điều hướng sang Vay & Tạm ứng.
+                  setDebtRedirect({ code: cat!.code, label: debt });
+                  return;
+                }
+                setForm({ ...form, categoryId: id });
+              }}
+              required
+            >
               <option value="">— Chọn —</option>
               {visibleCategories.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -921,5 +945,35 @@ export function ExpenseCreateModal({
     </div>
   );
 
-  return createPortal(<div className="lc-scope" data-theme={theme}>{node}</div>, document.body);
+  return createPortal(
+    <div className="lc-scope" data-theme={theme}>
+      {node}
+      {debtRedirect && (
+        <div className="lc-confirm-scrim" onClick={() => setDebtRedirect(null)}>
+          <div className="lc-confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="lc-confirm-title">Khoản “{debtRedirect.label}”</div>
+            <div className="lc-confirm-body">
+              Khoản này phải tạo ở màn <b>Vay &amp; Tạm ứng</b> để gắn đúng khoản vay/phiếu tạm ứng
+              (nếu tạo ở đây sẽ không vào sổ nợ). Chuyển qua đó?
+            </div>
+            <div className="lc-confirm-acts">
+              <button type="button" className="btn ghost" onClick={() => setDebtRedirect(null)}>
+                Huỷ
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  window.location.href = "/admin/debts";
+                }}
+              >
+                Qua Vay &amp; Tạm ứng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
 }
