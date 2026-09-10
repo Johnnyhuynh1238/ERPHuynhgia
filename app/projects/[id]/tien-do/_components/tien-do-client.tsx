@@ -23,6 +23,23 @@ type Task = {
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
 
+const DAY_MS = 86400000;
+// "YYYY-MM-DD" (+n ngày) → "YYYY-MM-DD"
+const isoAddDays = (iso: string, n: number) => {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const isoOfMs = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+// số ngày thi công (bao gồm cả 2 đầu) từ start→end; "" nếu thiếu
+const durationDays = (start: string | null, end: string | null): number | "" => {
+  if (!start || !end) return "";
+  const s = Date.parse(start);
+  const e = Date.parse(end);
+  if (Number.isNaN(s) || Number.isNaN(e) || e < s) return "";
+  return Math.round((e - s) / DAY_MS) + 1;
+};
+
 // % DỰ KIẾN hôm nay theo khoảng ngày kế hoạch (nội suy tuyến tính)
 const plannedPct = (t: { planStart: string | null; planEnd: string | null }): number => {
   if (!t.planStart || !t.planEnd) return 0;
@@ -317,7 +334,10 @@ export function TienDoClient({
             Chưa có PHẦN nào. Vào Dự toán → “Quản lý phần” tạo theo HĐTK trước.
           </div>
         ) : view === "gantt" ? (
-          <GanttView tasks={tasks} />
+          <GanttView
+            tasks={tasks}
+            onPlan={(t, patch) => savePlan(t, patch)}
+          />
         ) : (
           <>
             {groups.map((g) => {
@@ -374,20 +394,39 @@ export function TienDoClient({
                       </div>
                       {t.sectionId && (
                         <div className="rplan">
-                          <span className="rplan-l">Dự kiến</span>
+                          <span className="rplan-l">Bắt đầu</span>
                           <input
                             type="date"
                             value={t.planStart ?? ""}
-                            onChange={(e) => savePlan(t, { planStart: e.target.value || null })}
+                            onChange={(e) => {
+                              const start = e.target.value || null;
+                              if (!start) {
+                                savePlan(t, { planStart: null, planEnd: null });
+                                return;
+                              }
+                              const cur = durationDays(t.planStart, t.planEnd);
+                              const dur = typeof cur === "number" ? cur : 1;
+                              savePlan(t, { planStart: start, planEnd: isoAddDays(start, dur - 1) });
+                            }}
                             aria-label={`Ngày bắt đầu ${t.name}`}
                           />
-                          <span className="arr">→</span>
                           <input
-                            type="date"
-                            value={t.planEnd ?? ""}
-                            onChange={(e) => savePlan(t, { planEnd: e.target.value || null })}
-                            aria-label={`Ngày kết thúc ${t.name}`}
+                            type="number"
+                            min={1}
+                            className="rdays"
+                            placeholder="số ngày"
+                            value={durationDays(t.planStart, t.planEnd)}
+                            onChange={(e) => {
+                              if (!t.planStart) {
+                                toast("Chọn ngày bắt đầu trước");
+                                return;
+                              }
+                              const n = Math.max(1, Math.round(Number(e.target.value) || 0));
+                              savePlan(t, { planEnd: isoAddDays(t.planStart, n - 1) });
+                            }}
+                            aria-label={`Số ngày thi công ${t.name}`}
                           />
+                          <span className="rdays-u">ngày</span>
                           {t.planStart && t.planEnd
                             ? (() => {
                                 const pv = plannedPct(t);
@@ -422,14 +461,32 @@ export function TienDoClient({
 // Cột trái = tên PHẦN; trục ngang = ngày chạy hết dự án; mỗi phần 1 thanh theo plan_start→plan_end,
 // bên trong tô % thực tế; có vạch "hôm nay".
 const DAY = 86400000;
-function GanttView({ tasks }: { tasks: Task[] }) {
+type DragState = {
+  key: string;
+  mode: "move" | "start" | "end";
+  startClientX: number;
+  origStart: number;
+  origEnd: number;
+  curStart: number;
+  curEnd: number;
+};
+function GanttView({
+  tasks,
+  onPlan,
+}: {
+  tasks: Task[];
+  onPlan: (t: Task, patch: { planStart: string; planEnd: string }) => void;
+}) {
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [scrubMs, setScrubMs] = useState<number | null>(null); // line ngày kéo được (null = hôm nay)
+  const [scrubDrag, setScrubDrag] = useState<{ startClientX: number; origMs: number } | null>(null);
   const secs = tasks;
   const dated = secs.filter((t) => t.planStart && t.planEnd);
   if (!dated.length)
     return (
       <div className="empty">
         <div className="ic">📅</div>
-        Chưa có ngày kế hoạch. Đặt ngày ở view danh sách (nút ☰) — mỗi phần có 2 ô ngày.
+        Chưa có ngày kế hoạch. Đặt ở view danh sách (nút ☰): ngày bắt đầu + số ngày thi công.
       </div>
     );
 
@@ -467,11 +524,14 @@ function GanttView({ tasks }: { tasks: Task[] }) {
     }
   }
   const nowMs = Date.now();
-  const todayX = nowMs >= origin && nowMs <= end ? posX(nowMs) : null;
   const fmtD = (ms: number) => {
     const d = new Date(ms);
     return `${d.getDate()}/${d.getMonth() + 1}`;
   };
+  // Line ngày kéo được (scrubber) — mặc định = hôm nay, kẹp trong [origin, end].
+  const scrubEff = Math.min(end, Math.max(origin, scrubMs != null ? scrubMs : nowMs));
+  const scrubX = posX(scrubEff);
+  const isToday = scrubMs == null || new Date(scrubMs).toDateString() === new Date().toDateString();
 
   return (
     <div className="gantt">
@@ -500,14 +560,16 @@ function GanttView({ tasks }: { tasks: Task[] }) {
                   {fmtD(origin + d * DAY)}
                 </span>
               ))}
-              {todayX != null && <span className="g-todayhd" style={{ left: todayX }} />}
             </div>
           </div>
           {/* Hàng từng phần */}
           {secs.map((t) => {
             const has = t.planStart && t.planEnd;
-            const l = has ? posX(Date.parse(t.planStart as string)) : 0;
-            const w = has ? Math.max(8, posX(Date.parse(t.planEnd as string)) - l) : 0;
+            const dCur = drag && drag.key === keyOf(t) ? drag : null;
+            const sMs = has ? (dCur ? dCur.curStart : Date.parse(t.planStart as string)) : 0;
+            const eMs = has ? (dCur ? dCur.curEnd : Date.parse(t.planEnd as string)) : 0;
+            const l = has ? posX(sMs) : 0;
+            const w = has ? Math.max(8, posX(eMs) - l) : 0;
             const pv = plannedPct(t);
             const late = has && t.percent < pv;
             return (
@@ -518,26 +580,84 @@ function GanttView({ tasks }: { tasks: Task[] }) {
                 <div className="g-lane" style={{ width: chartW }}>
                   {has && (
                     <div
-                      className={`g-bar${t.done ? " done" : ""}${late ? " late" : ""}`}
+                      className={`g-bar${t.done ? " done" : ""}${late ? " late" : ""}${dCur ? " dragging" : ""}`}
                       style={{ left: l, width: w }}
-                      title={`${t.planStart} → ${t.planEnd} · thực tế ${t.percent}% · dự kiến ${pv}% · đã mua ${fmt(t.bought)}/${fmt(t.amount)}đ`}
+                      title={`${isoOfMs(sMs)} → ${isoOfMs(eMs)} · ${durationDays(isoOfMs(sMs), isoOfMs(eMs))} ngày · thực tế ${t.percent}% · dự kiến ${pv}% · đã mua ${fmt(t.bought)}/${fmt(t.amount)}đ`}
+                      onPointerDown={(ev) => {
+                        const tgt = ev.target as HTMLElement;
+                        const mode =
+                          tgt.dataset.h === "l" ? "start" : tgt.dataset.h === "r" ? "end" : "move";
+                        ev.currentTarget.setPointerCapture(ev.pointerId);
+                        const os = Date.parse(t.planStart as string);
+                        const oe = Date.parse(t.planEnd as string);
+                        setDrag({ key: keyOf(t), mode, startClientX: ev.clientX, origStart: os, origEnd: oe, curStart: os, curEnd: oe });
+                        ev.preventDefault();
+                      }}
+                      onPointerMove={(ev) => {
+                        if (!drag || drag.key !== keyOf(t)) return;
+                        const delta = Math.round((ev.clientX - drag.startClientX) / PXD);
+                        let cs = drag.origStart;
+                        let ce = drag.origEnd;
+                        if (drag.mode === "move") {
+                          cs = drag.origStart + delta * DAY;
+                          ce = drag.origEnd + delta * DAY;
+                        } else if (drag.mode === "start") {
+                          cs = Math.min(drag.origEnd - DAY, drag.origStart + delta * DAY);
+                        } else {
+                          ce = Math.max(drag.origStart + DAY, drag.origEnd + delta * DAY);
+                        }
+                        setDrag({ ...drag, curStart: cs, curEnd: ce });
+                      }}
+                      onPointerUp={(ev) => {
+                        if (!drag || drag.key !== keyOf(t)) return;
+                        ev.currentTarget.releasePointerCapture(ev.pointerId);
+                        onPlan(t, { planStart: isoOfMs(drag.curStart), planEnd: isoOfMs(drag.curEnd) });
+                        setDrag(null);
+                      }}
                     >
                       <span className="g-fill" style={{ width: `${Math.max(0, Math.min(100, t.percent))}%` }} />
                       <span className="g-plab">{t.percent}%</span>
+                      {/* hover: ngày 2 đầu + số ngày ở giữa */}
+                      <span className="g-hint g-hs">{fmtD(sMs)}</span>
+                      <span className="g-hint g-hd">{durationDays(isoOfMs(sMs), isoOfMs(eMs))} ngày</span>
+                      <span className="g-hint g-he">{fmtD(eMs)}</span>
+                      <span className="g-handle l" data-h="l" />
+                      <span className="g-handle r" data-h="r" />
                     </div>
                   )}
-                  {todayX != null && <span className="g-today" style={{ left: todayX }} />}
                 </div>
               </div>
             );
           })}
+          {/* Line ngày kéo được (scrubber) — nhãn ngày ở đầu, kéo để rà timeline */}
+          <div
+            className={`g-scrub${isToday ? " today" : ""}`}
+            style={{ left: 160 + scrubX }}
+            onPointerDown={(ev) => {
+              ev.currentTarget.setPointerCapture(ev.pointerId);
+              setScrubDrag({ startClientX: ev.clientX, origMs: scrubEff });
+              ev.preventDefault();
+            }}
+            onPointerMove={(ev) => {
+              if (!scrubDrag) return;
+              const delta = Math.round((ev.clientX - scrubDrag.startClientX) / PXD);
+              setScrubMs(Math.min(end, Math.max(origin, scrubDrag.origMs + delta * DAY)));
+            }}
+            onPointerUp={(ev) => {
+              if (!scrubDrag) return;
+              ev.currentTarget.releasePointerCapture(ev.pointerId);
+              setScrubDrag(null);
+            }}
+          >
+            <span className="g-scrub-lbl">{fmtD(scrubEff)}</span>
+          </div>
         </div>
       </div>
       <div className="g-legend">
         <span><i className="lg-fill" /> Thực tế</span>
         <span><i className="lg-bar" /> Khoảng dự kiến</span>
         <span><i className="lg-late" /> Đang trễ</span>
-        <span><i className="lg-today" /> Hôm nay</span>
+        <span><i className="lg-today" /> Line ngày (kéo để rà)</span>
       </div>
     </div>
   );
