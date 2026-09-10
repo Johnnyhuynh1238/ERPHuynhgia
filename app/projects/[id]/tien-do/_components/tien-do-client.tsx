@@ -49,7 +49,17 @@ export function TienDoClient({
   const [err, setErr] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("dark"); // mặc định tối
+  const [view, setView] = useState<"list" | "gantt">("list"); // PC auto → gantt
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // PC (rộng ≥1024) auto hiện Gantt; mobile giữ danh sách. Người dùng đổi được bằng nút.
+  useEffect(() => {
+    try {
+      if (window.matchMedia("(min-width: 1024px)").matches) setView("gantt");
+    } catch {
+      /* noop */
+    }
+  }, []);
 
   // Nền tối mặc định; nhớ lựa chọn của người dùng.
   useEffect(() => {
@@ -217,6 +227,15 @@ export function TienDoClient({
             </div>
           </div>
           <div className="tbtns">
+            <button
+              className="iconbtn"
+              onClick={() => setView((v) => (v === "gantt" ? "list" : "gantt"))}
+              type="button"
+              aria-label="Đổi danh sách / Gantt"
+              title={view === "gantt" ? "Xem danh sách" : "Xem Gantt (lịch)"}
+            >
+              {view === "gantt" ? "☰" : "📅"}
+            </button>
             <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
               ◑
             </button>
@@ -249,10 +268,10 @@ export function TienDoClient({
             <span className="tot-pc">{loading ? "—" : `${dispPct}%`}</span>
           </div>
           <div className="bar">
-            <i style={{ width: `${Math.max(0, Math.min(100, dispPct))}%` }} />
             {!loading && total.hasPlan && (
-              <span className="planmark" style={{ left: `${Math.max(0, Math.min(100, total.planPct))}%` }} />
+              <span className="planfill" style={{ width: `${Math.max(0, Math.min(100, total.planPct))}%` }} />
             )}
+            <i style={{ width: `${Math.max(0, Math.min(100, dispPct))}%` }} />
           </div>
           {!loading && total.hasPlan && (
             <div className="tot-plan">
@@ -286,6 +305,8 @@ export function TienDoClient({
             <div className="ic">📊</div>
             Chưa có PHẦN nào. Vào Dự toán → “Quản lý phần” tạo theo HĐTK trước.
           </div>
+        ) : view === "gantt" ? (
+          <GanttView tasks={tasks} />
         ) : (
           <>
             {groups.map((g) => {
@@ -377,6 +398,95 @@ export function TienDoClient({
       </div>
 
       <div className={`toast${toastMsg ? " show" : ""}`}>{toastMsg}</div>
+    </div>
+  );
+}
+
+// ───────────────────────── GANTT (view PC) ─────────────────────────
+// Cột trái = tên PHẦN; trục ngang = ngày chạy hết dự án; mỗi phần 1 thanh theo plan_start→plan_end,
+// bên trong tô % thực tế; có vạch "hôm nay".
+const DAY = 86400000;
+function GanttView({ tasks }: { tasks: Task[] }) {
+  const secs = tasks.filter((t) => t.refType === "section");
+  const dated = secs.filter((t) => t.planStart && t.planEnd);
+  if (!dated.length)
+    return (
+      <div className="empty">
+        <div className="ic">📅</div>
+        Chưa có ngày kế hoạch. Đặt ngày ở view danh sách (nút ☰) — mỗi phần có 2 ô ngày.
+      </div>
+    );
+
+  const origin = Math.min(...dated.map((t) => Date.parse(t.planStart as string)));
+  const end = Math.max(...dated.map((t) => Date.parse(t.planEnd as string)));
+  const span = Math.max(DAY, end - origin);
+  const totalDays = Math.round(span / DAY);
+  const PXD = 15; // px mỗi ngày
+  const chartW = totalDays * PXD;
+  const posX = (ms: number) => ((ms - origin) / span) * chartW;
+
+  // mốc ~ mỗi 7 ngày
+  const ticks: number[] = [];
+  for (let d = 0; d <= totalDays; d += 7) ticks.push(d);
+  const nowMs = Date.now();
+  const todayX = nowMs >= origin && nowMs <= end ? posX(nowMs) : null;
+  const fmtD = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  };
+
+  return (
+    <div className="gantt">
+      <div className="g-scroll">
+        <div className="g-inner" style={{ width: chartW + 172 }}>
+          {/* Header trục ngày */}
+          <div className="g-headrow">
+            <span className="g-corner">Phần</span>
+            <div className="g-axis" style={{ width: chartW }}>
+              {ticks.map((d) => (
+                <span key={d} className="g-tick" style={{ left: d * PXD }}>
+                  {fmtD(origin + d * DAY)}
+                </span>
+              ))}
+              {todayX != null && <span className="g-todayhd" style={{ left: todayX }} />}
+            </div>
+          </div>
+          {/* Hàng từng phần */}
+          {secs.map((t) => {
+            const has = t.planStart && t.planEnd;
+            const l = has ? posX(Date.parse(t.planStart as string)) : 0;
+            const w = has ? Math.max(8, posX(Date.parse(t.planEnd as string)) - l) : 0;
+            const pv = plannedPct(t);
+            const late = has && t.percent < pv;
+            return (
+              <div className="g-row" key={keyOf(t)}>
+                <span className="g-name" title={t.name}>
+                  {t.name}
+                </span>
+                <div className="g-lane" style={{ width: chartW }}>
+                  {has && (
+                    <div
+                      className={`g-bar${t.done ? " done" : ""}${late ? " late" : ""}`}
+                      style={{ left: l, width: w }}
+                      title={`${t.planStart} → ${t.planEnd} · thực tế ${t.percent}% · dự kiến ${pv}%`}
+                    >
+                      <span className="g-fill" style={{ width: `${Math.max(0, Math.min(100, t.percent))}%` }} />
+                      <span className="g-plab">{t.percent}%</span>
+                    </div>
+                  )}
+                  {todayX != null && <span className="g-today" style={{ left: todayX }} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="g-legend">
+        <span><i className="lg-fill" /> Thực tế</span>
+        <span><i className="lg-bar" /> Khoảng dự kiến</span>
+        <span><i className="lg-late" /> Đang trễ</span>
+        <span><i className="lg-today" /> Hôm nay</span>
+      </div>
     </div>
   );
 }

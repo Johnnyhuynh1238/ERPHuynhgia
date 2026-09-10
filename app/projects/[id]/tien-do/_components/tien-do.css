@@ -120,7 +120,9 @@
 
 /* ── Tiến độ DỰ KIẾN (planned vs actual) ── */
 .tddoc .tot .bar { position: relative; }
-.tddoc .tot .bar .planmark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .8; border-radius: 2px; transform: translateX(-1px); pointer-events: none; }
+/* Lớp DỰ KIẾN (nền, màu nhạt) — thực tế đè lên; chậm thì lộ khúc dự kiến, nhanh thì lấp hết. */
+.tddoc .tot .bar .planfill { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--orange) 32%, transparent); border-radius: 4px; z-index: 0; pointer-events: none; }
+.tddoc .tot .bar > i { position: absolute; left: 0; top: 0; bottom: 0; z-index: 1; }
 .tddoc .tot-plan { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
 .tddoc .tot-plan .num { color: var(--text); font-weight: 600; }
 .tddoc .schedbadge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
@@ -137,3 +139,44 @@
 .tddoc .rplan .rsched.ahead { background: rgba(91,122,82,.18); color: var(--ok); }
 .tddoc .rplan .rsched.behind { background: rgba(185,28,28,.16); color: #d1503f; }
 .tddoc .rplan .rsched.ontime { background: var(--track); color: var(--mut); }
+
+/* ── GANTT (view PC) ── */
+.tddoc .gantt { margin-top: 16px; }
+.tddoc .g-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.tddoc .g-inner { min-width: 100%; }
+.tddoc .g-headrow, .tddoc .g-row { display: flex; align-items: stretch; }
+.tddoc .g-corner, .tddoc .g-name {
+  position: sticky; left: 0; z-index: 3; flex: 0 0 160px; width: 160px;
+  background: var(--card); border-right: 1px solid var(--line2);
+  padding: 0 10px; display: flex; align-items: center; font-size: 12px;
+}
+.tddoc .g-corner { z-index: 4; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; font-size: 10px; color: var(--mut); height: 34px; border-bottom: 1px solid var(--line2); }
+.tddoc .g-name { min-height: 34px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tddoc .g-axis { position: relative; height: 34px; border-bottom: 1px solid var(--line2); flex: 0 0 auto; }
+.tddoc .g-tick { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 4px; font-size: 10px; color: var(--mut); border-left: 1px solid var(--line); font-family: var(--font-plex-mono), monospace; }
+.tddoc .g-lane { position: relative; height: 34px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.tddoc .g-bar {
+  position: absolute; top: 6px; height: 22px; border-radius: 6px;
+  background: color-mix(in srgb, var(--orange) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  overflow: hidden; display: flex; align-items: center;
+}
+.tddoc .g-bar .g-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--orange); border-radius: 5px 0 0 5px; }
+.tddoc .g-bar .g-plab { position: relative; z-index: 1; padding: 0 6px; font-size: 10px; font-weight: 700; color: var(--text); font-family: var(--font-plex-mono), monospace; }
+.tddoc .g-bar.done { background: color-mix(in srgb, var(--ok) 22%, transparent); border-color: var(--ok); }
+.tddoc .g-bar.done .g-fill { background: var(--ok); }
+.tddoc .g-bar.late { border-color: #d1503f; }
+.tddoc .g-today, .tddoc .g-todayhd { position: absolute; top: 0; bottom: 0; width: 2px; background: #d1503f; z-index: 2; pointer-events: none; }
+.tddoc .g-todayhd { opacity: .7; }
+.tddoc .g-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--mut); }
+.tddoc .g-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.tddoc .g-legend i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
+.tddoc .g-legend .lg-fill { background: var(--orange); }
+.tddoc .g-legend .lg-bar { background: color-mix(in srgb, var(--orange) 26%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); }
+.tddoc .g-legend .lg-late { background: none; border: 1px solid #d1503f; }
+.tddoc .g-legend .lg-today { width: 3px; background: #d1503f; }
+
+/* PC: nới khung để Gantt có chỗ (auto hiện ở ≥1024) */
+@media (min-width: 1024px) {
+  .tddoc .wrap { max-width: 1180px; }
+}
