@@ -84,7 +84,7 @@ export function SupplierDetailClient({
     const out = supplier.groups
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-      .map((g) => ({ id: g.id, name: g.name, prices: byGroup.get(g.id) ?? [] }));
+      .map((g) => ({ id: g.id as string | null, name: g.name, prices: byGroup.get(g.id) ?? [] }));
     const none = byGroup.get(null);
     if (none && none.length) out.push({ id: null, name: "Chưa phân nhóm", prices: none });
     return out;
