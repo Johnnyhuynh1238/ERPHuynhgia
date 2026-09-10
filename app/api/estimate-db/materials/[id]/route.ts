@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/estimate";
 export const runtime = "nodejs";
 
 type Patch = {
+  sectionId?: string | null;
   catalogId?: string | null;
   categoryId?: string | null;
   name?: string;
@@ -21,6 +22,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const b = (await req.json()) as Patch;
   const data: Record<string, unknown> = {};
+  if (b.sectionId !== undefined) data.sectionId = b.sectionId || null;
   if (b.catalogId !== undefined) data.catalogId = b.catalogId || null;
   if (b.categoryId !== undefined) data.categoryId = b.categoryId || null;
   if (b.name !== undefined) {

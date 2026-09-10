@@ -5,6 +5,7 @@ import { requireAdmin, requireMuaHang } from "@/lib/estimate";
 export const runtime = "nodejs";
 
 type MatBody = {
+  sectionId?: string | null;
   catalogId?: string | null;
   categoryId?: string | null;
   name?: string;
@@ -29,6 +30,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     where: { projectId: params.id, catalogId, categoryId },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: {
+      section: { select: { name: true, kind: true } },
       catalog: { select: { phaseCode: true, taskCode: true, taskName: true } },
       category: { select: { name: true } },
     },
@@ -39,6 +41,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const price = Number(r.unitPrice);
     return {
       id: r.id,
+      sectionId: r.sectionId,
+      sectionName: r.section?.name ?? null,
+      sectionKind: r.section?.kind ?? null,
       catalogId: r.catalogId,
       taskCode: r.catalog ? `${r.catalog.phaseCode}-${r.catalog.taskCode}` : null,
       taskName: r.catalog?.taskName ?? null,
@@ -76,6 +81,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const created = await prisma.estimateDbMaterial.create({
     data: {
       projectId: params.id,
+      sectionId: b.sectionId || null,
       catalogId: b.catalogId || null,
       categoryId: b.categoryId || null,
       name,

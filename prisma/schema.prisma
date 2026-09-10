@@ -760,6 +760,7 @@ model Project {
   estimateMaterialMaps      EstimateMaterialMap[]
   estimateDbKhoan           EstimateDbKhoan[]
   estimateDbMaterials       EstimateDbMaterial[]
+  sections                  ProjectSection[]
 
   @@index([status])
   @@map("projects")
@@ -4381,7 +4382,8 @@ model EstimateDbKhoan {
 model EstimateDbMaterial {
   id         String   @id @default(uuid()) @db.Uuid
   projectId  String   @map("project_id") @db.Uuid
-  catalogId  String?  @map("catalog_id") @db.Uuid // → StandardTaskCatalog (công tác)
+  sectionId  String?  @map("section_id") @db.Uuid // → ProjectSection (PHẦN theo HĐTK, per-dự án)
+  catalogId  String?  @map("catalog_id") @db.Uuid // → StandardTaskCatalog (công tác) — legacy, giữ để dự án cũ ko vỡ
   categoryId String?  @map("category_id") @db.Uuid // → MaterialCategory (chủng loại)
   name       String // tên vật tư chi tiết
   unit       String   @db.VarChar(20)
@@ -4394,12 +4396,32 @@ model EstimateDbMaterial {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section  ProjectSection?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   catalog  StandardTaskCatalog? @relation(fields: [catalogId], references: [id], onDelete: SetNull)
   category MaterialCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  @@index([projectId, sectionId])
   @@index([projectId, catalogId])
   @@index([projectId, categoryId])
   @@map("estimate_db_materials")
+}
+
+// PHẦN dự án — nhóm hạng mục theo cách HĐTK chia sẵn (Nền móng, Kết cấu khung BT, Hoàn thiện…).
+// KHÁC catalog công tác chuẩn: mỗi dự án 1 list riêng, tạo thủ công/seed từ HĐTK, không cố định.
+model ProjectSection {
+  id        String          @id @default(uuid()) @db.Uuid
+  projectId String          @map("project_id") @db.Uuid
+  name      String
+  kind      BudgetPlanGroup @default(tho) // thô / hoàn thiện / nhân công / chung — để gom & tính lãi
+  sortOrder Int             @default(0) @map("sort_order")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materials EstimateDbMaterial[]
+
+  @@index([projectId, sortOrder])
+  @@map("project_sections")
 }
 
 // ── Module MUA HÀNG (đơn đặt VT bám dự toán) ──────────────────────────

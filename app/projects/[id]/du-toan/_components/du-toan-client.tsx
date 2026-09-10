@@ -4,12 +4,21 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildVtGroups, buildSuperGroups, type VtGroup, type SuperGroup } from "@/lib/estimate-vt-groups";
-import { api, fmt, type CatalogTask, type Khoan, type Material } from "./du-toan-data";
+import {
+  api,
+  fmt,
+  kindLabel,
+  SECTION_KINDS,
+  type Khoan,
+  type Material,
+  type Section,
+  type SectionKind,
+} from "./du-toan-data";
 import "./du-toan.css";
 
 type TabKey = "ct" | "vt" | "kh";
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "ct", label: "Công tác" },
+  { key: "ct", label: "Phần" },
   { key: "vt", label: "Vật tư" },
   { key: "kh", label: "Khoán" },
 ];
@@ -64,13 +73,12 @@ function PriceCell({ value, onSave }: { value: number; onSave: (n: number) => vo
   );
 }
 
+// Nhóm theo PHẦN dự án (thay công tác catalog).
 type CtGroup = {
-  catalogId: string | null;
-  code: string | null;
-  taskName: string;
-  taskNote: string | null;
-  phaseCode: string;
-  phaseName: string;
+  sectionId: string | null;
+  name: string;
+  kind: SectionKind | null;
+  sortOrder: number;
   mats: Material[];
   value: number;
 };
@@ -89,10 +97,11 @@ export function DuToanClient({
   const [tab, setTab] = useState<TabKey>(validTab);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [khoan, setKhoan] = useState<Khoan[]>([]);
-  const [tasksMeta, setTasksMeta] = useState<CatalogTask[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ kind: TabKey; id: string } | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
 
@@ -107,9 +116,9 @@ export function DuToanClient({
   }, []);
 
   useEffect(() => {
-    Promise.all([api.meta(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
-      .then(([m, mat, kh]) => {
-        setTasksMeta(m.tasks);
+    Promise.all([api.listSections(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
+      .then(([sec, mat, kh]) => {
+        setSections(sec.sections);
         setMaterials(mat.items);
         setKhoan(kh.items);
       })
@@ -117,11 +126,19 @@ export function DuToanClient({
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  const phaseByCatalog = useMemo(() => {
-    const map = new Map<string, CatalogTask>();
-    for (const t of tasksMeta) map.set(t.id, t);
-    return map;
-  }, [tasksMeta]);
+  // reload PHẦN + VT (xoá/đổi tên phần ảnh hưởng nhãn VT)
+  const reloadAll = async () => {
+    try {
+      const [sec, mat] = await Promise.all([
+        api.listSections(projectId),
+        api.listMaterials(projectId),
+      ]);
+      setSections(sec.sections);
+      setMaterials(mat.items);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
 
   const matTotal = useMemo(() => materials.reduce((s, m) => s + amountOf(m), 0), [materials]);
   const khoanTotal = useMemo(() => khoan.reduce((s, k) => s + k.value, 0), [khoan]);
@@ -129,36 +146,40 @@ export function DuToanClient({
   const vtPct = grand ? Math.round((matTotal / grand) * 100) : 0;
   const khPct = grand ? 100 - vtPct : 0;
 
-  // gộp theo công tác
+  // gộp theo PHẦN dự án (kể cả phần rỗng — để hiển thị & gán VT vào)
   const ctGroups = useMemo<CtGroup[]>(() => {
     const map = new Map<string, CtGroup>();
+    for (const s of sections) {
+      map.set(s.id, {
+        sectionId: s.id,
+        name: s.name,
+        kind: s.kind,
+        sortOrder: s.sortOrder,
+        mats: [],
+        value: 0,
+      });
+    }
     for (const m of materials) {
-      const key = m.catalogId ?? "__none";
+      const key = m.sectionId ?? "__none";
       let g = map.get(key);
       if (!g) {
-        const meta = m.catalogId ? phaseByCatalog.get(m.catalogId) : undefined;
         g = {
-          catalogId: m.catalogId,
-          code: m.taskCode ?? meta?.code ?? null,
-          taskName: m.taskName ?? meta?.taskName ?? "Chưa gán công tác",
-          taskNote: m.taskNote ?? null,
-          phaseCode: meta?.phaseCode ?? (m.catalogId ? "??" : "zz"),
-          phaseName: meta?.phaseName ?? (m.catalogId ? "Khác" : "Chưa gán công tác"),
+          sectionId: m.sectionId,
+          name: m.sectionName ?? "Chưa gán phần",
+          kind: m.sectionKind,
+          sortOrder: Number.MAX_SAFE_INTEGER,
           mats: [],
           value: 0,
         };
         map.set(key, g);
       }
-      if (!g.taskNote && m.taskNote) g.taskNote = m.taskNote;
       g.mats.push(m);
       g.value += amountOf(m);
     }
-    return Array.from(map.values()).sort((a, b) =>
-      a.phaseCode !== b.phaseCode
-        ? a.phaseCode.localeCompare(b.phaseCode)
-        : (a.code ?? "").localeCompare(b.code ?? ""),
+    return Array.from(map.values()).sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
     );
-  }, [materials, phaseByCatalog]);
+  }, [materials, sections]);
 
   // gộp theo vật tư (tên + đvt) — nguồn chung với màn Mua hàng (lib/estimate-vt-groups)
   const vtGroups = useMemo<VtGroup<Material>[]>(
@@ -177,6 +198,22 @@ export function DuToanClient({
     setMaterials((rows) => rows.map((r) => (r.id === id ? { ...r, unitPrice: price } : r)));
     try {
       await api.patchMaterial(id, { unitPrice: price });
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  // gán 1 VT vào PHẦN (hoặc bỏ gán)
+  const saveMatSection = async (id: string, sectionId: string | null) => {
+    const s = sections.find((x) => x.id === sectionId) ?? null;
+    setMaterials((rows) =>
+      rows.map((r) =>
+        r.id === id
+          ? { ...r, sectionId, sectionName: s?.name ?? null, sectionKind: s?.kind ?? null }
+          : r,
+      ),
+    );
+    try {
+      await api.patchMaterial(id, { sectionId });
     } catch (e) {
       setErr((e as Error).message);
     }
@@ -259,7 +296,7 @@ export function DuToanClient({
         <div className="dt-tabs">
           {TABS.map((t) => {
             const n = t.key === "ct" ? ctGroups.length : t.key === "vt" ? vtGroups.length : khoan.length;
-            const unit = t.key === "ct" ? "công tác" : t.key === "vt" ? "loại" : "HĐ";
+            const unit = t.key === "ct" ? "phần" : t.key === "vt" ? "loại" : "HĐ";
             return (
               <button
                 key={t.key}
@@ -278,7 +315,12 @@ export function DuToanClient({
         {loading ? (
           <div className="dt-empty">Đang tải…</div>
         ) : tab === "ct" ? (
-          <CongTacPanel groups={ctGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "ct", id })} />
+          <CongTacPanel
+            groups={ctGroups}
+            total={matTotal}
+            onOpen={(id) => setSheet({ kind: "ct", id })}
+            onManage={() => setManageOpen(true)}
+          />
         ) : tab === "vt" ? (
           <VatTuPanel superGroups={vtSuperGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "vt", id })} />
         ) : (
@@ -298,9 +340,11 @@ export function DuToanClient({
               <div className="dt-grip" />
               {sheet.kind === "ct" && (
                 <CtSheet
-                  group={ctGroups.find((g) => (g.catalogId ?? "__none") === sheet.id)}
+                  group={ctGroups.find((g) => (g.sectionId ?? "__none") === sheet.id)}
+                  sections={sections}
                   onClose={() => setSheet(null)}
                   onSavePrice={saveMatPrice}
+                  onSaveSection={saveMatSection}
                 />
               )}
               {sheet.kind === "vt" && (
@@ -317,6 +361,26 @@ export function DuToanClient({
                   onSaveValue={saveKhoanValue}
                 />
               )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Quản lý PHẦN */}
+      {manageOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="dt-portal" data-theme={theme ?? undefined}>
+            <div className="dt-scrim show" onClick={() => setManageOpen(false)} />
+            <div className="dt-sheet show" role="dialog" aria-modal="true">
+              <div className="dt-grip" />
+              <ManageSections
+                projectId={projectId}
+                sections={sections}
+                onClose={() => setManageOpen(false)}
+                onChanged={reloadAll}
+                onError={(m) => setErr(m)}
+              />
             </div>
           </div>,
           document.body,
@@ -347,49 +411,70 @@ export function DuToanClient({
 }
 
 // ───────────────────────── PANELS ─────────────────────────
+// thứ tự loại để gom siêu nhóm; null (chưa gán) xếp cuối
+const kindRank = (k: SectionKind | null) => {
+  const i = SECTION_KINDS.findIndex((x) => x.key === k);
+  return i < 0 ? SECTION_KINDS.length : i;
+};
+
 function CongTacPanel({
   groups,
   total,
   onOpen,
+  onManage,
 }: {
   groups: CtGroup[];
   total: number;
   onOpen: (id: string) => void;
+  onManage: () => void;
 }) {
-  if (groups.length === 0) return <div className="dt-empty">Chưa có công tác nào. Dùng 🤖 AI để bóc vật tư.</div>;
-  const phaseTotal = new Map<string, number>();
-  for (const g of groups) phaseTotal.set(g.phaseCode, (phaseTotal.get(g.phaseCode) ?? 0) + g.value);
+  const manageBtn = (
+    <button type="button" className="dt-manage" onClick={onManage}>
+      ⚙ Quản lý phần
+    </button>
+  );
+  if (groups.length === 0)
+    return (
+      <div>
+        {manageBtn}
+        <div className="dt-empty">Chưa có PHẦN nào. Bấm “Quản lý phần” để tạo theo HĐTK.</div>
+      </div>
+    );
 
-  let lastPhase = "";
+  // tổng theo loại (thô / hoàn thiện / …)
+  const kindTotal = new Map<SectionKind | null, number>();
+  for (const g of groups) kindTotal.set(g.kind, (kindTotal.get(g.kind) ?? 0) + g.value);
+
+  const sorted = [...groups].sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.sortOrder - b.sortOrder);
+  let lastKind: SectionKind | null | undefined = undefined;
   let idx = 0;
   return (
     <div>
-      {groups.map((g) => {
+      {manageBtn}
+      {sorted.map((g) => {
         idx++;
         const header =
-          g.phaseCode !== lastPhase ? (
-            <div className="dt-phead" key={"h-" + g.phaseCode}>
-              <span className="pi">{g.phaseCode === "zz" ? "—" : "GĐ " + g.phaseCode}</span>
-              <span className="pn">{g.phaseName}</span>
-              <span className="pt dt-num">{fmt(phaseTotal.get(g.phaseCode) ?? 0)}</span>
+          g.kind !== lastKind ? (
+            <div className="dt-phead" key={"h-" + (g.kind ?? "none")}>
+              <span className="pi">{kindLabel(g.kind)}</span>
+              <span className="pn" />
+              <span className="pt dt-num">{fmt(kindTotal.get(g.kind) ?? 0)}</span>
             </div>
           ) : null;
-        lastPhase = g.phaseCode;
+        lastKind = g.kind;
         return (
-          <div key={g.catalogId ?? "__none"}>
+          <div key={g.sectionId ?? "__none"}>
             {header}
-            <button className="dt-row" onClick={() => onOpen(g.catalogId ?? "__none")}>
+            <button className="dt-row" onClick={() => onOpen(g.sectionId ?? "__none")}>
               <span className="stt dt-num">{idx}</span>
               <span className="rb">
                 <span className="r1">
-                  <span className="rn">{g.taskName}</span>
+                  <span className="rn">{g.name}</span>
                   <span className="rav dt-num">{fmt(g.value)}</span>
                 </span>
                 <span className="r2">
                   <span className="rs">
-                    {g.code && <span className="code">{g.code}</span>}
-                    {g.code ? " · " : ""}
-                    {g.mats.length} chủng loại VT
+                    {g.mats.length} vật tư{g.sectionId == null ? " · chưa gán phần" : ""}
                   </span>
                   <span className="rau">vật tư</span>
                 </span>
@@ -400,7 +485,7 @@ function CongTacPanel({
         );
       })}
       <div className="dt-gstrip">
-        <span className="gk">Tổng vật tư {groups.length} công tác</span>
+        <span className="gk">Tổng vật tư {groups.length} phần</span>
         <span className="gv dt-num">
           {fmt(total)}
           <span className="u">đ</span>
@@ -413,7 +498,7 @@ function CongTacPanel({
 // 1 dòng chủng loại (giữ nguyên markup cũ) — dùng trong các siêu nhóm.
 function ChungLoaiRow({ g, onOpen }: { g: VtGroup<Material>; onOpen: (id: string) => void }) {
   const cta = new Set<string>();
-  g.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
+  g.items.forEach((it) => it.members.forEach((m) => cta.add(m.sectionId ?? "__none")));
   // Tổng SL theo đơn vị (1 chủng loại có thể nhiều đvt: Thép có cây + kg)
   const byUnit = new Map<string, number>();
   g.items.forEach((it) => byUnit.set(it.unit, (byUnit.get(it.unit) ?? 0) + it.qty));
@@ -432,7 +517,7 @@ function ChungLoaiRow({ g, onOpen }: { g: VtGroup<Material>; onOpen: (id: string
           <span className="rs">
             {g.items.length} vật tư · <b className="dt-num">{qtyStr}</b>
           </span>
-          <span className="rau">{cta.size} công tác</span>
+          <span className="rau">{cta.size} phần</span>
         </span>
       </span>
       <span className="chev">›</span>
@@ -544,24 +629,28 @@ function SheetHead({ eye, title, onClose }: { eye: string; title: string; onClos
 
 function CtSheet({
   group,
+  sections,
   onClose,
   onSavePrice,
+  onSaveSection,
 }: {
   group?: CtGroup;
+  sections: Section[];
   onClose: () => void;
   onSavePrice: (id: string, price: number) => void;
+  onSaveSection: (id: string, sectionId: string | null) => void;
 }) {
-  if (!group) return <SheetHead eye="Công tác" title="—" onClose={onClose} />;
+  if (!group) return <SheetHead eye="Phần" title="—" onClose={onClose} />;
   const sub = group.mats.reduce((s, m) => s + amountOf(m), 0);
   return (
     <>
-      <SheetHead eye={`Công tác${group.code ? " · " + group.code : ""}`} title={group.taskName} onClose={onClose} />
+      <SheetHead eye={`Phần · ${kindLabel(group.kind)}`} title={group.name} onClose={onClose} />
       <div className="dt-sbody">
         <div className="dt-kpi">
           <div className="ki">
-            <div className="kk">Giai đoạn</div>
+            <div className="kk">Loại</div>
             <div className="kv" style={{ fontSize: 13 }}>
-              {group.phaseName}
+              {kindLabel(group.kind)}
             </div>
           </div>
           <div className="ki">
@@ -575,7 +664,7 @@ function CtSheet({
         </div>
 
         <div className="dt-blabel">Chi tiết vật tư</div>
-        <p className="dt-ephelp">Chạm đơn giá để sửa · bấm ra ngoài để lưu</p>
+        <p className="dt-ephelp">Chạm đơn giá để sửa · đổi ô “Phần” để chuyển vật tư sang phần khác</p>
         <table className="dt-t">
           <thead>
             <tr>
@@ -594,6 +683,18 @@ function CtSheet({
                     {qfmt(m.quantity, m.unit)}
                     {m.note ? " · " + m.note : ""}
                   </div>
+                  <select
+                    className="dt-msel"
+                    value={m.sectionId ?? ""}
+                    onChange={(e) => onSaveSection(m.id, e.target.value || null)}
+                  >
+                    <option value="">— chưa gán phần —</option>
+                    {sections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="r">
                   <PriceCell value={m.unitPrice} onSave={(v) => onSavePrice(m.id, v)} />
@@ -628,7 +729,7 @@ function VtSheet({
   if (!group) return <SheetHead eye="Vật tư" title="—" onClose={onClose} />;
   const tot = group.amount;
   const cta = new Set<string>();
-  group.items.forEach((it) => it.members.forEach((m) => cta.add(m.catalogId ?? "__none")));
+  group.items.forEach((it) => it.members.forEach((m) => cta.add(m.sectionId ?? "__none")));
   return (
     <>
       <SheetHead eye="Vật tư · chủng loại" title={group.categoryName ?? "Chưa phân loại"} onClose={onClose} />
@@ -639,7 +740,7 @@ function VtSheet({
             <div className="kv">{group.items.length}</div>
           </div>
           <div className="ki">
-            <div className="kk">Công tác</div>
+            <div className="kk">Phần</div>
             <div className="kv">{cta.size}</div>
           </div>
           <div className="ki">
@@ -647,7 +748,7 @@ function VtSheet({
             <div className="kv hl">{fmt(tot)}</div>
           </div>
         </div>
-        <p className="dt-ephelp">Chạm đơn giá để sửa · áp cho mọi công tác dùng vật tư đó</p>
+        <p className="dt-ephelp">Chạm đơn giá để sửa · áp cho mọi phần dùng vật tư đó</p>
 
         <div className="dt-blabel">Vật tư trong chủng loại ({group.items.length})</div>
         <table className="dt-t">
@@ -667,7 +768,7 @@ function VtSheet({
                   <td>
                     <div className="dn">{it.name}</div>
                     <div className="dsub">
-                      {qfmt(it.qty, it.unit)} · {it.members.length} công tác
+                      {qfmt(it.qty, it.unit)} · {it.members.length} phần
                     </div>
                   </td>
                   <td className="r">
@@ -736,6 +837,144 @@ function KhSheet({
             <div className="dt-blabel">Ghi chú</div>
             <div className="dt-prose lead">{khoan.note}</div>
           </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ───────────────────────── QUẢN LÝ PHẦN ─────────────────────────
+function ManageSections({
+  projectId,
+  sections,
+  onClose,
+  onChanged,
+  onError,
+}: {
+  projectId: string;
+  sections: Section[];
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+  onError: (m: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<SectionKind>("tho");
+  const [busy, setBusy] = useState(false);
+
+  const wrap = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      await onChanged();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    void wrap(async () => {
+      await api.addSection(projectId, { name: n, kind });
+      setName("");
+    });
+  };
+  const rename = (s: Section) => {
+    const n = window.prompt("Tên phần:", s.name);
+    if (n == null) return;
+    const t = n.trim();
+    if (!t || t === s.name) return;
+    void wrap(() => api.patchSection(projectId, s.id, { name: t }));
+  };
+  const changeKind = (s: Section, k: SectionKind) =>
+    void wrap(() => api.patchSection(projectId, s.id, { kind: k }));
+  const del = (s: Section) => {
+    if (!window.confirm(`Xoá phần “${s.name}”?\nVật tư trong phần sẽ về “chưa gán” (không mất).`)) return;
+    void wrap(() => api.delSection(projectId, s.id));
+  };
+  const move = (s: Section, dir: -1 | 1) => {
+    const sorted = [...sections].sort((a, b) => a.sortOrder - b.sortOrder);
+    const i = sorted.findIndex((x) => x.id === s.id);
+    const j = i + dir;
+    if (j < 0 || j >= sorted.length) return;
+    const a = sorted[i];
+    const b = sorted[j];
+    void wrap(() =>
+      Promise.all([
+        api.patchSection(projectId, a.id, { sortOrder: b.sortOrder }),
+        api.patchSection(projectId, b.id, { sortOrder: a.sortOrder }),
+      ]),
+    );
+  };
+
+  const ordered = [...sections].sort((x, y) => x.sortOrder - y.sortOrder);
+  return (
+    <>
+      <SheetHead eye="Dự toán" title="Quản lý phần (theo HĐTK)" onClose={onClose} />
+      <div className="dt-sbody">
+        <div className="dt-addph">
+          <input
+            className="dt-in"
+            placeholder="Tên phần (VD: Phần nền móng)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+          />
+          <select className="dt-msel" value={kind} onChange={(e) => setKind(e.target.value as SectionKind)}>
+            {SECTION_KINDS.map((k) => (
+              <option key={k.key} value={k.key}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+          <button className="dt-addbtn" onClick={add} disabled={busy || !name.trim()}>
+            ＋ Thêm
+          </button>
+        </div>
+
+        <div className="dt-blabel">Danh sách phần ({ordered.length})</div>
+        {ordered.length === 0 ? (
+          <div className="dt-empty">Chưa có phần nào — thêm theo cách HĐTK chia.</div>
+        ) : (
+          <div className="dt-phlist">
+            {ordered.map((s, i) => (
+              <div className="dt-phrow" key={s.id}>
+                <div className="ord">
+                  <button onClick={() => move(s, -1)} disabled={busy || i === 0} aria-label="Lên">
+                    ▲
+                  </button>
+                  <button onClick={() => move(s, 1)} disabled={busy || i === ordered.length - 1} aria-label="Xuống">
+                    ▼
+                  </button>
+                </div>
+                <div className="nm">
+                  <button className="link" onClick={() => rename(s)}>
+                    {s.name}
+                  </button>
+                  <div className="sub">
+                    {s.matCount} VT · {fmt(s.total)} đ
+                  </div>
+                </div>
+                <select
+                  className="dt-msel"
+                  value={s.kind}
+                  onChange={(e) => changeKind(s, e.target.value as SectionKind)}
+                  disabled={busy}
+                >
+                  {SECTION_KINDS.map((k) => (
+                    <option key={k.key} value={k.key}>
+                      {k.label}
+                    </option>
+                  ))}
+                </select>
+                <button className="del" onClick={() => del(s)} disabled={busy} aria-label="Xoá">
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </>
