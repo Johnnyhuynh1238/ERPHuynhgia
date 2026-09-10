@@ -447,6 +447,25 @@ function GanttView({ tasks }: { tasks: Task[] }) {
   const gridX0 = firstSun * PXD; // px offset để căn gridline/mốc vào CN
   const ticks: number[] = [];
   for (let d = firstSun; d <= totalDays; d += 7) ticks.push(d);
+  // Mảng THÁNG (xen kẽ tông màu để phân biệt) — cắt theo mốc đầu tháng trong [origin, end].
+  const monthBands: { x: number; w: number; alt: boolean; label: string }[] = [];
+  {
+    const o = new Date(origin);
+    let cur = Date.UTC(o.getUTCFullYear(), o.getUTCMonth(), 1);
+    let mi = 0;
+    while (cur < end) {
+      const c = new Date(cur);
+      const next = Date.UTC(c.getUTCFullYear(), c.getUTCMonth() + 1, 1);
+      const s = Math.max(origin, cur);
+      const e = Math.min(end, next);
+      if (e > s) {
+        const x = posX(s);
+        monthBands.push({ x, w: posX(e) - x, alt: mi % 2 === 1, label: `Tháng ${c.getUTCMonth() + 1}` });
+        mi++;
+      }
+      cur = next;
+    }
+  }
   const nowMs = Date.now();
   const todayX = nowMs >= origin && nowMs <= end ? posX(nowMs) : null;
   const fmtD = (ms: number) => {
@@ -461,6 +480,17 @@ function GanttView({ tasks }: { tasks: Task[] }) {
           className="g-inner"
           style={{ width: chartW + 172, "--gw": `${7 * PXD}px`, "--gx": `${gridX0}px` } as unknown as CSSProperties}
         >
+          {/* Nền xen kẽ theo THÁNG (phân biệt tháng) */}
+          <div className="g-bands" style={{ left: 160, width: chartW }}>
+            {monthBands.map((m, i) => (
+              <span
+                key={i}
+                className={`g-band${m.alt ? " alt" : ""}`}
+                style={{ left: m.x, width: m.w }}
+                title={m.label}
+              />
+            ))}
+          </div>
           {/* Header trục ngày */}
           <div className="g-headrow">
             <span className="g-corner">Phần</span>
