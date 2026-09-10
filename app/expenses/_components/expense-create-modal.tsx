@@ -267,6 +267,8 @@ export function ExpenseCreateModal({
   // Danh bạ đối tượng nhận tiền — tự nạp khi mở popup (dùng chung toàn công ty).
   const [payees, setPayees] = useState<PayeeOption[]>([]);
   const [savingPayee, setSavingPayee] = useState(false);
+  const [payeeOpen, setPayeeOpen] = useState(false);
+  const payeeComboRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -323,6 +325,25 @@ export function ExpenseCreateModal({
     if (sel && !inScope.some((c) => c.id === sel.id)) return [sel, ...inScope];
     return inScope;
   }, [categories, chiScope, form.categoryId]);
+
+  // Combobox đối tượng nhận: lọc theo tên đang gõ ở ô "Người/đơn vị nhận".
+  const payeeMatches = useMemo(() => {
+    const q = form.payee.trim().toLowerCase();
+    if (!q) return payees;
+    return payees.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.accountNumber || "").toLowerCase().includes(q) || (p.phone || "").includes(q),
+    );
+  }, [payees, form.payee]);
+
+  // Đóng panel khi bấm ra ngoài ô combobox.
+  useEffect(() => {
+    if (!payeeOpen) return;
+    function onDown(e: MouseEvent) {
+      if (payeeComboRef.current && !payeeComboRef.current.contains(e.target as Node)) setPayeeOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [payeeOpen]);
 
   async function uploadOne(file: File): Promise<string | null> {
     if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
@@ -485,6 +506,7 @@ export function ExpenseCreateModal({
       payeeAccountNumber: p.accountNumber || "",
       payeeAccountName: p.accountName || "",
     }));
+    setPayeeOpen(false);
     toast.success(`Đã chọn: ${p.name}`);
   }
 
@@ -674,7 +696,41 @@ export function ExpenseCreateModal({
           </label>
           <label className="fld" style={{ marginBottom: 0 }}>
             <span className="lbl">Người/đơn vị nhận</span>
-            <input className="ctrl" value={form.payee} onChange={(e) => setForm({ ...form, payee: e.target.value })} placeholder="VD: Cửa hàng VLXD Minh Anh" />
+            <div className="payee-combo" ref={payeeComboRef}>
+              <input
+                className="ctrl"
+                value={form.payee}
+                onChange={(e) => {
+                  setForm({ ...form, payee: e.target.value });
+                  setPayeeOpen(true);
+                }}
+                onFocus={() => setPayeeOpen(true)}
+                placeholder="VD: Cửa hàng VLXD Minh Anh"
+                autoComplete="off"
+              />
+              {payeeOpen && (
+                <div className="payee-panel">
+                  <button type="button" className="payee-new" onClick={() => setPayeeOpen(false)}>
+                    ＋ Tạo mới (tự nhập){form.payee.trim() ? `: “${form.payee.trim()}”` : ""}
+                  </button>
+                  {payeeMatches.length === 0 ? (
+                    <div className="payee-empty">Chưa có đối tượng khớp — gõ tên rồi nhập tay bên dưới.</div>
+                  ) : (
+                    payeeMatches.map((p) => {
+                      const bank = p.bankBin ? findBankByBin(p.bankBin) : null;
+                      return (
+                        <button type="button" key={p.id} className="payee-opt" onClick={() => applyPayee(p.id)}>
+                          <span className="nm">{p.name}</span>
+                          <span className="meta">
+                            {[p.accountNumber, bank?.shortName, p.phone].filter(Boolean).join(" · ") || "chưa có STK"}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           </label>
           <label className="fld" style={{ marginBottom: 0 }}>
             <span className="lbl">
@@ -777,27 +833,6 @@ export function ExpenseCreateModal({
                 </button>
               </div>
             </div>
-            {payees.length > 0 && (
-              <label className="fld" style={{ marginBottom: 8 }}>
-                <span className="lbl">Chọn đối tượng đã lưu</span>
-                <select
-                  className="ctrl"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) applyPayee(e.target.value);
-                  }}
-                >
-                  <option value="">— Chọn từ danh bạ ({payees.length}) —</option>
-                  {payees.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                      {p.accountNumber ? ` · ${p.accountNumber}` : ""}
-                      {p.bankBin ? ` · ${findBankByBin(p.bankBin)?.shortName ?? ""}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <div className="formgrid">
               <label className="fld" style={{ marginBottom: 0 }}>
                 <span className="lbl">Ngân hàng</span>
