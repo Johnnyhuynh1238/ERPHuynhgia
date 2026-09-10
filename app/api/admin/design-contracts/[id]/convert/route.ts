@@ -75,6 +75,35 @@ export async function POST(_request: Request, { params }: { params: { id: string
       data: { projectId: project.id, status: "done" },
     });
 
+    // Lịch thu khách: lấy từ báo giá (quoteData.thanhToan) — mỗi đợt { ty:%, label }.
+    // Ngày dự kiến rải đều trong khoảng thi công (không có ngày trong báo giá).
+    const qd = (contract.quoteData ?? {}) as { thanhToan?: { ty?: number; label?: string }[] };
+    const dot = Array.isArray(qd.thanhToan) ? qd.thanhToan : [];
+    if (dot.length) {
+      const grand = Math.round(sum.grand || 0);
+      const spanDays = 90;
+      await tx.paymentSchedule.createMany({
+        data: dot.map((d, i) => {
+          const pct = Number(d.ty) || 0;
+          const dt = new Date(start);
+          dt.setDate(dt.getDate() + Math.round((spanDays * i) / Math.max(1, dot.length - 1)));
+          return {
+            projectId: project.id,
+            phaseNumber: i + 1,
+            milestoneDescription: d.label?.trim() || `Đợt ${i + 1}`,
+            percent: new Prisma.Decimal(pct),
+            amount: new Prisma.Decimal(Math.round((grand * pct) / 100)),
+            expectedDate: dt,
+            type: "contract" as const,
+            installmentNo: i + 1,
+            description: d.label?.trim() || `Đợt ${i + 1}`,
+            dueDate: dt,
+            createdBy: user.id,
+          };
+        }),
+      });
+    }
+
     // Snapshot version "chốt" để lưu vết đúng trạng thái bàn giao sang dự án vận hành.
     const lastV = await tx.designContractQuoteVersion.findFirst({
       where: { contractId: contract.id },
