@@ -214,9 +214,13 @@
 .tddoc .g-hint { position: absolute; top: 50%; transform: translateY(-50%); z-index: 4; pointer-events: none;
   font-size: 10px; font-weight: 700; font-family: var(--font-plex-mono), monospace; white-space: nowrap;
   opacity: 0; transition: opacity .12s; }
-.tddoc .g-bar:hover .g-hint { opacity: 1; }
-.tddoc .g-hint.g-hs { left: 0; transform: translate(calc(-100% - 5px), -50%); color: var(--mut); }
-.tddoc .g-hint.g-he { right: 0; transform: translate(calc(100% + 5px), -50%); color: var(--mut); }
+/* g-hd nằm trong thanh (giữa); g-hs/g-he nằm trong LANE (ngoài thanh) → hiện khi hover thanh */
+.tddoc .g-bar:hover .g-hint,
+.tddoc .g-lane .g-bar:hover ~ .g-hint { opacity: 1; }
+.tddoc .g-hint.g-hs, .tddoc .g-hint.g-he { color: var(--text);
+  background: color-mix(in srgb, var(--card) 88%, transparent); padding: 1px 5px; border-radius: 5px; }
+.tddoc .g-hint.g-hs { transform: translate(calc(-100% - 5px), -50%); }
+.tddoc .g-hint.g-he { transform: translate(5px, -50%); }
 .tddoc .g-hint.g-hd { left: 50%; transform: translate(-50%, -50%); color: var(--text);
   background: color-mix(in srgb, var(--card) 82%, transparent); padding: 1px 6px; border-radius: 5px; }
 

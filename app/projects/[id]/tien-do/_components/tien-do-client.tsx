@@ -617,14 +617,15 @@ function GanttView({
                     >
                       <span className="g-fill" style={{ width: `${Math.max(0, Math.min(100, t.percent))}%` }} />
                       <span className="g-plab">{t.percent}%</span>
-                      {/* hover: ngày 2 đầu + số ngày ở giữa */}
-                      <span className="g-hint g-hs">{fmtD(sMs)}</span>
+                      {/* số ngày ở giữa thân (hover) */}
                       <span className="g-hint g-hd">{durationDays(isoOfMs(sMs), isoOfMs(eMs))} ngày</span>
-                      <span className="g-hint g-he">{fmtD(eMs)}</span>
                       <span className="g-handle l" data-h="l" />
                       <span className="g-handle r" data-h="r" />
                     </div>
                   )}
+                  {/* ngày 2 đầu — ngoài thanh (không bị overflow cắt), hiện khi hover thanh */}
+                  {has && <span className="g-hint g-hs" style={{ left: l }}>{fmtD(sMs)}</span>}
+                  {has && <span className="g-hint g-he" style={{ left: l + w }}>{fmtD(eMs)}</span>}
                 </div>
               </div>
             );
