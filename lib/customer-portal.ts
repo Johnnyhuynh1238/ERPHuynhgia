@@ -9,7 +9,7 @@ export function derivePortalPassword(input: { customerPortalPassword: string | n
   if (input.customerPortalPassword && input.customerPortalPassword.trim()) return input.customerPortalPassword.trim();
 
   const source = (input.customerIdNumber || input.customerPhone || "").replace(/\D/g, "");
-  if (!source) return null;
+  if (!source) return "0000"; // mặc định khi chưa có CCCD/SĐT/mật khẩu riêng
   return source.slice(-4).padStart(4, "0");
 }
 
