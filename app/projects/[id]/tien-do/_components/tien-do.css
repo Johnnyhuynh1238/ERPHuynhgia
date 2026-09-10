@@ -233,3 +233,9 @@
   background: var(--gold); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 6px;
   white-space: nowrap; font-family: var(--font-plex-mono), monospace; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .tddoc .g-scrub.today .g-scrub-lbl { background: #d1503f; }
+
+/* List gọn: cột phải = số tổng + đã mua */
+.tddoc .rright { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none; }
+.tddoc .rbuy2 { font-size: 11px; color: var(--mut); white-space: nowrap; }
+.tddoc .rbuy2 b { color: var(--terra); font-weight: 600; }
+.tddoc .rbuy2 b.over { color: #d1503f; }

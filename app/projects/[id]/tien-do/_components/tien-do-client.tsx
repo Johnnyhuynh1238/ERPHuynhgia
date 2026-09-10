@@ -362,35 +362,16 @@ export function TienDoClient({
                         <div className="rl">
                           <span className="rnm">{t.name}</span>
                         </div>
-                        <span className="ramt num">
-                          <b>{fmt((t.percent / 100) * t.amount)}</b>
-                          <span className="ramt-den"> / {fmt(t.amount)} NS</span>
-                        </span>
-                      </div>
-                      <div className="rbuy">
-                        <span>
-                          Đã mua <b className={`num${t.bought > t.amount ? " over" : ""}`}>{fmt(t.bought)}</b> đ
-                          {t.bought > t.amount ? " · vượt NS" : ""}
-                        </span>
-                      </div>
-                      <div className="rctl">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={1}
-                          value={t.percent}
-                          onChange={(e) => setPercent(t, Number(e.target.value))}
-                          aria-label={`Tiến độ ${t.name}`}
-                        />
-                        <span className="rpct">{t.percent}%</span>
-                        <button
-                          type="button"
-                          className={`dn${t.done ? " on" : ""}`}
-                          onClick={() => toggleDone(t)}
-                        >
-                          {t.done ? "✓ Xong" : "Xong"}
-                        </button>
+                        <div className="rright">
+                          <span className="ramt num">
+                            <b>{fmt((t.percent / 100) * t.amount)}</b>
+                            <span className="ramt-den"> / {fmt(t.amount)} NS</span>
+                          </span>
+                          <span className="rbuy2">
+                            đã mua <b className={`num${t.bought > t.amount ? " over" : ""}`}>{fmt(t.bought)}</b> đ
+                            {t.bought > t.amount ? " · vượt" : ""}
+                          </span>
+                        </div>
                       </div>
                       {t.sectionId && (
                         <div className="rplan">
@@ -438,6 +419,25 @@ export function TienDoClient({
                             : null}
                         </div>
                       )}
+                      <div className="rctl">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={t.percent}
+                          onChange={(e) => setPercent(t, Number(e.target.value))}
+                          aria-label={`Tiến độ ${t.name}`}
+                        />
+                        <span className="rpct">{t.percent}%</span>
+                        <button
+                          type="button"
+                          className={`dn${t.done ? " on" : ""}`}
+                          onClick={() => toggleDone(t)}
+                        >
+                          {t.done ? "✓ Xong" : "Xong"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
