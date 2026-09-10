@@ -180,3 +180,8 @@
 @media (min-width: 1024px) {
   .tddoc .wrap { max-width: 1180px; }
 }
+
+/* Đã mua thực tế / dòng */
+.tddoc .rbuy { margin-top: 5px; font-size: 11.5px; color: var(--mut); }
+.tddoc .rbuy b { color: var(--terra); font-weight: 600; }
+.tddoc .rbuy b.over { color: #d1503f; }

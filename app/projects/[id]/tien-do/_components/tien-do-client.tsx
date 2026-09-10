@@ -7,12 +7,14 @@ import "./tien-do.css";
 
 
 type Task = {
-  refType: "section" | "khoan";
-  refId: string;
-  groupKey: string; // kind ("tho"…) hoặc "khoan"
-  groupLabel: string; // "Thô" / "Hoàn thiện" / … / "Khoán trọn gói"
+  refType: "budget";
+  refId: string; // = tên dòng ngân sách
+  sectionId: string | null; // section khớp tên (để set ngày dự kiến)
+  groupKey: string; // kind ("tho"…)
+  groupLabel: string; // "Thô" / "Hoàn thiện" / …
   name: string;
-  amount: number;
+  amount: number; // ngân sách
+  bought: number; // đã mua thực tế (đã chi + công nợ)
   percent: number; // thực tế
   done: boolean;
   planStart: string | null; // dự kiến
@@ -108,12 +110,14 @@ export function TienDoClient({
     let amt = 0;
     let earned = 0;
     let planned = 0;
+    let bought = 0;
     let doneCnt = 0;
     let hasPlan = false;
     tasks.forEach((t) => {
       amt += t.amount;
       earned += (t.percent / 100) * t.amount;
       planned += (plannedPct(t) / 100) * t.amount;
+      bought += t.bought;
       if (t.done) doneCnt += 1;
       if (t.planStart && t.planEnd) hasPlan = true;
     });
@@ -121,6 +125,7 @@ export function TienDoClient({
       amt,
       earned,
       planned,
+      bought,
       pct: amt > 0 ? Math.round((earned / amt) * 100) : 0,
       planPct: amt > 0 ? Math.round((planned / amt) * 100) : 0,
       doneCnt,
@@ -192,8 +197,11 @@ export function TienDoClient({
   // Lưu ngày DỰ KIẾN của 1 PHẦN (chỉ refType 'section'), qua API sections.
   const savePlan = async (t: Task, patch: { planStart?: string | null; planEnd?: string | null }) => {
     setTasks((prev) => prev.map((x) => (keyOf(x) === keyOf(t) ? { ...x, ...patch } : x)));
-    if (t.refType !== "section") return;
-    const r = await fetch(`/api/projects/${projectId}/sections/${t.refId}`, {
+    if (!t.sectionId) {
+      toast("Dòng này không gắn PHẦN dự toán — không đặt ngày được");
+      return;
+    }
+    const r = await fetch(`/api/projects/${projectId}/sections/${t.sectionId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(patch),
@@ -291,7 +299,10 @@ export function TienDoClient({
               Giá trị hoàn thành <span className="num">{loading ? "…" : fmt(dispEarned)}</span> đ
             </span>
             <span>
-              Dự toán <span className="num">{loading ? "…" : fmt(total.amt)}</span> đ
+              Đã mua <span className="num">{loading ? "…" : fmt(total.bought)}</span> đ
+            </span>
+            <span>
+              Ngân sách <span className="num">{loading ? "…" : fmt(total.amt)}</span> đ
             </span>
           </div>
         </div>
@@ -334,7 +345,13 @@ export function TienDoClient({
                         </div>
                         <span className="ramt num">
                           <b>{fmt((t.percent / 100) * t.amount)}</b>
-                          <span className="ramt-den"> / {fmt(t.amount)}</span>
+                          <span className="ramt-den"> / {fmt(t.amount)} NS</span>
+                        </span>
+                      </div>
+                      <div className="rbuy">
+                        <span>
+                          Đã mua <b className={`num${t.bought > t.amount ? " over" : ""}`}>{fmt(t.bought)}</b> đ
+                          {t.bought > t.amount ? " · vượt NS" : ""}
                         </span>
                       </div>
                       <div className="rctl">
@@ -356,7 +373,7 @@ export function TienDoClient({
                           {t.done ? "✓ Xong" : "Xong"}
                         </button>
                       </div>
-                      {t.refType === "section" && (
+                      {t.sectionId && (
                         <div className="rplan">
                           <span className="rplan-l">Dự kiến</span>
                           <input
@@ -407,7 +424,7 @@ export function TienDoClient({
 // bên trong tô % thực tế; có vạch "hôm nay".
 const DAY = 86400000;
 function GanttView({ tasks }: { tasks: Task[] }) {
-  const secs = tasks.filter((t) => t.refType === "section");
+  const secs = tasks;
   const dated = secs.filter((t) => t.planStart && t.planEnd);
   if (!dated.length)
     return (
@@ -468,7 +485,7 @@ function GanttView({ tasks }: { tasks: Task[] }) {
                     <div
                       className={`g-bar${t.done ? " done" : ""}${late ? " late" : ""}`}
                       style={{ left: l, width: w }}
-                      title={`${t.planStart} → ${t.planEnd} · thực tế ${t.percent}% · dự kiến ${pv}%`}
+                      title={`${t.planStart} → ${t.planEnd} · thực tế ${t.percent}% · dự kiến ${pv}% · đã mua ${fmt(t.bought)}/${fmt(t.amount)}đ`}
                     >
                       <span className="g-fill" style={{ width: `${Math.max(0, Math.min(100, t.percent))}%` }} />
                       <span className="g-plab">{t.percent}%</span>
