@@ -15,6 +15,16 @@ import { parseVietQrString } from "@/lib/vietqr";
 export type ProjectOption = { id: string; code: string; name: string };
 export type CategoryOption = { id: string; code: string; name: string; scope: string | null };
 export type DesignContractOption = { id: string; customerName: string; signedAt: string };
+// Danh bạ đối tượng nhận tiền: chọn 1 phát fill đủ thông tin chuyển khoản.
+type PayeeOption = {
+  id: string;
+  name: string;
+  phone: string | null;
+  bankBin: string | null;
+  accountNumber: string | null;
+  accountName: string | null;
+  note: string | null;
+};
 
 export type ExpenseCreatePrefill = Partial<{
   projectId: string;
@@ -254,6 +264,24 @@ export function ExpenseCreateModal({
     };
   }, [open]);
 
+  // Danh bạ đối tượng nhận tiền — tự nạp khi mở popup (dùng chung toàn công ty).
+  const [payees, setPayees] = useState<PayeeOption[]>([]);
+  const [savingPayee, setSavingPayee] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/payees", { cache: "no-store" });
+        const j = await res.json().catch(() => ({}));
+        if (alive && res.ok) setPayees(j.payees || []);
+      } catch {}
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
   const [form, setForm] = useState<CreateForm>(emptyCreate);
   const [creating, setCreating] = useState(false);
   const [decoding, setDecoding] = useState(false);
@@ -443,6 +471,63 @@ export function ExpenseCreateModal({
   function close() {
     onClose();
     setForm(emptyCreate);
+  }
+
+  // Chọn đối tượng đã lưu → fill đủ thông tin vào form.
+  function applyPayee(id: string) {
+    const p = payees.find((x) => x.id === id);
+    if (!p) return;
+    setForm((f) => ({
+      ...f,
+      payee: p.name || f.payee,
+      payeePhone: p.phone || f.payeePhone,
+      payeeBankBin: p.bankBin || "",
+      payeeAccountNumber: p.accountNumber || "",
+      payeeAccountName: p.accountName || "",
+    }));
+    toast.success(`Đã chọn: ${p.name}`);
+  }
+
+  // Lưu thông tin đang nhập thành đối tượng trong danh bạ (upsert theo NH + STK).
+  async function savePayee() {
+    const bin = form.payeeBankBin;
+    const acc = form.payeeAccountNumber.trim();
+    const name = form.payee.trim();
+    if (!bin || !acc) {
+      toast.error("Cần có ngân hàng và số TK mới lưu được đối tượng");
+      return;
+    }
+    if (!name) {
+      toast.error("Nhập tên người/đơn vị nhận trước khi lưu");
+      return;
+    }
+    setSavingPayee(true);
+    try {
+      const res = await fetch("/api/payees", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone: form.payeePhone.trim() || undefined,
+          bankBin: bin,
+          accountNumber: acc,
+          accountName: form.payeeAccountName.trim() || undefined,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error("Không lưu được đối tượng");
+        return;
+      }
+      const saved = j.payee as PayeeOption;
+      setPayees((list) => {
+        const rest = list.filter((p) => p.id !== saved.id);
+        return [...rest, saved].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+      });
+      toast.success("Đã lưu đối tượng vào danh bạ");
+    } finally {
+      setSavingPayee(false);
+    }
   }
 
   async function submitCreate(e: FormEvent) {
@@ -667,20 +752,52 @@ export function ExpenseCreateModal({
           <div className="fld">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span className="lbl">Tài khoản nhận (để KT bấm “Chuyển khoản”)</span>
-              <input
-                ref={qrInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) decodeQrFile(f);
-                }}
-              />
-              <button type="button" className="actbtn a-link" onClick={() => qrInputRef.current?.click()} disabled={decoding}>
-                {decoding ? "Đang đọc QR…" : "📷 Tải ảnh QR"}
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  ref={qrInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) decodeQrFile(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="actbtn a-link"
+                  onClick={savePayee}
+                  disabled={savingPayee || !form.payeeBankBin || !form.payeeAccountNumber.trim()}
+                  title="Lưu người/đơn vị nhận này vào danh bạ để lần sau chọn nhanh"
+                >
+                  {savingPayee ? "Đang lưu…" : "💾 Lưu đối tượng"}
+                </button>
+                <button type="button" className="actbtn a-link" onClick={() => qrInputRef.current?.click()} disabled={decoding}>
+                  {decoding ? "Đang đọc QR…" : "📷 Tải ảnh QR"}
+                </button>
+              </div>
             </div>
+            {payees.length > 0 && (
+              <label className="fld" style={{ marginBottom: 8 }}>
+                <span className="lbl">Chọn đối tượng đã lưu</span>
+                <select
+                  className="ctrl"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) applyPayee(e.target.value);
+                  }}
+                >
+                  <option value="">— Chọn từ danh bạ ({payees.length}) —</option>
+                  {payees.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.accountNumber ? ` · ${p.accountNumber}` : ""}
+                      {p.bankBin ? ` · ${findBankByBin(p.bankBin)?.shortName ?? ""}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="formgrid">
               <label className="fld" style={{ marginBottom: 0 }}>
                 <span className="lbl">Ngân hàng</span>

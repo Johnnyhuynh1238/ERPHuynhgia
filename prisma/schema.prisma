@@ -569,6 +569,7 @@ model User {
   expensesPaid                     Expense[]                     @relation("ExpensePayer")
   expensesCancelled                Expense[]                     @relation("ExpenseCanceller")
   expensesTptcApproved             Expense[]                     @relation("ExpenseTptcApprover")
+  payeesCreated                    Payee[]                       @relation("PayeeCreator")
   receiptsCreated                  Receipt[]                     @relation("ReceiptCreator")
   receiptsReceived                 Receipt[]                     @relation("ReceiptReceiver")
   receiptsCancelled                Receipt[]                     @relation("ReceiptCanceller")
@@ -3904,6 +3905,27 @@ model Expense {
   @@index([advanceId])
   @@index([budgetLineId])
   @@map("expenses")
+}
+
+/// Danh bạ đối tượng nhận tiền, lưu lúc tạo Lệnh chi ngoài để lần sau chọn 1 phát
+/// ra đủ thông tin chuyển khoản. Dùng chung toàn công ty (admin + kế toán đều thấy).
+model Payee {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(200)
+  phone         String?  @db.VarChar(20)
+  bankBin       String?  @map("bank_bin") @db.VarChar(20)
+  accountNumber String?  @map("account_number") @db.VarChar(40)
+  accountName   String?  @map("account_name") @db.VarChar(200)
+  note          String?  @db.Text
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  creator User @relation("PayeeCreator", fields: [createdBy], references: [id])
+
+  @@unique([bankBin, accountNumber])
+  @@index([name])
+  @@map("payees")
 }
 
 /// Lệnh thu do admin tạo: thu từ khách / vay / hoàn ứng / khác.
