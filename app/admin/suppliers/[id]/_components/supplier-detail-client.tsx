@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { confirmDialog } from "@/components/confirm-dialog";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, FolderPlus, Tag } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { plexSans } from "@/lib/fonts";
+import "./supplier-detail.css";
 
 type Group = { id: string; name: string; sortOrder: number; _count: { prices: number } };
 type Price = {
@@ -36,22 +37,32 @@ type Supplier = {
   prices: Price[];
 };
 
-function fmtVnd(n: number) {
-  return n.toLocaleString("vi-VN");
-}
+const fmtVnd = (n: number) => n.toLocaleString("vi-VN");
+const fmtDate = (iso: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return `${`0${d.getDate()}`.slice(-2)}/${`0${d.getMonth() + 1}`.slice(-2)}/${d.getFullYear()}`;
+};
 
-export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
+// Dùng ở 2 nơi: trang /admin/suppliers/[id] (onClose không có → nút "← Danh sách")
+// và bottom-sheet trong màn Quản lý NCC dự án (onClose có → nút ✕).
+export function SupplierDetailClient({
+  supplierId,
+  onClose,
+}: {
+  supplierId: string;
+  onClose?: () => void;
+}) {
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
-  const [showNewPrice, setShowNewPrice] = useState(false);
+  const [newPriceGroup, setNewPriceGroup] = useState<string | "" | null>(null); // groupId ("" = chưa nhóm), null = đóng
   const [editPrice, setEditPrice] = useState<Price | null>(null);
-  const [filterGroup, setFilterGroup] = useState<string>("all");
 
   const load = useCallback(async () => {
-    setLoading(true);
     const res = await fetch(`/api/admin/suppliers/${supplierId}`, { cache: "no-store" });
     const j = await res.json().catch(() => ({}));
     setLoading(false);
@@ -62,240 +73,238 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
     load();
   }, [load]);
 
-  const groupNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    supplier?.groups.forEach((g) => map.set(g.id, g.name));
-    return map;
-  }, [supplier?.groups]);
+  // Gom VT theo nhóm (giữ thứ tự nhóm), VT chưa gán nhóm dồn cuối.
+  const sections = useMemo(() => {
+    if (!supplier) return [] as { id: string | null; name: string; prices: Price[] }[];
+    const byGroup = new Map<string | null, Price[]>();
+    for (const p of supplier.prices) {
+      const k = p.groupId ?? null;
+      (byGroup.get(k) ?? byGroup.set(k, []).get(k)!).push(p);
+    }
+    const out = supplier.groups
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+      .map((g) => ({ id: g.id, name: g.name, prices: byGroup.get(g.id) ?? [] }));
+    const none = byGroup.get(null);
+    if (none && none.length) out.push({ id: null, name: "Chưa phân nhóm", prices: none });
+    return out;
+  }, [supplier]);
 
-  const visiblePrices = useMemo(() => {
-    if (!supplier) return [];
-    if (filterGroup === "all") return supplier.prices;
-    if (filterGroup === "_none") return supplier.prices.filter((p) => !p.groupId);
-    return supplier.prices.filter((p) => p.groupId === filterGroup);
-  }, [supplier, filterGroup]);
+  const lastUpdate = useMemo(() => {
+    if (!supplier?.prices.length) return null;
+    return supplier.prices.reduce<string | null>((m, p) => (!m || p.updatedAt > m ? p.updatedAt : m), null);
+  }, [supplier]);
 
   async function deleteGroup(g: Group) {
-    if (g._count.prices > 0) {
-      toast.error("Xoá toàn bộ vật tư trong nhóm trước");
-      return;
-    }
-    if (!await confirmDialog(`Xoá nhóm "${g.name}"?`)) return;
+    if (g._count.prices > 0) return toast.error("Xoá hết vật tư trong nhóm trước");
+    if (!(await confirmDialog(`Xoá nhóm "${g.name}"?`))) return;
     const res = await fetch(`/api/admin/suppliers/${supplierId}/groups/${g.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast.error(j.message || j.error || "Lỗi xoá");
-      return;
-    }
+    if (!res.ok) return toast.error("Lỗi xoá");
+    toast.success("Đã xoá");
+    load();
+  }
+  async function deletePrice(p: Price) {
+    if (!(await confirmDialog(`Xoá vật tư "${p.materialName}"?`))) return;
+    const res = await fetch(`/api/admin/suppliers/${supplierId}/prices/${p.id}`, { method: "DELETE" });
+    if (!res.ok) return toast.error("Lỗi xoá");
     toast.success("Đã xoá");
     load();
   }
 
-  async function deletePrice(p: Price) {
-    if (!await confirmDialog(`Xoá vật tư "${p.materialName}"?`)) return;
-    const res = await fetch(`/api/admin/suppliers/${supplierId}/prices/${p.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("Lỗi xoá");
-      return;
-    }
-    toast.success("Đã xoá");
-    load();
-  }
+  const wrapCls = `sndoc ${plexSans.variable}${onClose ? " sheet" : ""}`;
 
   if (loading) {
     return (
-      <div className={`mx-auto min-h-screen max-w-5xl p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
-        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-6 text-center text-sm text-[#8a6a52]">
-          Đang tải…
-        </div>
+      <div className={wrapCls}>
+        <div className="empty">Đang tải…</div>
       </div>
     );
   }
-
   if (!supplier) {
     return (
-      <div className={`mx-auto min-h-screen max-w-5xl p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
-        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-6 text-center text-sm text-[#8a6a52]">
-          Không tìm thấy NCC.
-        </div>
+      <div className={wrapCls}>
+        <div className="empty">Không tìm thấy NCC.</div>
       </div>
     );
   }
 
+  const closeBtn = onClose ? (
+    <button type="button" className="sn-close" onClick={onClose} aria-label="Đóng">
+      ✕
+    </button>
+  ) : (
+    <Link href="/admin/suppliers" className="sn-back">
+      ← Danh sách NCC
+    </Link>
+  );
+
   return (
-    <div className={`mx-auto min-h-screen max-w-5xl space-y-4 p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <div className="text-[11px] font-semibold text-[#8a6a52]">{supplier.code}</div>
-          <h1 className="text-lg font-bold text-[#2e140a]">{supplier.name}</h1>
+    <div className={wrapCls}>
+      {/* topbar */}
+      <div className="sn-top">
+        <div className="sn-brand">
+          <div className="sn-mk">H6</div>
+          <div>
+            <b>HUỲNH GIA</b>
+            <span>Nhà cung cấp</span>
+          </div>
         </div>
-        {!supplier.isActive && (
-          <span className="rounded-full bg-[#c0553f]/20 px-2 py-0.5 text-[10px] font-semibold text-[#c0553f]">
-            Tạm ngưng
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#e5dcc9] bg-[#fbf7ec] px-3 py-1.5 text-sm text-[#2e140a] hover:border-[#e36122]/40"
-        >
-          <Pencil className="h-4 w-4" /> Sửa
-        </button>
+        {closeBtn}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8a6a52]">Liên hệ</div>
-          <InfoRow label="SĐT" value={supplier.phone} />
-          <InfoRow label="SĐT phụ" value={supplier.altPhone} />
-          <InfoRow label="Email" value={supplier.email} />
-          <InfoRow label="Địa chỉ" value={supplier.address} />
-          <InfoRow label="MST" value={supplier.taxCode} />
+      {/* header NCC */}
+      <div className="sn-hd">
+        <div className="sn-eyebrow">Nhà cung cấp vật tư</div>
+        <div className="sn-h1">
+          {supplier.name}
+          <span className="sn-code">{supplier.code}</span>
+          {!supplier.isActive && <span className="sn-off">Tạm ngưng</span>}
         </div>
-        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8a6a52]">Thanh toán</div>
-          <InfoRow label="Ngân hàng" value={supplier.bankName} />
-          <InfoRow label="Số TK" value={supplier.bankAccount} />
-          <InfoRow label="Chủ TK" value={supplier.bankAccountName} />
-          <InfoRow label="Ghi chú" value={supplier.notes} multiline />
+        <div className="sn-info">
+          {supplier.phone && (
+            <span>
+              <span className="ic">📞</span>
+              <b>{supplier.phone}</b>
+            </span>
+          )}
+          {supplier.address && (
+            <span>
+              <span className="ic">📍</span>
+              {supplier.address}
+            </span>
+          )}
+          {supplier.bankName && (
+            <span>
+              <span className="ic">🏦</span>
+              {supplier.bankName}
+              {supplier.bankAccount ? ` · ` : ""}
+              {supplier.bankAccount && <b>{supplier.bankAccount}</b>}
+              {supplier.bankAccountName ? ` · ${supplier.bankAccountName}` : ""}
+            </span>
+          )}
+          {supplier.taxCode && (
+            <span>
+              <span className="ic">🧾</span>MST {supplier.taxCode}
+            </span>
+          )}
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-[#2e140a]">Nhóm hàng ({supplier.groups.length})</div>
-          <button
-            type="button"
-            onClick={() => setShowNewGroup(true)}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#e36122] px-3 py-1 text-xs font-semibold text-white hover:bg-[#c9541b]"
-          >
-            <FolderPlus className="h-3.5 w-3.5" /> Thêm nhóm
+        {supplier.notes && <div className="sn-notes">{supplier.notes}</div>}
+        <div className="sn-acts">
+          <button type="button" className="sn-btn pri" onClick={() => setEditing(true)}>
+            ✏️ Sửa thông tin
+          </button>
+          <button type="button" className="sn-btn" onClick={() => setShowNewGroup(true)}>
+            ＋ Thêm nhóm hàng
           </button>
         </div>
-        {supplier.groups.length === 0 ? (
-          <div className="text-xs text-[#8a6a52]">Chưa có nhóm hàng.</div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {supplier.groups.map((g) => (
-              <div
-                key={g.id}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#e5dcc9] bg-[#f5efe1] px-2.5 py-1 text-xs"
-              >
-                <span className="font-semibold text-[#2e140a]">{g.name}</span>
-                <span className="text-[10px] text-[#8a6a52]">{g._count.prices} VT</span>
-                <button
-                  type="button"
-                  onClick={() => setEditGroupId(g.id)}
-                  className="text-[#8a6a52] hover:text-[#e36122]"
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteGroup(g)}
-                  className="text-[#8a6a52] hover:text-[#c0553f]"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-[#2e140a]">
-            Bảng giá vật tư ({supplier.prices.length})
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
-              className="rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-2 py-1 text-xs text-[#2e140a] outline-none"
-            >
-              <option value="all">Tất cả nhóm</option>
-              <option value="_none">Chưa gán nhóm</option>
-              {supplier.groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setShowNewPrice(true)}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#e36122] px-3 py-1 text-xs font-semibold text-white hover:bg-[#c9541b]"
-            >
-              <Plus className="h-3.5 w-3.5" /> Thêm vật tư
-            </button>
+      {/* strip */}
+      <div className="sn-strip">
+        <div className="sn-st">
+          <div className="k">Nhóm hàng</div>
+          <div className="v num">{supplier.groups.length}</div>
+        </div>
+        <div className="sn-st">
+          <div className="k">Vật tư báo giá</div>
+          <div className="v num">{supplier.prices.length}</div>
+        </div>
+        <div className="sn-st">
+          <div className="k">Cập nhật giá</div>
+          <div className="v">{fmtDate(lastUpdate)}</div>
+        </div>
+        <div className="sn-st">
+          <div className="k">Trạng thái</div>
+          <div className="v" style={{ color: supplier.isActive ? "var(--sn-ok)" : "var(--sn-red)" }}>
+            {supplier.isActive ? "Đang dùng" : "Ngưng"}
           </div>
         </div>
-        {visiblePrices.length === 0 ? (
-          <div className="text-xs text-[#8a6a52]">Chưa có vật tư trong bảng giá.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="text-[10px] uppercase tracking-wide text-[#8a6a52]">
-                <tr>
-                  <th className="px-2 py-1 text-left">Mã NCC</th>
-                  <th className="px-2 py-1 text-left">Tên vật tư</th>
-                  <th className="px-2 py-1 text-left">ĐVT</th>
-                  <th className="px-2 py-1 text-left">Nhóm</th>
-                  <th className="px-2 py-1 text-right">Đơn giá</th>
-                  <th className="px-2 py-1" />
-                </tr>
-              </thead>
-              <tbody>
-                {visiblePrices.map((p) => (
-                  <tr key={p.id} className="border-t border-[#e5dcc9] text-[#2e140a]">
-                    <td className="px-2 py-1.5 font-mono text-[11px] text-[#8a6a52]">
-                      {p.supplierItemCode || "—"}
-                    </td>
-                    <td className="px-2 py-1.5">{p.materialName}</td>
-                    <td className="px-2 py-1.5 text-[#8a6a52]">{p.unit}</td>
-                    <td className="px-2 py-1.5 text-[#8a6a52]">
-                      {p.groupId ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Tag className="h-3 w-3" />
-                          {groupNameById.get(p.groupId) || "—"}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtVnd(p.unitPrice)}</td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setEditPrice(p)}
-                        className="text-[#8a6a52] hover:text-[#e36122]"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deletePrice(p)}
-                        className="ml-2 text-[#8a6a52] hover:text-[#c0553f]"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
+
+      {/* groups */}
+      {sections.length === 0 ? (
+        <div className="sn-empty2">
+          Chưa có nhóm/bảng giá. Bấm “Thêm nhóm hàng” rồi thêm vật tư.
+        </div>
+      ) : (
+        sections.map((sec) => (
+          <div className="sn-grp" key={sec.id ?? "__none"}>
+            <div className="sn-ghd">
+              <span className="sn-gdot" />
+              <span className="sn-gnm">{sec.name}</span>
+              <span className="sn-gcount">{sec.prices.length} vật tư</span>
+              {sec.id && (
+                <span className="sn-gtools">
+                  <button
+                    type="button"
+                    className="sn-gedit"
+                    onClick={() => setEditGroupId(sec.id)}
+                    title="Sửa nhóm"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    className="sn-gdel"
+                    onClick={() => {
+                      const g = supplier.groups.find((x) => x.id === sec.id);
+                      if (g) deleteGroup(g);
+                    }}
+                    title="Xoá nhóm"
+                  >
+                    🗑
+                  </button>
+                </span>
+              )}
+              <button type="button" className="sn-gadd" onClick={() => setNewPriceGroup(sec.id ?? "")}>
+                ＋ Thêm vật tư
+              </button>
+            </div>
+            {sec.prices.length > 0 && (
+              <div className="sn-tablewrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Vật tư</th>
+                      <th>ĐVT</th>
+                      <th className="r">Đơn giá</th>
+                      <th>Ghi chú</th>
+                      <th className="r" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sec.prices.map((p) => (
+                      <tr key={p.id}>
+                        <td className="mname">
+                          {p.materialName}
+                          {p.supplierItemCode && <span className="mcode"> · {p.supplierItemCode}</span>}
+                        </td>
+                        <td className="unit">{p.unit}</td>
+                        <td className="r price num">{fmtVnd(p.unitPrice)}</td>
+                        <td className="note">{p.note || "—"}</td>
+                        <td className="r rowact">
+                          <button type="button" onClick={() => setEditPrice(p)} title="Sửa">
+                            ✏️
+                          </button>
+                          <button type="button" onClick={() => deletePrice(p)} title="Xoá">
+                            🗑
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+
+      <div className="sn-foot">Danh mục báo giá NCC · dùng chung mọi dự án · Đúng — Đẹp — Bền</div>
 
       {editing && <EditSupplierModal supplier={supplier} onClose={() => setEditing(false)} onSaved={load} />}
       {showNewGroup && (
-        <GroupModal
-          supplierId={supplierId}
-          onClose={() => setShowNewGroup(false)}
-          onSaved={load}
-        />
+        <GroupModal supplierId={supplierId} onClose={() => setShowNewGroup(false)} onSaved={load} />
       )}
       {editGroupId && (
         <GroupModal
@@ -305,11 +314,12 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
           onSaved={load}
         />
       )}
-      {showNewPrice && (
+      {newPriceGroup !== null && (
         <PriceModal
           supplierId={supplierId}
           groups={supplier.groups}
-          onClose={() => setShowNewPrice(false)}
+          defaultGroupId={newPriceGroup}
+          onClose={() => setNewPriceGroup(null)}
           onSaved={load}
         />
       )}
@@ -326,17 +336,7 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
   );
 }
 
-function InfoRow({ label, value, multiline }: { label: string; value: string | null; multiline?: boolean }) {
-  return (
-    <div className="flex gap-2 border-b border-[#e5dcc9] py-1 last:border-b-0">
-      <div className="w-20 shrink-0 text-[11px] text-[#8a6a52]">{label}</div>
-      <div className={`flex-1 text-xs text-[#2e140a] ${multiline ? "whitespace-pre-wrap" : ""}`}>
-        {value || "—"}
-      </div>
-    </div>
-  );
-}
-
+// ───────────────────────── MODALS ─────────────────────────
 function EditSupplierModal({
   supplier,
   onClose,
@@ -360,10 +360,7 @@ function EditSupplierModal({
   const [busy, setBusy] = useState(false);
 
   async function save() {
-    if (name.trim().length < 2) {
-      toast.error("Nhập tên NCC");
-      return;
-    }
+    if (name.trim().length < 2) return toast.error("Nhập tên NCC");
     setBusy(true);
     const res = await fetch(`/api/admin/suppliers/${supplier.id}`, {
       method: "PATCH",
@@ -383,68 +380,32 @@ function EditSupplierModal({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      toast.error("Lỗi lưu");
-      return;
-    }
+    if (!res.ok) return toast.error("Lỗi lưu");
     toast.success("Đã lưu");
     onClose();
     onSaved();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
-        <div className="mb-3 text-base font-bold text-[#2e140a]">Sửa NCC</div>
-        <div className="space-y-2">
-          <MiniField label="Tên NCC *" value={name} onChange={setName} />
-          <MiniField label="SĐT chính" value={phone} onChange={setPhone} />
-          <MiniField label="SĐT phụ" value={altPhone} onChange={setAltPhone} />
-          <MiniField label="Email" value={email} onChange={setEmail} />
-          <MiniField label="Địa chỉ" value={address} onChange={setAddress} />
-          <MiniField label="MST" value={taxCode} onChange={setTaxCode} />
-          <MiniField label="Ngân hàng" value={bankName} onChange={setBankName} />
-          <MiniField label="Số TK" value={bankAccount} onChange={setBankAccount} />
-          <MiniField label="Tên chủ TK" value={bankAccountName} onChange={setBankAccountName} />
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Ghi chú</div>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[#2e140a]">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 accent-[#e36122]"
-            />
-            Đang hoạt động
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
-          >
-            Huỷ
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy}
-            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {busy ? "Đang lưu…" : "Lưu"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ModalShell title="Sửa thông tin NCC" onClose={onClose} busy={busy} onSave={save}>
+      <MiniField label="Tên NCC *" value={name} onChange={setName} />
+      <MiniField label="SĐT chính" value={phone} onChange={setPhone} />
+      <MiniField label="SĐT phụ" value={altPhone} onChange={setAltPhone} />
+      <MiniField label="Email" value={email} onChange={setEmail} />
+      <MiniField label="Địa chỉ" value={address} onChange={setAddress} />
+      <MiniField label="MST" value={taxCode} onChange={setTaxCode} />
+      <MiniField label="Ngân hàng" value={bankName} onChange={setBankName} />
+      <MiniField label="Số TK" value={bankAccount} onChange={setBankAccount} />
+      <MiniField label="Tên chủ TK" value={bankAccountName} onChange={setBankAccountName} />
+      <label className="sn-flabel">
+        <div className="sn-fl">Ghi chú</div>
+        <textarea className="sn-fin" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </label>
+      <label className="sn-check">
+        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+        Đang hoạt động
+      </label>
+    </ModalShell>
   );
 }
 
@@ -464,15 +425,10 @@ function GroupModal({
   const [busy, setBusy] = useState(false);
 
   async function save() {
-    if (name.trim().length < 1) {
-      toast.error("Nhập tên nhóm");
-      return;
-    }
+    if (name.trim().length < 1) return toast.error("Nhập tên nhóm");
     setBusy(true);
     const res = await fetch(
-      group
-        ? `/api/admin/suppliers/${supplierId}/groups/${group.id}`
-        : `/api/admin/suppliers/${supplierId}/groups`,
+      group ? `/api/admin/suppliers/${supplierId}/groups/${group.id}` : `/api/admin/suppliers/${supplierId}/groups`,
       {
         method: group ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -482,8 +438,7 @@ function GroupModal({
     setBusy(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      toast.error(j.message || j.error || "Lỗi lưu");
-      return;
+      return toast.error(j.message || j.error || "Lỗi lưu");
     }
     toast.success("Đã lưu");
     onClose();
@@ -491,43 +446,18 @@ function GroupModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
-        <div className="mb-3 text-base font-bold text-[#2e140a]">
-          {group ? "Sửa nhóm" : "Thêm nhóm"}
-        </div>
-        <div className="space-y-2">
-          <MiniField label="Tên nhóm *" value={name} onChange={setName} />
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Thứ tự</div>
-            <input
-              type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(Number(e.target.value) || 0)}
-              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
-            />
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
-          >
-            Huỷ
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy}
-            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {busy ? "Đang lưu…" : "Lưu"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ModalShell title={group ? "Sửa nhóm hàng" : "Thêm nhóm hàng"} onClose={onClose} busy={busy} onSave={save}>
+      <MiniField label="Tên nhóm *" value={name} onChange={setName} />
+      <label className="sn-flabel">
+        <div className="sn-fl">Thứ tự</div>
+        <input
+          className="sn-fin"
+          type="number"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(Number(e.target.value) || 0)}
+        />
+      </label>
+    </ModalShell>
   );
 }
 
@@ -535,12 +465,14 @@ function PriceModal({
   supplierId,
   groups,
   price,
+  defaultGroupId,
   onClose,
   onSaved,
 }: {
   supplierId: string;
   groups: Group[];
   price?: Price;
+  defaultGroupId?: string | "";
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -548,108 +480,84 @@ function PriceModal({
   const [unit, setUnit] = useState(price?.unit || "");
   const [supplierItemCode, setSupplierItemCode] = useState(price?.supplierItemCode || "");
   const [unitPrice, setUnitPrice] = useState(String(price?.unitPrice ?? ""));
-  const [groupId, setGroupId] = useState<string>(price?.groupId || "");
+  const [groupId, setGroupId] = useState<string>(price?.groupId ?? defaultGroupId ?? "");
   const [note, setNote] = useState(price?.note || "");
   const [busy, setBusy] = useState(false);
-
   const isEdit = !!price;
 
   async function save() {
-    if (!materialName.trim() || !unit.trim()) {
-      toast.error("Nhập tên vật tư + ĐVT");
-      return;
-    }
+    if (!materialName.trim() || !unit.trim()) return toast.error("Nhập tên vật tư + ĐVT");
     const num = Number(unitPrice.replace(/[^0-9.]/g, ""));
-    if (!num || num <= 0) {
-      toast.error("Đơn giá phải > 0");
-      return;
-    }
+    if (!num || num <= 0) return toast.error("Đơn giá phải > 0");
     setBusy(true);
+    // POST /prices = upsert theo (tên VT + ĐVT). Khi sửa, tên+ĐVT khoá → cùng key → update đúng dòng.
     const res = await fetch(`/api/admin/suppliers/${supplierId}/prices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        materialName: materialName.trim(),
-        unit: unit.trim(),
-        supplierItemCode: supplierItemCode.trim() || undefined,
-        unitPrice: num,
-        groupId: groupId || null,
-        note: note.trim() || undefined,
-      }),
+          materialName: materialName.trim(),
+          unit: unit.trim(),
+          supplierItemCode: supplierItemCode.trim() || undefined,
+          unitPrice: num,
+          groupId: groupId || null,
+          note: note.trim() || undefined,
+        }),
     });
     setBusy(false);
-    if (!res.ok) {
-      toast.error("Lỗi lưu");
-      return;
-    }
+    if (!res.ok) return toast.error("Lỗi lưu");
     toast.success("Đã lưu");
     onClose();
     onSaved();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
-        <div className="mb-3 text-base font-bold text-[#2e140a]">
-          {isEdit ? "Sửa vật tư" : "Thêm vật tư vào bảng giá"}
-        </div>
-        <div className="space-y-2">
-          <MiniField label="Tên vật tư *" value={materialName} onChange={setMaterialName} disabled={isEdit} />
-          <MiniField label="ĐVT *" value={unit} onChange={setUnit} disabled={isEdit} placeholder="VD: kg, m, cây" />
-          <MiniField
-            label="Mã hàng của NCC"
-            value={supplierItemCode}
-            onChange={setSupplierItemCode}
-            placeholder="VD: SAT-D10"
-          />
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Đơn giá (VNĐ) *</div>
-            <input
-              inputMode="decimal"
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
-              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
-            />
-          </label>
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Nhóm hàng</div>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
-            >
-              <option value="">— Chưa gán —</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Ghi chú</div>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
-            />
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
-          >
+    <ModalShell title={isEdit ? "Sửa vật tư" : "Thêm vật tư"} onClose={onClose} busy={busy} onSave={save}>
+      <MiniField label="Tên vật tư *" value={materialName} onChange={setMaterialName} disabled={isEdit} />
+      <MiniField label="ĐVT *" value={unit} onChange={setUnit} placeholder="VD: kg, m, cây" disabled={isEdit} />
+      <MiniField label="Mã hàng NCC" value={supplierItemCode} onChange={setSupplierItemCode} placeholder="VD: SAT-D10" />
+      <label className="sn-flabel">
+        <div className="sn-fl">Đơn giá (VNĐ) *</div>
+        <input className="sn-fin" inputMode="decimal" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+      </label>
+      <label className="sn-flabel">
+        <div className="sn-fl">Nhóm hàng</div>
+        <select className="sn-fin" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+          <option value="">— Chưa gán —</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <MiniField label="Ghi chú" value={note} onChange={setNote} />
+    </ModalShell>
+  );
+}
+
+function ModalShell({
+  title,
+  children,
+  onClose,
+  onSave,
+  busy,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  onSave: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="sn-mscrim" onClick={onClose}>
+      <div className={`sn-modal ${plexSans.variable}`} onClick={(e) => e.stopPropagation()}>
+        <div className="sn-mtitle">{title}</div>
+        <div className="sn-mbody">{children}</div>
+        <div className="sn-macts">
+          <button type="button" className="sn-btn" onClick={onClose} disabled={busy}>
             Huỷ
           </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy}
-            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <button type="button" className="sn-btn pri" onClick={onSave} disabled={busy}>
             {busy ? "Đang lưu…" : "Lưu"}
           </button>
         </div>
@@ -672,14 +580,14 @@ function MiniField({
   disabled?: boolean;
 }) {
   return (
-    <label className="block">
-      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">{label}</div>
+    <label className="sn-flabel">
+      <div className="sn-fl">{label}</div>
       <input
+        className="sn-fin"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60 disabled:opacity-60"
       />
     </label>
   );

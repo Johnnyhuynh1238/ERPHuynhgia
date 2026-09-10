@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SubContractsTab } from "./sub-tab";
+import { SupplierDetailClient } from "@/app/admin/suppliers/[id]/_components/supplier-detail-client";
 import { findBankByName } from "@/lib/vn-banks";
 import { copyText } from "@/lib/copy-text";
 import "./cong-no.css";
@@ -86,6 +87,7 @@ export function CongNoClient({
 }) {
   const [tab, setTab] = useState<"ncc" | "sub">("ncc");
   const [nccView, setNccView] = useState<"debt" | "all">("debt"); // sub-menu tab NCC
+  const [openAllSid, setOpenAllSid] = useState<string | null>(null); // NCC mở bottom-sheet
   const [allNcc, setAllNcc] = useState<AllSupplier[] | null>(null);
   const [allNccLoading, setAllNccLoading] = useState(false);
   const [data, setData] = useState<Data | null>(null);
@@ -287,9 +289,10 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
             ) : (
               <div className="nlist">
                 {allNcc.map((s) => (
-                  <a
+                  <button
                     key={s.id}
-                    href={`/admin/suppliers/${s.id}`}
+                    type="button"
+                    onClick={() => setOpenAllSid(s.id)}
                     className={`nccrow${s.isActive ? "" : " paidoff"}`}
                   >
                     <div className="nl">
@@ -305,7 +308,7 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
                       <div className="rk">báo giá</div>
                     </div>
                     <span className="chev">›</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             )}
@@ -398,6 +401,18 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
 
       {/* xem đơn — chỉ đọc (đã ghi công nợ = xong quy trình) */}
       {editing && <ViewSheet order={editing} onClose={() => setEditing(null)} onPO={downloadPO} />}
+
+      {/* bottom-sheet chi tiết NCC (từ tab "Tất cả NCC") */}
+      {openAllSid &&
+        mounted &&
+        createPortal(
+          <div className="ncc-sheet-scrim" onClick={() => setOpenAllSid(null)}>
+            <div className="ncc-sheet" onClick={(e) => e.stopPropagation()}>
+              <SupplierDetailClient supplierId={openAllSid} onClose={() => setOpenAllSid(null)} />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* AI drawer — portal ra body */}
       {aiOpen &&
