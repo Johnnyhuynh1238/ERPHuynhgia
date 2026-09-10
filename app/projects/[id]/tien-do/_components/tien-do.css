@@ -152,8 +152,12 @@
 }
 .tddoc .g-corner { z-index: 4; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; font-size: 10px; color: var(--mut); height: 34px; border-bottom: 1px solid var(--line2); }
 .tddoc .g-name { min-height: 34px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Gridline dọc mỗi tuần (--gw = 7×px/ngày) — phân tuần xuyên header + mọi hàng. */
+.tddoc .g-axis, .tddoc .g-lane {
+  background-image: repeating-linear-gradient(90deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--gw, 105px));
+}
 .tddoc .g-axis { position: relative; height: 34px; border-bottom: 1px solid var(--line2); flex: 0 0 auto; }
-.tddoc .g-tick { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 4px; font-size: 10px; color: var(--mut); border-left: 1px solid var(--line); font-family: var(--font-plex-mono), monospace; }
+.tddoc .g-tick { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 5px; font-size: 10px; color: var(--mut); font-family: var(--font-plex-mono), monospace; }
 .tddoc .g-lane { position: relative; height: 34px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
 .tddoc .g-bar {
   position: absolute; top: 6px; height: 22px; border-radius: 6px;
@@ -178,7 +182,7 @@
 
 /* PC: nới khung để Gantt có chỗ (auto hiện ở ≥1024) */
 @media (min-width: 1024px) {
-  .tddoc .wrap { max-width: 1180px; }
+  .tddoc .wrap { max-width: none; padding: 0 28px; }
 }
 
 /* Đã mua thực tế / dòng */

@@ -2,7 +2,7 @@
 
 import { plexSans, plexMono } from "@/lib/fonts";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./tien-do.css";
 
 
@@ -454,7 +454,10 @@ function GanttView({ tasks }: { tasks: Task[] }) {
   return (
     <div className="gantt">
       <div className="g-scroll">
-        <div className="g-inner" style={{ width: chartW + 172 }}>
+        <div
+          className="g-inner"
+          style={{ width: chartW + 172, "--gw": `${7 * PXD}px` } as unknown as CSSProperties}
+        >
           {/* Header trục ngày */}
           <div className="g-headrow">
             <span className="g-corner">Phần</span>
