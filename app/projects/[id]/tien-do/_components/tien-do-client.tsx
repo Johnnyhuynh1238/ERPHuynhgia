@@ -340,7 +340,6 @@ export function TienDoClient({
                     <div key={keyOf(t)} className={`row${t.done ? " done" : ""}`}>
                       <div className="rtop">
                         <div className="rl">
-                          {t.refType === "khoan" && <span className="rc kh num">KHOÁN</span>}
                           <span className="rnm">{t.name}</span>
                         </div>
                         <span className="ramt num">
