@@ -441,9 +441,12 @@ function GanttView({ tasks }: { tasks: Task[] }) {
   const chartW = totalDays * PXD;
   const posX = (ms: number) => ((ms - origin) / span) * chartW;
 
-  // mốc ~ mỗi 7 ngày
+  // mốc mỗi tuần, CĂN VÀO CHỦ NHẬT (getUTCDay: 0=CN). Bù ngày từ origin tới CN đầu tiên.
+  const startWd = new Date(origin).getUTCDay();
+  const firstSun = (7 - startWd) % 7; // số ngày từ origin tới CN đầu tiên
+  const gridX0 = firstSun * PXD; // px offset để căn gridline/mốc vào CN
   const ticks: number[] = [];
-  for (let d = 0; d <= totalDays; d += 7) ticks.push(d);
+  for (let d = firstSun; d <= totalDays; d += 7) ticks.push(d);
   const nowMs = Date.now();
   const todayX = nowMs >= origin && nowMs <= end ? posX(nowMs) : null;
   const fmtD = (ms: number) => {
@@ -456,7 +459,7 @@ function GanttView({ tasks }: { tasks: Task[] }) {
       <div className="g-scroll">
         <div
           className="g-inner"
-          style={{ width: chartW + 172, "--gw": `${7 * PXD}px` } as unknown as CSSProperties}
+          style={{ width: chartW + 172, "--gw": `${7 * PXD}px`, "--gx": `${gridX0}px` } as unknown as CSSProperties}
         >
           {/* Header trục ngày */}
           <div className="g-headrow">
