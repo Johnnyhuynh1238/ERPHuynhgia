@@ -4,6 +4,7 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, FolderPlus, Tag } from "lucide-react";
 import { toast } from "sonner";
+import { plexSans } from "@/lib/fonts";
 
 type Group = { id: string; name: string; sortOrder: number; _count: { prices: number } };
 type Price = {
@@ -103,8 +104,8 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl p-4">
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+      <div className={`mx-auto min-h-screen max-w-5xl p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
+        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-6 text-center text-sm text-[#8a6a52]">
           Đang tải…
         </div>
       </div>
@@ -113,8 +114,8 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
 
   if (!supplier) {
     return (
-      <div className="mx-auto max-w-5xl p-4">
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+      <div className={`mx-auto min-h-screen max-w-5xl p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
+        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-6 text-center text-sm text-[#8a6a52]">
           Không tìm thấy NCC.
         </div>
       </div>
@@ -122,37 +123,37 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4">
+    <div className={`mx-auto min-h-screen max-w-5xl space-y-4 p-4 ${plexSans.variable}`} style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}>
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <div className="text-[11px] font-semibold text-[#8892b0]">{supplier.code}</div>
-          <h1 className="text-lg font-bold text-[#f0f2ff]">{supplier.name}</h1>
+          <div className="text-[11px] font-semibold text-[#8a6a52]">{supplier.code}</div>
+          <h1 className="text-lg font-bold text-[#2e140a]">{supplier.name}</h1>
         </div>
         {!supplier.isActive && (
-          <span className="rounded-full bg-[#D26B6B]/20 px-2 py-0.5 text-[10px] font-semibold text-[#D26B6B]">
+          <span className="rounded-full bg-[#c0553f]/20 px-2 py-0.5 text-[10px] font-semibold text-[#c0553f]">
             Tạm ngưng
           </span>
         )}
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#252840] bg-[#1a1d2e] px-3 py-1.5 text-sm text-[#f0f2ff] hover:border-[#ff8a3d]/40"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#e5dcc9] bg-[#fbf7ec] px-3 py-1.5 text-sm text-[#2e140a] hover:border-[#e36122]/40"
         >
           <Pencil className="h-4 w-4" /> Sửa
         </button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8892b0]">Liên hệ</div>
+        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8a6a52]">Liên hệ</div>
           <InfoRow label="SĐT" value={supplier.phone} />
           <InfoRow label="SĐT phụ" value={supplier.altPhone} />
           <InfoRow label="Email" value={supplier.email} />
           <InfoRow label="Địa chỉ" value={supplier.address} />
           <InfoRow label="MST" value={supplier.taxCode} />
         </div>
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8892b0]">Thanh toán</div>
+        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8a6a52]">Thanh toán</div>
           <InfoRow label="Ngân hàng" value={supplier.bankName} />
           <InfoRow label="Số TK" value={supplier.bankAccount} />
           <InfoRow label="Chủ TK" value={supplier.bankAccountName} />
@@ -160,39 +161,39 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+      <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-[#f0f2ff]">Nhóm hàng ({supplier.groups.length})</div>
+          <div className="text-sm font-semibold text-[#2e140a]">Nhóm hàng ({supplier.groups.length})</div>
           <button
             type="button"
             onClick={() => setShowNewGroup(true)}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#ff8a3d] px-3 py-1 text-xs font-semibold text-black hover:bg-[#ffa05f]"
+            className="inline-flex items-center gap-1 rounded-lg bg-[#e36122] px-3 py-1 text-xs font-semibold text-white hover:bg-[#c9541b]"
           >
             <FolderPlus className="h-3.5 w-3.5" /> Thêm nhóm
           </button>
         </div>
         {supplier.groups.length === 0 ? (
-          <div className="text-xs text-[#8892b0]">Chưa có nhóm hàng.</div>
+          <div className="text-xs text-[#8a6a52]">Chưa có nhóm hàng.</div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {supplier.groups.map((g) => (
               <div
                 key={g.id}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#2d3249] bg-[#0f1220] px-2.5 py-1 text-xs"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#e5dcc9] bg-[#f5efe1] px-2.5 py-1 text-xs"
               >
-                <span className="font-semibold text-[#f0f2ff]">{g.name}</span>
-                <span className="text-[10px] text-[#8892b0]">{g._count.prices} VT</span>
+                <span className="font-semibold text-[#2e140a]">{g.name}</span>
+                <span className="text-[10px] text-[#8a6a52]">{g._count.prices} VT</span>
                 <button
                   type="button"
                   onClick={() => setEditGroupId(g.id)}
-                  className="text-[#8892b0] hover:text-[#ff8a3d]"
+                  className="text-[#8a6a52] hover:text-[#e36122]"
                 >
                   <Pencil className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteGroup(g)}
-                  className="text-[#8892b0] hover:text-[#D26B6B]"
+                  className="text-[#8a6a52] hover:text-[#c0553f]"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -202,16 +203,16 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+      <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-[#f0f2ff]">
+          <div className="text-sm font-semibold text-[#2e140a]">
             Bảng giá vật tư ({supplier.prices.length})
           </div>
           <div className="flex items-center gap-2">
             <select
               value={filterGroup}
               onChange={(e) => setFilterGroup(e.target.value)}
-              className="rounded-lg border border-[#2d3249] bg-[#0f1220] px-2 py-1 text-xs text-[#f0f2ff] outline-none"
+              className="rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-2 py-1 text-xs text-[#2e140a] outline-none"
             >
               <option value="all">Tất cả nhóm</option>
               <option value="_none">Chưa gán nhóm</option>
@@ -224,18 +225,18 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
             <button
               type="button"
               onClick={() => setShowNewPrice(true)}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#ff8a3d] px-3 py-1 text-xs font-semibold text-black hover:bg-[#ffa05f]"
+              className="inline-flex items-center gap-1 rounded-lg bg-[#e36122] px-3 py-1 text-xs font-semibold text-white hover:bg-[#c9541b]"
             >
               <Plus className="h-3.5 w-3.5" /> Thêm vật tư
             </button>
           </div>
         </div>
         {visiblePrices.length === 0 ? (
-          <div className="text-xs text-[#8892b0]">Chưa có vật tư trong bảng giá.</div>
+          <div className="text-xs text-[#8a6a52]">Chưa có vật tư trong bảng giá.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="text-[10px] uppercase tracking-wide text-[#8892b0]">
+              <thead className="text-[10px] uppercase tracking-wide text-[#8a6a52]">
                 <tr>
                   <th className="px-2 py-1 text-left">Mã NCC</th>
                   <th className="px-2 py-1 text-left">Tên vật tư</th>
@@ -247,13 +248,13 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
               </thead>
               <tbody>
                 {visiblePrices.map((p) => (
-                  <tr key={p.id} className="border-t border-[#252840] text-[#f0f2ff]">
-                    <td className="px-2 py-1.5 font-mono text-[11px] text-[#8892b0]">
+                  <tr key={p.id} className="border-t border-[#e5dcc9] text-[#2e140a]">
+                    <td className="px-2 py-1.5 font-mono text-[11px] text-[#8a6a52]">
                       {p.supplierItemCode || "—"}
                     </td>
                     <td className="px-2 py-1.5">{p.materialName}</td>
-                    <td className="px-2 py-1.5 text-[#8892b0]">{p.unit}</td>
-                    <td className="px-2 py-1.5 text-[#8892b0]">
+                    <td className="px-2 py-1.5 text-[#8a6a52]">{p.unit}</td>
+                    <td className="px-2 py-1.5 text-[#8a6a52]">
                       {p.groupId ? (
                         <span className="inline-flex items-center gap-1">
                           <Tag className="h-3 w-3" />
@@ -268,14 +269,14 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
                       <button
                         type="button"
                         onClick={() => setEditPrice(p)}
-                        className="text-[#8892b0] hover:text-[#ff8a3d]"
+                        className="text-[#8a6a52] hover:text-[#e36122]"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => deletePrice(p)}
-                        className="ml-2 text-[#8892b0] hover:text-[#D26B6B]"
+                        className="ml-2 text-[#8a6a52] hover:text-[#c0553f]"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -327,9 +328,9 @@ export function SupplierDetailClient({ supplierId }: { supplierId: string }) {
 
 function InfoRow({ label, value, multiline }: { label: string; value: string | null; multiline?: boolean }) {
   return (
-    <div className="flex gap-2 border-b border-[#252840] py-1 last:border-b-0">
-      <div className="w-20 shrink-0 text-[11px] text-[#8892b0]">{label}</div>
-      <div className={`flex-1 text-xs text-[#f0f2ff] ${multiline ? "whitespace-pre-wrap" : ""}`}>
+    <div className="flex gap-2 border-b border-[#e5dcc9] py-1 last:border-b-0">
+      <div className="w-20 shrink-0 text-[11px] text-[#8a6a52]">{label}</div>
+      <div className={`flex-1 text-xs text-[#2e140a] ${multiline ? "whitespace-pre-wrap" : ""}`}>
         {value || "—"}
       </div>
     </div>
@@ -393,8 +394,8 @@ function EditSupplierModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 text-base font-bold text-[#f0f2ff]">Sửa NCC</div>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
+        <div className="mb-3 text-base font-bold text-[#2e140a]">Sửa NCC</div>
         <div className="space-y-2">
           <MiniField label="Tên NCC *" value={name} onChange={setName} />
           <MiniField label="SĐT chính" value={phone} onChange={setPhone} />
@@ -406,20 +407,20 @@ function EditSupplierModal({
           <MiniField label="Số TK" value={bankAccount} onChange={setBankAccount} />
           <MiniField label="Tên chủ TK" value={bankAccountName} onChange={setBankAccountName} />
           <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">Ghi chú</div>
+            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Ghi chú</div>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
             />
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#f0f2ff]">
+          <label className="flex items-center gap-2 text-sm text-[#2e140a]">
             <input
               type="checkbox"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 accent-[#ff8a3d]"
+              className="h-4 w-4 accent-[#e36122]"
             />
             Đang hoạt động
           </label>
@@ -429,7 +430,7 @@ function EditSupplierModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-xl border border-[#2d3249] px-3 py-1.5 text-sm text-[#8892b0]"
+            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
           >
             Huỷ
           </button>
@@ -437,7 +438,7 @@ function EditSupplierModal({
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-xl bg-[#ff8a3d] px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
+            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Đang lưu…" : "Lưu"}
           </button>
@@ -491,19 +492,19 @@ function GroupModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 text-base font-bold text-[#f0f2ff]">
+      <div className="w-full max-w-sm rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
+        <div className="mb-3 text-base font-bold text-[#2e140a]">
           {group ? "Sửa nhóm" : "Thêm nhóm"}
         </div>
         <div className="space-y-2">
           <MiniField label="Tên nhóm *" value={name} onChange={setName} />
           <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">Thứ tự</div>
+            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Thứ tự</div>
             <input
               type="number"
               value={sortOrder}
               onChange={(e) => setSortOrder(Number(e.target.value) || 0)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
             />
           </label>
         </div>
@@ -512,7 +513,7 @@ function GroupModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-xl border border-[#2d3249] px-3 py-1.5 text-sm text-[#8892b0]"
+            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
           >
             Huỷ
           </button>
@@ -520,7 +521,7 @@ function GroupModal({
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-xl bg-[#ff8a3d] px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
+            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Đang lưu…" : "Lưu"}
           </button>
@@ -588,8 +589,8 @@ function PriceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 text-base font-bold text-[#f0f2ff]">
+      <div className="w-full max-w-md rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
+        <div className="mb-3 text-base font-bold text-[#2e140a]">
           {isEdit ? "Sửa vật tư" : "Thêm vật tư vào bảng giá"}
         </div>
         <div className="space-y-2">
@@ -602,20 +603,20 @@ function PriceModal({
             placeholder="VD: SAT-D10"
           />
           <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">Đơn giá (VNĐ) *</div>
+            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Đơn giá (VNĐ) *</div>
             <input
               inputMode="decimal"
               value={unitPrice}
               onChange={(e) => setUnitPrice(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
             />
           </label>
           <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">Nhóm hàng</div>
+            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Nhóm hàng</div>
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
             >
               <option value="">— Chưa gán —</option>
               {groups.map((g) => (
@@ -626,11 +627,11 @@ function PriceModal({
             </select>
           </label>
           <label className="block">
-            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">Ghi chú</div>
+            <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">Ghi chú</div>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+              className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
             />
           </label>
         </div>
@@ -639,7 +640,7 @@ function PriceModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-xl border border-[#2d3249] px-3 py-1.5 text-sm text-[#8892b0]"
+            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
           >
             Huỷ
           </button>
@@ -647,7 +648,7 @@ function PriceModal({
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-xl bg-[#ff8a3d] px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
+            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Đang lưu…" : "Lưu"}
           </button>
@@ -672,13 +673,13 @@ function MiniField({
 }) {
   return (
     <label className="block">
-      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">{label}</div>
+      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">{label}</div>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60 disabled:opacity-60"
+        className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60 disabled:opacity-60"
       />
     </label>
   );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Search, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { plexSans } from "@/lib/fonts";
 
 type SupplierRow = {
   id: string;
@@ -39,40 +40,43 @@ export function SuppliersClient() {
   }, [load]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4">
+    <div
+      className={`mx-auto min-h-screen max-w-5xl space-y-4 p-4 ${plexSans.variable}`}
+      style={{ fontFamily: "var(--font-plex-sans), system-ui, sans-serif", background: "#f5efe1" }}
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#f0f2ff]">Nhà cung cấp vật tư</h1>
-          <p className="text-xs text-[#8892b0]">Quản lý NCC, nhóm hàng và bảng giá</p>
+          <h1 className="text-xl font-bold text-[#2e140a]">Nhà cung cấp vật tư</h1>
+          <p className="text-xs text-[#8a6a52]">Quản lý NCC, nhóm hàng và bảng giá</p>
         </div>
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#ff8a3d] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffa05f]"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#e36122] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c9541b]"
         >
           <Plus className="h-4 w-4" />
           Thêm NCC
         </button>
       </div>
 
-      <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3">
+      <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3">
         <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-[#8892b0]" />
+          <Search className="h-4 w-4 text-[#8a6a52]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm theo tên / mã / SĐT"
-            className="flex-1 bg-transparent text-sm text-[#f0f2ff] outline-none placeholder:text-[#5a627a]"
+            className="flex-1 bg-transparent text-sm text-[#2e140a] outline-none placeholder:text-[#b0a08c]"
           />
         </div>
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-6 text-center text-sm text-[#8892b0]">
+        <div className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-6 text-center text-sm text-[#8a6a52]">
           Đang tải…
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#252840] bg-[#1a1d2e] p-8 text-center text-sm text-[#8892b0]">
+        <div className="rounded-2xl border border-dashed border-[#e5dcc9] bg-[#fbf7ec] p-8 text-center text-sm text-[#8a6a52]">
           Chưa có NCC nào. Bấm &ldquo;Thêm NCC&rdquo; để bắt đầu.
         </div>
       ) : (
@@ -81,37 +85,37 @@ export function SuppliersClient() {
             <Link
               key={s.id}
               href={`/admin/suppliers/${s.id}`}
-              className="rounded-2xl border border-[#252840] bg-[#1a1d2e] p-3 transition hover:border-[#ff8a3d]/40"
+              className="rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-3 transition hover:border-[#e36122]/40"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-[#ff8a3d]/10 p-2 text-[#ff8a3d]">
+                  <div className="rounded-xl bg-[#e36122]/10 p-2 text-[#e36122]">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] font-semibold text-[#8892b0]">{s.code}</div>
-                    <div className="text-sm font-semibold text-[#f0f2ff]">{s.name}</div>
-                    <div className="mt-0.5 text-[11px] text-[#8892b0]">{s.phone || "—"}</div>
+                    <div className="text-[11px] font-semibold text-[#8a6a52]">{s.code}</div>
+                    <div className="text-sm font-semibold text-[#2e140a]">{s.name}</div>
+                    <div className="mt-0.5 text-[11px] text-[#8a6a52]">{s.phone || "—"}</div>
                   </div>
                 </div>
                 {!s.isActive && (
-                  <span className="rounded-full bg-[#D26B6B]/20 px-2 py-0.5 text-[10px] font-semibold text-[#D26B6B]">
+                  <span className="rounded-full bg-[#c0553f]/20 px-2 py-0.5 text-[10px] font-semibold text-[#c0553f]">
                     Tạm ngưng
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[#8892b0]">
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[#8a6a52]">
                 <div className="flex gap-3">
                   <span>{s._count.groups} nhóm</span>
                   <span>·</span>
                   <span>{s._count.prices} VT</span>
                 </div>
                 {s.outstanding > 0 ? (
-                  <span className="font-semibold text-[#e0864f]">Còn nợ: {Math.round(s.outstanding).toLocaleString("vi-VN")} đ</span>
+                  <span className="font-semibold text-[#8a3d1c]">Còn nợ: {Math.round(s.outstanding).toLocaleString("vi-VN")} đ</span>
                 ) : s.outstanding < 0 ? (
-                  <span className="font-semibold text-[#c9a24b]">Trả dư: {Math.round(-s.outstanding).toLocaleString("vi-VN")} đ</span>
+                  <span className="font-semibold text-[#b8934a]">Trả dư: {Math.round(-s.outstanding).toLocaleString("vi-VN")} đ</span>
                 ) : (
-                  <span className="text-[#5a627a]">Không nợ</span>
+                  <span className="text-[#b0a08c]">Không nợ</span>
                 )}
               </div>
             </Link>
@@ -164,8 +168,8 @@ function NewSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#252840] bg-[#1a1d2e] p-4">
-        <div className="mb-3 text-base font-bold text-[#f0f2ff]">Thêm NCC mới</div>
+      <div className="w-full max-w-md rounded-2xl border border-[#e5dcc9] bg-[#fbf7ec] p-4">
+        <div className="mb-3 text-base font-bold text-[#2e140a]">Thêm NCC mới</div>
         <div className="space-y-2">
           <Field label="Tên NCC *" value={name} onChange={setName} placeholder="VD: NCC Sắt Thép Tâm Anh" />
           <Field label="Số điện thoại" value={phone} onChange={setPhone} placeholder="VD: 0901234567" />
@@ -179,7 +183,7 @@ function NewSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreat
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-xl border border-[#2d3249] px-3 py-1.5 text-sm text-[#8892b0]"
+            className="rounded-xl border border-[#e5dcc9] px-3 py-1.5 text-sm text-[#8a6a52]"
           >
             Huỷ
           </button>
@@ -187,7 +191,7 @@ function NewSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreat
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-xl bg-[#ff8a3d] px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
+            className="rounded-xl bg-[#e36122] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Đang tạo…" : "Tạo NCC"}
           </button>
@@ -210,12 +214,12 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8892b0]">{label}</div>
+      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-[#8a6a52]">{label}</div>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-[#2d3249] bg-[#0f1220] px-3 py-2 text-sm text-[#f0f2ff] outline-none focus:border-[#ff8a3d]/60"
+        className="w-full rounded-lg border border-[#e5dcc9] bg-[#f5efe1] px-3 py-2 text-sm text-[#2e140a] outline-none focus:border-[#e36122]/60"
       />
     </label>
   );
