@@ -7,11 +7,10 @@ import "./tien-do.css";
 
 
 type Task = {
-  refType: "catalog" | "khoan";
+  refType: "section" | "khoan";
   refId: string;
-  phaseCode: string;
-  phaseName: string;
-  taskCode: string;
+  groupKey: string; // kind ("tho"…) hoặc "khoan"
+  groupLabel: string; // "Thô" / "Hoàn thiện" / … / "Khoán trọn gói"
   name: string;
   amount: number;
   percent: number;
@@ -122,11 +121,11 @@ export function TienDoClient({
   const dispPct = total.amt > 0 ? Math.round((dispEarned / total.amt) * 100) : 0;
 
   const groups = useMemo(() => {
-    const map = new Map<string, { phaseCode: string; phaseName: string; items: Task[] }>();
+    const map = new Map<string, { groupKey: string; groupLabel: string; items: Task[] }>();
     for (const t of tasks) {
-      const g = map.get(t.phaseCode);
+      const g = map.get(t.groupKey);
       if (g) g.items.push(t);
-      else map.set(t.phaseCode, { phaseCode: t.phaseCode, phaseName: t.phaseName, items: [t] });
+      else map.set(t.groupKey, { groupKey: t.groupKey, groupLabel: t.groupLabel, items: [t] });
     }
     return Array.from(map.values());
   }, [tasks]);
@@ -188,7 +187,7 @@ export function TienDoClient({
           </div>
         </div>
 
-        <div className="eyebrow">Tiến độ · theo công tác dự toán</div>
+        <div className="eyebrow">Tiến độ · theo phần (HĐTK)</div>
         <h1>{projectName}</h1>
         <div className="meta">
           <span>{projectCode}</span>
@@ -200,7 +199,7 @@ export function TienDoClient({
           ) : null}
           <span className="d">·</span>
           <span>
-            <span className="num">{tasks.length}</span> công tác
+            <span className="num">{tasks.length}</span> phần
           </span>
         </div>
 
@@ -230,7 +229,7 @@ export function TienDoClient({
         ) : !tasks.length ? (
           <div className="empty">
             <div className="ic">📊</div>
-            Dự toán chưa có công tác nào. Vào Dự toán thêm vật tư/khoán trước.
+            Chưa có PHẦN nào. Vào Dự toán → “Quản lý phần” tạo theo HĐTK trước.
           </div>
         ) : (
           <>
@@ -239,26 +238,22 @@ export function TienDoClient({
               const gAmt = g.items.reduce((s, x) => s + x.amount, 0);
               const gEarned = g.items.reduce((s, x) => s + (x.percent / 100) * x.amount, 0);
               return (
-                <div key={g.phaseCode} className="sec">
+                <div key={g.groupKey} className="sec">
                   <div className="phead">
-                    <span className="pc num">{g.phaseCode === "KHOAN" ? "KHOÁN" : `GĐ ${g.phaseCode}`}</span>
-                    <span className="pnm">{g.phaseName}</span>
+                    <span className="pc">{g.groupLabel}</span>
+                    <span className="pnm" />
                     <span className="pr">
                       <span className="pr-m num">
                         {fmt(gEarned)}<span className="pr-den"> / {fmt(gAmt)} đ</span>
                       </span>
-                      <span className="pr-d">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} công tác`}</span>
+                      <span className="pr-d">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} phần`}</span>
                     </span>
                   </div>
                   {g.items.map((t) => (
                     <div key={keyOf(t)} className={`row${t.done ? " done" : ""}`}>
                       <div className="rtop">
                         <div className="rl">
-                          {t.taskCode ? (
-                            <span className="rc num">{t.taskCode}</span>
-                          ) : (
-                            <span className="rc kh num">KHOÁN</span>
-                          )}
+                          {t.refType === "khoan" && <span className="rc kh num">KHOÁN</span>}
                           <span className="rnm">{t.name}</span>
                         </div>
                         <span className="ramt num">
@@ -292,7 +287,7 @@ export function TienDoClient({
             })}
             {uncataloged > 0 && (
               <div className="note">
-                {uncataloged} dòng vật tư chưa gắn công tác — không tính vào tiến độ. Gắn công tác trong Dự toán để hiện ở đây.
+                {uncataloged} dòng vật tư chưa gắn phần — không tính vào tiến độ. Gán phần trong Dự toán để hiện ở đây.
               </div>
             )}
           </>

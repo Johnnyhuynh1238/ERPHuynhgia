@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json(prog);
 }
 
-// PATCH: cập nhật 1 công tác. Body { refType:'catalog'|'khoan', refId, percent?, done? }.
+// PATCH: cập nhật 1 phần/khoán. Body { refType:'section'|'khoan', refId, percent?, done? }.
 //  - done=true → percent=100. percent<100 → done=false. percent>0 & done chưa set → giữ done cũ nếu 100.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireAdmin();
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     percent?: number;
     done?: boolean;
   };
-  const refType = body.refType === "khoan" ? "khoan" : body.refType === "catalog" ? "catalog" : null;
+  const refType = body.refType === "khoan" ? "khoan" : body.refType === "section" ? "section" : null;
   const refId = typeof body.refId === "string" ? body.refId.trim() : "";
   if (!refType || !refId) {
     return NextResponse.json({ message: "Thiếu công tác" }, { status: 400 });

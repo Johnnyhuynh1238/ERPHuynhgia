@@ -229,7 +229,7 @@ async function buildProjectReport(projectId: string): Promise<string> {
   L.push(`Trạng thái: ${STATUS_VN[meta.status] || meta.status}`);
   if (meta.address) L.push(`Địa chỉ: ${meta.address}`);
   L.push(`Bắt đầu: ${fmtDate(meta.startDate)} · Dự kiến xong: ${fmtDate(meta.expectedEndDate)}${daysLeft != null ? ` (${daysLeft >= 0 ? `còn ${daysLeft}` : `trễ ${-daysLeft}`} ngày)` : ""}`);
-  if (prog) L.push(`Tiến độ (theo công tác): ${prog.earnedPct}%`);
+  if (prog) L.push(`Tiến độ (theo phần): ${prog.earnedPct}%`);
 
   L.push(``);
   L.push(`💰 TÀI CHÍNH`);
