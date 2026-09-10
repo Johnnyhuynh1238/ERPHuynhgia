@@ -5,7 +5,20 @@ import { requireAdmin } from "@/lib/estimate";
 
 export const runtime = "nodejs";
 
-type Body = { name?: string; kind?: BudgetPlanGroup; sortOrder?: number };
+type Body = {
+  name?: string;
+  kind?: BudgetPlanGroup;
+  sortOrder?: number;
+  planStart?: string | null;
+  planEnd?: string | null;
+};
+
+// "YYYY-MM-DD" → Date (UTC) hợp lệ, sai định dạng → undefined (bỏ qua)
+const parseDate = (v: string | null | undefined): Date | null | undefined => {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? new Date(v + "T00:00:00Z") : undefined;
+};
 
 // PATCH: đổi tên / loại / thứ tự 1 PHẦN
 export async function PATCH(
@@ -16,7 +29,13 @@ export async function PATCH(
   if (error) return error;
 
   const b = (await req.json().catch(() => ({}))) as Body;
-  const data: { name?: string; kind?: BudgetPlanGroup; sortOrder?: number } = {};
+  const data: {
+    name?: string;
+    kind?: BudgetPlanGroup;
+    sortOrder?: number;
+    planStart?: Date | null;
+    planEnd?: Date | null;
+  } = {};
   if (b.name != null) {
     const name = b.name.trim();
     if (!name) return NextResponse.json({ message: "Tên phần không được rỗng" }, { status: 400 });
@@ -28,6 +47,10 @@ export async function PATCH(
     data.kind = b.kind;
   }
   if (b.sortOrder != null && Number.isFinite(b.sortOrder)) data.sortOrder = Math.round(b.sortOrder);
+  const ps = parseDate(b.planStart);
+  if (ps !== undefined) data.planStart = ps;
+  const pe = parseDate(b.planEnd);
+  if (pe !== undefined) data.planEnd = pe;
 
   const res = await prisma.projectSection.updateMany({
     where: { id: params.sectionId, projectId: params.id },

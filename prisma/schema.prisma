@@ -4435,6 +4435,8 @@ model ProjectSection {
   projectId String          @map("project_id") @db.Uuid
   name      String
   kind      BudgetPlanGroup @default(tho) // thô / hoàn thiện / nhân công / chung — để gom & tính lãi
+  planStart DateTime?       @map("plan_start") @db.Date // tiến độ DỰ KIẾN: ngày bắt đầu phần
+  planEnd   DateTime?       @map("plan_end") @db.Date // tiến độ DỰ KIẾN: ngày kết thúc phần
   sortOrder Int             @default(0) @map("sort_order")
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")

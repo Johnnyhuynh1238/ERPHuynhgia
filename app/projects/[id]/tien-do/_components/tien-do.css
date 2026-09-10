@@ -117,3 +117,23 @@
   opacity: 0; pointer-events: none; transition: all 0.25s ease; z-index: 50; max-width: 90vw;
 }
 .tddoc .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Tiến độ DỰ KIẾN (planned vs actual) ── */
+.tddoc .tot .bar { position: relative; }
+.tddoc .tot .bar .planmark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .8; border-radius: 2px; transform: translateX(-1px); pointer-events: none; }
+.tddoc .tot-plan { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
+.tddoc .tot-plan .num { color: var(--text); font-weight: 600; }
+.tddoc .schedbadge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.tddoc .schedbadge.ahead { background: rgba(91,122,82,.18); color: var(--ok); }
+.tddoc .schedbadge.behind { background: rgba(185,28,28,.16); color: #d1503f; }
+.tddoc .schedbadge.ontime { background: var(--track); color: var(--mut); }
+:root[data-theme="dark"] .tddoc .schedbadge.behind, .tddoc[data-theme="dark"] .schedbadge.behind { color: #f0876f; }
+
+.tddoc .rplan { display: flex; align-items: center; gap: 7px; margin-top: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--mut); }
+.tddoc .rplan .rplan-l { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; font-weight: 600; }
+.tddoc .rplan input[type="date"] { padding: 4px 7px; border: 1px solid var(--line2); border-radius: 7px; background: var(--bg); color: var(--text); font-size: 11.5px; font-family: inherit; }
+.tddoc .rplan .arr { color: var(--mut2); }
+.tddoc .rplan .rsched { margin-left: auto; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.tddoc .rplan .rsched.ahead { background: rgba(91,122,82,.18); color: var(--ok); }
+.tddoc .rplan .rsched.behind { background: rgba(185,28,28,.16); color: #d1503f; }
+.tddoc .rplan .rsched.ontime { background: var(--track); color: var(--mut); }

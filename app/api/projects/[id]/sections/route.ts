@@ -21,6 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     },
   });
 
+  const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   const sections = rows.map((s) => {
     const total = s.materials.reduce((acc, m) => acc + Number(m.quantity) * Number(m.unitPrice), 0);
     return {
@@ -28,6 +29,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       name: s.name,
       kind: s.kind,
       sortOrder: s.sortOrder,
+      planStart: iso(s.planStart),
+      planEnd: iso(s.planEnd),
       matCount: s.materials.length,
       total,
     };
@@ -62,5 +65,5 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     },
     select: { id: true, name: true, kind: true, sortOrder: true },
   });
-  return NextResponse.json({ ...created, matCount: 0, total: 0 });
+  return NextResponse.json({ ...created, planStart: null, planEnd: null, matCount: 0, total: 0 });
 }

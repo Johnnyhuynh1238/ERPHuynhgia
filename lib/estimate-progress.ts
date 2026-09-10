@@ -28,8 +28,10 @@ export type ProgressTask = {
   groupLabel: string; // "Thô" / "Hoàn thiện" / … / "Khoán trọn gói"
   name: string;
   amount: number; // tiền dự toán của phần/HĐ
-  percent: number; // 0..100
+  percent: number; // 0..100 — tiến độ THỰC TẾ
   done: boolean;
+  planStart: string | null; // "YYYY-MM-DD" — tiến độ DỰ KIẾN (chỉ phần)
+  planEnd: string | null;
 };
 
 export type EstimateProgress = {
@@ -44,7 +46,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
     prisma.projectSection.findMany({
       where: { projectId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: { id: true, name: true, kind: true, sortOrder: true },
+      select: { id: true, name: true, kind: true, sortOrder: true, planStart: true, planEnd: true },
     }),
     prisma.estimateDbMaterial.findMany({
       where: { projectId },
@@ -63,6 +65,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
 
   const progMap = new Map<string, { percent: number; done: boolean }>();
   for (const p of progRows) progMap.set(`${p.refType}|${p.refId}`, { percent: p.percent, done: p.done });
+  const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
   // Σ VT theo PHẦN. VT chưa gắn phần → uncataloged (không thành dòng tiến độ).
   const amtBySection = new Map<string, number>();
@@ -88,6 +91,8 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
       amount: amtBySection.get(s.id) ?? 0,
       percent: pr?.percent ?? 0,
       done: pr?.done ?? false,
+      planStart: iso(s.planStart),
+      planEnd: iso(s.planEnd),
     });
   }
   for (const k of khoans) {
@@ -101,6 +106,8 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
       amount: Number(k.value),
       percent: pr?.percent ?? 0,
       done: pr?.done ?? false,
+      planStart: null,
+      planEnd: null,
     });
   }
 

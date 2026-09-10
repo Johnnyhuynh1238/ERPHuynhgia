@@ -13,11 +13,23 @@ type Task = {
   groupLabel: string; // "Thô" / "Hoàn thiện" / … / "Khoán trọn gói"
   name: string;
   amount: number;
-  percent: number;
+  percent: number; // thực tế
   done: boolean;
+  planStart: string | null; // dự kiến
+  planEnd: string | null;
 };
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
+
+// % DỰ KIẾN hôm nay theo khoảng ngày kế hoạch (nội suy tuyến tính)
+const plannedPct = (t: { planStart: string | null; planEnd: string | null }): number => {
+  if (!t.planStart || !t.planEnd) return 0;
+  const s = Date.parse(t.planStart);
+  const e = Date.parse(t.planEnd);
+  const n = Date.now();
+  if (!(e > s)) return n >= e ? 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(((n - s) / (e - s)) * 100)));
+};
 const keyOf = (t: { refType: string; refId: string }) => `${t.refType}|${t.refId}`;
 
 export function TienDoClient({
@@ -85,13 +97,25 @@ export function TienDoClient({
   const total = useMemo(() => {
     let amt = 0;
     let earned = 0;
+    let planned = 0;
     let doneCnt = 0;
+    let hasPlan = false;
     tasks.forEach((t) => {
       amt += t.amount;
       earned += (t.percent / 100) * t.amount;
+      planned += (plannedPct(t) / 100) * t.amount;
       if (t.done) doneCnt += 1;
+      if (t.planStart && t.planEnd) hasPlan = true;
     });
-    return { amt, earned, pct: amt > 0 ? Math.round((earned / amt) * 100) : 0, doneCnt };
+    return {
+      amt,
+      earned,
+      planned,
+      pct: amt > 0 ? Math.round((earned / amt) * 100) : 0,
+      planPct: amt > 0 ? Math.round((planned / amt) * 100) : 0,
+      doneCnt,
+      hasPlan,
+    };
   }, [tasks]);
 
   // Tween số tiền hoàn thành: bám theo target khi kéo thanh → chạy mượt.
@@ -155,6 +179,21 @@ export function TienDoClient({
     timers.current[k] = setTimeout(() => save({ ...t, percent }, { percent }), 350);
   };
 
+  // Lưu ngày DỰ KIẾN của 1 PHẦN (chỉ refType 'section'), qua API sections.
+  const savePlan = async (t: Task, patch: { planStart?: string | null; planEnd?: string | null }) => {
+    setTasks((prev) => prev.map((x) => (keyOf(x) === keyOf(t) ? { ...x, ...patch } : x)));
+    if (t.refType !== "section") return;
+    const r = await fetch(`/api/projects/${projectId}/sections/${t.refId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      toast(j.message || "Lưu ngày lỗi");
+    }
+  };
+
   const toggleDone = (t: Task) => {
     const nextDone = !t.done;
     setTasks((prev) =>
@@ -203,7 +242,7 @@ export function TienDoClient({
           </span>
         </div>
 
-        {/* Tổng tiến độ — 1 thanh phẳng, tiền tween khi kéo */}
+        {/* Tổng tiến độ — thanh thực tế + vạch dự kiến (PV), badge sớm/trễ */}
         <div className="tot">
           <div className="tot-top">
             <span className="tot-n">Tổng tiến độ dự án</span>
@@ -211,7 +250,23 @@ export function TienDoClient({
           </div>
           <div className="bar">
             <i style={{ width: `${Math.max(0, Math.min(100, dispPct))}%` }} />
+            {!loading && total.hasPlan && (
+              <span className="planmark" style={{ left: `${Math.max(0, Math.min(100, total.planPct))}%` }} />
+            )}
           </div>
+          {!loading && total.hasPlan && (
+            <div className="tot-plan">
+              <span>
+                Dự kiến hôm nay <span className="num">{total.planPct}%</span>
+              </span>
+              {(() => {
+                const d = total.pct - total.planPct;
+                const cls = d > 0 ? "ahead" : d < 0 ? "behind" : "ontime";
+                const txt = d > 0 ? `Sớm ${d}%` : d < 0 ? `Trễ ${-d}%` : "Đúng tiến độ";
+                return <span className={`schedbadge ${cls}`}>{txt}</span>;
+              })()}
+            </div>
+          )}
           <div className="tot-m">
             <span>
               Giá trị hoàn thành <span className="num">{loading ? "…" : fmt(dispEarned)}</span> đ
@@ -280,6 +335,33 @@ export function TienDoClient({
                           {t.done ? "✓ Xong" : "Xong"}
                         </button>
                       </div>
+                      {t.refType === "section" && (
+                        <div className="rplan">
+                          <span className="rplan-l">Dự kiến</span>
+                          <input
+                            type="date"
+                            value={t.planStart ?? ""}
+                            onChange={(e) => savePlan(t, { planStart: e.target.value || null })}
+                            aria-label={`Ngày bắt đầu ${t.name}`}
+                          />
+                          <span className="arr">→</span>
+                          <input
+                            type="date"
+                            value={t.planEnd ?? ""}
+                            onChange={(e) => savePlan(t, { planEnd: e.target.value || null })}
+                            aria-label={`Ngày kết thúc ${t.name}`}
+                          />
+                          {t.planStart && t.planEnd
+                            ? (() => {
+                                const pv = plannedPct(t);
+                                const d = t.percent - pv;
+                                const cls = d > 0 ? "ahead" : d < 0 ? "behind" : "ontime";
+                                const txt = d > 0 ? `sớm ${d}%` : d < 0 ? `trễ ${-d}%` : "đúng";
+                                return <span className={`rsched ${cls}`}>DK {pv}% · {txt}</span>;
+                              })()
+                            : null}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
