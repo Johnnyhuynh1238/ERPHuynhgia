@@ -330,3 +330,9 @@
 .cn-ai-head b { font-size: 13px; color: #7aa2ff; font-weight: 600; }
 .cn-ai-head .x { margin-left: auto; background: none; border: none; color: #94a3b8; font-size: 15px; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
 .cn-ai-box iframe { width: 100%; flex: 1; border: 0; }
+
+/* sub-menu trong tab NCC: Có công nợ | Tất cả NCC */
+.cndoc .cnsub { display: inline-flex; gap: 4px; margin-top: 12px; padding: 3px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.cndoc .cnsubtab { font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 8px; border: none; background: none; color: var(--mut); cursor: pointer; }
+.cndoc .cnsubtab.on { background: var(--text); color: var(--bg); }
+.cndoc .cnsubtab:active { transform: scale(0.97); }

@@ -42,6 +42,16 @@ type Supplier = {
 };
 type Account = { id: string; code: string; name: string; kind: string; currentBalance: number };
 type Data = { summary: { tongNo: number; daTra: number; conLai: number }; suppliers: Supplier[]; accounts: Account[] };
+// Danh mục NCC toàn công ty (tab "Tất cả NCC")
+type AllSupplier = {
+  id: string;
+  code: string | null;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+  priceCount: number;
+};
 
 // Đơn NCC: không mark "đã thanh toán". received = "Đã ghi công nợ" = hết quy trình.
 // Trong công nợ đơn chỉ để XEM (read-only).
@@ -75,6 +85,9 @@ export function CongNoClient({
   currentUserId: string;
 }) {
   const [tab, setTab] = useState<"ncc" | "sub">("ncc");
+  const [nccView, setNccView] = useState<"debt" | "all">("debt"); // sub-menu tab NCC
+  const [allNcc, setAllNcc] = useState<AllSupplier[] | null>(null);
+  const [allNccLoading, setAllNccLoading] = useState(false);
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -132,6 +145,30 @@ export function CongNoClient({
       }
     })();
   }, [load]);
+
+  // Lazy-load danh mục NCC toàn công ty khi lần đầu mở tab "Tất cả NCC".
+  useEffect(() => {
+    if (nccView !== "all" || allNcc !== null || allNccLoading) return;
+    setAllNccLoading(true);
+    fetch(`/api/admin/suppliers`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Không đọc được danh mục NCC"))))
+      .then((j) => {
+        const rows = (j.suppliers ?? j ?? []) as Array<Record<string, unknown>>;
+        setAllNcc(
+          rows.map((s) => ({
+            id: String(s.id),
+            code: (s.code as string) ?? null,
+            name: String(s.name ?? ""),
+            phone: (s.phone as string) ?? null,
+            address: (s.address as string) ?? null,
+            isActive: s.isActive !== false,
+            priceCount: Number((s._count as { prices?: number } | undefined)?.prices ?? 0),
+          })),
+        );
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : "Lỗi tải NCC"))
+      .finally(() => setAllNccLoading(false));
+  }, [nccView, allNcc, allNccLoading]);
 
   const sum = data?.summary ?? { tongNo: 0, daTra: 0, conLai: 0 };
   const suppliers = data?.suppliers ?? [];
@@ -226,6 +263,56 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
           <SubContractsTab projectId={projectId} canManage={canManageSub} currentRole={currentRole} currentUserId={currentUserId} />
         ) : (
         <>
+        {/* sub-menu tab NCC: Có công nợ | Tất cả NCC */}
+        <div className="cnsub" role="tablist">
+          <button type="button" className={`cnsubtab${nccView === "debt" ? " on" : ""}`} onClick={() => setNccView("debt")}>
+            Có công nợ
+          </button>
+          <button type="button" className={`cnsubtab${nccView === "all" ? " on" : ""}`} onClick={() => setNccView("all")}>
+            Tất cả NCC
+          </button>
+        </div>
+
+        {nccView === "all" ? (
+          <>
+            <div className="meta">
+              <span>{allNccLoading ? "…" : `${allNcc?.length ?? 0} NCC`}</span>
+              <span className="d">·</span>
+              <span>Danh mục toàn công ty</span>
+            </div>
+            {allNccLoading ? (
+              <div className="load">Đang tải danh mục NCC…</div>
+            ) : !allNcc?.length ? (
+              <div className="empty"><div className="ic">🏭</div>Chưa có nhà cung cấp nào.</div>
+            ) : (
+              <div className="nlist">
+                {allNcc.map((s) => (
+                  <a
+                    key={s.id}
+                    href={`/admin/suppliers/${s.id}`}
+                    className={`nccrow${s.isActive ? "" : " paidoff"}`}
+                  >
+                    <div className="nl">
+                      <div className="nn">{s.name}{!s.isActive && " (ngưng)"}</div>
+                      <div className="nsub">
+                        {s.code && <span>{s.code}</span>}
+                        {s.phone && <span>· {s.phone}</span>}
+                        {s.address && <span>· {s.address}</span>}
+                      </div>
+                    </div>
+                    <div className="nr">
+                      <div className="rv num">{s.priceCount}</div>
+                      <div className="rk">báo giá</div>
+                    </div>
+                    <span className="chev">›</span>
+                  </a>
+                ))}
+              </div>
+            )}
+            <div className="foot">Danh mục NCC dùng chung mọi dự án · bấm để xem bảng báo giá</div>
+          </>
+        ) : (
+        <>
         <div className="meta">
           <span>{loading ? "…" : `${suppliers.length} NCC`}</span>
           <span className="d">·</span>
@@ -291,6 +378,8 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
         )}
 
         <div className="foot">Công nợ bám đơn mua hàng · Đúng — Đẹp — Bền</div>
+        </>
+        )}
         </>
         )}
       </div>
