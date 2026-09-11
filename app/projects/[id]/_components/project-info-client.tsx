@@ -569,9 +569,9 @@ export function ProjectInfoClient({
         <div className="space-y-2 text-sm">
           <div>
             Link: {data.customerPortalToken ? (
-              <a className="break-all text-orange-300 underline" href={buildPortalUrl(data.customerPortalToken)} target="_blank" rel="noreferrer">
+              <button type="button" className="break-all text-left text-orange-300 underline" onClick={copyPortalLink} title="Bấm để copy link">
                 {buildPortalUrl(data.customerPortalToken)}
-              </a>
+              </button>
             ) : "-"}
           </div>
           {data.customerPortalToken ? (
