@@ -146,6 +146,20 @@ export async function PATCH(
     }
     data.receivedAt = new Date();
     data.receivedBy = user!.id;
+
+    // Trả tiền TRƯỚC khi nhận hàng: lệnh chi gắn đơn (source_type='mua_hang_order') có thể đã
+    // được ghi "đã chi" khi đơn còn 'ordered' → flip lúc chi (guard status='received') không chạy,
+    // đơn kẹt 'received' = "Chờ thanh toán" mãi. Ở mốc nhận hàng, nếu tổng đã chi ≥ tổng đơn →
+    // nhảy thẳng 'paid'. (finalTotal lấy total mới nếu đơn này sửa giá trong cùng request.)
+    const finalTotal = Number("total" in data ? (data.total as number) : order.total);
+    const agg = await prisma.expense.aggregate({
+      where: { sourceType: "mua_hang_order", sourceId: order.id, status: "paid" },
+      _sum: { paidAmount: true },
+    });
+    const paidSum = Number(agg._sum.paidAmount ?? 0);
+    if (finalTotal > 0 && paidSum >= finalTotal) {
+      data.status = "paid";
+    }
   }
 
   // KT + đơn đã nhận: chỉ giữ lại thay đổi NCC + status (received/paid), bỏ mọi field khác.
