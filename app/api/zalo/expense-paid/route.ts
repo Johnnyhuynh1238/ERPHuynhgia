@@ -36,7 +36,9 @@ function fmtVnd(n: number): string {
 /** Cắt mọi token số trong OCR text → set chuỗi chỉ chữ số (đã bỏ dấu ngăn cách). */
 function amountTokens(text: string): Set<string> {
   const set = new Set<string>();
-  for (const m of Array.from(text.matchAll(/\d[\d.,\s]*\d|\d/g))) {
+  // KHÔNG gộp \s: tránh nuốt xuống dòng dính số tiền "150,000" với giờ "18:48"
+  // dòng sau thành "15000018" → lệch tiền giả. Dấu ngăn cách VN là . hoặc , (không phải space).
+  for (const m of Array.from(text.matchAll(/\d[\d.,]*\d|\d/g))) {
     const digits = m[0].replace(/\D/g, "").replace(/^0+/, "");
     if (digits) set.add(digits);
   }
