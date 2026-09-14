@@ -1,6 +1,7 @@
 import { Prisma, MhOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
+import { resolveAlloc } from "@/lib/mh-budget-alloc";
 
 // ── Ngân sách dòng tiền theo HẠNG MỤC ────────────────────────────────────────
 // Mỗi hạng mục: Ngân sách · Đã chi · Công nợ · Còn phải chi.
@@ -47,7 +48,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     prisma.project.findUnique({ where: { id: projectId }, select: { contractValue: true } }),
     prisma.mhOrder.findMany({
       where: { projectId, status: { in: MH_ACTIVE } },
-      select: { id: true, status: true, total: true, supplierId: true, budgetLineId: true },
+      select: { id: true, status: true, total: true, supplierId: true, budgetLineId: true, budgetAlloc: true },
     }),
     prisma.subContract.findMany({
       where: { projectId, status: { in: ["active", "completed"] }, budgetLineId: { not: null } },
@@ -132,9 +133,15 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     if (total <= 0) continue;
     const paidOrder = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
     const owed = total - paidOrder;
-    if (o.budgetLineId) {
-      add(spent, o.budgetLineId, paidOrder);
-      add(debt, o.budgetLineId, owed);
+    // Chia đã-trả/còn-nợ theo alloc (nhiều hạng mục). Alloc rỗng = chưa gắn.
+    const alloc = resolveAlloc(o);
+    if (alloc.length) {
+      const sumA = alloc.reduce((s, a) => s + a.amount, 0) || 1;
+      for (const a of alloc) {
+        const r = a.amount / sumA;
+        add(spent, a.lineId, paidOrder * r);
+        add(debt, a.lineId, owed * r);
+      }
     } else {
       unassigned.spent += paidOrder;
       unassigned.debt += owed;
@@ -155,17 +162,25 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     for (const o of group) {
       const amt = num(o.total);
       if (amt <= 0) continue;
-      const key = o.budgetLineId ?? null;
+      const alloc = resolveAlloc(o); // nhiều hạng mục / đơn (rỗng = chưa gắn)
       // Đơn NCC đã 'paid' (trả ngay/tất toán riêng, không qua 'received') nằm
       // NGOÀI công nợ NCC — view ncc_cong_no_du_an chỉ theo dõi đơn 'received'.
       // Coi như đã chi thẳng, không đưa vào phân bổ nợ (nếu không sẽ hiện nợ ảo).
       if (o.status === MhOrderStatus.paid) {
-        if (key) add(spent, key, amt);
+        if (alloc.length) for (const a of alloc) add(spent, a.lineId, a.amount);
         else unassigned.spent += amt;
         continue;
       }
-      weight.set(key, (weight.get(key) ?? 0) + amt);
-      sumOrders += amt;
+      // Trọng số phân bổ da_tra/con_lai theo SỐ TIỀN từng hạng mục; mẫu số = Σ trọng số.
+      if (alloc.length) {
+        for (const a of alloc) {
+          weight.set(a.lineId, (weight.get(a.lineId) ?? 0) + a.amount);
+          sumOrders += a.amount;
+        }
+      } else {
+        weight.set(null, (weight.get(null) ?? 0) + amt);
+        sumOrders += amt;
+      }
     }
     if (sumOrders <= 0) continue;
     const ncc = nccMap.get(supplierId);

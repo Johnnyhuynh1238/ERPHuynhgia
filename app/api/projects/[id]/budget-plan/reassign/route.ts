@@ -47,12 +47,31 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
+  // Đơn mua hàng đổi hạng mục = GỘP cả đơn về 1 hạng mục (budgetAlloc 1 phần tử phủ total),
+  // hoặc bỏ gắn (alloc rỗng). Cần total từng đơn để dựng alloc.
+  const mhIds = changes.filter((c) => c.source === "mh_order").map((c) => c.id);
+  const mhTotals = new Map<string, number>(
+    mhIds.length
+      ? (
+          await prisma.mhOrder.findMany({
+            where: { id: { in: mhIds }, projectId },
+            select: { id: true, total: true },
+          })
+        ).map((o) => [o.id, Math.round(Number(o.total))])
+      : [],
+  );
+
   // updateMany scope theo id + projectId → không đụng dự án khác.
   await prisma.$transaction(
     changes.map((c) => {
       const where = { id: c.id, projectId } as { id: string; projectId: string };
+      if (c.source === "mh_order") {
+        const alloc = c.budgetLineId
+          ? [{ lineId: c.budgetLineId, amount: mhTotals.get(c.id) ?? 0 }]
+          : [];
+        return prisma.mhOrder.updateMany({ where, data: { budgetLineId: c.budgetLineId, budgetAlloc: alloc } });
+      }
       const data = { budgetLineId: c.budgetLineId };
-      if (c.source === "mh_order") return prisma.mhOrder.updateMany({ where, data });
       if (c.source === "sub") return prisma.subContract.updateMany({ where, data });
       return prisma.expense.updateMany({ where, data });
     }),

@@ -472,6 +472,24 @@
 .mhdoc .cart-hm select:focus { border-color: var(--orange); }
 .mhdoc .cart-hm-hint { margin-top: 5px; font-size: 11px; color: var(--mut2); }
 
+/* phân bổ NHIỀU hạng mục theo số tiền (dùng chung giỏ hàng + sửa đơn) */
+.alloc-ed > label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mut); margin-bottom: 8px; }
+.alloc-ed .alloc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.alloc-ed .alloc-row select { flex: 1; min-width: 0; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
+.alloc-ed .alloc-row select:focus { border-color: var(--orange); }
+.alloc-ed .alloc-amt { width: 118px; flex: none; text-align: right; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; }
+.alloc-ed .alloc-amt:focus { border-color: var(--orange); }
+.alloc-ed .alloc-amt-full { width: 118px; flex: none; text-align: right; font-size: 13px; font-weight: 700; color: var(--terra); white-space: nowrap; }
+.alloc-ed .alloc-rm { flex: none; width: 30px; height: 30px; border: none; background: transparent; color: var(--red); font-size: 15px; cursor: pointer; border-radius: 8px; }
+.alloc-ed .alloc-rm:hover { background: rgba(210, 60, 60, 0.1); }
+.alloc-ed .alloc-add { margin-top: 2px; background: transparent; border: 1.5px dashed var(--line2); color: var(--terra); font-family: inherit; font-size: 12.5px; font-weight: 600; border-radius: 9px; padding: 7px 11px; cursor: pointer; }
+.alloc-ed .alloc-add:hover { border-color: var(--orange); color: var(--orange); }
+.alloc-ed .alloc-sum { margin-top: 8px; font-size: 12px; font-weight: 600; }
+.alloc-ed .alloc-sum.ok { color: #1f7d52; }
+.alloc-ed .alloc-sum.bad { color: var(--red); }
+/* hạng mục read-only nhiều dòng (sửa đơn, KT xem) */
+.mhp .sbody .fld > .hm-badge.ro { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 13px; font-weight: 600; color: var(--terra); padding: 3px 0; }
+
 /* hạng mục ngân sách cho CẢ ĐƠN — sửa đơn (EditSheet) */
 .mhp .sbody .fld > .hm-sel { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
 .mhp .sbody .fld > .hm-sel:focus { border-color: var(--orange); }

@@ -1,10 +1,38 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
+import { cleanAlloc, validateAlloc, type BudgetAlloc } from "@/lib/mh-budget-alloc";
 
 export const runtime = "nodejs";
 
 type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
+
+// Hạng mục hợp lệ của dự án (để kiểm alloc).
+async function validLineIds(projectId: string): Promise<Set<string>> {
+  const rows = await prisma.projectBudgetPlanLine.findMany({
+    where: { plan: { projectId } },
+    select: { id: true },
+  });
+  return new Set(rows.map((r) => r.id));
+}
+
+// Dựng alloc từ body (budgetAlloc ưu tiên; budgetLineId legacy → 1 phần tử phủ total).
+// Kiểm khi CÓ gắn; rỗng = bỏ gắn (cho phép ở bước sửa). Trả {alloc} hoặc {error}.
+async function allocFromBody(
+  body: Record<string, unknown>,
+  projectId: string,
+  total: number,
+): Promise<{ alloc: BudgetAlloc[] } | { error: string }> {
+  let alloc = cleanAlloc(body.budgetAlloc);
+  if (!("budgetAlloc" in body) && body.budgetLineId) {
+    alloc = [{ lineId: String(body.budgetLineId), amount: total }];
+  }
+  if (alloc.length) {
+    const err = validateAlloc(alloc, await validLineIds(projectId), total);
+    if (err) return { error: err };
+  }
+  return { alloc };
+}
 
 const STATUSES = ["draft", "ordered", "received", "paid"] as const;
 type St = (typeof STATUSES)[number];
@@ -32,10 +60,13 @@ export async function PATCH(
   // mục ngân sách của đơn (budgetLineId) để thống kê; giữ nguyên tên/SL/giá/total.
   if (order.status === "paid") {
     const isAdmin = !isKeToan;
-    if (isAdmin && "budgetLineId" in body) {
+    if (isAdmin && ("budgetAlloc" in body || "budgetLineId" in body)) {
+      // Đơn đã trả: total cố định → alloc phải khớp order.total (nếu có gắn).
+      const res = await allocFromBody(body, params.id, Number(order.total));
+      if ("error" in res) return NextResponse.json({ message: res.error }, { status: 400 });
       await prisma.mhOrder.update({
         where: { id: order.id },
-        data: { budgetLineId: body.budgetLineId ? String(body.budgetLineId) : null },
+        data: { budgetAlloc: res.alloc, budgetLineId: res.alloc[0]?.lineId ?? null },
       });
       return NextResponse.json({ ok: true });
     }
@@ -55,7 +86,7 @@ export async function PATCH(
   if ("supplierName" in body) data.supplierName = String(body.supplierName || "").trim() || null;
   if ("supplierId" in body) data.supplierId = body.supplierId ? String(body.supplierId) : null;
   if ("note" in body) data.note = String(body.note || "").trim() || null;
-  if ("budgetLineId" in body) data.budgetLineId = body.budgetLineId ? String(body.budgetLineId) : null;
+  // Hạng mục ngân sách (alloc) xử lý SAU khi tính total mới (bên dưới) để kiểm Σ = total.
 
   if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) {
     data.status = body.status as St;
@@ -113,6 +144,15 @@ export async function PATCH(
     });
     data.items = items;
     data.total = items.reduce((s, it) => s + it.qty * it.price, 0);
+  }
+
+  // Hạng mục ngân sách: alloc phải khớp TỔNG ĐƠN MỚI (sau khi sửa vật tư). Bỏ gắn = alloc rỗng.
+  if ("budgetAlloc" in body || "budgetLineId" in body) {
+    const finalTotal = Number("total" in data ? (data.total as number) : order.total);
+    const res = await allocFromBody(body, params.id, finalTotal);
+    if ("error" in res) return NextResponse.json({ message: res.error }, { status: 400 });
+    data.budgetAlloc = res.alloc;
+    data.budgetLineId = res.alloc[0]?.lineId ?? null;
   }
 
   // Ảnh chứng minh nhận hàng: [{url,kind}] kind=phieu|hang, url phải minio://

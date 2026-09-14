@@ -24,6 +24,8 @@ type Material = {
 
 type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 type BudgetLine = { id: string; name: string; groupKind: string };
+// Phân bổ nhiều hạng mục theo số tiền cho 1 đơn: Σ amount = tổng đơn.
+type BudgetAlloc = { lineId: string; amount: number };
 type Order = {
   id: string;
   seq: number;
@@ -34,7 +36,8 @@ type Order = {
   note: string | null;
   total: number;
   items: OrderItem[];
-  budgetLineId?: string | null; // hạng mục ngân sách của CẢ ĐƠN
+  budgetLineId?: string | null; // hạng mục CHÍNH (phần tử đầu của budgetAlloc)
+  budgetAlloc?: BudgetAlloc[]; // phân bổ nhiều hạng mục theo số tiền
   receiptImages?: ReceiptImg[]; // ảnh chứng minh nhận hàng
   receivedAt?: string | null;
   hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
@@ -84,6 +87,14 @@ const baseName = (n: string) => {
   const i = n.indexOf(" (");
   return (i >= 0 ? n.slice(0, i) : n).trim();
 };
+// ── Phân bổ hạng mục theo số tiền ──
+const allocSum = (a: BudgetAlloc[]) => a.reduce((s, x) => s + (x.amount || 0), 0);
+// Alloc hợp lệ: có dòng, mỗi dòng có hạng mục + tiền > 0, không trùng, Σ = tổng đơn.
+const allocValid = (a: BudgetAlloc[], total: number) =>
+  a.length > 0 &&
+  a.every((x) => x.lineId && x.amount > 0) &&
+  new Set(a.map((x) => x.lineId)).size === a.length &&
+  Math.round(allocSum(a)) === Math.round(total);
 // Đơn giá vật tư: giá thống nhất nếu mọi lần cùng giá, ngược lại bình quân theo SL.
 const upriceOf = (it: VtItem) => it.uniformPrice ?? (it.qty > 0 ? it.amount / it.qty : 0);
 // Khoá đã đặt theo vật tư (baseName + đvt, thường hoá chữ thường).
@@ -257,8 +268,8 @@ export function MuaHangClient({
   const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number; name?: string; unit?: string }>>({});
   // Hạng mục ngân sách dự án (rỗng = dự án chưa lập ngân sách → không bắt gắn).
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([]);
-  // Hạng mục ngân sách chọn cho CẢ ĐƠN khi lên đơn (per-đơn, không per-dòng).
-  const [orderHm, setOrderHm] = useState<string>("");
+  // Phân bổ hạng mục ngân sách (nhiều hạng mục theo số tiền) cho CẢ ĐƠN khi lên đơn.
+  const [orderAlloc, setOrderAlloc] = useState<BudgetAlloc[]>([]);
   // VT đang mở popup để nhập SL + giá.
   const [picked, setPicked] = useState<VtItem<Material> | null>(null);
   // Trạng thái xổ 3 siêu nhóm (mặc định thu gọn hết).
@@ -536,7 +547,7 @@ export function MuaHangClient({
     return { tot, pl, remain: tot - pl, pct: tot > 0 ? Math.round((pl / tot) * 100) : 0 };
   }, [allItems, placed]);
 
-  const createOrder = async (budgetLineId: string | null) => {
+  const createOrder = async (alloc: BudgetAlloc[]) => {
     const items: OrderItem[] = cartEntries.map((e) => ({
       key: e.it.key,
       name: e.it.name,
@@ -545,16 +556,17 @@ export function MuaHangClient({
       price: Math.round(e.price),
     }));
     if (!items.length) return;
-    // Bắt buộc chọn 1 hạng mục cho CẢ ĐƠN khi dự án đã lập ngân sách.
-    if (budgetLines.length && !budgetLineId) {
-      toast("Chọn hạng mục ngân sách cho đơn trước khi đặt hàng");
+    const total = items.reduce((s, it) => s + it.qty * it.price, 0);
+    // Bắt buộc phân bổ hạng mục (Σ = tổng đơn) khi dự án đã lập ngân sách.
+    if (budgetLines.length && !allocValid(alloc, total)) {
+      toast("Phân bổ hạng mục ngân sách phải bằng tổng đơn trước khi đặt hàng");
       return;
     }
     // NCC chọn ở bước sửa đơn (tab Đơn hàng), không chọn ở màn mua.
     const r = await fetch(`/api/projects/${projectId}/mua-hang`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items, budgetLineId }),
+      body: JSON.stringify({ items, budgetAlloc: alloc }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -562,7 +574,7 @@ export function MuaHangClient({
       return;
     }
     setCartMap({});
-    setOrderHm("");
+    setOrderAlloc([]);
     await loadOrders();
     setTab("orders"); // nhảy qua tab Đơn hàng để tải PO
     toast(`Đã tạo đơn #${j.seq} · ${items.length} vật tư`);
@@ -875,12 +887,12 @@ ${(() => {
               entries={cartEntries}
               total={cart.sum}
               budgetLines={budgetLines}
-              orderHm={orderHm}
-              onHm={setOrderHm}
+              alloc={orderAlloc}
+              onAlloc={setOrderAlloc}
               onEdit={setPicked}
               onRemove={removeFromCart}
               onClear={clearCart}
-              onOrder={() => createOrder(orderHm || null)}
+              onOrder={() => createOrder(orderAlloc)}
             />
           ) : tab === "orders" ? (
             <OrdersList
@@ -1213,13 +1225,106 @@ function VtPopup({
   );
 }
 
-// Tab Giỏ hàng: chọn 1 hạng mục cho CẢ ĐƠN rồi Đặt hàng → tạo 1 đơn.
+// Bảng phân bổ hạng mục ngân sách theo SỐ TIỀN (nhiều hạng mục / đơn). Σ phải = tổng đơn.
+// 1 dòng = trọn tổng đơn (khoá ô tiền). ≥2 dòng = nhập tiền tay, hiện thiếu/dư.
+function BudgetAllocEditor({
+  budgetLines,
+  alloc,
+  total,
+  onChange,
+  disabled,
+}: {
+  budgetLines: BudgetLine[];
+  alloc: BudgetAlloc[];
+  total: number;
+  onChange: (a: BudgetAlloc[]) => void;
+  disabled?: boolean;
+}) {
+  const single = alloc.length <= 1;
+  const sum = allocSum(alloc);
+  const remain = Math.round(total - sum);
+  // 1 dòng → luôn đồng bộ số tiền = tổng đơn (không cho lệch).
+  useEffect(() => {
+    if (alloc.length === 1 && Math.round(alloc[0].amount) !== Math.round(total)) {
+      onChange([{ ...alloc[0], amount: Math.round(total) }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alloc, total]);
+
+  const setRow = (i: number, patch: Partial<BudgetAlloc>) =>
+    onChange(alloc.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const removeRow = (i: number) => {
+    const next = alloc.filter((_, j) => j !== i);
+    if (next.length === 1) next[0] = { ...next[0], amount: Math.round(total) }; // còn 1 → trọn tổng
+    onChange(next);
+  };
+  const addRow = () => onChange([...alloc, { lineId: "", amount: Math.max(0, remain) }]);
+  const usedElsewhere = (i: number) =>
+    new Set(alloc.filter((_, j) => j !== i).map((r) => r.lineId).filter(Boolean));
+
+  return (
+    <div className="cart-hm alloc-ed">
+      <label>Hạng mục ngân sách (cả đơn) *</label>
+      {alloc.map((r, i) => (
+        <div key={i} className="alloc-row">
+          <select
+            value={r.lineId}
+            disabled={disabled}
+            onChange={(e) => setRow(i, { lineId: e.target.value })}
+          >
+            <option value="">— Chọn hạng mục —</option>
+            {budgetLines
+              .filter((l) => !usedElsewhere(i).has(l.id))
+              .map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+          </select>
+          {single ? (
+            <span className="alloc-amt-full num">{fmt(total)} đ</span>
+          ) : (
+            <input
+              className="alloc-amt num"
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              disabled={disabled}
+              value={r.amount ? fmt(r.amount) : ""}
+              onChange={(e) =>
+                setRow(i, { amount: Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0) })
+              }
+            />
+          )}
+          {!single && !disabled && (
+            <button type="button" className="alloc-rm" onClick={() => removeRow(i)} aria-label="Xoá dòng">
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {!disabled && (
+        <button type="button" className="alloc-add" onClick={addRow}>
+          + Thêm hạng mục
+        </button>
+      )}
+      {!single && (
+        <div className={`alloc-sum${remain === 0 ? " ok" : " bad"}`}>
+          Đã phân bổ {fmt(sum)} / {fmt(total)} đ
+          {remain !== 0 && (remain > 0 ? ` · thiếu ${fmt(remain)}đ` : ` · dư ${fmt(-remain)}đ`)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tab Giỏ hàng: chọn hạng mục (nhiều, theo số tiền) cho CẢ ĐƠN rồi Đặt hàng → tạo 1 đơn.
 function CartPanel({
   entries,
   total,
   budgetLines,
-  orderHm,
-  onHm,
+  alloc,
+  onAlloc,
   onEdit,
   onRemove,
   onClear,
@@ -1228,19 +1333,19 @@ function CartPanel({
   entries: { it: VtItem<Material>; qty: number; price: number }[];
   total: number;
   budgetLines: BudgetLine[];
-  orderHm: string;
-  onHm: (id: string) => void;
+  alloc: BudgetAlloc[];
+  onAlloc: (a: BudgetAlloc[]) => void;
   onEdit: (it: VtItem<Material>) => void;
   onRemove: (key: string) => void;
   onClear: () => void;
   onOrder: () => void;
 }) {
   const needHm = budgetLines.length > 0;
-  // Gợi ý hạng mục theo tên vật tư đầu giỏ (chỉ 1 lần, khi chưa chọn).
+  // Gợi ý hạng mục dòng đầu theo tên vật tư đầu giỏ (khi chưa phân bổ).
   useEffect(() => {
-    if (needHm && !orderHm && entries.length) {
+    if (needHm && alloc.length === 0 && entries.length) {
       const g = guessBudgetLineId(entries[0].it.name, budgetLines);
-      if (g) onHm(g);
+      onAlloc([{ lineId: g || "", amount: Math.round(total) }]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needHm, entries.length]);
@@ -1273,22 +1378,18 @@ function CartPanel({
         <b className="num">{fmt(total)} đ</b>
       </div>
       {needHm && (
-        <div className="cart-hm">
-          <label>Hạng mục ngân sách (cả đơn) *</label>
-          <select value={orderHm} onChange={(e) => onHm(e.target.value)}>
-            <option value="">— Chọn hạng mục —</option>
-            {budgetLines.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-          <div className="cart-hm-hint">Mua nhiều hạng mục khác nhau → tách thành nhiều đơn.</div>
-        </div>
+        <BudgetAllocEditor budgetLines={budgetLines} alloc={alloc} total={total} onChange={onAlloc} />
       )}
       <div className="cacts">
         <button type="button" className="btn ghost" onClick={onClear}>
           Xoá giỏ
         </button>
-        <button type="button" className="btn" onClick={onOrder} disabled={needHm && !orderHm}>
+        <button
+          type="button"
+          className="btn"
+          onClick={onOrder}
+          disabled={needHm && !allocValid(alloc, total)}
+        >
           Đặt hàng →
         </button>
       </div>
@@ -1585,8 +1686,17 @@ function EditSheet({
   };
   // Bản sao vật tư để sửa tên/đvt/SL/đơn giá (KT + admin đều được, không thêm/bớt dòng).
   const [items, setItems] = useState<OrderItem[]>(order.items.map((it) => ({ ...it })));
-  // Hạng mục ngân sách của CẢ ĐƠN (per-đơn). Admin sửa được kể cả đơn đã trả.
-  const [budgetLineId, setBudgetLineId] = useState<string>(order.budgetLineId ?? "");
+  // Phân bổ hạng mục ngân sách (nhiều hạng mục theo số tiền). Admin sửa được kể cả đơn đã trả.
+  const [alloc, setAlloc] = useState<BudgetAlloc[]>(() => {
+    const a = Array.isArray(order.budgetAlloc)
+      ? order.budgetAlloc
+          .filter((x) => x && x.lineId && x.amount > 0)
+          .map((x) => ({ lineId: String(x.lineId), amount: Math.round(Number(x.amount) || 0) }))
+      : [];
+    if (a.length) return a;
+    if (order.budgetLineId) return [{ lineId: order.budgetLineId, amount: Math.round(order.total) }];
+    return [];
+  });
   // Bảng giá hàng của NCC đang chọn → droplist "hàng theo NCC" + tự điền đơn giá.
   const [nccPrices, setNccPrices] = useState<NccPrice[]>([]);
   const [saving, setSaving] = useState(false);
@@ -1649,6 +1759,10 @@ function EditSheet({
   }, [supplierId]);
 
   const total = items.reduce((s, it) => s + it.qty * (it.price || 0), 0);
+  // Ô hạng mục có sửa được không (admin đơn đã trả, hoặc mọi người đơn chưa khoá).
+  const allocEditable = canEditHm || !readOnly;
+  // Chặn lưu khi phân bổ chưa khớp tổng đơn (chỉ khi dự án có ngân sách + ô đang sửa được).
+  const allocOk = !needHm || !allocEditable || allocValid(alloc, total);
 
   // Đang chuyển sang "đã nhận" (chưa nhận trước đó). KT phải đủ ảnh phiếu + ảnh hàng.
   const receiving = status === "received" && order.status !== "received" && order.status !== "paid";
@@ -1687,7 +1801,7 @@ function EditSheet({
         deliveryDate: deliveryDate || null,
         status,
         note,
-        budgetLineId: budgetLineId || null,
+        budgetAlloc: alloc,
         items,
         receiptImages: receipts.map((r) => ({ url: r.url, kind: r.kind })),
       }),
@@ -1889,27 +2003,24 @@ function EditSheet({
           </div>
           </fieldset>
 
-          {needHm && (
-            <div className="fld">
-              <label>Hạng mục ngân sách (cả đơn){canEditHm || !readOnly ? " *" : ""}</label>
-              {canEditHm || !readOnly ? (
-                <select
-                  className="hm-sel"
-                  value={budgetLineId}
-                  onChange={(e) => setBudgetLineId(e.target.value)}
-                >
-                  <option value="">— Chọn hạng mục —</option>
-                  {budgetLines.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className={`hm-badge${budgetLineId ? "" : " none"}`}>
-                  {budgetLines.find((l) => l.id === budgetLineId)?.name ?? "Chưa gắn"}
-                </div>
-              )}
-            </div>
-          )}
+          {needHm &&
+            (allocEditable ? (
+              <BudgetAllocEditor budgetLines={budgetLines} alloc={alloc} total={total} onChange={setAlloc} />
+            ) : (
+              <div className="fld">
+                <label>Hạng mục ngân sách (cả đơn)</label>
+                {alloc.length ? (
+                  alloc.map((a, i) => (
+                    <div key={i} className="hm-badge ro">
+                      <span>{budgetLines.find((l) => l.id === a.lineId)?.name ?? "Hạng mục đã xoá"}</span>
+                      <b className="num">{fmt(a.amount)} đ</b>
+                    </div>
+                  ))
+                ) : (
+                  <div className="hm-badge none">Chưa gắn</div>
+                )}
+              </div>
+            ))}
 
           {(receiving || (order.receiptImages && order.receiptImages.length > 0)) && (
             <div className="rcpt">
@@ -1953,12 +2064,12 @@ function EditSheet({
               {readOnly ? "Đóng" : "Huỷ"}
             </button>
             {!lockedPaid ? (
-              <button type="button" className="btn" onClick={save} disabled={saving || !proofOk}>
+              <button type="button" className="btn" onClick={save} disabled={saving || !proofOk || !allocOk}>
                 {saving ? "Đang lưu…" : readOnly ? "Lưu NCC" : receiving ? "Xác nhận đã nhận" : "Lưu đơn"}
               </button>
             ) : (
               canEditHm && (
-                <button type="button" className="btn" onClick={save} disabled={saving}>
+                <button type="button" className="btn" onClick={save} disabled={saving || !allocOk}>
                   {saving ? "Đang lưu…" : "Lưu hạng mục"}
                 </button>
               )

@@ -4473,7 +4473,10 @@ model MhOrder {
   total        Decimal       @default(0) @db.Decimal(18, 2)
   items        Json          @default("[]")
   // Hạng mục ngân sách gắn cho CẢ ĐƠN (thống kê vào ProjectBudgetPlanLine). Scalar, FK ở migration.
+  // = hạng mục CHÍNH (phần tử đầu của budgetAlloc) — giữ để tương thích chỗ đọc cũ.
   budgetLineId String?       @map("budget_line_id") @db.Uuid
+  // Phân bổ NHIỀU hạng mục theo số tiền: [{lineId,amount}], Σ amount = total. Đơn 1 hạng mục = 1 phần tử.
+  budgetAlloc  Json          @default("[]") @map("budget_alloc")
   // Ảnh chứng minh nhận hàng (KT bắt buộc khi mark "đã nhận"): [{url,kind}] kind=phieu|hang
   receiptImages Json         @default("[]") @map("receipt_images")
   receivedAt   DateTime?     @map("received_at")

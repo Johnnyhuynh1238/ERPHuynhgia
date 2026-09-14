@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
+import { cleanAlloc, validateAlloc, type BudgetAlloc } from "@/lib/mh-budget-alloc";
 
 export const runtime = "nodejs";
 
@@ -85,6 +86,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       total: Number(o.total),
       items: o.items,
       budgetLineId: o.budgetLineId,
+      budgetAlloc: o.budgetAlloc,
       receiptImages: o.receiptImages,
       receivedAt: o.receivedAt,
       hasInflightExpense: inflightSet.has(o.id),
@@ -107,11 +109,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     note?: string;
     deliveryDate?: string | null;
     budgetLineId?: string | null;
+    budgetAlloc?: unknown;
   };
   const items = cleanItems(body.items);
   if (!items.length) {
     return NextResponse.json({ message: "Đơn phải có ít nhất 1 vật tư (SL > 0)" }, { status: 400 });
   }
+  const total = money(items);
 
   // Ngày nhận (tuỳ chọn khi tạo — NCC chọn ở bước sửa đơn; enforce "trả ngay bắt buộc ngày nhận" ở PATCH).
   const deliveryDate =
@@ -123,19 +127,29 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!project) return NextResponse.json({ message: "Không thấy dự án" }, { status: 404 });
 
   // Hạng mục ngân sách gắn cho CẢ ĐƠN — bắt buộc chọn khi dự án đã lập ngân sách.
+  // Nhiều hạng mục: budgetAlloc=[{lineId,amount}], Σ amount = tổng đơn. Client cũ gửi budgetLineId → 1 phần tử.
   const budgetLines = await prisma.projectBudgetPlanLine.findMany({
     where: { plan: { projectId: params.id } },
     select: { id: true },
   });
-  const budgetLineId = body.budgetLineId ? String(body.budgetLineId) : null;
+  const validIds = new Set(budgetLines.map((l) => l.id));
+  let alloc: BudgetAlloc[] = cleanAlloc(body.budgetAlloc);
+  if (!alloc.length && body.budgetLineId) {
+    alloc = [{ lineId: String(body.budgetLineId), amount: total }];
+  }
   if (budgetLines.length) {
-    if (!budgetLineId || !budgetLines.some((l) => l.id === budgetLineId)) {
+    if (!alloc.length) {
       return NextResponse.json(
         { message: "Chọn hạng mục ngân sách cho đơn trước khi đặt hàng" },
         { status: 400 },
       );
     }
+    const err = validateAlloc(alloc, validIds, total);
+    if (err) return NextResponse.json({ message: err }, { status: 400 });
+  } else {
+    alloc = []; // dự án chưa lập ngân sách → không gắn
   }
+  const budgetLineId = alloc[0]?.lineId ?? null;
 
   // ── Kế toán: 1 tường SL theo dự toán (giá KT tự ghi). Admin bỏ qua (tự do). ──
   if (isKeToan) {
@@ -222,9 +236,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       supplierId: body.supplierId ? String(body.supplierId) : null,
       note: body.note?.trim() || null,
       deliveryDate,
-      total: money(items),
+      total,
       items,
       budgetLineId,
+      budgetAlloc: alloc,
       createdBy: user!.id,
     },
   });

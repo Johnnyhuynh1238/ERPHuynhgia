@@ -8,6 +8,7 @@ import {
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { getSubContractPaidTotals } from "@/lib/sub-payment-utils";
+import { resolveAlloc } from "@/lib/mh-budget-alloc";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,11 @@ export async function GET(
   const projectId = params.id;
   const lineFilter = params.lineId === "unassigned" ? null : params.lineId;
 
-  const [orders, subs, expenses, lines] = await Promise.all([
+  const [ordersAll, subs, expenses, lines] = await Promise.all([
+    // Lấy MỌI đơn active (không lọc theo cột budgetLineId) vì 1 đơn có thể chia nhiều
+    // hạng mục trong budgetAlloc → lọc + tính tỉ phần (share) ở JS bên dưới.
     prisma.mhOrder.findMany({
-      where: { projectId, status: { in: MH_ACTIVE }, budgetLineId: lineFilter },
+      where: { projectId, status: { in: MH_ACTIVE } },
       select: {
         id: true,
         seq: true,
@@ -73,6 +76,7 @@ export async function GET(
         status: true,
         orderDate: true,
         budgetLineId: true,
+        budgetAlloc: true,
         items: true,
       },
       orderBy: { seq: "desc" },
@@ -123,6 +127,20 @@ export async function GET(
     }),
   ]);
 
+  // Tỉ phần của đơn thuộc hạng mục đang xem (0..1). Đơn chưa gắn → thuộc "unassigned".
+  const shareOf = (o: { budgetAlloc: unknown; budgetLineId: string | null; total: unknown }): number => {
+    const alloc = resolveAlloc(o);
+    if (!alloc.length) return lineFilter === null ? 1 : 0;
+    if (lineFilter === null) return 0;
+    const sumA = alloc.reduce((s, a) => s + a.amount, 0) || 1;
+    const mine = alloc.filter((a) => a.lineId === lineFilter).reduce((s, a) => s + a.amount, 0);
+    return mine / sumA;
+  };
+  // Chỉ giữ đơn có phần thuộc hạng mục này; kèm share để nhân số tiền.
+  const orders = ordersAll
+    .map((o) => ({ ...o, share: shareOf(o) }))
+    .filter((o) => o.share > 0);
+
   const dstr = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
 
   // Đã chi từng HĐ thầu phụ = Σ lệnh chi ĐÃ CHI gắn hợp đồng (nguồn thật, khớp sổ quỹ).
@@ -136,8 +154,10 @@ export async function GET(
         source: "mh_order" as const,
         id: o.id,
         label: `Đơn #${o.seq}${o.supplierName ? ` · ${o.supplierName}` : ""}`,
-        sub: o.status === "paid" ? "Đã thanh toán" : o.supplierName ? "Công nợ NCC" : "Trả ngay",
-        amount: num(o.total),
+        sub:
+          (o.status === "paid" ? "Đã thanh toán" : o.supplierName ? "Công nợ NCC" : "Trả ngay") +
+          (o.share < 0.999 ? " · một phần" : ""),
+        amount: num(o.total) * o.share,
         date: dstr(o.orderDate),
         budgetLineId: o.budgetLineId,
         goods: goodsOf(o.items),
@@ -208,20 +228,23 @@ export async function GET(
   }
   const lineBySupplier = new Map<string, number>();
   for (const o of nccOrders)
-    lineBySupplier.set(o.supplierId!, (lineBySupplier.get(o.supplierId!) ?? 0) + num(o.total));
+    lineBySupplier.set(o.supplierId!, (lineBySupplier.get(o.supplierId!) ?? 0) + num(o.total) * o.share);
 
   const items: Item[] = [];
 
   if (kind === "spent") {
     for (const o of cashOrders) {
       const total = num(o.total);
-      const paid = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+      const paidWhole = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+      const paid = paidWhole * o.share;
       if (paid > 0.5)
         items.push({
           source: "mh_order",
           id: o.id,
           label: `Đơn #${o.seq}`,
-          sub: o.supplierName ? "Đã trả · đơn NCC" : "Đã trả · trả ngay",
+          sub:
+            (o.supplierName ? "Đã trả · đơn NCC" : "Đã trả · trả ngay") +
+            (o.share < 0.999 ? " · một phần" : ""),
           amount: paid,
           date: dstr(o.orderDate),
           budgetLineId: o.budgetLineId,
@@ -271,14 +294,14 @@ export async function GET(
     // debt
     for (const o of cashOrders) {
       const total = num(o.total);
-      const paid = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
-      const owed = total - paid;
+      const paidWhole = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+      const owed = (total - paidWhole) * o.share;
       if (owed > 0.5)
         items.push({
           source: "mh_order",
           id: o.id,
           label: `Đơn #${o.seq}`,
-          sub: "Còn nợ · trả ngay",
+          sub: "Còn nợ · trả ngay" + (o.share < 0.999 ? " · một phần" : ""),
           amount: owed,
           date: dstr(o.orderDate),
           budgetLineId: o.budgetLineId,
