@@ -66,7 +66,10 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
   const secByName = new Map<string, { id: string; planStart: Date | null; planEnd: Date | null }>();
   for (const s of sections) if (!secByName.has(s.name)) secByName.set(s.name, s);
 
-  const tasks: ProgressTask[] = budget.lines.map((l) => {
+  // Bỏ nhân công khoán (nhan_cong) khỏi tiến độ thi công — không phải tiến độ xây dựng.
+  const tasks: ProgressTask[] = budget.lines
+    .filter((l) => l.groupKind !== "nhan_cong")
+    .map((l) => {
     const pr = progMap.get(l.name);
     const sec = secByName.get(l.name);
     return {
