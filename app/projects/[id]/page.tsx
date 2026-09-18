@@ -86,7 +86,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
   // Kế toán vào dự án chỉ để mua hàng: màn ngà riêng (Mua hàng + Công nợ NCC),
   // KHÔNG finance header / info card / tile thi công như admin.
   if (user.role === UserRole.accountant) {
-    const [orderAgg, pendingCount, nccRows] = await Promise.all([
+    const [orderAgg, pendingCount, nccRows, schedules] = await Promise.all([
       prisma.mhOrder.aggregate({
         where: { projectId: params.id },
         _count: { _all: true },
@@ -104,8 +104,19 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
                COUNT(*) FILTER (WHERE con_lai > 0)::int AS ncc_count
         FROM ncc_cong_no_du_an
         WHERE project_id = ${params.id}::uuid`,
+      prisma.paymentSchedule.findMany({
+        where: { projectId: params.id },
+        select: { amount: true, paidAmount: true, status: true },
+      }),
     ]);
     const ncc = nccRows[0] ?? { tong_no: "0", da_tra: "0", con_lai: "0", ncc_count: 0 };
+    const scheduleTotal = schedules.reduce((s, r) => s + Number(r.amount), 0);
+    const scheduleCollected = schedules.reduce(
+      (s, r) => s + (r.status === "collected" ? Number(r.amount) : Number(r.paidAmount ?? 0)),
+      0,
+    );
+    const scheduleCount = schedules.length;
+    const scheduleCollectedCount = schedules.filter((r) => r.status === "collected").length;
     return (
       <KetoanProjectHub
         projectId={project.id}
@@ -120,6 +131,10 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
         tongNo={Number(ncc.tong_no)}
         daTra={Number(ncc.da_tra)}
         conLai={Number(ncc.con_lai)}
+        scheduleTotal={scheduleTotal}
+        scheduleCollected={scheduleCollected}
+        scheduleCount={scheduleCount}
+        scheduleCollectedCount={scheduleCollectedCount}
       />
     );
   }

@@ -20,8 +20,8 @@ async function nextReceiptCode() {
 export async function POST(request: Request, { params }: { params: { id: string; paymentId: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role !== UserRole.admin) {
-    return NextResponse.json({ message: "Chỉ admin được tạo lệnh thu từ đợt thanh toán" }, { status: 403 });
+  if (user.role !== UserRole.admin && user.role !== UserRole.accountant) {
+    return NextResponse.json({ message: "Chỉ admin hoặc kế toán được tạo lệnh thu từ đợt thanh toán" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -127,8 +127,8 @@ export async function POST(request: Request, { params }: { params: { id: string;
 export async function DELETE(_request: Request, { params }: { params: { id: string; paymentId: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role !== UserRole.admin) {
-    return NextResponse.json({ message: "Chỉ admin được huỷ lệnh thu" }, { status: 403 });
+  if (user.role !== UserRole.admin && user.role !== UserRole.accountant) {
+    return NextResponse.json({ message: "Chỉ admin hoặc kế toán được huỷ lệnh thu" }, { status: 403 });
   }
 
   const schedule = await prisma.paymentSchedule.findFirst({

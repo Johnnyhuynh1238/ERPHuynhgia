@@ -370,16 +370,18 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
 
               {canEdit ? (
                 <div className="pacts">
-                  {isAdmin && !row.activeReceipt && row.remaining > 0 ? (
+                  {canEdit && !row.activeReceipt && row.remaining > 0 ? (
                     <button className="btn primary" onClick={() => openCollect(row)} disabled={pendingId === row.id}>
                       {pendingId === row.id
                         ? "Đang gửi…"
                         : row.collectedAmount > 0
                           ? "Thu tiếp phần còn lại"
-                          : "Yêu cầu KT thu"}
+                          : isAdmin
+                            ? "Yêu cầu KT thu"
+                            : "Tạo lệnh thu"}
                     </button>
                   ) : null}
-                  {isAdmin && row.activeReceipt && row.activeReceipt.status !== "received" ? (
+                  {canEdit && row.activeReceipt && row.activeReceipt.status !== "received" ? (
                     <button className="btn danger" onClick={() => cancelCollection(row)} disabled={pendingId === row.id}>
                       Huỷ lệnh thu
                     </button>

@@ -23,9 +23,13 @@ type Props = {
   tongNo: number;
   daTra: number;
   conLai: number;
+  scheduleTotal: number;
+  scheduleCollected: number;
+  scheduleCount: number;
+  scheduleCollectedCount: number;
 };
 
-// Màn kế toán vào dự án: brand ngà, CHỈ Mua hàng + Công nợ NCC (không tile thi công/tài chính khác).
+// Màn kế toán vào dự án: brand ngà, Thanh toán HĐ (thu theo đợt) + Mua hàng + Công nợ NCC (không tile thi công/tài chính khác).
 export function KetoanProjectHub({
   projectId,
   code,
@@ -39,8 +43,13 @@ export function KetoanProjectHub({
   tongNo,
   daTra,
   conLai,
+  scheduleTotal,
+  scheduleCollected,
+  scheduleCount,
+  scheduleCollectedCount,
 }: Props) {
   const base = `/projects/${projectId}`;
+  const scheduleRemaining = scheduleTotal - scheduleCollected;
   return (
     <div className="kph">
       <div className="kph-wrap">
@@ -81,6 +90,29 @@ export function KetoanProjectHub({
 
         <div className="kph-blabel">Tài chính · Vật tư</div>
         <div className="kph-nav">
+          <Link href={`${base}/payments`} className="kph-navrow">
+            <span className="kph-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+              </svg>
+            </span>
+            <span className="kph-nb">
+              <span className="nt">
+                Thanh toán HĐ
+                {scheduleCount > 0 && scheduleCollectedCount < scheduleCount && (
+                  <span className="pill">{scheduleCount - scheduleCollectedCount} đợt chờ thu</span>
+                )}
+              </span>
+              <span className="ns">
+                {scheduleCount > 0
+                  ? `${scheduleCollectedCount}/${scheduleCount} đợt đã thu · còn phải thu ${fmt(scheduleRemaining)}đ`
+                  : "Chưa có đợt thanh toán"}
+              </span>
+            </span>
+            <span className="kph-chev">›</span>
+          </Link>
+
           <Link href={`${base}/mua-hang`} className="kph-navrow">
             <span className="kph-ic">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -119,7 +151,7 @@ export function KetoanProjectHub({
           </Link>
         </div>
 
-        <div className="kph-foot">Kế toán · chỉ mua hàng &amp; công nợ NCC</div>
+        <div className="kph-foot">Kế toán · thu theo đợt HĐ · mua hàng &amp; công nợ NCC</div>
       </div>
     </div>
   );
