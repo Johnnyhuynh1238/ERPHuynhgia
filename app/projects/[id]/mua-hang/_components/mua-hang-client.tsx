@@ -1598,6 +1598,7 @@ function ReceiptGroup({
   onRemove: (idx: number) => void;
 }) {
   const inpRef = useRef<HTMLInputElement>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
   const mine = items.map((r, i) => ({ r, i })).filter((x) => x.r.kind === kind);
   const srcOf = (r: { preview?: string }, i: number) =>
     r.preview || `/api/projects/${projectId}/mua-hang/${orderId}/receipt/${i}/file`;
@@ -1614,7 +1615,12 @@ function ReceiptGroup({
         {mine.map(({ r, i }) => (
           <div className="rg-im" key={i}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={srcOf(r, i)} alt={label} />
+            <img
+              src={srcOf(r, i)}
+              alt={label}
+              onClick={() => setZoom(srcOf(r, i))}
+              style={{ cursor: "zoom-in" }}
+            />
             {!readOnly && (
               <button type="button" className="rg-rm" onClick={() => onRemove(i)} aria-label="Xoá ảnh">
                 ✕
@@ -1640,7 +1646,214 @@ function ReceiptGroup({
           e.target.value = "";
         }}
       />
+      {zoom && <PhotoZoom src={zoom} onClose={() => setZoom(null)} />}
     </div>
+  );
+}
+
+// Xem ảnh nhận hàng phóng to: pinch 2 ngón / lăn chuột / double-tap zoom, kéo di chuyển.
+function PhotoZoom({ src, onClose }: { src: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const dragOrigin = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const pinchOrigin = useRef<{ dist: number; scale: number } | null>(null);
+  const lastTap = useRef(0);
+
+  const MIN = 1;
+  const MAX = 5;
+  const clampScale = (s: number) => Math.min(MAX, Math.max(MIN, s));
+  const reset = () => {
+    setScale(1);
+    setTx(0);
+    setTy(0);
+  };
+  const bump = (delta: number) => {
+    setScale((s) => {
+      const next = clampScale(s + delta);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "+" || e.key === "=") bump(0.5);
+      else if (e.key === "-" || e.key === "_") bump(-0.5);
+      else if (e.key === "0") reset();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = e.clientX - rect.left - rect.width / 2;
+    const cy = e.clientY - rect.top - rect.height / 2;
+    const delta = -e.deltaY * 0.002;
+    setScale((s) => {
+      const next = clampScale(s * Math.exp(delta));
+      const ratio = next / s;
+      setTx((p) => cx - (cx - p) * ratio);
+      setTy((p) => cy - (cy - p) * ratio);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+      return next;
+    });
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      const [a, b] = Array.from(pointers.current.values());
+      pinchOrigin.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), scale };
+      dragOrigin.current = null;
+    } else if (pointers.current.size === 1 && scale > 1) {
+      dragOrigin.current = { x: e.clientX, y: e.clientY, tx, ty };
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2 && pinchOrigin.current) {
+      const [a, b] = Array.from(pointers.current.values());
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const next = clampScale((dist / pinchOrigin.current.dist) * pinchOrigin.current.scale);
+      setScale(next);
+      if (next === 1) {
+        setTx(0);
+        setTy(0);
+      }
+    } else if (pointers.current.size === 1 && dragOrigin.current) {
+      setTx(dragOrigin.current.tx + (e.clientX - dragOrigin.current.x));
+      setTy(dragOrigin.current.ty + (e.clientY - dragOrigin.current.y));
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchOrigin.current = null;
+    if (pointers.current.size === 0) dragOrigin.current = null;
+  };
+
+  const onImgClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      if (scale > 1) reset();
+      else setScale(2.5);
+    }
+    lastTap.current = now;
+  };
+
+  if (typeof document === "undefined") return null;
+
+  const btn: React.CSSProperties = {
+    display: "grid",
+    placeItems: "center",
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    border: "none",
+    background: "rgba(255,255,255,.14)",
+    color: "#fff",
+    fontSize: 20,
+    lineHeight: 1,
+    cursor: "pointer",
+  };
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 3000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        background: "rgba(0,0,0,.92)",
+        touchAction: "none",
+      }}
+    >
+      <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...btn, position: "absolute", top: 16, right: 16, zIndex: 2 }} aria-label="Đóng">
+        ✕
+      </button>
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute",
+          bottom: 22,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 2,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: 6,
+          borderRadius: 999,
+          background: "rgba(255,255,255,.1)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <button onClick={() => bump(-0.5)} style={btn} aria-label="Thu nhỏ">−</button>
+        <div style={{ minWidth: 50, textAlign: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>
+          {Math.round(scale * 100)}%
+        </div>
+        <button onClick={() => bump(0.5)} style={btn} aria-label="Phóng to">+</button>
+        <button onClick={reset} style={{ ...btn, fontSize: 16 }} aria-label="Về gốc">⟲</button>
+      </div>
+
+      <div
+        ref={containerRef}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", height: "100%", width: "100%", alignItems: "center", justifyContent: "center" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="Ảnh nhận hàng"
+          onClick={onImgClick}
+          onDragStart={(e) => e.preventDefault()}
+          draggable={false}
+          style={{
+            maxHeight: "100%",
+            maxWidth: "100%",
+            objectFit: "contain",
+            borderRadius: 12,
+            userSelect: "none",
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            transition: pointers.current.size ? "none" : "transform .15s ease-out",
+            cursor: scale > 1 ? "grab" : "zoom-in",
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
   );
 }
 

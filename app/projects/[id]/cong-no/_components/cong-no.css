@@ -274,6 +274,24 @@
 .cndoc .hmsel:disabled { opacity: 0.5; }
 .cndoc .hmhint { font-size: 12px; color: var(--mut); padding: 6px 2px 0; }
 
+/* Phân bổ nhiều hạng mục ngân sách theo tiền (tab Thông tin thầu phụ). */
+.cndoc .info .irow.hmrow { flex-direction: column; align-items: stretch; gap: 8px; }
+.cndoc .hmalloc { display: flex; flex-direction: column; gap: 7px; }
+.cndoc .hmalloc-row { display: flex; align-items: center; gap: 7px; }
+.cndoc .hmalloc-row select { flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: var(--card); border: 1px solid var(--line2); border-radius: 8px; padding: 7px 9px; cursor: pointer; -webkit-appearance: none; }
+.cndoc .hmalloc-row select:disabled { opacity: 0.5; }
+.cndoc .hmalloc-amt { flex: 0 0 34%; min-width: 0; text-align: right; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; color: var(--text); background: var(--card); border: 1px solid var(--line2); border-radius: 8px; padding: 7px 9px; outline: none; -webkit-appearance: none; }
+.cndoc .hmalloc-full { flex: 0 0 auto; font-family: var(--font-plex-mono), "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; color: var(--mut); white-space: nowrap; }
+.cndoc .hmalloc-rm { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--text); font-size: 13px; cursor: pointer; }
+.cndoc .hmalloc-acts { display: flex; gap: 8px; align-items: center; }
+.cndoc .hmalloc-add { flex: 1 1 auto; background: none; border: 1.5px dashed var(--line2); border-radius: 9px; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--text); padding: 8px 10px; cursor: pointer; }
+.cndoc .hmalloc-add:disabled { opacity: 0.5; }
+.cndoc .hmalloc-save { flex: none; background: var(--orange); color: #fff; border: none; border-radius: 9px; font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 16px; cursor: pointer; }
+.cndoc .hmalloc-save:disabled { opacity: 0.6; }
+.cndoc .hmalloc-sum { font-size: 12px; font-weight: 600; padding: 2px 2px 0; }
+.cndoc .hmalloc-sum.ok { color: #1f7d52; }
+.cndoc .hmalloc-sum.bad { color: var(--orange); }
+
 .cndoc .proseblk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* pay card */

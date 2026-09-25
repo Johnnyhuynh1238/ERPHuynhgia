@@ -56,6 +56,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
         id: true,
         contractValue: true,
         budgetLineId: true,
+        budgetAlloc: true,
       },
     }),
     // Chi tay gắn hạng mục (không thuộc mua hàng/thầu phụ) — đã trả.
@@ -207,8 +208,20 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
   for (const sc of subContracts) {
     const cv = num(sc.contractValue);
     const paid = subPaidById.get(sc.id) ?? 0;
-    add(spent, sc.budgetLineId, paid);
-    add(debt, sc.budgetLineId, Math.max(0, cv - paid));
+    const owed = Math.max(0, cv - paid);
+    // Chia đã chi / công nợ theo phân bổ nhiều hạng mục (giống đơn mua hàng).
+    const alloc = resolveAlloc({ budgetAlloc: sc.budgetAlloc, budgetLineId: sc.budgetLineId, total: cv });
+    const sumA = alloc.reduce((s, a) => s + a.amount, 0);
+    if (alloc.length > 0 && sumA > 0) {
+      for (const a of alloc) {
+        const ratio = a.amount / sumA;
+        add(spent, a.lineId, paid * ratio);
+        add(debt, a.lineId, owed * ratio);
+      }
+    } else {
+      add(spent, sc.budgetLineId, paid);
+      add(debt, sc.budgetLineId, owed);
+    }
   }
 
   // ── Chi tay / chi chung gắn hạng mục (lệnh chi đã trả) ──

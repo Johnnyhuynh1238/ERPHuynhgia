@@ -21,6 +21,8 @@ import { ExpenseCreateModal, type ExpenseCreatePrefill } from "@/app/expenses/_c
 // ── Popup chi tiết Hợp đồng thầu phụ — full màn, tông ngà (.cndoc).
 // Render trong tab Thầu phụ (màn Quản lý NCC). Giữ đủ chức năng của màn cũ.
 
+type BudgetAllocRow = { lineId: string; amount: number };
+
 type ContractDetail = {
   id: string;
   code: string;
@@ -36,6 +38,7 @@ type ContractDetail = {
   status: SubContractStatus;
   notes: string | null;
   budgetLineId: string | null;
+  budgetAlloc?: Array<{ lineId: string; amount: number }> | null;
   project: { id: string; code: string; name: string };
   subcontractor: {
     id: string;
@@ -171,6 +174,8 @@ export function SubDetailPopup({
 
   const [budgetLines, setBudgetLines] = useState<Array<{ id: string; name: string }>>([]);
   const [savingBudgetLine, setSavingBudgetLine] = useState(false);
+  // Bản nháp phân bổ hạng mục ngân sách (nhiều hạng mục chia theo tiền) đang sửa trong tab Thông tin.
+  const [budgetDraft, setBudgetDraft] = useState<BudgetAllocRow[]>([]);
 
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -260,16 +265,36 @@ export function SubDetailPopup({
     );
   }, []);
 
-  const assignBudgetLine = useCallback(
-    async (value: string) => {
+  // Lưu phân bổ nhiều hạng mục ngân sách theo số tiền (Σ = giá trị hợp đồng). Rỗng = bỏ gắn.
+  const saveBudgetAlloc = useCallback(
+    async (alloc: BudgetAllocRow[]) => {
       if (!contract) return;
-      const budgetLineId = value || null;
-      if (budgetLineId === (contract.budgetLineId || null)) return;
+      const cv = Math.round(Number(contract.contractValue) || 0);
+      const clean = alloc.filter((a) => a.lineId && a.amount > 0);
+      // 1 hạng mục → luôn phủ trọn giá trị hợp đồng.
+      if (clean.length === 1) clean[0] = { ...clean[0], amount: cv };
+      if (clean.length > 0) {
+        const ids = new Set<string>();
+        for (const a of clean) {
+          if (ids.has(a.lineId)) {
+            toast.error("Một hạng mục bị chọn trùng");
+            return;
+          }
+          ids.add(a.lineId);
+        }
+        const sum = clean.reduce((s, a) => s + a.amount, 0);
+        if (Math.round(sum) !== cv) {
+          toast.error(
+            `Tổng phân bổ (${fmt(sum)}đ) phải bằng giá trị hợp đồng (${fmt(cv)}đ)`,
+          );
+          return;
+        }
+      }
       setSavingBudgetLine(true);
       const res = await fetch(`/api/sub-contracts/${contract.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ budgetLineId }),
+        body: JSON.stringify({ budgetAlloc: clean }),
       });
       const json = await res.json().catch(() => ({}));
       setSavingBudgetLine(false);
@@ -277,12 +302,31 @@ export function SubDetailPopup({
         toast.error(json.message || "Không gắn được hạng mục ngân sách");
         return;
       }
-      toast.success(budgetLineId ? "Đã gắn hạng mục ngân sách" : "Đã bỏ gắn hạng mục");
-      setContract((prev) => (prev ? { ...prev, budgetLineId } : prev));
+      toast.success(clean.length ? "Đã lưu hạng mục ngân sách" : "Đã bỏ gắn hạng mục");
+      const nextLineId = clean[0]?.lineId ?? null;
+      setContract((prev) => (prev ? { ...prev, budgetLineId: nextLineId, budgetAlloc: clean } : prev));
       onChanged?.();
     },
     [contract, onChanged],
   );
+
+  // Nạp bản nháp phân bổ từ HĐ (ưu tiên budgetAlloc; cũ chỉ có budgetLineId → 1 dòng trọn giá trị).
+  useEffect(() => {
+    if (!contract) {
+      setBudgetDraft([]);
+      return;
+    }
+    const cv = Math.round(Number(contract.contractValue) || 0);
+    const raw = Array.isArray(contract.budgetAlloc)
+      ? contract.budgetAlloc
+          .filter((a) => a && a.lineId)
+          .map((a) => ({ lineId: a.lineId, amount: Math.round(Number(a.amount) || 0) }))
+      : [];
+    if (raw.length) setBudgetDraft(raw);
+    else if (contract.budgetLineId) setBudgetDraft([{ lineId: contract.budgetLineId, amount: cv }]);
+    else setBudgetDraft([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract?.id, contract?.budgetLineId, contract?.contractValue]);
 
   const loadPayments = useCallback(async () => {
     const res = await fetch(`/api/sub-contracts/${contractId}/payments`, { cache: "no-store" });
@@ -739,24 +783,119 @@ export function SubDetailPopup({
                     <div className="irow"><span className="ik">Kết thúc dự kiến</span><span className="iv num">{formatDate(contract.expectedEndDate)}</span></div>
                     {contract.actualEndDate && <div className="irow"><span className="ik">Kết thúc thực tế</span><span className="iv num">{formatDate(contract.actualEndDate)}</span></div>}
                     <div className="irow"><span className="ik">Tạo bởi</span><span className="iv">{contract.creator.fullName}</span></div>
-                    <div className="irow">
+                    <div className="irow hmrow">
                       <span className="ik">Hạng mục NS</span>
                       {isAdmin ? (
-                        <select
-                          className="hmsel"
-                          value={contract.budgetLineId ?? ""}
-                          disabled={savingBudgetLine}
-                          onChange={(e) => assignBudgetLine(e.target.value)}
-                        >
-                          <option value="">— Chưa gắn —</option>
-                          {budgetLines.map((l) => (
-                            <option key={l.id} value={l.id}>{l.name}</option>
-                          ))}
-                        </select>
+                        <div className="hmalloc">
+                          {budgetDraft.map((r, i) => {
+                            const single = budgetDraft.length <= 1;
+                            const used = new Set(
+                              budgetDraft.filter((_, j) => j !== i).map((x) => x.lineId).filter(Boolean),
+                            );
+                            return (
+                              <div className="hmalloc-row" key={i}>
+                                <select
+                                  value={r.lineId}
+                                  disabled={savingBudgetLine}
+                                  onChange={(e) =>
+                                    setBudgetDraft((d) =>
+                                      d.map((x, j) => (j === i ? { ...x, lineId: e.target.value } : x)),
+                                    )
+                                  }
+                                >
+                                  <option value="">— Chọn hạng mục —</option>
+                                  {budgetLines
+                                    .filter((l) => !used.has(l.id))
+                                    .map((l) => (
+                                      <option key={l.id} value={l.id}>{l.name}</option>
+                                    ))}
+                                </select>
+                                {single ? (
+                                  <span className="hmalloc-full num">{fmt(contractValue)} đ</span>
+                                ) : (
+                                  <input
+                                    className="hmalloc-amt num"
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    disabled={savingBudgetLine}
+                                    value={r.amount ? fmt(r.amount) : ""}
+                                    onChange={(e) => {
+                                      const v = Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0);
+                                      setBudgetDraft((d) => d.map((x, j) => (j === i ? { ...x, amount: v } : x)));
+                                    }}
+                                  />
+                                )}
+                                {!single && (
+                                  <button
+                                    type="button"
+                                    className="hmalloc-rm"
+                                    disabled={savingBudgetLine}
+                                    aria-label="Xoá dòng"
+                                    onClick={() =>
+                                      setBudgetDraft((d) => {
+                                        const next = d.filter((_, j) => j !== i);
+                                        if (next.length === 1) next[0] = { ...next[0], amount: Math.round(contractValue) };
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <div className="hmalloc-acts">
+                            <button
+                              type="button"
+                              className="hmalloc-add"
+                              disabled={savingBudgetLine || budgetLines.length === 0}
+                              onClick={() =>
+                                setBudgetDraft((d) => {
+                                  const sum = d.reduce((s, x) => s + (x.amount || 0), 0);
+                                  const remain = Math.max(0, Math.round(contractValue) - sum);
+                                  return [...d, { lineId: "", amount: remain }];
+                                })
+                              }
+                            >
+                              + Thêm hạng mục
+                            </button>
+                            <button
+                              type="button"
+                              className="hmalloc-save"
+                              disabled={savingBudgetLine}
+                              onClick={() => saveBudgetAlloc(budgetDraft)}
+                            >
+                              {savingBudgetLine ? "Đang lưu…" : "Lưu"}
+                            </button>
+                          </div>
+                          {budgetDraft.length > 1 &&
+                            (() => {
+                              const sum = budgetDraft.reduce((s, x) => s + (x.amount || 0), 0);
+                              const remain = Math.round(contractValue) - sum;
+                              return (
+                                <div className={`hmalloc-sum${remain === 0 ? " ok" : " bad"}`}>
+                                  Đã phân bổ {fmt(sum)} / {fmt(contractValue)} đ
+                                  {remain !== 0 && (remain > 0 ? ` · thiếu ${fmt(remain)}đ` : ` · dư ${fmt(-remain)}đ`)}
+                                </div>
+                              );
+                            })()}
+                        </div>
                       ) : (
                         <span className="iv">
-                          {budgetLines.find((l) => l.id === contract.budgetLineId)?.name ??
-                            (contract.budgetLineId ? "Đã gắn" : "Chưa gắn")}
+                          {(() => {
+                            const list =
+                              Array.isArray(contract.budgetAlloc) && contract.budgetAlloc.length
+                                ? contract.budgetAlloc
+                                : contract.budgetLineId
+                                  ? [{ lineId: contract.budgetLineId, amount: contractValue }]
+                                  : [];
+                            if (!list.length) return "Chưa gắn";
+                            return list
+                              .map((a) => budgetLines.find((l) => l.id === a.lineId)?.name ?? "Đã gắn")
+                              .join(", ");
+                          })()}
                         </span>
                       )}
                     </div>

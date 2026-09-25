@@ -2227,7 +2227,10 @@ model SubContract {
   status          SubContractStatus @default(draft)
   notes           String?           @db.Text
   // Hạng mục thi công (project_budget_plan_lines). Scalar, FK ở migration.
+  // = hạng mục CHÍNH (phần tử đầu của budgetAlloc) — giữ để tương thích chỗ đọc cũ.
   budgetLineId    String?           @map("budget_line_id") @db.Uuid
+  // Phân bổ nhiều hạng mục ngân sách theo SỐ TIỀN: [{lineId, amount}], Σ = contractValue.
+  budgetAlloc     Json              @default("[]") @map("budget_alloc")
   createdAt       DateTime          @default(now()) @map("created_at")
   createdBy       String            @map("created_by") @db.Uuid
   updatedAt       DateTime          @updatedAt @map("updated_at")
