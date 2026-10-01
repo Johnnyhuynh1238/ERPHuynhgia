@@ -40,6 +40,7 @@ type Order = {
   budgetAlloc?: BudgetAlloc[]; // phân bổ nhiều hạng mục theo số tiền
   receiptImages?: ReceiptImg[]; // ảnh chứng minh nhận hàng
   receivedAt?: string | null;
+  returnOfOrderId?: string | null; // != null => đơn TRẢ HÀNG (total & qty âm), trỏ đơn mua gốc
   hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
   depositPaid?: number; // Σ tiền đã cọc (lệnh chi 'paid' gắn đơn) — đơn trả ngay
 };
@@ -276,6 +277,7 @@ export function MuaHangClient({
   const [openSup, setOpenSup] = useState<Record<string, boolean>>({});
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [editing, setEditing] = useState<Order | null>(null);
+  const [returning, setReturning] = useState<Order | null>(null); // đơn đang mở sheet trả hàng
   const [poOrder, setPoOrder] = useState<Order | null>(null);
   const poRef = useRef<HTMLDivElement>(null);
   const poScrollRef = useRef<HTMLDivElement>(null);
@@ -901,6 +903,7 @@ ${(() => {
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
+              onReturn={isKeToan ? undefined : setReturning}
               emptyText="Chưa có đơn hàng nào chờ nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -911,6 +914,7 @@ ${(() => {
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
+              onReturn={isKeToan ? undefined : setReturning}
               emptyText="Chưa có đơn nào đã nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -978,6 +982,22 @@ ${(() => {
             setEditing(null);
             await loadOrders();
             toast("Đã lưu đơn");
+          }}
+        />
+      )}
+
+      {/* trả hàng (admin) — tạo đơn giá trị âm, chọn cấn nợ / NCC hoàn tiền */}
+      {returning && (
+        <ReturnSheet
+          order={returning}
+          allOrders={orders}
+          projectId={projectId}
+          theme={theme}
+          onClose={() => setReturning(null)}
+          onSaved={async (msg) => {
+            setReturning(null);
+            await loadOrders();
+            toast(msg);
           }}
         />
       )}
@@ -1434,6 +1454,7 @@ function OrdersList({
   onEdit,
   onDel,
   onPO,
+  onReturn,
   emptyText,
   hideDel,
 }: {
@@ -1442,6 +1463,7 @@ function OrdersList({
   onEdit: (o: Order) => void;
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
+  onReturn?: (o: Order) => void; // admin: mở sheet trả hàng (undefined = ẩn, vd kế toán)
   emptyText?: string;
   hideDel?: (o: Order) => boolean;
 }) {
@@ -1460,11 +1482,21 @@ function OrdersList({
     );
   return (
     <div>
-      {orders.map((o) => (
-        <div key={o.id} className="ord-card" onClick={() => onEdit(o)}>
+      {orders.map((o) => {
+        const isRet = !!o.returnOfOrderId; // đơn trả hàng (total âm)
+        const canReturn =
+          !!onReturn && !isRet && (o.status === "received" || o.status === "paid");
+        return (
+        <div
+          key={o.id}
+          className={`ord-card${isRet ? " is-return" : ""}`}
+          onClick={() => onEdit(o)}
+        >
           <div className="r1">
-            <span className="no">Đơn #{o.seq}</span>
-            {(() => {
+            <span className="no">{isRet ? "↩ Trả #" : "Đơn #"}{o.seq}</span>
+            {isRet ? (
+              <span className="chip return" title="Đơn trả hàng (giá trị âm)">Trả hàng</span>
+            ) : (() => {
               const b = stBadge(o.status, o.supplierName);
               return <span className={`chip ${b.cls}`}>{b.label}</span>;
             })()}
@@ -1515,6 +1547,16 @@ function OrdersList({
                   🧾 {(o.depositPaid ?? 0) > 0 ? `Chi nốt ${fmt(remainOf(o))}đ` : "Gửi lệnh chi"}
                 </button>
               ))}
+            {canReturn && (
+              <button
+                type="button"
+                className="linkbtn ret"
+                title="Trả lại hàng đã mua cho NCC (tạo đơn giá trị âm)"
+                onClick={() => onReturn!(o)}
+              >
+                ↩ Trả hàng
+              </button>
+            )}
             {!hideDel?.(o) && (
               <button type="button" className="del" onClick={() => onDel(o)}>
                 Xoá
@@ -1522,7 +1564,8 @@ function OrdersList({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -2287,6 +2330,218 @@ function EditSheet({
                 </button>
               )
             )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ── Trả hàng (admin) ──────────────────────────────────────────
+// Tạo đơn mh_orders giá trị ÂM trỏ về đơn gốc. Chọn:
+//   • Cấn công nợ: đơn âm status 'received' → view công nợ NCC tự trừ (không sinh tiền).
+//   • NCC hoàn tiền: đơn âm status 'paid' + lệnh thu 'supplier_refund' (chờ KT thu → vào quỹ).
+function ReturnSheet({
+  order,
+  allOrders,
+  projectId,
+  theme,
+  onClose,
+  onSaved,
+}: {
+  order: Order;
+  allOrders: Order[];
+  projectId: string;
+  theme: "light" | "dark";
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+}) {
+  const [show, setShow] = useState(false);
+  const [cashMode, setCashMode] = useState<"offset" | "refund">("offset");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  // SL trả nhập cho từng vật tư (theo key). Mặc định 0.
+  const [qtyByKey, setQtyByKey] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const close = useCallback(() => {
+    setShow(false);
+    window.setTimeout(onClose, 440);
+  }, [onClose]);
+
+  // Đã trả trước đó cho đơn này (các đơn trả trỏ về order.id) — cộng dồn theo key (qty âm).
+  const returnedByKey = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const o of allOrders) {
+      if (o.returnOfOrderId !== order.id) continue;
+      for (const it of o.items || []) m[it.key] = (m[it.key] || 0) + Math.abs(Number(it.qty) || 0);
+    }
+    return m;
+  }, [allOrders, order.id]);
+
+  // Dòng trả: chỉ VT còn SL có thể trả (available > 0).
+  const rows = order.items.map((it) => {
+    const available = Math.max(Number(it.qty) - (returnedByKey[it.key] || 0), 0);
+    return { ...it, available, ret: qtyByKey[it.key] || 0 };
+  });
+
+  const total = rows.reduce((s, r) => s + r.ret * (r.price || 0), 0); // tiền trả (dương)
+  const anyQty = rows.some((r) => r.ret > 0);
+
+  const setRet = (key: string, v: number, max: number) =>
+    setQtyByKey((m) => ({ ...m, [key]: Math.max(0, Math.min(v, max)) }));
+
+  const submit = async () => {
+    const items = rows.filter((r) => r.ret > 0).map((r) => ({ key: r.key, qty: r.ret }));
+    if (!items.length) return;
+    setSaving(true);
+    const r = await fetch(`/api/projects/${projectId}/mua-hang/${order.id}/return`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items, cashMode, note: note.trim() || undefined }),
+    });
+    setSaving(false);
+    if (r.ok) {
+      const j = await r.json().catch(() => ({}));
+      onSaved(
+        cashMode === "refund"
+          ? `Đã tạo đơn trả #${j.seq} + lệnh thu ${j.receiptCode} (chờ KT thu)`
+          : `Đã tạo đơn trả #${j.seq} — cấn công nợ NCC`,
+      );
+    } else {
+      const j = await r.json().catch(() => ({}));
+      alert(j.message || "Trả hàng lỗi");
+    }
+  };
+
+  if (typeof document === "undefined") return null;
+  const segBtn = (mode: "offset" | "refund", label: string, sub: string) => (
+    <button
+      type="button"
+      onClick={() => setCashMode(mode)}
+      style={{
+        flex: 1,
+        textAlign: "left",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: cashMode === mode ? "1.5px solid var(--terra,#c2683f)" : "1px solid var(--line,#d9d2c4)",
+        background: cashMode === mode ? "color-mix(in srgb,var(--terra,#c2683f) 10%,transparent)" : "transparent",
+        cursor: "pointer",
+        color: "inherit",
+      }}
+    >
+      <div style={{ fontWeight: 700, fontSize: 13 }}>{label}</div>
+      <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 2 }}>{sub}</div>
+    </button>
+  );
+
+  return createPortal(
+    <div className={`mhdoc mhp ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <div className={`scrim${show ? " show" : ""}`} onClick={close} />
+      <div className={`sheet${show ? " show" : ""}`} role="dialog" aria-modal="true">
+        <div className="grip" />
+        <div className="shead">
+          <div>
+            <div className="se">Trả hàng đã mua</div>
+            <div className="st">Đơn #{order.seq} · {order.supplierName || "Chưa gán NCC"}</div>
+          </div>
+          <button type="button" className="xclose" onClick={close} aria-label="Đóng">
+            ✕
+          </button>
+        </div>
+        <div className="sbody">
+          <div className="esh">Vật tư trả lại</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rows.map((r) => (
+              <div
+                key={r.key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid var(--line,#d9d2c4)",
+                  opacity: r.available > 0 ? 1 : 0.5,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.name}
+                  </div>
+                  <div style={{ fontSize: 11.5, opacity: 0.7 }}>
+                    Mua {fmtQ(r.qty)} {r.unit}
+                    {(returnedByKey[r.key] || 0) > 0 ? ` · đã trả ${fmtQ(returnedByKey[r.key])}` : ""}
+                    {` · còn trả ${fmtQ(r.available)}`} · {fmt(r.price)}đ
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={r.available}
+                  step="any"
+                  value={r.ret || ""}
+                  disabled={r.available <= 0}
+                  onChange={(e) => setRet(r.key, Number(e.target.value) || 0, r.available)}
+                  placeholder="0"
+                  style={{
+                    width: 76,
+                    flex: "0 0 auto",
+                    textAlign: "right",
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid var(--line,#d9d2c4)",
+                    background: "transparent",
+                    color: "inherit",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="esh" style={{ marginTop: 16 }}>Xử lý tiền</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {segBtn("offset", "Cấn công nợ", "Trừ thẳng nợ NCC, không xuất tiền")}
+            {segBtn("refund", "NCC hoàn tiền", "Tạo lệnh thu → KT thu vào quỹ")}
+          </div>
+
+          <div className="fld" style={{ marginTop: 14 }}>
+            <label>Ghi chú (tuỳ chọn)</label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Lý do trả: hàng lỗi, dư, sai quy cách…"
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "color-mix(in srgb,var(--terra,#c2683f) 9%,transparent)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Tổng tiền trả</span>
+            <span className="num" style={{ fontSize: 16, fontWeight: 700, color: "var(--terra,#c2683f)" }}>
+              −{fmt(total)} đ
+            </span>
+          </div>
+
+          <div className="sactions">
+            <button type="button" className="btn ghost" onClick={close}>
+              Huỷ
+            </button>
+            <button type="button" className="btn" onClick={submit} disabled={saving || !anyQty || total <= 0}>
+              {saving ? "Đang xử lý…" : cashMode === "refund" ? "Trả hàng + tạo lệnh thu" : "Trả hàng (cấn nợ)"}
+            </button>
           </div>
         </div>
       </div>

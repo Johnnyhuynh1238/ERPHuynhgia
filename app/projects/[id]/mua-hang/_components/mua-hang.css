@@ -206,6 +206,12 @@
 .mhdoc .chip.debt { color: var(--terra); border-color: color-mix(in srgb, var(--terra) 45%, transparent); }
 .mhdoc .chip.await { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
 .mhdoc .chip.paid { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.mhdoc .chip.return { color: var(--terra); border-color: color-mix(in srgb, var(--terra) 45%, transparent); }
+
+/* ---- đơn trả hàng (giá trị âm) ---- */
+.mhdoc .ord-card.is-return { border-left: 3px solid var(--terra); }
+.mhdoc .ord-card.is-return .r1 .tot { color: var(--terra); }
+.mhdoc .ord-card .r3 .linkbtn.ret { color: var(--terra); border: 1.5px solid color-mix(in srgb, var(--terra) 45%, transparent); border-radius: 9px; padding: 7px 12px; }
 
 /* ---- toast ---- */
 .mhdoc .toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%) translateY(20px); z-index: 60; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; padding: 11px 18px; border-radius: 11px; opacity: 0; pointer-events: none; transition: all 0.28s; box-shadow: 0 8px 30px rgba(20, 8, 3, 0.3); max-width: 90vw; text-align: center; }

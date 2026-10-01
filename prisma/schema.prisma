@@ -410,6 +410,7 @@ enum ReceiptSource {
   customer
   loan
   advance_return
+  supplier_refund // NCC hoàn tiền khi trả hàng đã mua
   other
 }
 
@@ -4487,11 +4488,15 @@ model MhOrder {
   createdBy    String        @map("created_by") @db.Uuid
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
+  // Đơn trả hàng: total & items.qty ÂM, trỏ về đơn mua gốc. NULL = đơn mua thường.
+  // Scalar (không @relation) để khỏi thêm self-relation; giữ nhẹ.
+  returnOfOrderId String?    @map("return_of_order_id") @db.Uuid
 
   @@unique([projectId, seq])
   @@index([projectId, status])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([budgetLineId])
+  @@index([returnOfOrderId])
   @@map("mh_orders")
 }
 

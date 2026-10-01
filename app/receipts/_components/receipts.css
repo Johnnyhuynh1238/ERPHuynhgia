@@ -86,6 +86,7 @@
 .src-customer{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
 .src-loan{background:color-mix(in srgb,var(--violet) 18%,transparent);color:var(--violet)}
 .src-advance_return{background:color-mix(in srgb,var(--sky) 18%,transparent);color:var(--sky)}
+.src-supplier_refund{background:color-mix(in srgb,var(--terra,#c2683f) 18%,transparent);color:var(--terra,#c2683f)}
 .src-other{background:var(--track);color:var(--mut)}
 .rt-st{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
 .stt-awaiting_approval{background:color-mix(in srgb,var(--violet) 18%,transparent);color:var(--violet)}

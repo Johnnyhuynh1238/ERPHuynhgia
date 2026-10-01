@@ -13,7 +13,7 @@ import "./receipts.css";
 type ProjectOption = { id: string; code: string; name: string };
 type DesignContractOption = { id: string; customerName: string; notes: string | null };
 
-type ReceiptSource = "customer" | "loan" | "advance_return" | "other";
+type ReceiptSource = "customer" | "loan" | "advance_return" | "supplier_refund" | "other";
 
 type Receipt = {
   id: string;
@@ -48,6 +48,7 @@ const SOURCE_LABEL: Record<ReceiptSource, string> = {
   customer: "Khách hàng",
   loan: "Vay",
   advance_return: "Hoàn ứng",
+  supplier_refund: "NCC hoàn tiền",
   other: "Khác",
 };
 
@@ -55,6 +56,7 @@ const SOURCE_META: Record<ReceiptSource, { dot: string; sub: string }> = {
   customer: { dot: "var(--ok)", sub: "Thu theo đợt HĐ" },
   loan: { dot: "var(--violet)", sub: "Vay vốn / mượn" },
   advance_return: { dot: "var(--sky)", sub: "Thu hồi tạm ứng" },
+  supplier_refund: { dot: "var(--terra, #c2683f)", sub: "Trả hàng — NCC hoàn" },
   other: { dot: "var(--mut)", sub: "Nguồn thu khác" },
 };
 
@@ -637,7 +639,7 @@ export function ReceiptsClient({
                       className="rt-ctrl"
                       value={form.payer}
                       onChange={(e) => setForm({ ...form, payer: e.target.value })}
-                      placeholder={form.source === "customer" ? "Tên chủ nhà" : form.source === "loan" ? "Bên cho vay" : form.source === "advance_return" ? "TPTC / KS hoàn ứng" : "Người nộp"}
+                      placeholder={form.source === "customer" ? "Tên chủ nhà" : form.source === "loan" ? "Bên cho vay" : form.source === "advance_return" ? "TPTC / KS hoàn ứng" : form.source === "supplier_refund" ? "Nhà cung cấp" : "Người nộp"}
                     />
                   </div>
                   <div className="rt-fld">

@@ -29,7 +29,7 @@ async function nextReceiptCode() {
 }
 
 const createSchema = z.object({
-  source: z.enum(["customer", "loan", "advance_return", "other"]),
+  source: z.enum(["customer", "loan", "advance_return", "supplier_refund", "other"]),
   projectId: z.string().uuid().nullable().optional(),
   designContractId: z.string().uuid().nullable().optional(),
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
   ) {
     where.status = status as ReceiptStatus;
   }
-  if (source && (source === "customer" || source === "loan" || source === "advance_return" || source === "other")) {
+  if (source && (source === "customer" || source === "loan" || source === "advance_return" || source === "supplier_refund" || source === "other")) {
     where.source = source as ReceiptSource;
   }
   if (projectId === "none") where.projectId = null;

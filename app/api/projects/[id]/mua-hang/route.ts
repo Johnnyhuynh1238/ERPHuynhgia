@@ -89,6 +89,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       budgetAlloc: o.budgetAlloc,
       receiptImages: o.receiptImages,
       receivedAt: o.receivedAt,
+      returnOfOrderId: o.returnOfOrderId,
       hasInflightExpense: inflightSet.has(o.id),
       depositPaid: depositMap.get(o.id) || 0,
       createdAt: o.createdAt,

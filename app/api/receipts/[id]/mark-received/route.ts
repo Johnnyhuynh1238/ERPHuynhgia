@@ -24,6 +24,7 @@ const SOURCE_LABEL: Record<string, string> = {
   customer: "Khách hàng",
   loan: "Vay",
   advance_return: "Hoàn ứng",
+  supplier_refund: "NCC hoàn tiền",
   other: "Khác",
 };
 
