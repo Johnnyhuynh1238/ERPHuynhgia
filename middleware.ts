@@ -111,6 +111,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Trang mô tả gói thi công công khai cho khách (giai đoạn 1 của dự án theo tiến độ).
+  // Khách mở qua huynhgia6.com/<slug> (nginx proxy về /mo-ta/<slug>), CHỈ ĐỌC, không gắn user.
+  if (pathname.startsWith("/mo-ta/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Tách luồng riêng cho cổng chủ nhà, không đi qua NextAuth middleware
   if (pathname.startsWith("/cn/")) {
     const segments = pathname.split("/").filter(Boolean);

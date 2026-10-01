@@ -1,0 +1,765 @@
+/* ============================================================
+   Dự án theo tiến độ 6 giai đoạn — brand Huỳnh Gia (ngà/terracotta, IBM Plex).
+   Trang scope .pldoc; modal portal ra body scope .plportal
+   (tránh app-shell .slide-up transform neo modal fixed).
+   Dùng chung cho /projects (PC, admin) và /admin/du-an/[id].
+   ============================================================ */
+
+.pldoc,
+.plportal {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --track: rgba(46, 20, 10, 0.07);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --gold: #b8934a;
+  --ok: #5b7a52;
+  --red: #b5432e;
+  --okbg: rgba(91, 122, 82, 0.12);
+  --orbg: rgba(227, 97, 34, 0.1);
+  --redbg: rgba(181, 67, 46, 0.1);
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+  color-scheme: light;
+}
+.pldoc {
+  background: var(--bg);
+  min-height: 100dvh;
+  padding: 20px 24px 60px;
+}
+.pldoc *,
+.plportal * {
+  box-sizing: border-box;
+}
+.pldoc .pl-num,
+.plportal .pl-num {
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* header */
+.pldoc .pl-back {
+  color: var(--terra);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+.pldoc .pl-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 6px 0 16px;
+  flex-wrap: wrap;
+}
+.pldoc .pl-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--terra);
+  font-weight: 600;
+}
+.pldoc .pl-h1 {
+  margin: 2px 0 0;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.pldoc .pl-sub {
+  color: var(--mut);
+  font-size: 13px;
+  margin-top: 2px;
+}
+.pldoc .pl-hact {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pldoc .pl-seg {
+  display: inline-flex;
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--card);
+}
+.pldoc .pl-seg button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  padding: 8px 14px;
+  color: var(--mut);
+  cursor: pointer;
+}
+.pldoc .pl-seg button + button {
+  border-left: 1px solid var(--line2);
+}
+.pldoc .pl-seg button.on {
+  background: var(--text);
+  color: var(--bg);
+}
+.pldoc .pl-btn,
+.plportal .pl-btn {
+  border: 1px solid var(--orange);
+  border-radius: 9px;
+  background: var(--orange);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-block;
+}
+.pldoc .pl-btn.ghost,
+.plportal .pl-btn.ghost {
+  background: var(--card);
+  color: var(--terra);
+  border-color: var(--line2);
+}
+.pldoc .pl-btn.danger {
+  background: none;
+  color: var(--red);
+  border-color: var(--line2);
+  font-weight: 500;
+}
+.pldoc .pl-btn:disabled,
+.plportal .pl-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* dải 6 giai đoạn (đếm + lọc) */
+.pldoc .pl-strip {
+  display: grid;
+  grid-template-columns: 1.05fr repeat(6, minmax(0, 1fr));
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.pldoc .pl-st {
+  padding: 12px 14px;
+  cursor: pointer;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  position: relative;
+  min-width: 0;
+}
+.pldoc .pl-st:first-child {
+  border-left: 0;
+}
+@media (hover: hover) {
+  .pldoc .pl-st:hover {
+    background: rgba(46, 20, 10, 0.03);
+  }
+}
+.pldoc .pl-st .k {
+  font-size: 11px;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pldoc .pl-st .k b {
+  color: var(--terra);
+  margin-right: 5px;
+}
+.pldoc .pl-st .v {
+  font-size: 24px;
+  font-weight: 600;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+.pldoc .pl-st .d {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pldoc .pl-st.on {
+  background: var(--orbg);
+}
+.pldoc .pl-st.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--orange);
+}
+.pldoc .pl-st.on .v {
+  color: var(--orange);
+}
+
+/* thanh lọc */
+.pldoc .pl-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.pldoc .pl-search {
+  flex: 1;
+  min-width: 240px;
+}
+.pldoc .pl-search input,
+.pldoc .pl-bar select,
+.plportal .pl-field input {
+  width: 100%;
+  font: inherit;
+  padding: 9px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+}
+.pldoc .pl-bar select {
+  width: auto;
+  max-width: 200px;
+  cursor: pointer;
+}
+.pldoc .pl-search input:focus,
+.plportal .pl-field input:focus {
+  border-color: var(--orange);
+}
+.pldoc .pl-clear {
+  border: 1px solid var(--line2);
+  background: none;
+  border-radius: 9px;
+  font: inherit;
+  padding: 9px 12px;
+  color: var(--terra);
+  cursor: pointer;
+}
+.pldoc .pl-count {
+  color: var(--mut);
+  font-size: 13px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* bảng */
+.pldoc .pl-tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  table-layout: fixed;
+}
+.pldoc .pl-tbl th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line2);
+  background: rgba(46, 20, 10, 0.03);
+  white-space: nowrap;
+}
+.pldoc .pl-tbl td {
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  overflow: hidden;
+}
+.pldoc .pl-tbl tr:last-child td {
+  border-bottom: 0;
+}
+@media (hover: hover) {
+  .pldoc .pl-tbl tbody tr:hover td {
+    background: rgba(46, 20, 10, 0.025);
+  }
+}
+.pldoc .pl-name {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14.5px;
+  border-bottom: 1px solid transparent;
+}
+.pldoc .pl-name:hover {
+  color: var(--orange);
+  border-bottom-color: var(--orange);
+}
+.pldoc .pl-meta {
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pldoc .pl-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid;
+  margin-left: 6px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.pldoc .pl-tag.late {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--redbg);
+}
+.pldoc .pl-tag.pause {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.pldoc .pl-tag.done {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: var(--okbg);
+}
+
+/* view tiến độ */
+.pldoc .pl-pv th.sc b {
+  color: var(--terra);
+  margin-right: 4px;
+}
+.pldoc .pl-pv td.sc {
+  position: relative;
+  padding: 13px 10px 13px 14px;
+}
+.pldoc .pl-pv td.sc.click {
+  cursor: pointer;
+}
+.pldoc .pl-pv td.sc::before {
+  content: "";
+  position: absolute;
+  top: 23px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--track);
+}
+.pldoc .pl-pv td.sc.first::before {
+  left: 24px;
+}
+.pldoc .pl-pv td.sc.last::before {
+  right: calc(100% - 24px);
+}
+.pldoc .pl-pv td.sc.done::before {
+  background: var(--ok);
+  opacity: 0.55;
+}
+.pldoc .pl-pv td.sc.doing::before {
+  background: linear-gradient(90deg, var(--ok) 0, var(--ok) 24px, var(--track) 24px);
+  opacity: 0.8;
+}
+.pldoc .pl-pv td.sc.doing.first::before {
+  background: var(--track);
+}
+.pldoc .pl-node {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: normal;
+  background: var(--card);
+  border: 2px solid var(--line2);
+  color: var(--mut2);
+}
+.pldoc .done .pl-node {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.pldoc .doing .pl-node {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--orbg);
+}
+.pldoc .pl-sl {
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.pldoc .pl-sd {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-top: 1px;
+  line-height: 1.3;
+}
+.pldoc .todo .pl-sl {
+  color: var(--mut2);
+  font-weight: 400;
+}
+.pldoc .doing .pl-sl {
+  color: var(--orange);
+  font-weight: 600;
+}
+.pldoc .pl-mini {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--track);
+  margin-top: 5px;
+  overflow: hidden;
+  max-width: 110px;
+}
+.pldoc .pl-mini i {
+  display: block;
+  height: 100%;
+  background: var(--orange);
+}
+
+/* view danh sách */
+.pldoc .pl-lv td {
+  vertical-align: middle;
+}
+.pldoc .pl-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 99px;
+  border: 1px solid var(--line2);
+  color: var(--terra);
+  white-space: nowrap;
+}
+.pldoc .pl-chip.s5 {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: var(--orbg);
+}
+.pldoc .pl-chip.s6 {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: var(--okbg);
+}
+.pldoc .pl-r {
+  text-align: right !important;
+}
+.pldoc .pl-pg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pldoc .pl-pg .pl-mini {
+  flex: 1;
+  max-width: none;
+  margin-top: 0;
+}
+.pldoc .pl-pg span {
+  font-size: 12px;
+  color: var(--mut);
+  width: 34px;
+  text-align: right;
+}
+.pldoc .pl-mutc {
+  color: var(--mut);
+}
+.pldoc .pl-empty {
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  padding: 40px;
+  text-align: center;
+  color: var(--mut);
+}
+.pldoc .pl-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--mut);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pldoc .pl-legend span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.pldoc .pl-legend .pl-node {
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+  box-shadow: none;
+}
+
+/* ===== màn giai đoạn /admin/du-an/[id] ===== */
+.pldoc .pl-steps {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.pldoc .pl-stp {
+  padding: 10px 14px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--mut2);
+  font-weight: 500;
+  position: relative;
+  cursor: not-allowed;
+  min-width: 0;
+}
+.pldoc .pl-stp:first-child {
+  border-left: 0;
+}
+.pldoc .pl-stp i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line2);
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+.pldoc .pl-stp small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--mut);
+}
+.pldoc .pl-stp.done {
+  color: var(--text);
+  cursor: pointer;
+}
+.pldoc .pl-stp.done i {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+@media (hover: hover) {
+  .pldoc .pl-stp.done:hover {
+    background: var(--okbg);
+  }
+}
+.pldoc .pl-stp.cur {
+  color: var(--orange);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pldoc .pl-stp.cur i {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+.pldoc .pl-stp.view {
+  background: var(--orbg);
+}
+.pldoc .pl-stp.view::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--orange);
+}
+.pldoc .pl-review {
+  background: var(--okbg);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.pldoc .pl-err,
+.plportal .pl-err {
+  background: var(--redbg);
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.pldoc .pl-linkbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.pldoc .pl-linkbar .lb {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pldoc .pl-url {
+  flex: 1;
+  min-width: 220px;
+  font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pldoc .pl-url b {
+  color: var(--orange);
+  font-weight: 600;
+}
+.pldoc .pl-linknote {
+  font-size: 12px;
+  color: var(--mut);
+  margin: 0 2px 12px;
+}
+/* trình xem: khung cao đúng bằng nội dung → xem trọn trang, cuộn bằng trang ngoài */
+.pldoc .pl-pvw {
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  overflow: hidden;
+  background: #fff;
+}
+.pldoc .pl-pvw iframe {
+  display: block;
+  border: 0;
+  width: 100%;
+  background: #fff;
+}
+.pldoc .pl-ph {
+  border: 1px dashed var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--mut);
+}
+.pldoc .pl-ph b {
+  display: block;
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.pldoc .pl-ph .pl-btn {
+  margin-top: 14px;
+}
+
+/* ===== modal tạo mới (portal) ===== */
+.plportal.pl-ov {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(46, 20, 10, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.plportal .pl-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  padding: 20px;
+  max-height: 92dvh;
+  overflow: auto;
+}
+.plportal .pl-modal h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 700;
+}
+.plportal .pl-modal p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--mut);
+}
+.plportal .pl-field {
+  display: block;
+  margin-bottom: 11px;
+}
+.plportal .pl-field span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.plportal .pl-field em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 4px;
+  word-break: break-all;
+}
+.plportal .pl-field em b {
+  color: var(--orange);
+}
+.plportal .pl-mact {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .pldoc {
+    padding: 14px 12px 60px;
+  }
+  .pldoc .pl-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .pldoc .pl-stp {
+    border-top: 1px solid var(--line);
+  }
+}

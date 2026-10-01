@@ -763,6 +763,7 @@ model Project {
   estimateDbKhoan           EstimateDbKhoan[]
   estimateDbMaterials       EstimateDbMaterial[]
   sections                  ProjectSection[]
+  pipeline                  ProjectPipeline?
 
   @@index([status])
   @@map("projects")
@@ -4563,4 +4564,31 @@ model MhCartItem {
   @@unique([projectId, userId, key])
   @@index([projectId, userId])
   @@map("mh_cart_items")
+}
+
+// Dự án theo TIẾN ĐỘ 6 giai đoạn (khách chốt xây từ đầu): 1 Mô tả → 2 Báo giá → 3 Hợp đồng
+// → 4 Thiết kế → 5 Thi công → 6 Bàn giao. Admin tự bấm chuyển giai đoạn (stage).
+// Giai đoạn 1 có trang mô tả HTML công khai cho khách: huynhgia6.com/<slug> (nginx proxy → /mo-ta/<slug>).
+// projectId: gắn dự án thi công thật (projects) khi tới giai đoạn sau — hiện chưa dùng.
+model ProjectPipeline {
+  id                   String    @id @default(uuid()) @db.Uuid
+  name                 String
+  customerName         String    @map("customer_name")
+  customerPhone        String?   @map("customer_phone")
+  address              String?
+  slug                 String    @unique
+  stage                Int       @default(1) // 1..6
+  status               String    @default("active") @db.VarChar(20) // active | paused | done
+  stageDates           Json      @default("{}") @map("stage_dates") // {"1": ISO lúc chốt giai đoạn 1, ...}
+  descriptionHtml      String?   @map("description_html") @db.Text
+  descriptionUpdatedAt DateTime? @map("description_updated_at")
+  projectId            String?   @unique @map("project_id") @db.Uuid
+  createdById          String?   @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([stage])
+  @@map("project_pipelines")
 }
