@@ -41,6 +41,8 @@ type Order = {
   receiptImages?: ReceiptImg[]; // ảnh chứng minh nhận hàng
   receivedAt?: string | null;
   returnOfOrderId?: string | null; // != null => đơn TRẢ HÀNG (total & qty âm), trỏ đơn mua gốc
+  refundReceiptCode?: string | null; // mã lệnh thu "NCC hoàn tiền" đã lập cho đơn trả này
+  refundReceiptStatus?: string | null; // pending/awaiting_approval/received... (null = chưa lập)
   hasInflightExpense?: boolean; // đã có lệnh chi đang chờ -> khoá nút gửi
   depositPaid?: number; // Σ tiền đã cọc (lệnh chi 'paid' gắn đơn) — đơn trả ngay
 };
@@ -603,6 +605,27 @@ export function MuaHangClient({
     }
   };
 
+  // Lập lệnh thu "NCC hoàn tiền" cho đơn trả (refund) → chờ KT thu vào quỹ. Admin only.
+  const refundReceipt = async (o: Order) => {
+    if (
+      !window.confirm(
+        `Lập lệnh thu để NCC hoàn ${fmt(Math.abs(o.total))}đ (đơn trả #${o.seq})?\n` +
+          `Lệnh thu sẽ lên màn "Lệnh thu" chờ kế toán thu vào quỹ.`,
+      )
+    )
+      return;
+    const r = await fetch(`/api/projects/${projectId}/mua-hang/${o.id}/refund-receipt`, {
+      method: "POST",
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      await loadOrders();
+      toast(`Đã lập lệnh thu ${j.receiptCode || ""} — chờ kế toán thu.`);
+    } else {
+      toast(j.message || "Không lập được lệnh thu.");
+    }
+  };
+
   // Nội dung PO dùng chung cho modal (xem/ảnh) và cửa sổ in
   // Bỏ ghi chú "Vượt dự toán: ..." khỏi PO — thông tin nội bộ, NCC không cần thấy.
   // Note gốc vẫn giữ nguyên trong DB / đơn để admin đối chiếu.
@@ -904,6 +927,7 @@ ${(() => {
               onDel={delOrder}
               onPO={setPoOrder}
               onReturn={isKeToan ? undefined : setReturning}
+              onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn hàng nào chờ nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -915,6 +939,7 @@ ${(() => {
               onDel={delOrder}
               onPO={setPoOrder}
               onReturn={isKeToan ? undefined : setReturning}
+              onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn nào đã nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -1455,6 +1480,7 @@ function OrdersList({
   onDel,
   onPO,
   onReturn,
+  onRefund,
   emptyText,
   hideDel,
 }: {
@@ -1464,6 +1490,7 @@ function OrdersList({
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
   onReturn?: (o: Order) => void; // admin: mở sheet trả hàng (undefined = ẩn, vd kế toán)
+  onRefund?: (o: Order) => void; // admin: lập lệnh thu NCC hoàn tiền cho đơn trả (undefined = ẩn)
   emptyText?: string;
   hideDel?: (o: Order) => boolean;
 }) {
@@ -1486,6 +1513,12 @@ function OrdersList({
         const isRet = !!o.returnOfOrderId; // đơn trả hàng (total âm)
         const canReturn =
           !!onReturn && !isRet && (o.status === "received" || o.status === "paid");
+        // Đơn trả kiểu "NCC hoàn tiền" = đơn trả status 'paid' (cấn nợ là 'received').
+        const isRefundRet = isRet && o.status === "paid";
+        const rcStatus = o.refundReceiptStatus; // null = chưa lập lệnh thu
+        const rcCollected = rcStatus === "received";
+        // Nút "Lập lệnh thu": đơn hoàn tiền chưa có lệnh thu (chưa huỷ). KT không thấy (onRefund undefined).
+        const canRefund = !!onRefund && isRefundRet && !rcStatus;
         return (
         <div
           key={o.id}
@@ -1495,7 +1528,23 @@ function OrdersList({
           <div className="r1">
             <span className="no">{isRet ? "↩ Trả #" : "Đơn #"}{o.seq}</span>
             {isRet ? (
-              <span className="chip return" title="Đơn trả hàng (giá trị âm)">Trả hàng</span>
+              <>
+                <span className="chip return" title="Đơn trả hàng (giá trị âm)">Trả hàng</span>
+                {isRefundRet &&
+                  (rcCollected ? (
+                    <span className="chip paid" title={`Đã thu hoàn tiền${o.refundReceiptCode ? ` (${o.refundReceiptCode})` : ""}`}>
+                      Đã thu
+                    </span>
+                  ) : rcStatus ? (
+                    <span className="chip await" title={`Lệnh thu ${o.refundReceiptCode || ""} chờ thu`}>
+                      Chờ thu
+                    </span>
+                  ) : (
+                    <span className="chip await" title="Chưa lập lệnh thu NCC hoàn tiền">
+                      Chưa thu
+                    </span>
+                  ))}
+              </>
             ) : (() => {
               const b = stBadge(o.status, o.supplierName);
               return <span className={`chip ${b.cls}`}>{b.label}</span>;
@@ -1555,6 +1604,16 @@ function OrdersList({
                 onClick={() => onReturn!(o)}
               >
                 ↩ Trả hàng
+              </button>
+            )}
+            {canRefund && (
+              <button
+                type="button"
+                className="linkbtn pay"
+                title="Lập lệnh thu để NCC hoàn tiền trả hàng (chờ kế toán thu)"
+                onClick={() => onRefund!(o)}
+              >
+                🧾 Lập lệnh thu {fmt(Math.abs(o.total))}đ
               </button>
             )}
             {!hideDel?.(o) && (
@@ -1923,6 +1982,7 @@ function EditSheet({
   const needHm = budgetLines.length > 0;
   // Đơn ĐÃ TRẢ (paid — gắn sổ quỹ) → khoá chặt mọi người, không sửa được kể cả NCC.
   const lockedPaid = order.status === "paid";
+  const isReturnOrder = !!order.returnOfOrderId; // đơn trả hàng (giá trị âm)
   // Đơn ĐÃ NHẬN (received — công nợ / chờ thanh toán): NCC quyết định ghi công nợ hay TT ngay.
   const isReceivedOrder = order.status === "received";
   // KT xem đơn đã nhận = khoá vật tư/giá/ngày (nhưng vẫn sửa NCC ở dưới). Đơn đã trả = khoá hết.
@@ -2146,7 +2206,9 @@ function EditSheet({
                   color: "#5b6178",
                 }}
               >
-                🔒 Đơn đã thanh toán (gắn sổ quỹ) — khoá, không sửa được.
+                {isReturnOrder
+                  ? '🔒 Đơn trả hàng (NCC hoàn tiền) — khoá. Lập/ theo dõi lệnh thu ở danh sách đơn.'
+                  : "🔒 Đơn đã thanh toán (gắn sổ quỹ) — khoá, không sửa được."}
               </div>
             )}
             {isReceivedOrder && (
@@ -2341,7 +2403,8 @@ function EditSheet({
 // ── Trả hàng (admin) ──────────────────────────────────────────
 // Tạo đơn mh_orders giá trị ÂM trỏ về đơn gốc. Chọn:
 //   • Cấn công nợ: đơn âm status 'received' → view công nợ NCC tự trừ (không sinh tiền).
-//   • NCC hoàn tiền: đơn âm status 'paid' + lệnh thu 'supplier_refund' (chờ KT thu → vào quỹ).
+//   • NCC hoàn tiền: đơn âm status 'paid' (ngoài view công nợ). Lệnh thu 'supplier_refund'
+//     KHÔNG tạo tự động — admin bấm nút "Lập lệnh thu" trên đơn trả (chờ KT thu → vào quỹ).
 function ReturnSheet({
   order,
   allOrders,
@@ -2409,7 +2472,7 @@ function ReturnSheet({
       const j = await r.json().catch(() => ({}));
       onSaved(
         cashMode === "refund"
-          ? `Đã tạo đơn trả #${j.seq} + lệnh thu ${j.receiptCode} (chờ KT thu)`
+          ? `Đã tạo đơn trả #${j.seq}. Bấm "Lập lệnh thu" trên đơn để NCC hoàn tiền.`
           : `Đã tạo đơn trả #${j.seq} — cấn công nợ NCC`,
       );
     } else {
@@ -2506,7 +2569,7 @@ function ReturnSheet({
           <div className="esh" style={{ marginTop: 16 }}>Xử lý tiền</div>
           <div style={{ display: "flex", gap: 8 }}>
             {segBtn("offset", "Cấn công nợ", "Trừ thẳng nợ NCC, không xuất tiền")}
-            {segBtn("refund", "NCC hoàn tiền", "Tạo lệnh thu → KT thu vào quỹ")}
+            {segBtn("refund", "NCC hoàn tiền", "Tạo đơn trả → bấm Lập lệnh thu sau")}
           </div>
 
           <div className="fld" style={{ marginTop: 14 }}>
@@ -2540,7 +2603,7 @@ function ReturnSheet({
               Huỷ
             </button>
             <button type="button" className="btn" onClick={submit} disabled={saving || !anyQty || total <= 0}>
-              {saving ? "Đang xử lý…" : cashMode === "refund" ? "Trả hàng + tạo lệnh thu" : "Trả hàng (cấn nợ)"}
+              {saving ? "Đang xử lý…" : cashMode === "refund" ? "Trả hàng (NCC hoàn tiền)" : "Trả hàng (cấn nợ)"}
             </button>
           </div>
         </div>

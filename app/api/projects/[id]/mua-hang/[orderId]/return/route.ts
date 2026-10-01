@@ -1,31 +1,16 @@
 import { NextResponse } from "next/server";
-import { Prisma, ReceiptSource, ReceiptStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
-import { fireAndForget, notifyReceiptCreated } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
 type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 
-// Sinh mã lệnh thu THU-YYYYMM-####
-async function nextReceiptCode() {
-  const now = new Date();
-  const yymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const prefix = `THU-${yymm}-`;
-  const last = await prisma.receipt.findFirst({
-    where: { code: { startsWith: prefix } },
-    orderBy: { code: "desc" },
-    select: { code: true },
-  });
-  const lastNo = last ? Number(last.code.slice(prefix.length)) || 0 : 0;
-  return `${prefix}${String(lastNo + 1).padStart(4, "0")}`;
-}
-
 // POST: trả hàng đơn mua gốc → tạo đơn mh_orders giá trị ÂM.
 //  cashMode 'offset'  → status 'received' → view công nợ tự trừ (không sinh tiền).
-//  cashMode 'refund'  → status 'paid' (ngoài view công nợ) + lệnh thu 'supplier_refund'
-//                       (NCC hoàn tiền, chờ KT thu → tiền vào quỹ).
+//  cashMode 'refund'  → status 'paid' (ngoài view công nợ). KHÔNG tự tạo lệnh thu —
+//                       admin bấm nút "Lập lệnh thu" trên đơn trả để NCC hoàn tiền vào quỹ.
 // Body { items:[{key, qty}], cashMode, note? }. qty = SL trả (dương), lưu xuống âm.
 // CHỈ admin (không cho kế toán).
 export async function POST(
@@ -105,88 +90,36 @@ export async function POST(
   }
 
   const total = retItems.reduce((s, it) => s + it.qty * it.price, 0); // âm
-  const refundAmount = Math.abs(total);
   const note =
     `Trả hàng đơn #${src.seq}` +
     (cashMode === "refund" ? " · NCC hoàn tiền" : " · cấn công nợ") +
     (body.note?.trim() ? ` — ${body.note.trim()}` : "");
 
-  let receiptCode: string | null = null;
-  let createdSeq = 0;
-  let receiptForNotify: { id: string; code: string; amount: number } | null = null;
+  const last = await prisma.mhOrder.findFirst({
+    where: { projectId: params.id },
+    orderBy: { seq: "desc" },
+    select: { seq: true },
+  });
+  const seq = (last?.seq || 0) + 1;
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const last = await tx.mhOrder.findFirst({
-        where: { projectId: params.id },
-        orderBy: { seq: "desc" },
-        select: { seq: true },
-      });
-      const seq = (last?.seq || 0) + 1;
-      createdSeq = seq;
+  // offset → 'received' để đơn âm trừ CÔNG NỢ (view nợ chỉ tính received + supplier).
+  // refund → 'paid' (loại khỏi view công nợ): tiền về qua lệnh thu admin tự lập.
+  const retOrder = await prisma.mhOrder.create({
+    data: {
+      projectId: params.id,
+      seq,
+      status: cashMode === "refund" ? "paid" : "received",
+      supplierId: src.supplierId,
+      supplierName: src.supplierName,
+      orderDate: new Date(),
+      note,
+      total,
+      items: retItems as unknown as Prisma.InputJsonValue,
+      budgetLineId: src.budgetLineId, // giữ lineage hạng mục của đơn gốc
+      returnOfOrderId: src.id,
+      createdBy: user!.id,
+    },
+  });
 
-      // offset → 'received' để đơn âm trừ CÔNG NỢ (view nợ chỉ tính received + supplier).
-      // refund → 'paid' (loại khỏi view công nợ): tiền về qua lệnh thu, không tạo nợ âm ảo.
-      const retOrder = await tx.mhOrder.create({
-        data: {
-          projectId: params.id,
-          seq,
-          status: cashMode === "refund" ? "paid" : "received",
-          supplierId: src.supplierId,
-          supplierName: src.supplierName,
-          orderDate: new Date(),
-          note,
-          total,
-          items: retItems as unknown as Prisma.InputJsonValue,
-          budgetLineId: src.budgetLineId, // giữ lineage hạng mục của đơn gốc
-          returnOfOrderId: src.id,
-          createdBy: user!.id,
-        },
-      });
-
-      if (cashMode === "refund") {
-        const code = await nextReceiptCode();
-        receiptCode = code;
-        const receipt = await tx.receipt.create({
-          data: {
-            code,
-            source: ReceiptSource.supplier_refund,
-            projectId: params.id,
-            amount: new Prisma.Decimal(refundAmount),
-            payer: src.supplierName || "Nhà cung cấp",
-            note: `Hoàn tiền trả hàng đơn #${src.seq} (đơn trả #${retOrder.seq})`,
-            status: ReceiptStatus.pending, // admin tạo → chờ KT thu
-            createdBy: user!.id,
-          },
-          select: { id: true, code: true, amount: true },
-        });
-        receiptForNotify = { id: receipt.id, code: receipt.code, amount: Number(receipt.amount) };
-      }
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Lỗi tạo đơn trả hàng";
-    return NextResponse.json({ message: msg }, { status: 400 });
-  }
-
-  if (receiptForNotify) {
-    const project = await prisma.project.findUnique({
-      where: { id: params.id },
-      select: { code: true, name: true },
-    });
-    const r = receiptForNotify as { id: string; code: string; amount: number };
-    fireAndForget(
-      notifyReceiptCreated({
-        receiptId: r.id,
-        code: r.code,
-        amount: r.amount,
-        source: ReceiptSource.supplier_refund,
-        payer: src.supplierName || null,
-        projectLabel: project ? `${project.code} — ${project.name}` : null,
-        actorUserId: user!.id,
-        actorName: user!.name || user!.email || "Admin",
-      }),
-    );
-  }
-
-  return NextResponse.json({ ok: true, seq: createdSeq, receiptCode, cashMode });
+  return NextResponse.json({ ok: true, seq: retOrder.seq, cashMode });
 }

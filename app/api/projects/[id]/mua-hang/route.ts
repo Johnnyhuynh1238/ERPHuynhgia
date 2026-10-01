@@ -73,6 +73,22 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     : [];
   const depositMap = new Map(paidExpenses.map((e) => [e.sourceId, Number(e._sum.paidAmount || 0)]));
 
+  // Lệnh thu "NCC hoàn tiền" gắn đơn trả (refund) qua mhOrderId → surface để UI hiện
+  // nút "Lập lệnh thu" (chưa có) hoặc chip "Chờ thu" / "Đã thu".
+  const refundReceipts = orders.length
+    ? await prisma.receipt.findMany({
+        where: { mhOrderId: { in: orders.map((o) => o.id) }, status: { not: "cancelled" } },
+        select: { mhOrderId: true, code: true, status: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+  const refundMap = new Map<string, { code: string; status: string }>();
+  for (const r of refundReceipts) {
+    if (r.mhOrderId && !refundMap.has(r.mhOrderId)) {
+      refundMap.set(r.mhOrderId, { code: r.code, status: r.status });
+    }
+  }
+
   return NextResponse.json({
     items: orders.map((o) => ({
       id: o.id,
@@ -90,6 +106,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       receiptImages: o.receiptImages,
       receivedAt: o.receivedAt,
       returnOfOrderId: o.returnOfOrderId,
+      refundReceiptCode: refundMap.get(o.id)?.code ?? null,
+      refundReceiptStatus: refundMap.get(o.id)?.status ?? null,
       hasInflightExpense: inflightSet.has(o.id),
       depositPaid: depositMap.get(o.id) || 0,
       createdAt: o.createdAt,

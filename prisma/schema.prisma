@@ -3966,6 +3966,8 @@ model Receipt {
   // Gắn lệnh thu vào khoản vay (nhận tiền vay) hoặc phiếu tạm ứng (hoàn ứng).
   loanId    String? @map("loan_id") @db.Uuid
   advanceId String? @map("advance_id") @db.Uuid
+  // Lệnh thu NCC hoàn tiền trả hàng → gắn đơn trả (mh_orders). Scalar (không @relation) giữ nhẹ.
+  mhOrderId String? @map("mh_order_id") @db.Uuid
 
   project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   designContract  DesignContract?  @relation(fields: [designContractId], references: [id], onDelete: SetNull)
