@@ -1,16 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { PIPELINE_DOC_KEYS } from "@/lib/pipeline";
 import { renderPipelinePortal } from "@/lib/pipeline-portal";
+import { injectPipelineEmbed } from "@/lib/pipeline-server";
 
 export const dynamic = "force-dynamic";
-
-// Báo chiều cao trang cho khung xem trong ERP (iframe cao đúng bằng nội dung → xem trọn trang).
-const EMBED_SCRIPT = `<script>(function(){function s(){try{parent.postMessage({type:"hg-mota-height",h:Math.max(document.body.scrollHeight,document.documentElement.offsetHeight)},"*")}catch(e){}}
-window.addEventListener("load",s);window.addEventListener("resize",s);try{new ResizeObserver(s).observe(document.body)}catch(e){}s();setTimeout(s,800)})();</script>`;
-
-// File mô tả thường có khối cao 100vh (side-menu). Trong khung cao-theo-nội-dung, vh = chiều cao khung
-// → phải chặn để không tự phình.
-const EMBED_STYLE = `<style>html,body{overflow:hidden!important}</style>`;
 
 function page(title: string, status: number) {
   return new Response(
@@ -55,6 +48,7 @@ export async function GET(
         createdAt: true,
         descriptionUpdatedAt: true,
         quoteUpdatedAt: true,
+        quotePublishedAt: true,
       },
     });
     if (!versions.length) return page("Hồ sơ dự án đang được chuẩn bị", 200);
@@ -69,7 +63,7 @@ export async function GET(
           no: v.versionNo,
           date: `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}`,
           hasDescription: Boolean(v.descriptionUpdatedAt),
-          hasQuote: Boolean(v.quoteUpdatedAt),
+          hasQuote: Boolean(v.quoteUpdatedAt && v.quotePublishedAt),
         };
       }),
     });
@@ -92,23 +86,20 @@ export async function GET(
 
   const row = await prisma.projectPipelineVersion.findUnique({
     where: { pipelineId_versionNo: { pipelineId: pipe.id, versionNo } },
-    select: { descriptionHtml: true, quoteHtml: true },
+    select: { descriptionHtml: true, quoteHtml: true, quotePublishedAt: true },
   });
   if (!row) return page("Không tìm thấy trang", 404);
 
   let html = (isQuote ? row.quoteHtml : row.descriptionHtml) || "";
+  // Báo giá chưa chốt công bố: khách chưa thấy giá. Admin xem trước trong ERP qua /api/admin/pipeline/.../doc.
+  if (isQuote && !row.quotePublishedAt) html = "";
   if (!html)
     return page(
       isQuote ? "Báo giá đang được chuẩn bị" : "Bản mô tả đang được chuẩn bị",
       200,
     );
 
-  if (q.get("embed") === "1") {
-    const inject = EMBED_STYLE + EMBED_SCRIPT;
-    const idx = html.toLowerCase().lastIndexOf("</body>");
-    html =
-      idx >= 0 ? html.slice(0, idx) + inject + html.slice(idx) : html + inject;
-  }
+  if (q.get("embed") === "1") html = injectPipelineEmbed(html);
 
   return new Response(html, {
     status: 200,

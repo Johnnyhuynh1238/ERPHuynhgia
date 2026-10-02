@@ -6,6 +6,9 @@ export type PipelineVersionMeta = {
   descriptionUpdatedAt: string | null;
   quoteUpdatedAt: string | null;
   quoteTotal: number | null;
+  quotePublishedAt: string | null;
+  costUpdatedAt: string | null;
+  costTotal: number | null;
   createdAt: string;
 };
 
@@ -24,6 +27,22 @@ export type PipelineState = {
   createdAt: string;
   versions: PipelineVersionMeta[];
 };
+
+// Báo chiều cao trang cho khung xem trong ERP (iframe cao đúng bằng nội dung → xem trọn trang).
+const EMBED_SCRIPT = `<script>(function(){function s(){try{parent.postMessage({type:"hg-mota-height",h:Math.max(document.body.scrollHeight,document.documentElement.offsetHeight)},"*")}catch(e){}}
+window.addEventListener("load",s);window.addEventListener("resize",s);try{new ResizeObserver(s).observe(document.body)}catch(e){}s();setTimeout(s,800)})();</script>`;
+
+// File mô tả thường có khối cao 100vh (side-menu). Trong khung cao-theo-nội-dung, vh = chiều cao khung
+// → phải chặn để không tự phình.
+const EMBED_STYLE = `<style>html,body{overflow:hidden!important}</style>`;
+
+export function injectPipelineEmbed(html: string): string {
+  const inject = EMBED_STYLE + EMBED_SCRIPT;
+  const idx = html.toLowerCase().lastIndexOf("</body>");
+  return idx >= 0
+    ? html.slice(0, idx) + inject + html.slice(idx)
+    : html + inject;
+}
 
 // Trạng thái đầy đủ của 1 dự án pipeline cho màn giai đoạn (không kèm HTML — HTML xem qua /mo-ta/...).
 export async function loadPipelineState(
@@ -52,6 +71,9 @@ export async function loadPipelineState(
           descriptionUpdatedAt: true,
           quoteUpdatedAt: true,
           quoteTotal: true,
+          quotePublishedAt: true,
+          costUpdatedAt: true,
+          costTotal: true,
           createdAt: true,
         },
       },
@@ -79,6 +101,11 @@ export async function loadPipelineState(
         : null,
       quoteUpdatedAt: v.quoteUpdatedAt ? v.quoteUpdatedAt.toISOString() : null,
       quoteTotal: v.quoteTotal === null ? null : Number(v.quoteTotal),
+      quotePublishedAt: v.quotePublishedAt
+        ? v.quotePublishedAt.toISOString()
+        : null,
+      costUpdatedAt: v.costUpdatedAt ? v.costUpdatedAt.toISOString() : null,
+      costTotal: v.costTotal === null ? null : Number(v.costTotal),
       createdAt: v.createdAt.toISOString(),
     })),
   };

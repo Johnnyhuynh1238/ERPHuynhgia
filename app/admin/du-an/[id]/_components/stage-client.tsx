@@ -52,6 +52,8 @@ export function StageClient({
   const [frameKey, setFrameKey] = useState(0);
   const [totalDraft, setTotalDraft] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const [qtab, setQtab] = useState<"quote" | "cost">("quote");
+  const [adminDoc, setAdminDoc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { stage, status, stageDates, versions, contractVersionNo } = state;
@@ -65,11 +67,15 @@ export function StageClient({
   const isLatest = curNo === latestNo;
 
   const kind: PipelineDocKind = view === 2 ? "quote" : "description";
-  const kindLabel = kind === "quote" ? "báo giá" : "mô tả";
+  // Giai đoạn 2 có 2 phần: báo giá (khách xem sau khi chốt) và giá vốn (nội bộ, khách không bao giờ thấy).
+  const isCost = view === 2 && qtab === "cost";
+  const kindLabel = isCost ? "giá vốn" : kind === "quote" ? "báo giá" : "mô tả";
   const docAt = cur
-    ? kind === "quote"
-      ? cur.quoteUpdatedAt
-      : cur.descriptionUpdatedAt
+    ? isCost
+      ? cur.costUpdatedAt
+      : kind === "quote"
+        ? cur.quoteUpdatedAt
+        : cur.descriptionUpdatedAt
     : null;
   // Khách chỉ có 1 link cho cả dự án (trang cổng: mọi phiên bản mô tả + báo giá).
   const publicUrl = pipelinePublicUrl(state.slug);
@@ -119,6 +125,35 @@ export function StageClient({
     } finally {
       setBusy(false);
     }
+  };
+
+  // Báo giá + giá vốn ở giai đoạn 2 lấy qua API admin (báo giá chưa chốt và giá vốn không có ở link khách).
+  useEffect(() => {
+    if (view !== 2 || !docAt) {
+      setAdminDoc(null);
+      return;
+    }
+    let alive = true;
+    setAdminDoc(null);
+    fetch(
+      `/api/admin/pipeline/${state.id}/versions/${curNo}/doc?kind=${isCost ? "cost" : "quote"}`,
+    )
+      .then((r) => (r.ok ? r.json() : { html: "" }))
+      .then((j: { html?: string }) => {
+        if (alive) setAdminDoc(j.html || "");
+      })
+      .catch(() => {
+        if (alive) setAdminDoc("");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [view, isCost, curNo, docAt, frameKey, state.id]);
+
+  const pickTab = (t: "quote" | "cost") => {
+    setQtab(t);
+    setTotalDraft(null);
+    setFrameH(900);
   };
 
   const pickVer = (n: number) => {
@@ -231,12 +266,27 @@ export function StageClient({
     await call("", "PATCH", { contractVersionNo: n });
   };
 
+  const setQuotePublished = async (on: boolean) => {
+    if (
+      !window.confirm(
+        on
+          ? `Chốt báo giá V${curNo}? Khách mở link sẽ thấy giá ngay.`
+          : `Ẩn báo giá V${curNo} khỏi link khách?`,
+      )
+    )
+      return;
+    await call(`/versions/${curNo}`, "PATCH", { quotePublished: on });
+  };
+
   const saveTotal = async () => {
     if (totalDraft === null) return;
     const digits = totalDraft.replace(/[^0-9]/g, "");
-    const r = await call(`/versions/${curNo}`, "PATCH", {
-      quoteTotal: digits ? Number(digits) : null,
-    });
+    const n = digits ? Number(digits) : null;
+    const r = await call(
+      `/versions/${curNo}`,
+      "PATCH",
+      isCost ? { costTotal: n } : { quoteTotal: n },
+    );
     if (r) setTotalDraft(null);
   };
 
@@ -256,14 +306,22 @@ export function StageClient({
     if (
       docAt &&
       !window.confirm(
-        `Thay trang ${kindLabel} V${curNo} bằng file mới? Khách mở link sẽ thấy bản mới ngay.`,
+        isCost
+          ? `Thay bảng giá vốn V${curNo} bằng file mới? (Nội bộ, khách không thấy.)`
+          : kind === "quote"
+            ? `Thay trang báo giá V${curNo} bằng file mới? Báo giá sẽ ẩn với khách cho tới khi anh chốt lại.`
+            : `Thay trang ${kindLabel} V${curNo} bằng file mới? Khách mở link sẽ thấy bản mới ngay.`,
       )
     )
       return;
     const r = await call(
       `/versions/${curNo}`,
       "PATCH",
-      kind === "quote" ? { quoteHtml: html } : { descriptionHtml: html },
+      isCost
+        ? { costHtml: html }
+        : kind === "quote"
+          ? { quoteHtml: html }
+          : { descriptionHtml: html },
     );
     if (r) {
       setFrameH(900);
@@ -297,7 +355,16 @@ export function StageClient({
     contractVersionNo !== curNo &&
     stage <= 3;
   const totalValue =
-    totalDraft !== null ? totalDraft : fmtMoney(cur ? cur.quoteTotal : null);
+    totalDraft !== null
+      ? totalDraft
+      : fmtMoney(cur ? (isCost ? cur.costTotal : cur.quoteTotal) : null);
+  const profit =
+    cur &&
+    cur.quoteTotal !== null &&
+    cur.costTotal !== null &&
+    cur.costTotal > 0
+      ? cur.quoteTotal - cur.costTotal
+      : null;
 
   return (
     <div
@@ -471,6 +538,33 @@ export function StageClient({
             </span>
           </div>
 
+          {view === 2 ? (
+            <div className="pl-qtabs">
+              <button
+                type="button"
+                className={`pl-qtab${isCost ? "" : " on"}`}
+                onClick={() => pickTab("quote")}
+              >
+                Báo giá
+                <small>khách xem sau khi anh chốt</small>
+              </button>
+              <button
+                type="button"
+                className={`pl-qtab${isCost ? " on" : ""}`}
+                onClick={() => pickTab("cost")}
+              >
+                🔒 Giá vốn
+                <small>nội bộ, khách không thấy</small>
+              </button>
+              {profit !== null && cur && cur.costTotal ? (
+                <span className="pl-qprofit pl-num">
+                  Lãi gộp <b>{fmtMoney(profit)} đ</b> ·{" "}
+                  {((profit * 100) / cur.costTotal).toFixed(1)}% trên vốn
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="pl-linkbar">
             <span className="lb">Link gửi khách</span>
             <div className="pl-url pl-num">
@@ -499,9 +593,13 @@ export function StageClient({
             </button>
           </div>
           <div className="pl-linknote">
-            {docAt
-              ? `Trang ${kindLabel} V${curNo} cập nhật ${fmtDay(docAt, true)} · bên dưới là đúng trang khách thấy. `
-              : `Chưa có trang ${kindLabel} V${curNo}. `}
+            {isCost
+              ? docAt
+                ? `Bảng giá vốn V${curNo} cập nhật ${fmtDay(docAt, true)} · chỉ xem được trong ERP, không nằm ở link khách. `
+                : `Chưa có bảng giá vốn V${curNo}. `
+              : docAt
+                ? `Trang ${kindLabel} V${curNo} cập nhật ${fmtDay(docAt, true)} · bên dưới là đúng trang khách thấy. `
+                : `Chưa có trang ${kindLabel} V${curNo}. `}
             Một link cho cả dự án: khách mở ra chọn Mô tả / Báo giá
             {versions.length > 1 ? " và phiên bản V1, V2…" : ""} ngay trên
             trang.
@@ -509,7 +607,9 @@ export function StageClient({
 
           {view === 2 ? (
             <div className="pl-qtotal">
-              <span className="lb">Tổng báo giá V{curNo}</span>
+              <span className="lb">
+                {isCost ? "Tổng giá vốn" : "Tổng báo giá"} V{curNo}
+              </span>
               <input
                 className="pl-num"
                 inputMode="numeric"
@@ -536,17 +636,58 @@ export function StageClient({
                 </button>
               ) : null}
               <span className="hint">
-                Số này hiện ở màn Hợp đồng để chọn báo giá chốt.
+                {isCost
+                  ? "Chỉ anh thấy. Dùng để tính lãi gộp so với tổng báo giá."
+                  : "Số này hiện ở màn Hợp đồng để chọn báo giá chốt."}
               </span>
+            </div>
+          ) : null}
+
+          {view === 2 && !isCost && docAt ? (
+            <div
+              className={`pl-qpub${cur && cur.quotePublishedAt ? " on" : ""}`}
+            >
+              {cur && cur.quotePublishedAt ? (
+                <>
+                  <span>
+                    <b>Đã chốt</b> — khách đang thấy báo giá V{curNo} (
+                    {fmtDay(cur.quotePublishedAt)}).
+                  </span>
+                  <button
+                    type="button"
+                    className="pl-btn"
+                    onClick={() => setQuotePublished(false)}
+                    disabled={busy}
+                  >
+                    Ẩn lại
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>
+                    <b>Chưa chốt</b> — chỉ anh xem được, khách chưa thấy giá.
+                  </span>
+                  <button
+                    type="button"
+                    className="pl-btn"
+                    onClick={() => setQuotePublished(true)}
+                    disabled={busy}
+                  >
+                    ✓ Chốt, hiện giá cho khách
+                  </button>
+                </>
+              )}
             </div>
           ) : null}
 
           {docAt ? (
             <div className="pl-pvw">
               <iframe
-                key={`${kind}-${curNo}-${frameKey}`}
+                key={`${isCost ? "cost" : kind}-${curNo}-${frameKey}`}
                 ref={frameRef}
-                src={embedSrc}
+                {...(view === 2
+                  ? { srcDoc: adminDoc === null ? "" : adminDoc }
+                  : { src: embedSrc })}
                 title={`Trang ${kindLabel} V${curNo}`}
                 scrolling="no"
                 sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
@@ -558,8 +699,9 @@ export function StageClient({
               <b>
                 Chưa có trang {kindLabel} V{curNo}
               </b>
-              Tải file {kindLabel} (.html) lên để hiện ở đây và ở link gửi
-              khách.
+              {isCost
+                ? "Tải file giá vốn (.html) lên để lưu nội bộ. Khách không thấy."
+                : `Tải file ${kindLabel} (.html) lên để hiện ở đây và ở link gửi khách.`}
               <div>
                 <button
                   type="button"

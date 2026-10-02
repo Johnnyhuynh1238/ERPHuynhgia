@@ -4609,6 +4609,10 @@ model ProjectPipelineVersion {
   quoteHtml            String?   @map("quote_html") @db.Text
   quoteUpdatedAt       DateTime? @map("quote_updated_at")
   quoteTotal           Decimal?  @map("quote_total") @db.Decimal(18, 0)
+  quotePublishedAt     DateTime? @map("quote_published_at") // admin chốt thì khách mới thấy báo giá
+  costHtml             String?   @map("cost_html") @db.Text // giá vốn — NỘI BỘ, không bao giờ phục vụ qua route công khai
+  costUpdatedAt        DateTime? @map("cost_updated_at")
+  costTotal            Decimal?  @map("cost_total") @db.Decimal(18, 0)
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

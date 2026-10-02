@@ -18,6 +18,9 @@ const PatchSchema = z.object({
     .max(999_999_999_999)
     .nullable()
     .optional(),
+  quotePublished: z.boolean().optional(),
+  costHtml: z.string().max(MAX_HTML_BYTES).nullable().optional(),
+  costTotal: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
 });
 
 function parseNo(raw: string): number | null {
@@ -25,7 +28,7 @@ function parseNo(raw: string): number | null {
   return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
-// Cập nhật 1 phiên bản: ghi chú / file mô tả / file báo giá / tổng báo giá.
+// Cập nhật 1 phiên bản: ghi chú / file mô tả / file báo giá / tổng báo giá / file + tổng giá vốn (nội bộ).
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string; no: string } },
@@ -58,7 +61,7 @@ export async function PATCH(
   const where = { pipelineId_versionNo: { pipelineId: params.id, versionNo } };
   const existed = await prisma.projectPipelineVersion.findUnique({
     where,
-    select: { id: true },
+    select: { id: true, quoteHtml: true },
   });
   if (!existed)
     return NextResponse.json(
@@ -75,8 +78,26 @@ export async function PATCH(
   if (d.quoteHtml !== undefined) {
     data.quoteHtml = d.quoteHtml;
     data.quoteUpdatedAt = d.quoteHtml ? new Date() : null;
+    // Thay / gỡ file báo giá → ẩn lại với khách, admin xem xong chốt lại mới hiện.
+    data.quotePublishedAt = null;
+  }
+  if (d.quotePublished !== undefined) {
+    const hasQuote =
+      d.quoteHtml !== undefined ? d.quoteHtml : existed.quoteHtml;
+    if (d.quotePublished && !hasQuote)
+      return NextResponse.json(
+        { message: "Chưa có file báo giá để chốt" },
+        { status: 400 },
+      );
+    data.quotePublishedAt = d.quotePublished ? new Date() : null;
   }
   if (d.quoteTotal !== undefined) data.quoteTotal = d.quoteTotal;
+  // Giá vốn: nội bộ, chỉ đọc lại qua /api/admin/pipeline/[id]/versions/[no]/doc.
+  if (d.costHtml !== undefined) {
+    data.costHtml = d.costHtml;
+    data.costUpdatedAt = d.costHtml ? new Date() : null;
+  }
+  if (d.costTotal !== undefined) data.costTotal = d.costTotal;
 
   await prisma.projectPipelineVersion.update({ where, data });
   return NextResponse.json(await loadPipelineState(params.id));
