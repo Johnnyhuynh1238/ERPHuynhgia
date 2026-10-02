@@ -763,3 +763,162 @@
     border-top: 1px solid var(--line);
   }
 }
+
+/* ===== mobile (<1024px): bảng tiến độ gọn — mỗi dự án 1 khối, 6 nút giai đoạn nằm ngang ===== */
+.pldoc .pl-sn,
+.pldoc .pl-cur {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .pldoc .pl-h1 {
+    font-size: 22px;
+  }
+  .pldoc .pl-hact {
+    width: 100%;
+  }
+  .pldoc .pl-hact > .pl-btn:last-child {
+    margin-left: auto;
+  }
+  .pldoc .pl-strip {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .pldoc .pl-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .pldoc .pl-st {
+    flex: 0 0 auto;
+    min-width: 98px;
+    padding: 10px 12px;
+  }
+  .pldoc .pl-st .v {
+    font-size: 20px;
+  }
+  .pldoc .pl-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .pldoc .pl-bar select {
+    flex: 1 1 140px;
+    max-width: none;
+    min-width: 0;
+  }
+  /* 16px: iPhone không tự phóng to khi bấm vào ô nhập */
+  .pldoc .pl-search input,
+  .pldoc .pl-bar select,
+  .plportal .pl-field input {
+    font-size: 16px;
+  }
+  .pldoc .pl-count {
+    margin-left: auto;
+  }
+
+  .pldoc .pl-pv,
+  .pldoc .pl-pv tbody {
+    display: block;
+  }
+  .pldoc .pl-pv thead,
+  .pldoc .pl-pv colgroup {
+    display: none;
+  }
+  .pldoc .pl-pv tr {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border-bottom: 1px solid var(--line);
+  }
+  .pldoc .pl-pv tr:last-child {
+    border-bottom: 0;
+  }
+  .pldoc .pl-pv td {
+    border-bottom: 0;
+  }
+  .pldoc .pl-pv td:first-child {
+    grid-column: 1 / -1;
+    padding: 12px 12px 4px;
+  }
+  .pldoc .pl-pv td.sc {
+    padding: 8px 2px 12px 12px;
+  }
+  .pldoc .pl-pv td.sc::before {
+    top: 17px;
+  }
+  .pldoc .pl-pv td.sc.first::before {
+    left: 22px;
+  }
+  .pldoc .pl-pv td.sc.last::before {
+    right: calc(100% - 22px);
+  }
+  .pldoc .pl-pv td.sc.doing::before {
+    background: linear-gradient(90deg, var(--ok) 0, var(--ok) 22px, var(--track) 22px);
+  }
+  .pldoc .pl-pv .pl-sl,
+  .pldoc .pl-pv .pl-sd,
+  .pldoc .pl-pv .pl-mini {
+    display: none;
+  }
+  .pldoc .pl-sn {
+    display: block;
+    margin-top: 6px;
+    font-size: 10.5px;
+    line-height: 1.2;
+    color: var(--mut);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pldoc .todo .pl-sn {
+    color: var(--mut2);
+  }
+  .pldoc .doing .pl-sn {
+    color: var(--orange);
+    font-weight: 600;
+  }
+  .pldoc .pl-cur {
+    display: block;
+    margin-top: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--orange);
+  }
+  .pldoc .pl-cur b {
+    font-weight: 600;
+  }
+  .pldoc .pl-legend span:last-child {
+    margin-left: 0 !important;
+  }
+
+  /* view danh sách: giữ dạng bảng, vuốt ngang */
+  .pldoc .pl-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 11px;
+  }
+  .pldoc .pl-scroll .pl-lv {
+    min-width: 900px;
+  }
+
+  /* màn giai đoạn */
+  .pldoc .pl-url {
+    flex: 1 1 100%;
+    min-width: 0;
+    font-size: 13px;
+  }
+  .pldoc .pl-linkbar .pl-btn {
+    flex: 1 1 auto;
+    text-align: center;
+    padding: 9px 10px;
+  }
+  .pldoc .pl-pvw {
+    margin: 0 -12px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+  .pldoc .pl-stp {
+    padding: 9px 10px;
+    gap: 7px;
+    font-size: 13px;
+  }
+}

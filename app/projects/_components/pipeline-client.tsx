@@ -5,7 +5,12 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { plexMono, plexSans } from "@/lib/fonts";
-import { PIPELINE_STAGES, PUBLIC_SITE_URL, slugify, validateSlug } from "@/lib/pipeline";
+import {
+  PIPELINE_STAGES,
+  PUBLIC_SITE_URL,
+  slugify,
+  validateSlug,
+} from "@/lib/pipeline";
 import "./pipeline.css";
 
 type Row = {
@@ -31,7 +36,12 @@ type Row = {
   planning: boolean;
 };
 
-type Cell = { cls: "done" | "doing" | "todo"; label: string; detail: string; pct: number | null };
+type Cell = {
+  cls: "done" | "doing" | "todo";
+  label: string;
+  detail: string;
+  pct: number | null;
+};
 
 const STAGE_NUMS = [1, 2, 3, 4, 5, 6];
 
@@ -63,14 +73,21 @@ function cellOf(r: Row, n: number): Cell {
   if (r.kind === "pipeline") {
     if (r.status === "done" || n < r.stage) {
       const day = fmtDay(r.stageDates[String(n)]);
-      return { cls: "done", label: "Đã chốt", detail: day ? `Chốt ${day}` : "", pct: null };
+      return {
+        cls: "done",
+        label: "Đã chốt",
+        detail: day ? `Chốt ${day}` : "",
+        pct: null,
+      };
     }
     if (n === r.stage) {
       if (n === 1) {
         return {
           cls: "doing",
           label: "Đang thống nhất",
-          detail: r.hasDescription ? "Đã có trang mô tả" : "Chưa tải trang mô tả",
+          detail: r.hasDescription
+            ? "Đã có trang mô tả"
+            : "Chưa tải trang mô tả",
           pct: null,
         };
       }
@@ -80,14 +97,38 @@ function cellOf(r: Row, n: number): Cell {
   }
 
   // Dự án thi công có sẵn (tạo theo luồng cũ): coi như đã qua 1→4.
-  if (n === 1) return { cls: "done", label: "Đã tiếp nhận", detail: "", pct: null };
-  if (n === 2) return { cls: "done", label: "Đã chốt", detail: fmtMoney(r.contractValue), pct: null };
-  if (n === 3) return { cls: "done", label: "Đã ký", detail: fmtDay(r.startDate, true), pct: null };
+  if (n === 1)
+    return { cls: "done", label: "Đã tiếp nhận", detail: "", pct: null };
+  if (n === 2)
+    return {
+      cls: "done",
+      label: "Đã chốt",
+      detail: fmtMoney(r.contractValue),
+      pct: null,
+    };
+  if (n === 3)
+    return {
+      cls: "done",
+      label: "Đã ký",
+      detail: fmtDay(r.startDate, true),
+      pct: null,
+    };
   if (n === 4) return { cls: "done", label: "Đã xong", detail: "", pct: null };
   if (n === 5) {
-    if (r.stage === 6) return { cls: "done", label: "Đã xong", detail: `${r.progressPercent}%`, pct: null };
+    if (r.stage === 6)
+      return {
+        cls: "done",
+        label: "Đã xong",
+        detail: `${r.progressPercent}%`,
+        pct: null,
+      };
     if (r.planning || r.taskCount === 0) {
-      return { cls: "doing", label: "Chuẩn bị", detail: "Chưa lập tiến độ", pct: 0 };
+      return {
+        cls: "doing",
+        label: "Chuẩn bị",
+        detail: "Chưa lập tiến độ",
+        pct: 0,
+      };
     }
     return {
       cls: "doing",
@@ -96,16 +137,23 @@ function cellOf(r: Row, n: number): Cell {
       pct: r.progressPercent,
     };
   }
-  if (r.stage === 6) return { cls: "done", label: "Đã bàn giao", detail: "", pct: null };
+  if (r.stage === 6)
+    return { cls: "done", label: "Đã bàn giao", detail: "", pct: null };
   return { cls: "todo", label: "Chưa tới", detail: "", pct: null };
 }
 
 function Tags({ r }: { r: Row }) {
   return (
     <>
-      {r.lateDays > 0 ? <span className="pl-tag late">Trễ {r.lateDays} ngày</span> : null}
-      {r.status === "paused" ? <span className="pl-tag pause">Tạm ngưng</span> : null}
-      {r.kind === "pipeline" && r.status === "done" ? <span className="pl-tag done">Hoàn thành</span> : null}
+      {r.lateDays > 0 ? (
+        <span className="pl-tag late">Trễ {r.lateDays} ngày</span>
+      ) : null}
+      {r.status === "paused" ? (
+        <span className="pl-tag pause">Tạm ngưng</span>
+      ) : null}
+      {r.kind === "pipeline" && r.status === "done" ? (
+        <span className="pl-tag done">Hoàn thành</span>
+      ) : null}
     </>
   );
 }
@@ -129,7 +177,8 @@ export function PipelineClient() {
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
         if (!alive) return;
-        if (!res.ok) setLoadError(json.message || "Không tải được danh sách dự án");
+        if (!res.ok)
+          setLoadError(json.message || "Không tải được danh sách dự án");
         else setRows(json.rows || []);
       })
       .catch(() => alive && setLoadError("Không tải được danh sách dự án"))
@@ -162,7 +211,8 @@ export function PipelineClient() {
       if (fKs && r.engineer !== fKs) return false;
       if (fGd && r.manager !== fGd) return false;
       if (needle) {
-        const hay = `${r.code || ""} ${r.name} ${r.customerName} ${r.address} ${r.slug || ""}`.toLowerCase();
+        const hay =
+          `${r.code || ""} ${r.name} ${r.customerName} ${r.address} ${r.slug || ""}`.toLowerCase();
         if (hay.indexOf(needle) < 0) return false;
       }
       return true;
@@ -178,30 +228,50 @@ export function PipelineClient() {
   };
 
   return (
-    <div className={`pldoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`}>
+    <div
+      className={`pldoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`}
+    >
       <div className="pl-head">
         <div>
           <div className="pl-eyebrow">Huỳnh Gia · Quản lý</div>
           <h1 className="pl-h1">Dự án</h1>
-          <div className="pl-sub">Theo dõi từng dự án từ lúc thống nhất mô tả đến bàn giao</div>
+          <div className="pl-sub">
+            Theo dõi từng dự án từ lúc thống nhất mô tả đến bàn giao
+          </div>
         </div>
         <div className="pl-hact">
           <div className="pl-seg">
-            <button type="button" className={view === "pv" ? "on" : ""} onClick={() => setView("pv")}>
+            <button
+              type="button"
+              className={view === "pv" ? "on" : ""}
+              onClick={() => setView("pv")}
+            >
               ▤ Tiến độ
             </button>
-            <button type="button" className={view === "lv" ? "on" : ""} onClick={() => setView("lv")}>
+            <button
+              type="button"
+              className={view === "lv" ? "on" : ""}
+              onClick={() => setView("lv")}
+            >
               ☰ Danh sách
             </button>
           </div>
-          <button type="button" className="pl-btn" onClick={() => setShowCreate(true)}>
+          <button
+            type="button"
+            className="pl-btn"
+            onClick={() => setShowCreate(true)}
+          >
             + Tạo mới
           </button>
         </div>
       </div>
 
       <div className="pl-strip">
-        <button type="button" className={`pl-st ${fStage === 0 ? "on" : ""}`} onClick={() => setFStage(0)}>
+        <button
+          type="button"
+          className={`pl-st ${fStage === 0 ? "on" : ""}`}
+          onClick={() => setFStage(0)}
+        >
           <div className="k">Tất cả</div>
           <div className="v pl-num">{rows.length}</div>
           <div className="d">dự án đang theo dõi</div>
@@ -280,7 +350,9 @@ export function PipelineClient() {
         <div className="pl-empty">Đang tải…</div>
       ) : filtered.length === 0 ? (
         <div className="pl-empty">
-          {rows.length === 0 ? "Chưa có dự án nào. Bấm + Tạo mới để bắt đầu." : "Không có dự án khớp bộ lọc."}
+          {rows.length === 0
+            ? "Chưa có dự án nào. Bấm + Tạo mới để bắt đầu."
+            : "Không có dự án khớp bộ lọc."}
         </div>
       ) : view === "pv" ? (
         <>
@@ -303,139 +375,196 @@ export function PipelineClient() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr key={`${r.kind}-${r.id}`}>
-                  <td>
-                    <Link className="pl-name" href={rowHref(r)}>
-                      {r.name}
-                    </Link>
-                    <Tags r={r} />
-                    <div className="pl-meta">
-                      {r.code ? <span className="pl-num">{r.code} · </span> : null}
-                      {r.customerName}
-                    </div>
-                    <div className="pl-meta">
-                      {r.address || "—"}
-                      {r.engineer ? ` · KS ${r.engineer}` : ""}
-                    </div>
-                  </td>
-                  {STAGE_NUMS.map((n) => {
-                    const c = cellOf(r, n);
-                    const clickable = c.cls !== "todo";
-                    return (
-                      <td
-                        key={n}
-                        className={`sc ${c.cls} ${n === 1 ? "first" : ""} ${n === 6 ? "last" : ""} ${clickable ? "click" : ""}`}
-                        title={clickable ? `Xem giai đoạn ${n} · ${PIPELINE_STAGES[n - 1]}` : undefined}
-                        onClick={clickable ? () => router.push(rowHref(r, n)) : undefined}
-                      >
-                        <i className="pl-node">{c.cls === "done" ? "✓" : c.cls === "doing" ? "" : n}</i>
-                        <div className="pl-sl">{c.label}</div>
-                        {c.detail ? <div className="pl-sd">{c.detail}</div> : null}
-                        {c.cls === "doing" && c.pct !== null ? (
-                          <div className="pl-mini">
-                            <i style={{ width: `${c.pct}%` }} />
-                          </div>
+              {filtered.map((r) => {
+                const cur = cellOf(r, r.stage);
+                return (
+                  <tr key={`${r.kind}-${r.id}`}>
+                    <td>
+                      <Link className="pl-name" href={rowHref(r)}>
+                        {r.name}
+                      </Link>
+                      <Tags r={r} />
+                      <div className="pl-meta">
+                        {r.code ? (
+                          <span className="pl-num">{r.code} · </span>
                         ) : null}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                        {r.customerName}
+                      </div>
+                      <div className="pl-meta">
+                        {r.address || "—"}
+                        {r.engineer ? ` · KS ${r.engineer}` : ""}
+                      </div>
+                      <div className="pl-cur">
+                        <b className="pl-num">{r.stage}</b>{" "}
+                        {PIPELINE_STAGES[r.stage - 1]} · {cur.label}
+                        {cur.detail ? ` · ${cur.detail}` : ""}
+                      </div>
+                    </td>
+                    {STAGE_NUMS.map((n) => {
+                      const c = cellOf(r, n);
+                      const clickable = c.cls !== "todo";
+                      return (
+                        <td
+                          key={n}
+                          className={`sc ${c.cls} ${n === 1 ? "first" : ""} ${n === 6 ? "last" : ""} ${clickable ? "click" : ""}`}
+                          title={
+                            clickable
+                              ? `Xem giai đoạn ${n} · ${PIPELINE_STAGES[n - 1]}`
+                              : undefined
+                          }
+                          onClick={
+                            clickable
+                              ? () => router.push(rowHref(r, n))
+                              : undefined
+                          }
+                        >
+                          <i className="pl-node">
+                            {c.cls === "done"
+                              ? "✓"
+                              : c.cls === "doing"
+                                ? ""
+                                : n}
+                          </i>
+                          <div className="pl-sn">{PIPELINE_STAGES[n - 1]}</div>
+                          <div className="pl-sl">{c.label}</div>
+                          {c.detail ? (
+                            <div className="pl-sd">{c.detail}</div>
+                          ) : null}
+                          {c.cls === "doing" && c.pct !== null ? (
+                            <div className="pl-mini">
+                              <i style={{ width: `${c.pct}%` }} />
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div className="pl-legend">
             <span>
-              <i className="pl-node" style={{ background: "var(--ok)", borderColor: "var(--ok)", color: "#fff" }}>
+              <i
+                className="pl-node"
+                style={{
+                  background: "var(--ok)",
+                  borderColor: "var(--ok)",
+                  color: "#fff",
+                }}
+              >
                 ✓
               </i>
               Đã xong
             </span>
             <span>
-              <i className="pl-node" style={{ background: "var(--orange)", borderColor: "var(--orange)" }} />
+              <i
+                className="pl-node"
+                style={{
+                  background: "var(--orange)",
+                  borderColor: "var(--orange)",
+                }}
+              />
               Đang làm
             </span>
             <span>
               <i className="pl-node" />
               Chưa tới
             </span>
-            <span style={{ marginLeft: "auto" }}>Bấm tên dự án hoặc ô giai đoạn để mở</span>
+            <span style={{ marginLeft: "auto" }}>
+              Bấm tên dự án hoặc ô giai đoạn để mở
+            </span>
           </div>
         </>
       ) : (
-        <table className="pl-tbl pl-lv">
-          <colgroup>
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "11%" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Mã</th>
-              <th>Dự án</th>
-              <th>Chủ nhà</th>
-              <th>Giai đoạn</th>
-              <th className="pl-r">Giá trị</th>
-              <th>KS chính</th>
-              <th>Hạn xong</th>
-              <th>Tiến độ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => {
-              const pct = r.kind === "project" ? r.progressPercent : r.status === "done" ? 100 : 0;
-              return (
-                <tr key={`${r.kind}-${r.id}`}>
-                  <td className="pl-num pl-mutc" style={{ fontSize: 12 }}>
-                    {r.code || "—"}
-                  </td>
-                  <td>
-                    <Link className="pl-name" href={rowHref(r)}>
-                      {r.name}
-                    </Link>
-                    <Tags r={r} />
-                    <div className="pl-meta">{r.address || "—"}</div>
-                  </td>
-                  <td>{r.customerName}</td>
-                  <td>
-                    <span className={`pl-chip s${r.stage}`}>
-                      <b className="pl-num">{r.stage}</b>
-                      {PIPELINE_STAGES[r.stage - 1]}
-                    </span>
-                  </td>
-                  <td className="pl-r">
-                    {r.contractValue === null ? (
-                      <span className="pl-mutc">—</span>
-                    ) : (
-                      <span className="pl-num">{fmtMoney(r.contractValue)}</span>
-                    )}
-                  </td>
-                  <td>{r.engineer || <span className="pl-mutc">—</span>}</td>
-                  <td className="pl-num" style={{ fontSize: 12.5 }}>
-                    {fmtDay(r.endDate, true) || "—"}
-                  </td>
-                  <td>
-                    {r.kind === "project" || r.status === "done" ? (
-                      <div className="pl-pg">
-                        <div className="pl-mini">
-                          <i style={{ width: `${pct}%`, background: r.status === "done" ? "var(--ok)" : undefined }} />
+        <div className="pl-scroll">
+          <table className="pl-tbl pl-lv">
+            <colgroup>
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "11%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Dự án</th>
+                <th>Chủ nhà</th>
+                <th>Giai đoạn</th>
+                <th className="pl-r">Giá trị</th>
+                <th>KS chính</th>
+                <th>Hạn xong</th>
+                <th>Tiến độ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => {
+                const pct =
+                  r.kind === "project"
+                    ? r.progressPercent
+                    : r.status === "done"
+                      ? 100
+                      : 0;
+                return (
+                  <tr key={`${r.kind}-${r.id}`}>
+                    <td className="pl-num pl-mutc" style={{ fontSize: 12 }}>
+                      {r.code || "—"}
+                    </td>
+                    <td>
+                      <Link className="pl-name" href={rowHref(r)}>
+                        {r.name}
+                      </Link>
+                      <Tags r={r} />
+                      <div className="pl-meta">{r.address || "—"}</div>
+                    </td>
+                    <td>{r.customerName}</td>
+                    <td>
+                      <span className={`pl-chip s${r.stage}`}>
+                        <b className="pl-num">{r.stage}</b>
+                        {PIPELINE_STAGES[r.stage - 1]}
+                      </span>
+                    </td>
+                    <td className="pl-r">
+                      {r.contractValue === null ? (
+                        <span className="pl-mutc">—</span>
+                      ) : (
+                        <span className="pl-num">
+                          {fmtMoney(r.contractValue)}
+                        </span>
+                      )}
+                    </td>
+                    <td>{r.engineer || <span className="pl-mutc">—</span>}</td>
+                    <td className="pl-num" style={{ fontSize: 12.5 }}>
+                      {fmtDay(r.endDate, true) || "—"}
+                    </td>
+                    <td>
+                      {r.kind === "project" || r.status === "done" ? (
+                        <div className="pl-pg">
+                          <div className="pl-mini">
+                            <i
+                              style={{
+                                width: `${pct}%`,
+                                background:
+                                  r.status === "done" ? "var(--ok)" : undefined,
+                              }}
+                            />
+                          </div>
+                          <span className="pl-num">{pct}%</span>
                         </div>
-                        <span className="pl-num">{pct}%</span>
-                      </div>
-                    ) : (
-                      <span className="pl-mutc">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      ) : (
+                        <span className="pl-mutc">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {showCreate ? (
@@ -448,7 +577,13 @@ export function PipelineClient() {
   );
 }
 
-function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+function CreateModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
   const [name, setName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -478,7 +613,13 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       const res = await fetch("/api/admin/pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, customerName, customerPhone, address, slug: finalSlug }),
+        body: JSON.stringify({
+          name,
+          customerName,
+          customerPhone,
+          address,
+          slug: finalSlug,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -494,14 +635,29 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   };
 
   return createPortal(
-    <div className={`plportal pl-ov ${plexSans.variable} ${plexMono.variable}`} onClick={onClose}>
-      <form className="pl-modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+    <div
+      className={`plportal pl-ov ${plexSans.variable} ${plexMono.variable}`}
+      onClick={onClose}
+    >
+      <form
+        className="pl-modal"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+      >
         <h2>Tạo dự án mới</h2>
-        <p>Dự án bắt đầu ở giai đoạn 1 · Mô tả. Tạo xong sẽ mở màn dự án để tải trang mô tả gửi khách.</p>
+        <p>
+          Dự án bắt đầu ở giai đoạn 1 · Mô tả. Tạo xong sẽ mở màn dự án để tải
+          trang mô tả gửi khách.
+        </p>
         {error ? <div className="pl-err">{error}</div> : null}
         <label className="pl-field">
           <span>Tên dự án *</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhà anh Bin" autoFocus />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nhà anh Bin"
+            autoFocus
+          />
         </label>
         <label className="pl-field">
           <span>Khách hàng *</span>
@@ -513,7 +669,11 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         </label>
         <label className="pl-field">
           <span>Số điện thoại</span>
-          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} inputMode="tel" />
+          <input
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            inputMode="tel"
+          />
         </label>
         <label className="pl-field">
           <span>Địa chỉ xây</span>
@@ -531,7 +691,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             placeholder="nha-anh-bin"
           />
           <em>
-            {PUBLIC_SITE_URL}/<b>{finalSlug || "…"}</b> — không đổi được sau khi tạo
+            {PUBLIC_SITE_URL}/<b>{finalSlug || "…"}</b> — không đổi được sau khi
+            tạo
           </em>
         </label>
         <div className="pl-mact">
