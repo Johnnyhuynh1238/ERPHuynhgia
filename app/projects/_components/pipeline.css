@@ -922,3 +922,233 @@
     font-size: 13px;
   }
 }
+
+/* ===== phiên bản mô tả + báo giá (V1, V2…) ===== */
+.pldoc .pl-vers {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.pldoc .pl-vers .lb,
+.pldoc .pl-qtotal .lb {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: center;
+}
+.pldoc .pl-vt {
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-width: 132px;
+  max-width: 260px;
+}
+.pldoc .pl-vt b {
+  font-size: 14px;
+}
+.pldoc .pl-vt small,
+.pldoc .pl-vadd small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--mut);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pldoc .pl-vt.on {
+  border-color: var(--orange);
+  background: var(--orbg);
+}
+.pldoc .pl-vt.on b {
+  color: var(--orange);
+}
+.pldoc .pl-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  border: 1px solid;
+  margin-left: 6px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.pldoc .pl-tag.new {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+.pldoc .pl-tag.ct {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: var(--okbg);
+}
+.pldoc .pl-vadd {
+  border: 1px dashed var(--terra);
+  background: none;
+  color: var(--terra);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.pldoc .pl-vadd:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pldoc .pl-vact {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pldoc .pl-qtotal {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 2px 12px;
+}
+.pldoc .pl-qtotal input {
+  width: 190px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  padding: 7px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+.pldoc .pl-qtotal .hint {
+  font-size: 12px;
+  color: var(--mut);
+}
+/* màn Hợp đồng: chọn báo giá chốt */
+.pldoc .pl-pick {
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.pldoc .pl-pick h3 {
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  border-bottom: 1px solid var(--line2);
+  background: var(--track);
+}
+.pldoc .pl-pick table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pldoc .pl-pick td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.pldoc .pl-pick tr:last-child td {
+  border-bottom: 0;
+}
+.pldoc .pl-pick tr.sel td {
+  background: var(--okbg);
+}
+.pldoc .pl-pick .v {
+  font-weight: 600;
+  font-size: 15px;
+  width: 64px;
+}
+.pldoc .pl-pick .lk a,
+.pldoc .pl-pick .lk span {
+  margin-right: 14px;
+  white-space: nowrap;
+}
+.pldoc .pl-pick .lk a {
+  color: var(--terra);
+  font-weight: 500;
+  text-decoration: underline;
+}
+.pldoc .pl-pick .lk span {
+  color: var(--mut2);
+}
+.pldoc .pl-pick .r {
+  text-align: right;
+  white-space: nowrap;
+}
+.pldoc .pl-pick .act {
+  width: 150px;
+}
+@media (max-width: 1023px) {
+  .pldoc .pl-vers {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .pldoc .pl-vt,
+  .pldoc .pl-vadd {
+    flex: none;
+  }
+  .pldoc .pl-vact {
+    flex: none;
+    margin-left: 0;
+  }
+  .pldoc .pl-qtotal input {
+    font-size: 16px;
+    width: 170px;
+  }
+  .pldoc .pl-qtotal .hint {
+    flex-basis: 100%;
+  }
+  /* bảng chọn báo giá: mỗi phiên bản thành khối 2 dòng, không cuộn ngang */
+  .pldoc .pl-pick tr {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    border-bottom: 1px solid var(--line);
+  }
+  .pldoc .pl-pick tr:last-child {
+    border-bottom: 0;
+  }
+  .pldoc .pl-pick tr.sel {
+    background: var(--okbg);
+  }
+  .pldoc .pl-pick tr.sel td {
+    background: none;
+  }
+  .pldoc .pl-pick td {
+    border-bottom: 0;
+    padding: 10px 12px 4px;
+    min-width: 0;
+  }
+  .pldoc .pl-pick .v,
+  .pldoc .pl-pick .act {
+    width: auto;
+  }
+  .pldoc .pl-pick .lk {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 2px 12px 10px;
+  }
+  .pldoc .pl-pick .act {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    text-align: left;
+    padding: 0 12px 10px;
+  }
+}

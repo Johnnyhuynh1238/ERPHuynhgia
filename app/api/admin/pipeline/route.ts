@@ -34,7 +34,7 @@ export async function GET() {
         stage: true,
         status: true,
         stageDates: true,
-        descriptionUpdatedAt: true,
+        versions: { select: { versionNo: true, descriptionUpdatedAt: true } },
         projectId: true,
         createdAt: true,
       },
@@ -62,17 +62,29 @@ export async function GET() {
   const [inspectedCounts, validCounts] = await Promise.all([
     prisma.task.groupBy({
       by: ["projectId"],
-      where: { projectId: { in: ids }, isActive: true, status: TaskStatus.inspected },
+      where: {
+        projectId: { in: ids },
+        isActive: true,
+        status: TaskStatus.inspected,
+      },
       _count: { projectId: true },
     }),
     prisma.task.groupBy({
       by: ["projectId"],
-      where: { projectId: { in: ids }, isActive: true, NOT: { status: TaskStatus.na } },
+      where: {
+        projectId: { in: ids },
+        isActive: true,
+        NOT: { status: TaskStatus.na },
+      },
       _count: { projectId: true },
     }),
   ]);
-  const inspectedMap = new Map(inspectedCounts.map((x) => [x.projectId, x._count.projectId]));
-  const validMap = new Map(validCounts.map((x) => [x.projectId, x._count.projectId]));
+  const inspectedMap = new Map(
+    inspectedCounts.map((x) => [x.projectId, x._count.projectId]),
+  );
+  const validMap = new Map(
+    validCounts.map((x) => [x.projectId, x._count.projectId]),
+  );
 
   const now = Date.now();
 
@@ -88,7 +100,7 @@ export async function GET() {
     status: p.status,
     lateDays: 0,
     stageDates: (p.stageDates || {}) as Record<string, string>,
-    hasDescription: Boolean(p.descriptionUpdatedAt),
+    hasDescription: p.versions.some((v) => Boolean(v.descriptionUpdatedAt)),
     contractValue: null as number | null,
     engineer: null as string | null,
     manager: null as string | null,
@@ -103,7 +115,9 @@ export async function GET() {
     const totalTasks = validMap.get(p.id) || 0;
     const inspected = inspectedMap.get(p.id) || 0;
     const done = p.status === "completed";
-    const late = !done ? Math.floor((now - new Date(p.expectedEndDate).getTime()) / DAY_MS) : 0;
+    const late = !done
+      ? Math.floor((now - new Date(p.expectedEndDate).getTime()) / DAY_MS)
+      : 0;
     return {
       kind: "project" as const,
       id: p.id,
@@ -122,7 +136,8 @@ export async function GET() {
       manager: p.projectManager?.fullName || null,
       startDate: p.startDate.toISOString(),
       endDate: p.expectedEndDate.toISOString() as string | null,
-      progressPercent: totalTasks > 0 ? Math.round((inspected / totalTasks) * 100) : 0,
+      progressPercent:
+        totalTasks > 0 ? Math.round((inspected / totalTasks) * 100) : 0,
       taskCount: totalTasks,
       planning: p.status === "planning",
     };
@@ -144,17 +159,27 @@ export async function POST(request: Request) {
   }
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ message: "Cần nhập tên dự án và tên khách hàng" }, { status: 400 });
+    return NextResponse.json(
+      { message: "Cần nhập tên dự án và tên khách hàng" },
+      { status: 400 },
+    );
   }
   const { name, customerName, customerPhone, address } = parsed.data;
   const slug = parsed.data.slug ? slugify(parsed.data.slug) : slugify(name);
 
   const slugError = validateSlug(slug);
-  if (slugError) return NextResponse.json({ message: slugError }, { status: 400 });
+  if (slugError)
+    return NextResponse.json({ message: slugError }, { status: 400 });
 
-  const existed = await prisma.projectPipeline.findUnique({ where: { slug }, select: { id: true } });
+  const existed = await prisma.projectPipeline.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
   if (existed) {
-    return NextResponse.json({ message: `Link "${slug}" đã dùng cho dự án khác, đổi tên link` }, { status: 409 });
+    return NextResponse.json(
+      { message: `Link "${slug}" đã dùng cho dự án khác, đổi tên link` },
+      { status: 409 },
+    );
   }
 
   const created = await prisma.projectPipeline.create({
@@ -165,6 +190,7 @@ export async function POST(request: Request) {
       address: address || null,
       slug,
       createdById: user?.id ?? null,
+      versions: { create: { versionNo: 1 } },
     },
     select: { id: true, slug: true },
   });

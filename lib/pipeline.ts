@@ -1,6 +1,13 @@
 // Dự án theo tiến độ 6 giai đoạn — hằng số + helper dùng chung client/server.
 
-export const PIPELINE_STAGES = ["Mô tả", "Báo giá", "Hợp đồng", "Thiết kế", "Thi công", "Bàn giao"];
+export const PIPELINE_STAGES = [
+  "Mô tả",
+  "Báo giá",
+  "Hợp đồng",
+  "Thiết kế",
+  "Thi công",
+  "Bàn giao",
+];
 
 // Trang mô tả gửi khách: <PUBLIC_SITE_URL>/<slug> (nginx huynhgia6.com proxy về ERP /mo-ta/<slug>).
 export const PUBLIC_SITE_URL = "https://huynhgia6.com";
@@ -38,10 +45,28 @@ export function validateSlug(slug: string): string | null {
     return "Link chỉ gồm chữ thường không dấu, số, dấu gạch và phải có ít nhất 2 từ (vd: nha-anh-bin)";
   }
   if (slug.length > 60) return "Link quá dài (tối đa 60 ký tự)";
-  if (RESERVED_SLUGS.indexOf(slug) >= 0) return "Link này trùng trang có sẵn trên website, chọn tên khác";
+  if (RESERVED_SLUGS.indexOf(slug) >= 0)
+    return "Link này trùng trang có sẵn trên website, chọn tên khác";
   return null;
 }
 
-export function pipelinePublicUrl(slug: string): string {
-  return `${PUBLIC_SITE_URL}/${slug}`;
+export type PipelineDocKind = "description" | "quote";
+
+// Tên tab trên trang cổng khách + tham số ?doc= của trang mô tả / báo giá.
+export const PIPELINE_DOC_KEYS: Record<PipelineDocKind, string> = {
+  description: "mo-ta",
+  quote: "bao-gia",
+};
+
+// Mỗi dự án 1 link duy nhất cho khách: <PUBLIC_SITE_URL>/<slug> (trang cổng chứa mọi phiên bản mô tả + báo giá).
+// Truyền kind/versionNo → thêm #<tab>-v<n> để mở thẳng tab + phiên bản đó.
+export function pipelinePublicUrl(
+  slug: string,
+  kind?: PipelineDocKind,
+  versionNo?: number,
+): string {
+  const base = `${PUBLIC_SITE_URL}/${slug}`;
+  return kind && versionNo
+    ? `${base}#${PIPELINE_DOC_KEYS[kind]}-v${versionNo}`
+    : base;
 }

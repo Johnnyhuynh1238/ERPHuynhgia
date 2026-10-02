@@ -4582,15 +4582,38 @@ model ProjectPipeline {
   stage                Int       @default(1) // 1..6
   status               String    @default("active") @db.VarChar(20) // active | paused | done
   stageDates           Json      @default("{}") @map("stage_dates") // {"1": ISO lúc chốt giai đoạn 1, ...}
+  // LEGACY: mô tả giờ nằm ở ProjectPipelineVersion (đã chép sang V1), 2 cột dưới không còn đọc/ghi.
   descriptionHtml      String?   @map("description_html") @db.Text
   descriptionUpdatedAt DateTime? @map("description_updated_at")
+  contractVersionNo    Int?      @map("contract_version_no") // hợp đồng chốt theo báo giá phiên bản nào
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project  Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions ProjectPipelineVersion[]
 
   @@index([stage])
   @@map("project_pipelines")
+}
+
+// Phiên bản mô tả + báo giá của 1 dự án pipeline: mô tả Vn đi với báo giá Vn (cùng số).
+model ProjectPipelineVersion {
+  id                   String    @id @default(uuid()) @db.Uuid
+  pipelineId           String    @map("pipeline_id") @db.Uuid
+  versionNo            Int       @map("version_no")
+  note                 String?
+  descriptionHtml      String?   @map("description_html") @db.Text
+  descriptionUpdatedAt DateTime? @map("description_updated_at")
+  quoteHtml            String?   @map("quote_html") @db.Text
+  quoteUpdatedAt       DateTime? @map("quote_updated_at")
+  quoteTotal           Decimal?  @map("quote_total") @db.Decimal(18, 0)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  pipeline ProjectPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, versionNo])
+  @@map("project_pipeline_versions")
 }
