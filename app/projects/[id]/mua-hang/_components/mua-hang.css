@@ -193,8 +193,20 @@
 .mhdoc .ord-card .omore { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 100%; min-height: 40px; border: none; border-radius: 9px; background: none; font-family: inherit; font-size: 20px; font-weight: 700; line-height: 1; color: var(--mut); cursor: pointer; }
 .mhdoc .ord-card .omore:active { background: var(--line); }
 .mhdoc .ord-card .omenu-scrim { position: fixed; inset: 0; z-index: 7; cursor: default; }
-.mhdoc .ord-card .omenu { position: absolute; top: calc(100% - 4px); right: 4px; z-index: 8; min-width: 200px; max-width: 78vw; background: var(--sheet); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 8px 24px rgba(20, 8, 3, 0.22); padding: 4px; cursor: default; }
-.mhdoc .ord-card .omenu.up { top: auto; bottom: calc(100% - 4px); }
+.mhdoc .ord-card .omenu { position: absolute; top: calc(100% - 4px); right: 4px; z-index: 8; min-width: 200px; max-width: 78vw; background: var(--sheet); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 8px 24px rgba(20, 8, 3, 0.22); padding: 4px; cursor: default; transform-origin: top right; animation: omenu-in 0.18s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.mhdoc .ord-card .omenu.up { top: auto; bottom: calc(100% - 4px); transform-origin: bottom right; animation-name: omenu-in-up; }
+@keyframes omenu-in { from { opacity: 0; transform: translateY(-6px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes omenu-in-up { from { opacity: 0; transform: translateY(6px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes omenu-item-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.mhdoc .ord-card .omenu button { animation: omenu-item-in 0.2s ease-out both; }
+.mhdoc .ord-card .omenu button:nth-child(2) { animation-delay: 0.03s; }
+.mhdoc .ord-card .omenu button:nth-child(3) { animation-delay: 0.06s; }
+.mhdoc .ord-card .omenu button:nth-child(4) { animation-delay: 0.09s; }
+.mhdoc .ord-card .omenu button:nth-child(n+5) { animation-delay: 0.12s; }
+.mhdoc .ord-card .omore { transition: background-color 0.15s, color 0.15s, transform 0.15s; }
+.mhdoc .ord-card .omore[aria-expanded="true"] { background: var(--line); color: var(--text); }
+.mhdoc .ord-card .omore:active { transform: scale(0.9); }
+@media (prefers-reduced-motion: reduce) { .mhdoc .ord-card .omenu, .mhdoc .ord-card .omenu.up, .mhdoc .ord-card .omenu button { animation: none; } }
 .mhdoc .ord-card .omenu button { display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--text); padding: 11px 12px; border-radius: 8px; white-space: nowrap; }
 .mhdoc .ord-card .omenu button:active { background: var(--card); }
 .mhdoc .ord-card .omenu button.danger { color: var(--red); border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
