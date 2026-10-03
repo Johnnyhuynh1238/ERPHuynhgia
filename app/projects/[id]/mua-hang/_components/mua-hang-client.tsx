@@ -1494,6 +1494,8 @@ function OrdersList({
   emptyText?: string;
   hideDel?: (o: Order) => boolean;
 }) {
+  // Menu ⋯ của thẻ đơn đang mở (gom các nút thao tác cho gọn trên mobile).
+  const [menuId, setMenuId] = useState<Order["id"] | null>(null);
   if (!orders.length)
     return (
       <div className="empty">
@@ -1509,7 +1511,7 @@ function OrdersList({
     );
   return (
     <div>
-      {orders.map((o) => {
+      {orders.map((o, idx) => {
         const isRet = !!o.returnOfOrderId; // đơn trả hàng (total âm)
         const canReturn =
           !!onReturn && !isRet && (o.status === "received" || o.status === "paid");
@@ -1519,17 +1521,32 @@ function OrdersList({
         const rcCollected = rcStatus === "received";
         // Nút "Lập lệnh thu": đơn hoàn tiền chưa có lệnh thu (chưa huỷ). KT không thấy (onRefund undefined).
         const canRefund = !!onRefund && isRefundRet && !rcStatus;
+        const showDeposit = canDeposit(o);
+        const showPay = canPayNow(o) && !o.hasInflightExpense;
+        const showDel = !hideDel?.(o);
+        const deposited = (o.depositPaid ?? 0) > 0;
+        const paidFull = deposited && (o.status === "paid" || remainOf(o) === 0);
+        const inflight = canPayNow(o) && !!o.hasInflightExpense;
+        // 2 thẻ cuối danh sách: menu bung lên trên để khỏi bị thanh điều hướng đáy che.
+        const menuUp = idx >= 2 && idx >= orders.length - 2;
+        const pick = (fn: () => void) => () => {
+          setMenuId(null);
+          fn();
+        };
         return (
         <div
           key={o.id}
-          className={`ord-card${isRet ? " is-return" : ""}`}
+          className={`ord-card has-menu${isRet ? " is-return" : ""}`}
           onClick={() => onEdit(o)}
         >
+          <div className="obody">
           <div className="r1">
             <span className="no">{isRet ? "↩ Trả #" : "Đơn #"}{o.seq}</span>
             {isRet ? (
               <>
-                <span className="chip return" title="Đơn trả hàng (giá trị âm)">Trả hàng</span>
+                {!isRefundRet && (
+                  <span className="chip return" title="Đơn trả hàng (giá trị âm)">Trả hàng</span>
+                )}
                 {isRefundRet &&
                   (rcCollected ? (
                     <span className="chip paid" title={`Đã thu hoàn tiền${o.refundReceiptCode ? ` (${o.refundReceiptCode})` : ""}`}>
@@ -1549,7 +1566,6 @@ function OrdersList({
               const b = stBadge(o.status, o.supplierName);
               return <span className={`chip ${b.cls}`}>{b.label}</span>;
             })()}
-            <span className="date">{fmtDate(o.orderDate)}</span>
             <span className="tot num">{fmt(o.total)} đ</span>
           </div>
           <div className="r2">
@@ -1560,66 +1576,84 @@ function OrdersList({
               </span>{" "}
               · {o.items.length} vật tư
             </span>
-            <span className="rgt">{o.supplierName || "Chưa gán NCC"}</span>
+            <span className="rgt">
+              {fmtDate(o.orderDate)} · {o.supplierName || "Chưa gán NCC"}
+            </span>
           </div>
-          <div className="r3" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="linkbtn" onClick={() => onPO(o)}>
-              📄 Xem PO
+          {/* Dòng 3 chỉ hiện khi đơn có số tiền đã chi/cọc hoặc lệnh chi đang chờ. */}
+          {(deposited || inflight) && (
+            <div className="r3">
+              {deposited &&
+                (paidFull ? (
+                  <span className="ok" title="Đơn đã thanh toán đủ">✅ Đã trả đủ {fmt(o.depositPaid!)}đ</span>
+                ) : (
+                  <>
+                    <span className="coc" title="Tổng tiền đã đặt cọc cho đơn này">💰 Đã cọc {fmt(o.depositPaid!)}đ</span>
+                    <span className="rem" title="Số còn phải chi cho đơn này">Còn chi {fmt(remainOf(o))}đ</span>
+                  </>
+                ))}
+              {inflight && (
+                <span className="sent" title="Đã có lệnh chi đang chờ kế toán/admin xử lý">⏳ Đã gửi lệnh chi</span>
+              )}
+            </div>
+          )}
+          </div>
+          <div className="omenuw" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="omore"
+              aria-label="Tuỳ chọn"
+              aria-haspopup="menu"
+              aria-expanded={menuId === o.id}
+              onClick={() => setMenuId(menuId === o.id ? null : o.id)}
+            >
+              ⋮
             </button>
-            {(o.depositPaid ?? 0) > 0 &&
-              (o.status === "paid" || remainOf(o) === 0 ? (
-                <span className="linkbtn coc paid-full" title="Đơn đã thanh toán đủ">
-                  ✅ Đã trả đủ {fmt(o.depositPaid!)}đ
-                </span>
-              ) : (
-                <span className="linkbtn coc" title="Tổng tiền đã đặt cọc cho đơn này">
-                  💰 Đã cọc {fmt(o.depositPaid!)}đ
-                </span>
-              ))}
-            {/* Đặt cọc: đơn trả ngay chưa nhận — cọc được nhiều lần nên nút luôn hiện. */}
-            {canDeposit(o) && (
-              <button
-                type="button"
-                className="linkbtn pay"
-                onClick={() => goLenhChi(projectId, o, true)}
-              >
-                💰 Đặt cọc
-              </button>
-            )}
-            {canPayNow(o) &&
-              (o.hasInflightExpense ? (
-                <span className="linkbtn sent" title="Đã có lệnh chi đang chờ kế toán/admin xử lý">
-                  ⏳ Đã gửi lệnh chi
-                </span>
-              ) : (
-                <button type="button" className="linkbtn pay" onClick={() => goLenhChi(projectId, o)}>
-                  🧾 {(o.depositPaid ?? 0) > 0 ? `Chi nốt ${fmt(remainOf(o))}đ` : "Gửi lệnh chi"}
-                </button>
-              ))}
-            {canReturn && (
-              <button
-                type="button"
-                className="linkbtn ret"
-                title="Trả lại hàng đã mua cho NCC (tạo đơn giá trị âm)"
-                onClick={() => onReturn!(o)}
-              >
-                ↩ Trả hàng
-              </button>
-            )}
-            {canRefund && (
-              <button
-                type="button"
-                className="linkbtn pay"
-                title="Lập lệnh thu để NCC hoàn tiền trả hàng (chờ kế toán thu)"
-                onClick={() => onRefund!(o)}
-              >
-                🧾 Lập lệnh thu {fmt(Math.abs(o.total))}đ
-              </button>
-            )}
-            {!hideDel?.(o) && (
-              <button type="button" className="del" onClick={() => onDel(o)}>
-                Xoá
-              </button>
+            {menuId === o.id && (
+                  <>
+                    <div className="omenu-scrim" onClick={() => setMenuId(null)} />
+                    <div className={`omenu${menuUp ? " up" : ""}`} role="menu">
+                      <button type="button" role="menuitem" onClick={pick(() => onPO(o))}>
+                        📄 Xem PO
+                      </button>
+                      {/* Đặt cọc: đơn trả ngay chưa nhận — cọc được nhiều lần nên mục luôn hiện. */}
+                      {showDeposit && (
+                        <button type="button" role="menuitem" onClick={pick(() => goLenhChi(projectId, o, true))}>
+                          💰 Đặt cọc
+                        </button>
+                      )}
+                      {showPay && (
+                        <button type="button" role="menuitem" onClick={pick(() => goLenhChi(projectId, o))}>
+                          🧾 {(o.depositPaid ?? 0) > 0 ? `Chi nốt ${fmt(remainOf(o))}đ` : "Gửi lệnh chi"}
+                        </button>
+                      )}
+                      {canReturn && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          title="Trả lại hàng đã mua cho NCC (tạo đơn giá trị âm)"
+                          onClick={pick(() => onReturn!(o))}
+                        >
+                          ↩ Trả hàng
+                        </button>
+                      )}
+                      {canRefund && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          title="Lập lệnh thu để NCC hoàn tiền trả hàng (chờ kế toán thu)"
+                          onClick={pick(() => onRefund!(o))}
+                        >
+                          🧾 Lập lệnh thu {fmt(Math.abs(o.total))}đ
+                        </button>
+                      )}
+                      {showDel && (
+                        <button type="button" role="menuitem" className="danger" onClick={pick(() => onDel(o))}>
+                          🗑 Xoá đơn
+                        </button>
+                      )}
+                    </div>
+                  </>
             )}
           </div>
         </div>
