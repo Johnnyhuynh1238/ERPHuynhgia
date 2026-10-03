@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
-import { injectPipelineEmbed } from "@/lib/pipeline-server";
+import {
+  fillPipelineQuoteDates,
+  injectPipelineEmbed,
+} from "@/lib/pipeline-server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +31,11 @@ export async function GET(
 
   const row = await prisma.projectPipelineVersion.findUnique({
     where: { pipelineId_versionNo: { pipelineId: params.id, versionNo } },
-    select: { quoteHtml: kind === "quote", costHtml: kind === "cost" },
+    select: {
+      quoteHtml: kind === "quote",
+      costHtml: kind === "cost",
+      quotePublishedAt: true,
+    },
   });
   if (!row)
     return NextResponse.json(
@@ -36,7 +43,9 @@ export async function GET(
       { status: 404 },
     );
 
-  const html = (kind === "quote" ? row.quoteHtml : row.costHtml) || "";
+  let html = (kind === "quote" ? row.quoteHtml : row.costHtml) || "";
+  if (kind === "quote")
+    html = fillPipelineQuoteDates(html, row.quotePublishedAt);
   return NextResponse.json(
     { html: html ? injectPipelineEmbed(html) : "" },
     { headers: { "Cache-Control": "no-store" } },

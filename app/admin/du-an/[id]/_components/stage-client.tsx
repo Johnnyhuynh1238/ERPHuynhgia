@@ -271,7 +271,7 @@ export function StageClient({
       !window.confirm(
         on
           ? `Chốt báo giá V${curNo}? Khách mở link sẽ thấy giá ngay.`
-          : `Ẩn báo giá V${curNo} khỏi link khách?`,
+          : `Ẩn báo giá V${curNo} khỏi link khách và mở khoá để sửa? Chỉ dùng khi chốt nhầm — chốt lại thì ngày báo giá tính lại từ đầu.`,
       )
     )
       return;
@@ -358,6 +358,9 @@ export function StageClient({
     totalDraft !== null
       ? totalDraft
       : fmtMoney(cur ? (isCost ? cur.costTotal : cur.quoteTotal) : null);
+  // Báo giá đã chốt cho khách thì khoá file + tổng (giá vốn nội bộ vẫn sửa được).
+  const quoteLocked =
+    view === 2 && !isCost && Boolean(cur && cur.quotePublishedAt);
   const profit =
     cur &&
     cur.quoteTotal !== null &&
@@ -585,7 +588,12 @@ export function StageClient({
               type="button"
               className="pl-btn ghost"
               onClick={() => fileRef.current?.click()}
-              disabled={busy}
+              disabled={busy || quoteLocked}
+              title={
+                quoteLocked
+                  ? "Báo giá đã chốt cho khách. Tạo phiên bản mới để báo giá lại."
+                  : undefined
+              }
             >
               {docAt
                 ? `⬆ Thay file ${kindLabel} V${curNo}`
@@ -614,6 +622,7 @@ export function StageClient({
                 className="pl-num"
                 inputMode="numeric"
                 placeholder="chưa nhập"
+                readOnly={quoteLocked}
                 value={totalValue}
                 onChange={(e) => {
                   const digits = e.target.value
@@ -651,7 +660,8 @@ export function StageClient({
                 <>
                   <span>
                     <b>Đã chốt</b> — khách đang thấy báo giá V{curNo} (
-                    {fmtDay(cur.quotePublishedAt)}).
+                    {fmtDay(cur.quotePublishedAt)}). Đã khoá, muốn sửa thì tạo
+                    phiên bản mới.
                   </span>
                   <button
                     type="button"

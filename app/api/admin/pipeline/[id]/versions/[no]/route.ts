@@ -61,7 +61,7 @@ export async function PATCH(
   const where = { pipelineId_versionNo: { pipelineId: params.id, versionNo } };
   const existed = await prisma.projectPipelineVersion.findUnique({
     where,
-    select: { id: true, quoteHtml: true },
+    select: { id: true, quoteHtml: true, quotePublishedAt: true },
   });
   if (!existed)
     return NextResponse.json(
@@ -75,6 +75,17 @@ export async function PATCH(
     data.descriptionHtml = d.descriptionHtml;
     data.descriptionUpdatedAt = d.descriptionHtml ? new Date() : null;
   }
+  // Báo giá đã chốt cho khách → khoá file + tổng. Muốn sửa: tạo phiên bản mới (hoặc "Ẩn lại" nếu chốt nhầm).
+  if (
+    existed.quotePublishedAt &&
+    (d.quoteHtml !== undefined || d.quoteTotal !== undefined)
+  )
+    return NextResponse.json(
+      {
+        message: `Báo giá V${versionNo} đã chốt cho khách, không sửa được. Tạo phiên bản mới để báo giá lại.`,
+      },
+      { status: 409 },
+    );
   if (d.quoteHtml !== undefined) {
     data.quoteHtml = d.quoteHtml;
     data.quoteUpdatedAt = d.quoteHtml ? new Date() : null;

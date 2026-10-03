@@ -44,6 +44,30 @@ export function injectPipelineEmbed(html: string): string {
     : html + inject;
 }
 
+// File báo giá có thể đặt {{HG_NGAY_BAO_GIA}} / {{HG_HAN_BAO_GIA}}: ngày anh bấm chốt (giờ Việt Nam)
+// và ngày hết hiệu lực (chốt + 30 ngày). Chưa chốt → ghi rõ để admin xem trước không nhầm.
+export const QUOTE_VALID_DAYS = 30;
+
+export function fillPipelineQuoteDates(
+  html: string,
+  publishedAt: Date | null,
+): string {
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const fmt = (t: number) => {
+    const d = new Date(t + 7 * 3600 * 1000);
+    return `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+  };
+  const day = publishedAt ? fmt(publishedAt.getTime()) : "(chưa chốt)";
+  const due = publishedAt
+    ? fmt(publishedAt.getTime() + QUOTE_VALID_DAYS * 86400 * 1000)
+    : "(chưa chốt)";
+  return html
+    .split("{{HG_NGAY_BAO_GIA}}")
+    .join(day)
+    .split("{{HG_HAN_BAO_GIA}}")
+    .join(due);
+}
+
 // Trạng thái đầy đủ của 1 dự án pipeline cho màn giai đoạn (không kèm HTML — HTML xem qua /mo-ta/...).
 export async function loadPipelineState(
   id: string,

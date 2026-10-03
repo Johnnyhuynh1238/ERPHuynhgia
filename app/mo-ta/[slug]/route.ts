@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { PIPELINE_DOC_KEYS } from "@/lib/pipeline";
 import { renderPipelinePortal } from "@/lib/pipeline-portal";
-import { injectPipelineEmbed } from "@/lib/pipeline-server";
+import {
+  fillPipelineQuoteDates,
+  injectPipelineEmbed,
+} from "@/lib/pipeline-server";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +102,7 @@ export async function GET(
       200,
     );
 
+  if (isQuote) html = fillPipelineQuoteDates(html, row.quotePublishedAt);
   if (q.get("embed") === "1") html = injectPipelineEmbed(html);
 
   return new Response(html, {
