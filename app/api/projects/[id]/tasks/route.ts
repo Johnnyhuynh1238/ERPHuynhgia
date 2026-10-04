@@ -68,14 +68,13 @@ async function normalizeDisplayOrder(tx: Prisma.TransactionClient, projectId: st
     orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { code: "asc" }],
   });
 
-  await Promise.all(
-    ordered.map((task, idx) =>
-      tx.task.update({
-        where: { id: task.id },
-        data: { displayOrder: (idx + 1) * 100 },
-      }),
-    ),
-  );
+  // Tuần tự: 1 transaction = 1 kết nối, không chạy song song query trên tx.
+  for (let idx = 0; idx < ordered.length; idx++) {
+    await tx.task.update({
+      where: { id: ordered[idx].id },
+      data: { displayOrder: (idx + 1) * 100 },
+    });
+  }
 }
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {

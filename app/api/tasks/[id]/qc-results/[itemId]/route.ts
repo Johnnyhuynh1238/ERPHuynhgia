@@ -188,21 +188,20 @@ export async function POST(request: Request, { params }: { params: { id: string;
       },
     });
 
-    const [totalItems, passedItems] = await Promise.all([
-      tx.qcChecklistItem.count({
-        where: {
-          template: {
-            taskTemplateId: taskDetail.templateId!,
-          },
+    // Tuần tự: 1 transaction = 1 kết nối, không chạy song song query trên tx.
+    const totalItems = await tx.qcChecklistItem.count({
+      where: {
+        template: {
+          taskTemplateId: taskDetail.templateId!,
         },
-      }),
-      tx.taskQcResult.count({
-        where: {
-          taskId: params.id,
-          isPassed: true,
-        },
-      }),
-    ]);
+      },
+    });
+    const passedItems = await tx.taskQcResult.count({
+      where: {
+        taskId: params.id,
+        isPassed: true,
+      },
+    });
 
     const isQcCompleted = totalItems > 0 && passedItems === totalItems;
 

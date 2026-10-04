@@ -102,9 +102,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const created = await prisma.$transaction(async (tx) => {
-    const rows = await Promise.all(
-      urls.map((url) =>
-        tx.qcPhoto.create({
+    // Tuần tự: 1 transaction = 1 kết nối, không chạy song song query trên tx.
+    const rows = [];
+    for (const url of urls) {
+      rows.push(
+        await tx.qcPhoto.create({
           data: {
             qcItemId: item.id,
             taskId: params.id,
@@ -112,8 +114,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
             uploadedBy: user.id,
           },
         }),
-      ),
-    );
+      );
+    }
 
     await tx.qcLog.create({
       data: {

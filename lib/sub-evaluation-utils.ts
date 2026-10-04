@@ -34,21 +34,20 @@ export function computeWeightedOverallRating(input: {
 }
 
 export async function recomputeSubcontractorAggregates(tx: Prisma.TransactionClient, subcontractorId: string) {
-  const [avgResult, totalContracts] = await Promise.all([
-    tx.subEvaluation.aggregate({
-      where: {
-        subContract: {
-          subcontractorId,
-        },
+  // Tuần tự: 1 transaction = 1 kết nối, không chạy song song query trên tx.
+  const avgResult = await tx.subEvaluation.aggregate({
+    where: {
+      subContract: {
+        subcontractorId,
       },
-      _avg: {
-        overallRating: true,
-      },
-    }),
-    tx.subContract.count({
-      where: { subcontractorId },
-    }),
-  ]);
+    },
+    _avg: {
+      overallRating: true,
+    },
+  });
+  const totalContracts = await tx.subContract.count({
+    where: { subcontractorId },
+  });
 
   await tx.subcontractor.update({
     where: { id: subcontractorId },

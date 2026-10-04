@@ -25,17 +25,16 @@ async function resequencePhaseCodes(tx: Prisma.TransactionClient, projectId: str
     select: { id: true },
   });
 
-  await Promise.all(
-    phases.map((phase, index) =>
-      tx.projectPhase.update({
-        where: { id: phase.id },
-        data: {
-          code: `P${index + 1}`,
-          displayOrder: index + 1,
-        },
-      }),
-    ),
-  );
+  // Tuần tự: 1 transaction = 1 kết nối, không chạy song song query trên tx.
+  for (let index = 0; index < phases.length; index++) {
+    await tx.projectPhase.update({
+      where: { id: phases[index].id },
+      data: {
+        code: `P${index + 1}`,
+        displayOrder: index + 1,
+      },
+    });
+  }
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {

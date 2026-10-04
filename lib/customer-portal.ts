@@ -37,7 +37,11 @@ export function getClientIpFromHeaders(headers: Headers) {
   return headers.get("x-real-ip") || "0.0.0.0";
 }
 
+const PORTAL_TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function resolvePortalProjectByToken(token: string) {
+  // Cột customer_portal_token là uuid: token sai định dạng làm Postgres ném lỗi → 500. Coi như không tìm thấy.
+  if (!PORTAL_TOKEN_RE.test(token)) return null;
   return prisma.project.findUnique({
     where: { customerPortalToken: token },
     select: {
