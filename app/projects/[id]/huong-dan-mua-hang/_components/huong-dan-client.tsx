@@ -5,8 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { GuideAdjust, GuideGroup, PurchaseGuide } from "@/lib/purchase-guide";
 import "./huong-dan.css";
 
-type Tab = "all" | "tho" | "ht" | "kc";
+type Tab = "sap" | "all" | "tho" | "ht" | "kc";
 const TABS: { key: Tab; label: string }[] = [
+  { key: "sap", label: "Sắp cần mua" },
   { key: "all", label: "Tất cả" },
   { key: "tho", label: "Phần thô" },
   { key: "ht", label: "Hoàn thiện" },
@@ -23,6 +24,26 @@ const norm = (s: string) =>
     .replace(/đ/g, "d");
 const srcOf = (a: GuideAdjust) => a.source || "Phụ lục";
 
+// Tiến độ dự kiến 1 hạng mục (project_sections) + số đơn mua đã đặt cho hạng mục đó.
+export type SapSchedule = {
+  name: string; // tên nhóm VT trong HD mua hàng
+  start: string | null;
+  end: string | null;
+  parts: { name: string; start: string | null; end: string | null }[]; // >1 PHẦN gom chung nhóm VT
+  orders: number;
+  lastOrder: string | null;
+};
+
+// ngày dạng YYYY-MM-DD (không giờ) → cộng ngày / đổi dd/mm, tránh lệch múi giờ
+const addDays = (ymd: string, n: number) => {
+  const d = new Date(ymd + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const ddmm = (ymd: string) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`;
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
 export function HuongDanClient({
   projectCode,
   projectName,
@@ -31,6 +52,8 @@ export function HuongDanClient({
   signedAt,
   quoteUpdatedAt,
   guide,
+  schedule,
+  today,
   isAdmin,
   backHref,
 }: {
@@ -41,10 +64,12 @@ export function HuongDanClient({
   signedAt: string | null;
   quoteUpdatedAt: string | null;
   guide: PurchaseGuide | null;
+  schedule: SapSchedule[];
+  today: string;
   isAdmin: boolean;
   backHref: string;
 }) {
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = useState<Tab>("sap");
   const [q, setQ] = useState("");
   // card hạng mục: mặc định thu gọn; bấm mở 1 card, bấm ra ngoài card đó tự thu lại
   const [open, setOpen] = useState<string | null>(null);
@@ -111,6 +136,7 @@ export function HuongDanClient({
       .filter((g) => g.rows.length > 0 || (!nq && tab !== "kc" && g.qty.length > 0));
   };
 
+  const sap = tab === "sap";
   const tho = guide && (tab === "all" || tab === "tho" || tab === "kc") ? filterGroups(guide.tho) : [];
   const ht = guide && (tab === "all" || tab === "ht" || tab === "kc") ? filterGroups(guide.ht) : [];
   const showExcluded = guide && guide.excluded.length > 0 && tab === "all" && !q.trim();
@@ -193,6 +219,18 @@ export function HuongDanClient({
               </div>
             </div>
 
+            {sap && (
+              <SapView
+                guide={guide}
+                schedule={schedule}
+                today={today}
+                q={q}
+                isAdmin={isAdmin}
+                isOpen={isOpen}
+                toggle={toggle}
+              />
+            )}
+
             {tho.length > 0 && <div className="hdm-sec">Vật tư phần thô</div>}
             {tho.map((g) => (
               <GroupCard key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
@@ -203,7 +241,7 @@ export function HuongDanClient({
               <GroupCard key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
             ))}
 
-            {guide.extras.length > 0 && tab !== "kc" && (
+            {guide.extras.length > 0 && tab !== "kc" && !sap && (
               <>
                 <div className="hdm-sec">Thêm theo phụ lục</div>
                 <Card
@@ -283,6 +321,7 @@ function Card({
   count,
   tags,
   kc,
+  sub,
   open,
   onToggle,
   children,
@@ -292,6 +331,7 @@ function Card({
   count: string;
   tags?: string[];
   kc?: boolean;
+  sub?: React.ReactNode;
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -301,6 +341,7 @@ function Card({
       <button type="button" className="hdm-ch" onClick={onToggle} aria-expanded={open}>
         <span className="hdm-cht">
           <span className="nm">{title}</span>
+          {sub}
           <span className="hdm-chtags">
             <span className="n">{count}</span>
             {kc && <span className="hdm-tag kc">Khách tự cấp</span>}
@@ -320,13 +361,26 @@ function Card({
   );
 }
 
-function GroupCard({ g, open, onToggle }: { g: GuideGroup; open: boolean; onToggle: () => void }) {
+function GroupCard({
+  g,
+  open,
+  onToggle,
+  id,
+  sub,
+}: {
+  g: GuideGroup;
+  open: boolean;
+  onToggle: () => void;
+  id?: string;
+  sub?: React.ReactNode;
+}) {
   const ga = g.adjust;
   const groupKc = ga?.mode === "khach_cap";
   return (
     <Card
-      id={g.key}
+      id={id ?? g.key}
       title={g.name}
+      sub={sub}
       count={`${g.rows.length} VT`}
       tags={uniqSrc([ga, ...g.rows.map((r) => r.adjust)])}
       kc={groupKc}
@@ -415,5 +469,152 @@ function GroupBanner({ a }: { a: GuideAdjust }) {
       <b>Theo {srcOf(a)}:</b> {[a.loai, a.quycach].filter(Boolean).join(" — ")}
       {a.note ? `. ${a.note}` : ""}
     </div>
+  );
+}
+
+// ── Tab "Sắp cần mua" ──
+// Theo tiến độ DỰ KIẾN (admin đặt ngày ở màn Tiến độ): hạng mục sắp bắt đầu → KT chuẩn bị NCC trước,
+// không chờ giám sát đề xuất. Tuần tính Thứ 2 → Chủ nhật.
+type SapRow = { g: GuideGroup; s: SapSchedule };
+
+function SapView({
+  guide,
+  schedule,
+  today,
+  q,
+  isAdmin,
+  isOpen,
+  toggle,
+}: {
+  guide: PurchaseGuide;
+  schedule: SapSchedule[];
+  today: string;
+  q: string;
+  isAdmin: boolean;
+  isOpen: (key: string) => boolean;
+  toggle: (key: string) => void;
+}) {
+  const dow = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7; // 0 = Thứ 2
+  const thisMon = addDays(today, -dow);
+  const nextMon = addDays(thisMon, 7);
+  const nextSun = addDays(thisMon, 13);
+  const wk3Mon = addDays(thisMon, 14);
+  const wk3Sun = addDays(thisMon, 20);
+
+  const byName = new Map(schedule.map((s) => [s.name, s]));
+  const nq = norm(q.trim());
+  const rows: SapRow[] = [];
+  const noDate: string[] = [];
+  for (const g of [...guide.tho, ...guide.ht]) {
+    const s = byName.get(g.name);
+    if (!s?.start) {
+      noDate.push(g.name);
+      continue;
+    }
+    if (nq && !norm([g.name, ...g.rows.map((r) => `${r.ten} ${r.loai} ${r.quycach}`)].join(" ")).includes(nq)) continue;
+    rows.push({ g, s });
+  }
+  rows.sort((a, b) => (a.s.start! < b.s.start! ? -1 : a.s.start! > b.s.start! ? 1 : 0));
+
+  const ended = (r: SapRow) => !!r.s.end && r.s.end < today;
+  const dang = rows.filter((r) => r.s.start! <= today && !ended(r));
+  const tuanNay = rows.filter((r) => r.s.start! > today && r.s.start! < nextMon);
+  const tuanSau = rows.filter((r) => r.s.start! >= nextMon && r.s.start! <= nextSun);
+  const tuan3 = rows.filter((r) => r.s.start! >= wk3Mon && r.s.start! <= wk3Sun);
+  const sauDo = rows.filter((r) => r.s.start! > wk3Sun);
+
+  // always = luôn hiện khối (Tuần sau) kể cả trống, để KT biết tuần sau không có hạng mục mới
+  const block = (title: string, hint: string, list: SapRow[], hot?: boolean, always?: boolean) =>
+    (list.length > 0 || (always && !nq)) && (
+      <>
+        <div className={"hdm-sec hdm-sap-sec" + (hot ? " hot" : "")}>
+          {title}
+          <span>{hint}</span>
+        </div>
+        {list.length === 0 && <div className="hdm-sap-none">Không có hạng mục mới bắt đầu — chỉ bổ sung vật tư cho hạng mục đang thi công.</div>}
+        {list.map((r) => (
+          <GroupCard
+            key={r.g.key}
+            id={"sap|" + r.g.key}
+            g={r.g}
+            open={isOpen("sap|" + r.g.key)}
+            onToggle={() => toggle("sap|" + r.g.key)}
+            sub={<SapSub r={r} today={today} />}
+          />
+        ))}
+      </>
+    );
+
+  return (
+    <>
+      <div className="hdm-sap-note">
+        Theo tiến độ dự kiến — hôm nay {ddmm(today)}. Hạng mục sắp thi công cần chuẩn bị NCC / đặt hàng trước, không chờ giám
+        sát đề xuất. Vật tư chủ nhà cấp → nhắc chủ nhà giao trước ngày bắt đầu.
+      </div>
+      {block("Tuần sau", `${ddmm(nextMon)} – ${ddmm(nextSun)} · chuẩn bị NCC ngay`, tuanSau, true, true)}
+      {block("Trong tuần này", `đến ${ddmm(addDays(nextMon, -1))}`, tuanNay, true)}
+      {block("Đang thi công", "kiểm tra đã đủ vật tư", dang)}
+      {block("2 tuần nữa", `${ddmm(wk3Mon)} – ${ddmm(wk3Sun)}`, tuan3)}
+      {sauDo.length > 0 && (
+        <>
+          <div className="hdm-sec hdm-sap-sec">
+            Sau đó<span>chưa cần chuẩn bị</span>
+          </div>
+          <ul className="hdm-sap-later">
+            {sauDo.map((r) => (
+              <li key={r.g.key}>
+                <span>{r.g.name}</span>
+                <span>từ {ddmm(r.s.start!)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {dang.length + tuanNay.length + tuanSau.length + tuan3.length + sauDo.length === 0 && (
+        <div className="hdm-empty">
+          {nq ? "Không có vật tư khớp." : "Không có hạng mục nào sắp thi công theo tiến độ dự kiến."}
+        </div>
+      )}
+      {noDate.length > 0 && !nq && (
+        <div className="hdm-sap-nodate">
+          <b>Chưa có ngày dự kiến ({noDate.length}):</b> {noDate.join(", ")}.{" "}
+          {isAdmin ? "Đặt ngày ở màn Tiến độ để hiện vào lịch mua." : "Báo admin đặt ngày ở màn Tiến độ."}
+        </div>
+      )}
+    </>
+  );
+}
+
+function SapSub({ r, today }: { r: SapRow; today: string }) {
+  const start = r.s.start!;
+  const d = daysBetween(today, start);
+  const when =
+    d > 0
+      ? `Bắt đầu ${ddmm(start)} · còn ${d} ngày`
+      : `Đang thi công ${ddmm(start)}${r.s.end ? ` – ${ddmm(r.s.end)}` : ""}`;
+  const kcAll = r.g.adjust?.mode === "khach_cap";
+  const buyRows = r.g.rows.filter((x) => (x.adjust?.mode ?? r.g.adjust?.mode) !== "khach_cap").length;
+  return (
+    <span className="hdm-sap-sub">
+      <span>{when}</span>
+      {r.s.parts.length > 0 && (
+        <span className="hdm-sap-parts">
+          {r.s.parts.map((p) => (
+            <span key={p.name} className={p.end && p.end < today ? "done" : ""}>
+              {p.name.replace(/^PHẦN\s+/i, "")} {p.start ? ddmm(p.start) : "?"}–{p.end ? ddmm(p.end) : "?"}
+            </span>
+          ))}
+        </span>
+      )}
+      {kcAll || buyRows === 0 ? (
+        <span className="hdm-tag kc">Chủ nhà cấp — nhắc giao trước</span>
+      ) : r.s.orders > 0 ? (
+        <span className="hdm-tag doi">
+          Đã có {r.s.orders} đơn{r.s.lastOrder ? ` · gần nhất ${ddmm(new Date(Date.parse(r.s.lastOrder) + 7 * 3600 * 1000).toISOString().slice(0, 10))}` : ""}
+        </span>
+      ) : (
+        <span className="hdm-tag warn">Chưa đặt hàng</span>
+      )}
+    </span>
   );
 }
