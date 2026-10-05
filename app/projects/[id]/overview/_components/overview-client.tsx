@@ -159,6 +159,7 @@ export function OverviewClient({
     { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
     { href: `${base}/budget-plan`, emoji: "🐖", name: "Ngân sách", sub: "Hạng mục · đã chi · còn phải chi" },
     { href: `${base}/mua-hang`, emoji: "🛒", name: "Mua hàng", sub: `${data.tiles.muaHang.count} đơn · ${fmt(data.tiles.muaHang.total)}`, badge: data.tiles.muaHang.received ? { cls: "info", text: `${data.tiles.muaHang.received} đã nhận` } : undefined },
+    { href: `${base}/huong-dan-mua-hang`, emoji: "📋", name: "HD mua hàng", sub: "Chủng loại · hãng · quy cách theo HĐ" },
     { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },
     { href: `${base}/cong-no`, emoji: "💰", name: "Quản lý NCC", sub: `Công nợ · thầu phụ · Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
     { href: `${base}/work-orders`, emoji: "👷", name: "Giao việc", sub: "Phiếu hàng ngày", show: isSelf },

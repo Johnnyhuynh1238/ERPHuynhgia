@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Banknote,
+  BookCheck,
   BookOpen,
   Briefcase,
   CalendarClock,
@@ -186,6 +187,7 @@ export function ProjectHubClient({ project, phases, currentRole }: Props) {
     { Icon: Briefcase, label: "Dự toán", href: `/projects/${project.id}/budget`, color: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
     { Icon: ClipboardList, label: "Giao việc", href: `/projects/${project.id}/work-orders`, color: "#D27A52", bg: "rgba(210,122,82,0.12)" },
     { Icon: Sun, label: "Cuối ngày", href: `/projects/${project.id}/eod`, color: "#34d399", bg: "rgba(111,166,119,0.12)" },
+    { Icon: BookCheck, label: "HD mua hàng", href: `/projects/${project.id}/huong-dan-mua-hang`, color: "#34d399", bg: "rgba(111,166,119,0.12)" },
     { Icon: Wallet, label: "Lương tuần", href: `/projects/${project.id}/payroll`, color: "#fbbf24", bg: "rgba(224,184,85,0.12)" },
     { Icon: Users, label: "Thầu phụ", href: `/projects/${project.id}/sub-contracts`, color: "#D27A52", bg: "rgba(210,122,82,0.12)" },
     { Icon: BookOpen, label: "Nhật ký", href: `/projects/${project.id}/construction-log`, color: "#9a8f80", bg: "rgba(154,143,128,0.12)" },

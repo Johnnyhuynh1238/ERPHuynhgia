@@ -113,6 +113,20 @@ export function KetoanProjectHub({
             <span className="kph-chev">›</span>
           </Link>
 
+          <Link href={`${base}/huong-dan-mua-hang`} className="kph-navrow">
+            <span className="kph-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+                <path d="m9 9.5 2 2 4-4" />
+              </svg>
+            </span>
+            <span className="kph-nb">
+              <span className="nt">Hướng dẫn mua hàng</span>
+              <span className="ns">Chủng loại · thương hiệu · quy cách theo phụ lục HĐ</span>
+            </span>
+            <span className="kph-chev">›</span>
+          </Link>
+
           <Link href={`${base}/mua-hang`} className="kph-navrow">
             <span className="kph-ic">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

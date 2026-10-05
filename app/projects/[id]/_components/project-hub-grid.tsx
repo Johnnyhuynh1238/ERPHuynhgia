@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Banknote,
+  BookCheck,
   BookOpenCheck,
   BookText,
   Calculator,
@@ -102,6 +103,7 @@ export function ProjectHubGrid({
     ...(caps.canMuaHang
       ? [{ href: `${base}/mua-hang`, label: "Mua hàng", icon: ShoppingCart, desc: "Đặt VT bám dự toán" } as HubItem]
       : []),
+    { href: `${base}/huong-dan-mua-hang`, label: "HD mua hàng", icon: BookCheck, desc: "Hãng · quy cách theo HĐ" },
     ...(isSelf && caps.canViewPayroll
       ? [{ href: `${base}/payroll`, label: "Lương tuần", icon: Banknote, desc: "Bonus + payslip" } as HubItem]
       : []),
