@@ -17,7 +17,8 @@ const ALLOWED: UserRole[] = [
 ];
 
 // Hướng dẫn mua hàng = phụ lục vật tư HĐ ký với khách (quote_data của HĐ gắn dự án)
-// + điều chỉnh theo phụ lục. KT: căn cứ mua. Giám sát: căn cứ nhận hàng. Admin sửa điều chỉnh.
+// + điều chỉnh theo phụ lục (AI ghi thẳng bảng purchase_guide_adjusts, không sửa trên UI).
+// KT: căn cứ mua. Giám sát: căn cứ nhận hàng.
 export default async function HuongDanMuaHangPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) redirect("/login");
@@ -52,7 +53,6 @@ export default async function HuongDanMuaHangPage({ params }: { params: { id: st
 
   return (
     <HuongDanClient
-      projectId={project.id}
       projectCode={project.code}
       projectName={project.name}
       customerName={project.customerName}
