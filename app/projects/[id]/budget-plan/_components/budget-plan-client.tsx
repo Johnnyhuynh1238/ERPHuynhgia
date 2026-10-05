@@ -43,6 +43,8 @@ type DetailItem = {
   date: string | null;
   budgetLineId: string | null;
   goods?: Goods[]; // hàng hoá trong đơn (chỉ mh_order)
+  alloc?: { lineId: string; amount: number }[]; // phân bổ đủ mọi hạng mục của đơn (mh_order)
+  orderTotal?: number; // tổng đơn (mh_order)
 };
 type DetailData = { items: DetailItem[]; lines: { id: string; name: string; groupKind: string }[] };
 const SRC_LABEL: Record<DetailItem["source"], string> = {
@@ -523,6 +525,22 @@ export function BudgetPlanClient({
                     const val = k in changes ? changes[k] : it.budgetLineId ?? "";
                     const dirty = (val || null) !== (it.budgetLineId || null);
                     const hasGoods = it.source === "mh_order" && (it.goods?.length ?? 0) > 0;
+                    // Đơn chia ≥2 hạng mục: liệt kê đủ phân bổ; KHÔNG cho đổi bằng dropdown
+                    // (reassign gộp cả đơn về 1 hạng mục → mất phân bổ). Sửa ở màn Mua hàng.
+                    const multi = it.source === "mh_order" && (it.alloc?.length ?? 0) > 1;
+                    const lineName = (id: string) => detail.lines.find((l) => l.id === id)?.name ?? "Hạng mục đã xoá";
+                    const allocList = multi && (
+                      <span className="bp-ditem-alloc">
+                        {it.alloc!.map((a) => (
+                          <span key={a.lineId} className={a.lineId === detailLine?.id ? "cur" : undefined}>
+                            {lineName(a.lineId)} <b className="num">{fmt(a.amount)}</b>
+                          </span>
+                        ))}
+                        <span className="tot">
+                          Tổng đơn <b className="num">{fmt(it.orderTotal ?? 0)}</b>
+                        </span>
+                      </span>
+                    );
                     return (
                       <div className={`bp-ditem${dirty ? " dirty" : ""}`} key={k}>
                         {hasGoods ? (
@@ -540,6 +558,7 @@ export function BudgetPlanClient({
                               {it.sub}
                               {it.date ? ` · ${it.date}` : ""} · {it.goods?.length} hàng
                             </span>
+                            {allocList}
                           </button>
                         ) : (
                           <div className="bp-ditem-main">
@@ -549,11 +568,15 @@ export function BudgetPlanClient({
                               {it.sub}
                               {it.date ? ` · ${it.date}` : ""}
                             </span>
+                            {allocList}
                           </div>
                         )}
                         <div className="bp-ditem-right">
                           <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
-                          {detailKind === "total" && (
+                          {detailKind === "total" && multi && (
+                            <span className="bp-ditem-multi">{it.alloc!.length} hạng mục · sửa ở Mua hàng</span>
+                          )}
+                          {detailKind === "total" && !multi && (
                             <select
                               value={val}
                               onChange={(e) => setChanges((c) => ({ ...c, [k]: e.target.value }))}

@@ -34,6 +34,9 @@ type Item = {
   date: string | null;
   budgetLineId: string | null;
   goods?: Goods[];
+  // Đơn mua hàng: phân bổ ĐỦ mọi hạng mục của đơn (đơn chia nhiều hạng mục) + tổng đơn.
+  alloc?: { lineId: string; amount: number }[];
+  orderTotal?: number;
 };
 
 const goodsOf = (items: unknown): Goods[] =>
@@ -161,6 +164,8 @@ export async function GET(
         date: dstr(o.orderDate),
         budgetLineId: o.budgetLineId,
         goods: goodsOf(o.items),
+          alloc: resolveAlloc(o),
+          orderTotal: num(o.total),
       })),
       ...subs.map((s) => ({
         source: "sub" as const,
@@ -251,6 +256,8 @@ export async function GET(
           date: dstr(o.orderDate),
           budgetLineId: o.budgetLineId,
           goods: goodsOf(o.items),
+          alloc: resolveAlloc(o),
+          orderTotal: num(o.total),
         });
     }
     for (const sid of supplierIds) {
@@ -310,6 +317,8 @@ export async function GET(
           date: dstr(o.orderDate),
           budgetLineId: o.budgetLineId,
           goods: goodsOf(o.items),
+          alloc: resolveAlloc(o),
+          orderTotal: num(o.total),
         });
     }
     for (const sid of supplierIds) {
