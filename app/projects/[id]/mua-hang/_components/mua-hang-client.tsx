@@ -92,10 +92,11 @@ const baseName = (n: string) => {
 };
 // ── Phân bổ hạng mục theo số tiền ──
 const allocSum = (a: BudgetAlloc[]) => a.reduce((s, x) => s + (x.amount || 0), 0);
-// Alloc hợp lệ: có dòng, mỗi dòng có hạng mục + tiền > 0, không trùng, Σ = tổng đơn.
+// Alloc hợp lệ: có dòng, mỗi dòng có hạng mục + tiền ≠ 0 cùng dấu tổng đơn (đơn trả hàng
+// tổng âm → tiền âm), không trùng, Σ = tổng đơn.
 const allocValid = (a: BudgetAlloc[], total: number) =>
   a.length > 0 &&
-  a.every((x) => x.lineId && x.amount > 0) &&
+  a.every((x) => x.lineId && (total < 0 ? x.amount < 0 : x.amount > 0)) &&
   new Set(a.map((x) => x.lineId)).size === a.length &&
   Math.round(allocSum(a)) === Math.round(total);
 // Đơn giá vật tư: giá thống nhất nếu mọi lần cùng giá, ngược lại bình quân theo SL.
@@ -1303,7 +1304,9 @@ function BudgetAllocEditor({
     if (next.length === 1) next[0] = { ...next[0], amount: Math.round(total) }; // còn 1 → trọn tổng
     onChange(next);
   };
-  const addRow = () => onChange([...alloc, { lineId: "", amount: Math.max(0, remain) }]);
+  // Đơn trả hàng tổng âm: ô tiền nhập số dương, lưu kèm dấu âm.
+  const sign = total < 0 ? -1 : 1;
+  const addRow = () => onChange([...alloc, { lineId: "", amount: remain * sign > 0 ? remain : 0 }]);
   const usedElsewhere = (i: number) =>
     new Set(alloc.filter((_, j) => j !== i).map((r) => r.lineId).filter(Boolean));
 
@@ -1335,9 +1338,9 @@ function BudgetAllocEditor({
               inputMode="numeric"
               placeholder="0"
               disabled={disabled}
-              value={r.amount ? fmt(r.amount) : ""}
+              value={r.amount ? fmt(Math.abs(r.amount)) : ""}
               onChange={(e) =>
-                setRow(i, { amount: Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0) })
+                setRow(i, { amount: sign * Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0) })
               }
             />
           )}
@@ -1356,7 +1359,7 @@ function BudgetAllocEditor({
       {!single && (
         <div className={`alloc-sum${remain === 0 ? " ok" : " bad"}`}>
           Đã phân bổ {fmt(sum)} / {fmt(total)} đ
-          {remain !== 0 && (remain > 0 ? ` · thiếu ${fmt(remain)}đ` : ` · dư ${fmt(-remain)}đ`)}
+          {remain !== 0 && (remain * sign > 0 ? ` · thiếu ${fmt(Math.abs(remain))}đ` : ` · dư ${fmt(Math.abs(remain))}đ`)}
         </div>
       )}
     </div>

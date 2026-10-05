@@ -235,9 +235,11 @@ export async function GET(
   if (kind === "spent") {
     for (const o of cashOrders) {
       const total = num(o.total);
-      const paidWhole = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+      // Đơn trả hàng (tổng âm) = trừ đã chi (khớp lib/budget-plan.ts).
+      const paidWhole =
+        total < 0 || o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
       const paid = paidWhole * o.share;
-      if (paid > 0.5)
+      if (Math.abs(paid) > 0.5)
         items.push({
           source: "mh_order",
           id: o.id,
@@ -256,7 +258,7 @@ export async function GET(
       if (all <= 0) continue;
       const ratio = (lineBySupplier.get(sid) ?? 0) / all;
       const paid = (viewMap.get(sid)?.da_tra ?? 0) * ratio;
-      if (paid > 0.5)
+      if (Math.abs(paid) > 0.5)
         items.push({
           source: "ncc",
           id: sid,
@@ -269,7 +271,7 @@ export async function GET(
     }
     for (const s of subs) {
       const paid = subPaidOf(s.id);
-      if (paid > 0.5)
+      if (Math.abs(paid) > 0.5)
         items.push({
           source: "sub",
           id: s.id,
@@ -294,9 +296,11 @@ export async function GET(
     // debt
     for (const o of cashOrders) {
       const total = num(o.total);
-      const paidWhole = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+      // Đơn trả hàng (tổng âm) = trừ đã chi (khớp lib/budget-plan.ts).
+      const paidWhole =
+        total < 0 || o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
       const owed = (total - paidWhole) * o.share;
-      if (owed > 0.5)
+      if (Math.abs(owed) > 0.5)
         items.push({
           source: "mh_order",
           id: o.id,
@@ -315,7 +319,7 @@ export async function GET(
       const v = viewMap.get(sid);
       // NCC chưa vào view → coi toàn bộ đơn hạng mục là còn nợ.
       const owed = v ? v.con_lai * (lineTotal / all) : lineTotal;
-      if (owed > 0.5)
+      if (Math.abs(owed) > 0.5)
         items.push({
           source: "ncc",
           id: sid,
@@ -329,7 +333,7 @@ export async function GET(
     for (const s of subs) {
       const cv = num(s.contractValue);
       const owed = Math.max(0, cv - subPaidOf(s.id));
-      if (owed > 0.5)
+      if (Math.abs(owed) > 0.5)
         items.push({
           source: "sub",
           id: s.id,

@@ -131,8 +131,10 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
   // ── Mua hàng TRẢ NGAY: phân bổ đã trả (cọc/paid) & còn nợ theo HẠNG MỤC CỦA ĐƠN ──
   for (const o of cashOrders) {
     const total = num(o.total);
-    if (total <= 0) continue;
-    const paidOrder = o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
+    if (total === 0) continue;
+    // Đơn TRẢ HÀNG (tổng âm) → trừ thẳng "đã chi" của hạng mục, không sinh nợ.
+    const paidOrder =
+      total < 0 || o.status === MhOrderStatus.paid ? total : Math.min(total, depositMap.get(o.id) ?? 0);
     const owed = total - paidOrder;
     // Chia đã-trả/còn-nợ theo alloc (nhiều hạng mục). Alloc rỗng = chưa gắn.
     const alloc = resolveAlloc(o);
@@ -162,8 +164,11 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     let sumOrders = 0;
     for (const o of group) {
       const amt = num(o.total);
-      if (amt <= 0) continue;
+      if (amt === 0) continue;
       const alloc = resolveAlloc(o); // nhiều hạng mục / đơn (rỗng = chưa gắn)
+      // Đơn TRẢ HÀNG (tổng âm): 'paid' (NCC hoàn tiền) → trừ "đã chi" ở nhánh dưới;
+      // 'received' (cấn nợ) → view đã trừ nợ NCC, ở đây đưa trọng số ÂM để phần giảm
+      // rơi đúng hạng mục của đơn trả.
       // Đơn NCC đã 'paid' (trả ngay/tất toán riêng, không qua 'received') nằm
       // NGOÀI công nợ NCC — view ncc_cong_no_du_an chỉ theo dõi đơn 'received'.
       // Coi như đã chi thẳng, không đưa vào phân bổ nợ (nếu không sẽ hiện nợ ảo).

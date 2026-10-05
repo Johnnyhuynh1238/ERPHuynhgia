@@ -4,7 +4,8 @@
 
 export type BudgetAlloc = { lineId: string; amount: number };
 
-// Đọc/lọc mảng alloc thô từ body/JSON → chỉ giữ phần tử hợp lệ (lineId + amount > 0).
+// Đọc/lọc mảng alloc thô từ body/JSON → chỉ giữ phần tử hợp lệ (lineId + amount ≠ 0).
+// Đơn TRẢ HÀNG có tổng ÂM → amount âm (cùng dấu tổng đơn) là hợp lệ.
 export function cleanAlloc(raw: unknown): BudgetAlloc[] {
   if (!Array.isArray(raw)) return [];
   const out: BudgetAlloc[] = [];
@@ -13,7 +14,7 @@ export function cleanAlloc(raw: unknown): BudgetAlloc[] {
     const o = r as Record<string, unknown>;
     const lineId = o.lineId ? String(o.lineId) : "";
     const amount = Math.round(Number(o.amount) || 0);
-    if (lineId && amount > 0) out.push({ lineId, amount });
+    if (lineId && amount !== 0) out.push({ lineId, amount });
   }
   return out;
 }
@@ -31,7 +32,8 @@ export function validateAlloc(
     if (!validIds.has(a.lineId)) return "Có hạng mục ngân sách không hợp lệ";
     if (seen.has(a.lineId)) return "Một hạng mục ngân sách bị chọn trùng";
     seen.add(a.lineId);
-    if (!(a.amount > 0)) return "Số tiền mỗi hạng mục phải lớn hơn 0";
+    // Cùng dấu với tổng đơn (đơn trả hàng tổng âm → mỗi dòng âm).
+    if (!(total < 0 ? a.amount < 0 : a.amount > 0)) return "Số tiền mỗi hạng mục phải khác 0 và cùng dấu tổng đơn";
   }
   const sum = alloc.reduce((s, a) => s + a.amount, 0);
   if (Math.round(sum) !== Math.round(total)) {
