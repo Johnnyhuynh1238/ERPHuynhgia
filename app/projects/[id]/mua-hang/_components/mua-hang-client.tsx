@@ -476,6 +476,19 @@ export function MuaHangClient({
 
   // "Đã nhận" = đã nhận hàng (received) hoặc đã thanh toán (paid). Còn lại = chưa nhận.
   const isReceived = (s: Order["status"]) => s === "received" || s === "paid";
+
+  // Deep-link ?order=<id> (từ popup Ngân sách dự án): mở thẳng sheet sửa đơn đó (1 lần).
+  const deepOrderId = searchParams.get("order");
+  const deepDone = useRef(false);
+  useEffect(() => {
+    if (deepDone.current || !deepOrderId || !orders.length) return;
+    deepDone.current = true;
+    const o = orders.find((x) => x.id === deepOrderId);
+    if (!o) return;
+    setTab(isReceived(o.status) ? "received" : "orders");
+    setEditing(o);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, deepOrderId]);
   const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
   const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
 

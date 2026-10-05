@@ -574,7 +574,13 @@ export function BudgetPlanClient({
                         <div className="bp-ditem-right">
                           <span className="bp-ditem-amt num">{fmt(it.amount)}</span>
                           {detailKind === "total" && multi && (
-                            <span className="bp-ditem-multi">{it.alloc!.length} hạng mục · sửa ở Mua hàng</span>
+                            <Link
+                              className="bp-ditem-multi"
+                              href={`/projects/${projectId}/mua-hang?order=${it.id}`}
+                              title="Mở đơn này ở màn Mua hàng để sửa phân bổ hạng mục"
+                            >
+                              {it.alloc!.length} hạng mục · sửa ở Mua hàng ›
+                            </Link>
                           )}
                           {detailKind === "total" && !multi && (
                             <select

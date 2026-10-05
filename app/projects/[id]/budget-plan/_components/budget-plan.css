@@ -169,7 +169,7 @@
 .bpdoc .bp-ditem-alloc .cur::before { content: "▸ "; color: var(--orange); }
 .bpdoc .bp-ditem-alloc .tot { border-top: 1px dashed var(--line2); padding-top: 2px; margin-top: 1px; }
 .bpdoc .bp-ditem-alloc b { font-weight: 600; }
-.bpdoc .bp-ditem-multi { font-size: 11px; color: var(--mut); max-width: 150px; text-align: right; }
+.bpdoc .bp-ditem-multi { font-size: 11px; color: var(--orange); font-weight: 600; max-width: 150px; text-align: right; text-decoration: underline; text-underline-offset: 2px; }
 
 /* ── hàng hoá trong đơn (popup con) ── */
 .bpdoc .bp-good { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
