@@ -12,6 +12,7 @@ import {
   Handshake,
   History,
   Library,
+  ClipboardCheck,
   ListChecks,
   Package,
   Pencil,
@@ -104,6 +105,7 @@ export function ProjectHubGrid({
       ? [{ href: `${base}/mua-hang`, label: "Mua hàng", icon: ShoppingCart, desc: "Đặt VT bám dự toán" } as HubItem]
       : []),
     { href: `${base}/huong-dan-mua-hang`, label: "HD mua hàng", icon: BookCheck, desc: "Hãng · quy cách theo HĐ" },
+    { href: `${base}/hd-thi-cong`, label: "HD thi công", icon: ClipboardCheck, desc: "Vật tư · nghiệm thu · bản in" },
     ...(isSelf && caps.canViewPayroll
       ? [{ href: `${base}/payroll`, label: "Lương tuần", icon: Banknote, desc: "Bonus + payslip" } as HubItem]
       : []),

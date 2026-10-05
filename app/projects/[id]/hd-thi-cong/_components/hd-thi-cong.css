@@ -1,0 +1,40 @@
+/* HD thi công — phần riêng, dựa trên giao diện .hdm-* của HD mua hàng. */
+.hdt-print{background:var(--hd-terra);border-color:var(--hd-terra);color:#fff}
+.hdt-no{flex-shrink:0;align-self:flex-start;font-family:var(--hd-mono);font-size:18px;font-weight:700;color:var(--hd-terra);line-height:1.1;min-width:38px}
+.hdt-no small{font-size:10.5px;color:var(--hd-mut2);font-weight:600}
+.hdt-grow{flex:1}
+
+.hdt-scope{margin:10px 14px 0;padding:9px 11px;border-radius:9px;background:var(--hd-chip);font-size:12.5px;line-height:1.5}
+.hdt-scope b{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--hd-terra);margin-bottom:2px}
+.hdt-scope p{margin:0}
+.hdt-scope p + p{margin-top:3px}
+
+.hdt-h{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--hd-terra);padding:14px 14px 4px}
+.hdt-none{padding:4px 14px 6px;font-size:12.5px;color:var(--hd-mut)}
+.hdm-tbl.hdt-vt col.c1{width:24%} .hdm-tbl.hdt-vt col.c2{width:32%} .hdm-tbl.hdt-vt col.c3{width:44%}
+.hdt-chk{margin:0;padding:0;list-style:none;font-size:12px;color:var(--hd-mut);line-height:1.45}
+.hdt-chk li{position:relative;padding-left:11px}
+.hdt-chk li::before{content:"–";position:absolute;left:0}
+
+.hdt-stage{margin:6px 14px 10px;border:1px solid var(--hd-line);border-radius:11px;overflow:hidden}
+.hdt-sh{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--hd-chip)}
+.hdt-badge{flex-shrink:0;font-family:var(--hd-mono);font-size:11px;font-weight:700;color:#fff;background:var(--hd-terra);border-radius:6px;padding:2px 6px}
+.hdt-st{flex:1;min-width:0;font-size:13px;font-weight:700;line-height:1.3}
+.hdt-bb{flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--hd-mut2);white-space:nowrap}
+.hdt-crit{margin:0;padding:0;list-style:none;counter-reset:c}
+.hdt-crit li{counter-increment:c;position:relative;padding:8px 10px 8px 34px;border-top:1px solid var(--hd-line);font-size:12.5px;line-height:1.45}
+.hdt-crit li::before{content:counter(c);position:absolute;left:10px;top:8px;width:16px;text-align:center;font-family:var(--hd-mono);font-size:11px;font-weight:700;color:var(--hd-mut2)}
+.hdt-crit b{display:block;font-weight:600}
+.hdt-crit span{display:block;color:var(--hd-mut)}
+@media (min-width:640px){
+  .hdt-crit li{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:12px}
+}
+/* mobile: mỗi vật tư 1 khối dọc (tên → hãng/quy cách → kiểm khi nhận) cho đỡ chật */
+@media (max-width:560px){
+  .hdm-tbl.hdt-vt thead{display:none}
+  .hdm-tbl.hdt-vt, .hdm-tbl.hdt-vt tbody, .hdm-tbl.hdt-vt tr, .hdm-tbl.hdt-vt td{display:block;width:auto}
+  .hdm-tbl.hdt-vt tr{padding:9px 14px;border-bottom:1px solid var(--hd-line)}
+  .hdm-tbl.hdt-vt tr:last-child{border-bottom:0}
+  .hdm-tbl.hdt-vt td{padding:0;border:0}
+  .hdm-tbl.hdt-vt td + td{margin-top:4px}
+}
