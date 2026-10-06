@@ -55,8 +55,17 @@ export function StageClient({
   const [qtab, setQtab] = useState<"quote" | "cost">("quote");
   const [adminDoc, setAdminDoc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const contractFileRef = useRef<HTMLInputElement>(null);
+  const [contractDoc, setContractDoc] = useState<string | null>(null);
 
-  const { stage, status, stageDates, versions, contractVersionNo } = state;
+  const {
+    stage,
+    status,
+    stageDates,
+    versions,
+    contractVersionNo,
+    contractUpdatedAt,
+  } = state;
   const latestNo = versions.length
     ? versions[versions.length - 1].versionNo
     : 1;
@@ -149,6 +158,27 @@ export function StageClient({
       alive = false;
     };
   }, [view, isCost, curNo, docAt, frameKey, state.id]);
+
+  // File hợp đồng soạn sẵn ở giai đoạn 3 (chỉ admin, không nằm ở link khách).
+  useEffect(() => {
+    if (view !== 3 || !contractUpdatedAt) {
+      setContractDoc(null);
+      return;
+    }
+    let alive = true;
+    setContractDoc(null);
+    fetch(`/api/admin/pipeline/${state.id}/contract`)
+      .then((r) => (r.ok ? r.json() : { html: "" }))
+      .then((j: { html?: string }) => {
+        if (alive) setContractDoc(j.html || "");
+      })
+      .catch(() => {
+        if (alive) setContractDoc("");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [view, contractUpdatedAt, state.id]);
 
   const pickTab = (t: "quote" | "cost") => {
     setQtab(t);
@@ -327,6 +357,38 @@ export function StageClient({
       setFrameH(900);
       setFrameKey((k) => k + 1);
     }
+  };
+
+  const onPickContract = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!/\.html?$/i.test(file.name)) {
+      setError("Chỉ nhận file .html");
+      return;
+    }
+    const html = await file.text();
+    if (html.length > MAX_HTML_CHARS) {
+      setError("File quá lớn (tối đa 3MB)");
+      return;
+    }
+    if (
+      contractUpdatedAt &&
+      !window.confirm("Thay file hợp đồng hiện tại bằng file mới?")
+    )
+      return;
+    const r = await call("", "PATCH", { contractHtml: html });
+    if (r) setFrameH(900);
+  };
+
+  const removeContract = async () => {
+    if (
+      !window.confirm(
+        "Xoá file hợp đồng của dự án này? Không hoàn tác được (cần tải lại file).",
+      )
+    )
+      return;
+    await call("", "PATCH", { contractHtml: null });
   };
 
   const copyLink = async () => {
@@ -797,10 +859,81 @@ export function StageClient({
               </tbody>
             </table>
           </div>
-          <div className="pl-ph">
-            <b>Giai đoạn 3 · Hợp đồng</b>
-            Phần còn lại của màn Hợp đồng sẽ làm ở đợt sau.
+          <input
+            ref={contractFileRef}
+            type="file"
+            accept=".html,.htm,text/html"
+            hidden
+            onChange={onPickContract}
+          />
+          <div className="pl-linkbar">
+            <span className="lb">File hợp đồng</span>
+            <div className="pl-url pl-num">
+              {contractUpdatedAt
+                ? `Cập nhật ${fmtDay(contractUpdatedAt, true)}`
+                : "Chưa có"}
+            </div>
+            {contractUpdatedAt ? (
+              <a
+                className="pl-btn ghost"
+                href={`/api/admin/pipeline/${state.id}/contract?print=1`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                🖨 In / lưu PDF
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="pl-btn ghost"
+              onClick={() => contractFileRef.current?.click()}
+              disabled={busy}
+            >
+              {contractUpdatedAt ? "⬆ Thay file HĐ" : "⬆ Tải file HĐ"}
+            </button>
+            {contractUpdatedAt ? (
+              <button
+                type="button"
+                className="pl-btn ghost"
+                onClick={removeContract}
+                disabled={busy}
+              >
+                Xoá
+              </button>
+            ) : null}
           </div>
+          <div className="pl-linknote">
+            Hợp đồng chỉ xem được trong ERP, không nằm ở link khách. Bấm In →
+            chọn &quot;Lưu thành PDF&quot; để gửi khách.
+          </div>
+          {contractUpdatedAt ? (
+            <div className="pl-pvw">
+              <iframe
+                key={`contract-${contractUpdatedAt}`}
+                ref={frameRef}
+                srcDoc={contractDoc === null ? "" : contractDoc}
+                title="Hợp đồng"
+                scrolling="no"
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                style={{ height: frameH }}
+              />
+            </div>
+          ) : (
+            <div className="pl-ph">
+              <b>Chưa có file hợp đồng</b>
+              Tải file hợp đồng soạn sẵn (.html) lên để xem và in ở đây.
+              <div>
+                <button
+                  type="button"
+                  className="pl-btn"
+                  onClick={() => contractFileRef.current?.click()}
+                  disabled={busy}
+                >
+                  ⬆ Tải file HĐ
+                </button>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="pl-ph">

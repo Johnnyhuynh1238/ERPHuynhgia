@@ -4587,6 +4587,8 @@ model ProjectPipeline {
   descriptionHtml      String?   @map("description_html") @db.Text
   descriptionUpdatedAt DateTime? @map("description_updated_at")
   contractVersionNo    Int?      @map("contract_version_no") // hợp đồng chốt theo báo giá phiên bản nào
+  contractHtml         String?   @map("contract_html") @db.Text // file HĐ (.html) soạn sẵn, xem + in ở giai đoạn 3 (chỉ admin)
+  contractUpdatedAt    DateTime? @map("contract_updated_at")
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")

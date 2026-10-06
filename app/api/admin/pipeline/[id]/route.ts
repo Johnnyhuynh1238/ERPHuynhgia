@@ -13,6 +13,7 @@ const PatchSchema = z.object({
   status: z.enum(["active", "paused", "done"]).optional(),
   stage: z.number().int().min(1).max(6).optional(),
   contractVersionNo: z.number().int().min(1).optional(),
+  contractHtml: z.string().max(3 * 1024 * 1024).nullable().optional(),
 });
 
 // Sửa thông tin / chuyển giai đoạn (admin tự bấm) / chọn báo giá chốt hợp đồng.
@@ -63,6 +64,10 @@ export async function PATCH(
     data.customerPhone = d.customerPhone || null;
   if (d.address !== undefined) data.address = d.address || null;
   if (d.status !== undefined) data.status = d.status;
+  if (d.contractHtml !== undefined) {
+    data.contractHtml = d.contractHtml || null;
+    data.contractUpdatedAt = d.contractHtml ? new Date() : null;
+  }
 
   let contractNo = current.contractVersionNo;
   if (d.contractVersionNo !== undefined) {
