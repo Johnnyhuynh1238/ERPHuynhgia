@@ -71,6 +71,8 @@
 .cg-stage-h{break-after:avoid;break-inside:avoid;display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
 .cg-stage-no{font-weight:700;color:#fff;background:var(--cg-terra);border-radius:3px;padding:0 6px;font-variant-numeric:tabular-nums}
 .cg-stage-t{font-weight:700;flex:1}
+.cg-steps{margin:0 0 4px;font-size:10.5px;line-height:1.45;color:var(--cg-mut)}
+.cg-steps b{color:var(--cg-ink)}
 .cg-stage-bb{font-size:10.5px;color:var(--cg-mut);white-space:nowrap}
 .cg-crit col.c0{width:6%} .cg-crit col.c1{width:27%} .cg-crit col.c2{width:37%} .cg-crit col.c3{width:7%} .cg-crit col.c4{width:16%}
 .cg-foot{font-size:10.5px;color:var(--cg-mut);margin-top:8px}

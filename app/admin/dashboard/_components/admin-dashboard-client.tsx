@@ -82,6 +82,7 @@ type AppKey =
   | "tai-chinh"
   | "ke-hoach"
   | "vay-tam-ung"
+  | "ky-thuat"
   | "nhan-su"
   | "kpi"
   | "cau-hinh"
@@ -168,6 +169,12 @@ const APPS: AppDef[] = [
     href: "/admin/debts",
   },
   {
+    key: "ky-thuat",
+    label: "Kỹ thuật thi công",
+    Icon: ClipboardCheck,
+    href: "/ky-thuat-thi-cong",
+  },
+  {
     key: "nhan-su",
     label: "Nhân sự",
     Icon: Users,
@@ -219,6 +226,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
   "ke-hoach": [],
   "vay-tam-ung": [],
+  "ky-thuat": [],
   "nhan-su": [],
   "kpi": [],
   "cau-hinh": [],

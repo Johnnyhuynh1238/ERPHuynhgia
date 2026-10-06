@@ -4650,3 +4650,28 @@ model PurchaseGuideAdjust {
   @@unique([projectId, itemKey])
   @@map("purchase_guide_adjusts")
 }
+
+// Kỹ thuật thi công — thư viện MẪU chung toàn công ty (không theo dự án).
+// 1 dòng = 1 loại hạng mục (Móng, Khung BTCT, Xây tô…), tasks = các công tác con
+// (trình tự thi công + tiêu chí nghiệm thu = điểm dừng). HD thi công từng dự án
+// khớp tên hạng mục HĐ với match_keywords (theo sort_order, dòng đầu khớp thắng).
+// tasks jsonb: [{ title, when?, steps: string[], criteria: {noi,yc}[], notes: string[] }]
+model ConstructionTechnique {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique @db.VarChar(30)
+  name          String
+  phase         String   @default("tho") @db.VarChar(10) // tho | ht
+  matchKeywords String   @default("") @map("match_keywords") @db.Text
+  vtKeywords    String   @default("") @map("vt_keywords") @db.Text
+  standards     String   @default("") @db.Text
+  note          String   @default("") @db.Text
+  tasks         Json     @default("[]")
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  updatedBy     String?  @map("updated_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@map("construction_techniques")
+}

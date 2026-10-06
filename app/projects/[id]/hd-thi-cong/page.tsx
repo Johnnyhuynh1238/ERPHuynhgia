@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { buildConstructionGuide } from "@/lib/construction-guide";
+import { loadTechniques } from "@/lib/construction-technique-db";
 import type { GuideAdjust, GuideMode } from "@/lib/purchase-guide";
 import { HdThiCongClient } from "./_components/hd-thi-cong-client";
 
@@ -44,7 +45,8 @@ export default async function HdThiCongPage({ params }: { params: { id: string }
     source: a.source,
   }));
   const dc = project.designContract;
-  const guide = dc?.quoteData ? buildConstructionGuide(dc.quoteData, adjusts) : null;
+  // điểm dừng + trình tự lấy từ thư viện mẫu Kỹ thuật thi công (tile /ky-thuat-thi-cong)
+  const guide = dc?.quoteData ? buildConstructionGuide(dc.quoteData, adjusts, await loadTechniques()) : null;
 
   return (
     <HdThiCongClient

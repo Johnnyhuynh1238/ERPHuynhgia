@@ -90,6 +90,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/admin/templates" },
     { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
+    { label: "Kỹ thuật thi công", href: "/ky-thuat-thi-cong" },
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
   ],
@@ -101,6 +102,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Hồ sơ thợ", href: "/admin/workers" },
     { label: "KPI/Lương", href: "/me/kpi" },
     { label: "Đào tạo", href: "/dao-tao" },
+    { label: "Kỹ thuật thi công", href: "/ky-thuat-thi-cong" },
     { label: "Sổ tay", href: "/huongdanapp/ks" },
   ],
   foreman: [
@@ -142,6 +144,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Chuyên môn", href: "/admin/specialties" },
     { label: "Tiêu chí TP", href: "/admin/evaluation-criteria" },
     { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
+    { label: "Kỹ thuật thi công", href: "/ky-thuat-thi-cong" },
     { label: "Hướng dẫn", href: "/huongdanapp" },
   ],
 };

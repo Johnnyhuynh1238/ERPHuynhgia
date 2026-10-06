@@ -244,6 +244,22 @@ function HangMuc({ it, total }: { it: CgItem; total: number }) {
             <span className="cg-stage-t">{s.title}</span>
             <span className="cg-stage-bb">→ ký BB {s.no}</span>
           </div>
+          {s.steps.length > 0 && (
+            <p className="cg-steps">
+              <b>Trình tự thi công:</b>{" "}
+              {s.steps.map((x, i) => (
+                <span key={i}>
+                  {i + 1}) {x}
+                  {i < s.steps.length - 1 ? "; " : "."}
+                </span>
+              ))}
+            </p>
+          )}
+          {s.notes.length > 0 && (
+            <p className="cg-steps">
+              <b>Lưu ý:</b> {s.notes.join("; ")}
+            </p>
+          )}
           <table className="cg-tbl cg-crit">
             <colgroup>
               <col className="c0" />

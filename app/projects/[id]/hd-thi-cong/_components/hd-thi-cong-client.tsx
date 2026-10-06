@@ -90,7 +90,7 @@ export function HdThiCongClient({
         it.name,
         ...it.scope,
         ...it.vt.map((v) => `${v.ten} ${v.loai} ${v.quycach}`),
-        ...it.stages.map((s) => `${s.title} ${s.items.map((c) => c.noi).join(" ")}`),
+        ...it.stages.map((s) => `${s.title} ${s.steps.join(" ")} ${s.items.map((c) => c.noi).join(" ")}`),
       ].join(" "),
     ).includes(nq);
   });
@@ -106,6 +106,9 @@ export function HdThiCongClient({
             ‹ {projectCode}
           </Link>
           <div className="hdm-acts">
+            <Link href="/ky-thuat-thi-cong" className="hdm-btn" title="Thư viện mẫu kỹ thuật thi công — nguồn điểm dừng của HD này">
+              📚<span className="hdt-lbl"> Mẫu kỹ thuật</span>
+            </Link>
             {guide && (
               <button type="button" className="hdm-btn hdt-print" onClick={printDoc}>
                 🖨 In cho giám sát
@@ -228,6 +231,7 @@ function ItemCard({ it, total, open, onToggle }: { it: CgItem; total: number; op
             <span className="n">
               {it.vt.length} vật tư · {it.stages.length} điểm dừng
             </span>
+            {!it.tech && <span className="hdm-tag warn">Chưa có mẫu kỹ thuật</span>}
             {kcAll && <span className="hdm-tag kc">Chủ nhà cấp vật tư</span>}
             {srcs.map((s) => (
               <span key={s} className="hdm-tag doi">
@@ -304,6 +308,24 @@ function ItemCard({ it, total, open, onToggle }: { it: CgItem; total: number; op
               <span className="hdt-st">{s.title}</span>
               <span className="hdt-bb">ký BB {s.no}</span>
             </div>
+            {s.steps.length > 0 && (
+              <div className="hdt-steps">
+                <b>Trình tự thi công</b>
+                <ol>
+                  {s.steps.map((x, j) => (
+                    <li key={j}>{x}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {s.notes.length > 0 && (
+              <div className="hdt-steps warn">
+                <b>Lưu ý</b>
+                {s.notes.map((x, j) => (
+                  <p key={j}>• {x}</p>
+                ))}
+              </div>
+            )}
             <ol className="hdt-crit">
               {s.items.map((c, j) => (
                 <li key={j}>
