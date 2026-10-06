@@ -1055,6 +1055,9 @@
   border-style: solid;
   border-color: var(--terra);
 }
+.pldoc .pl-qpub > span {
+  flex: 1 1 240px;
+}
 /* màn Hợp đồng: chọn báo giá chốt */
 .pldoc .pl-pick {
   border: 1px solid var(--line2);

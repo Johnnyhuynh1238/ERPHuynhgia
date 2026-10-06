@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { plexMono, plexSans } from "@/lib/fonts";
 import {
+  PIPELINE_CONTRACT_DOC_KEY,
   PIPELINE_DOC_KEYS,
   PIPELINE_STAGES,
   PUBLIC_SITE_URL,
@@ -65,6 +66,7 @@ export function StageClient({
     versions,
     contractVersionNo,
     contractUpdatedAt,
+    contractPublishedAt,
   } = state;
   const latestNo = versions.length
     ? versions[versions.length - 1].versionNo
@@ -389,6 +391,30 @@ export function StageClient({
     )
       return;
     await call("", "PATCH", { contractHtml: null });
+  };
+
+  // Chốt HĐ → tab "Hợp đồng" hiện ở link khách (cùng link dự án, mở thẳng bằng #hop-dong).
+  const contractUrl = `${publicUrl}#${PIPELINE_CONTRACT_DOC_KEY}`;
+  const setContractPublished = async (on: boolean) => {
+    if (
+      !window.confirm(
+        on
+          ? "Chốt hợp đồng? Khách mở link sẽ thấy hợp đồng ngay."
+          : "Ẩn hợp đồng khỏi link khách?",
+      )
+    )
+      return;
+    await call("", "PATCH", { contractPublished: on });
+  };
+
+  const copyContractLink = async () => {
+    try {
+      await navigator.clipboard.writeText(contractUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("Chép link hợp đồng gửi khách:", contractUrl);
+    }
   };
 
   const copyLink = async () => {
@@ -902,10 +928,56 @@ export function StageClient({
               </button>
             ) : null}
           </div>
-          <div className="pl-linknote">
-            Hợp đồng chỉ xem được trong ERP, không nằm ở link khách. Bấm In →
-            chọn &quot;Lưu thành PDF&quot; để gửi khách.
-          </div>
+          {contractUpdatedAt ? (
+            <div className={`pl-qpub${contractPublishedAt ? " on" : ""}`}>
+              {contractPublishedAt ? (
+                <>
+                  <span>
+                    <b>Đã chốt</b> — khách xem được hợp đồng ở tab Hợp đồng (
+                    {fmtDay(contractPublishedAt)}). Thay file thì tự ẩn lại.
+                  </span>
+                  <button
+                    type="button"
+                    className="pl-btn ghost"
+                    onClick={copyContractLink}
+                  >
+                    {copied ? "✓ Đã chép" : "📋 Chép link"}
+                  </button>
+                  <a
+                    className="pl-btn ghost"
+                    href={contractUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Mở ↗
+                  </a>
+                  <button
+                    type="button"
+                    className="pl-btn"
+                    onClick={() => setContractPublished(false)}
+                    disabled={busy}
+                  >
+                    Ẩn lại
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>
+                    <b>Chưa chốt</b> — chỉ anh xem được, link khách chưa có hợp
+                    đồng.
+                  </span>
+                  <button
+                    type="button"
+                    className="pl-btn"
+                    onClick={() => setContractPublished(true)}
+                    disabled={busy}
+                  >
+                    ✓ Chốt, gửi HĐ cho khách
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
           {contractUpdatedAt ? (
             <div className="pl-pvw">
               <iframe

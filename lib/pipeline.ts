@@ -58,6 +58,9 @@ export const PIPELINE_DOC_KEYS: Record<PipelineDocKind, string> = {
   quote: "bao-gia",
 };
 
+// Hợp đồng: 1 file/dự án (không theo phiên bản), chỉ hiện ở trang cổng khi admin đã chốt gửi khách.
+export const PIPELINE_CONTRACT_DOC_KEY = "hop-dong";
+
 // Mỗi dự án 1 link duy nhất cho khách: <PUBLIC_SITE_URL>/<slug> (trang cổng chứa mọi phiên bản mô tả + báo giá).
 // Truyền kind/versionNo → thêm #<tab>-v<n> để mở thẳng tab + phiên bản đó.
 export function pipelinePublicUrl(

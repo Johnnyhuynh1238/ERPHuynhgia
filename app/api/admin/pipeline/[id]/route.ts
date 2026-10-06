@@ -14,6 +14,7 @@ const PatchSchema = z.object({
   stage: z.number().int().min(1).max(6).optional(),
   contractVersionNo: z.number().int().min(1).optional(),
   contractHtml: z.string().max(3 * 1024 * 1024).nullable().optional(),
+  contractPublished: z.boolean().optional(),
 });
 
 // Sửa thông tin / chuyển giai đoạn (admin tự bấm) / chọn báo giá chốt hợp đồng.
@@ -46,6 +47,7 @@ export async function PATCH(
       stage: true,
       stageDates: true,
       contractVersionNo: true,
+      contractUpdatedAt: true,
       versions: { select: { versionNo: true } },
     },
   });
@@ -67,6 +69,16 @@ export async function PATCH(
   if (d.contractHtml !== undefined) {
     data.contractHtml = d.contractHtml || null;
     data.contractUpdatedAt = d.contractHtml ? new Date() : null;
+    // Thay / xoá file → ẩn khỏi link khách, admin xem lại rồi bấm chốt lại.
+    data.contractPublishedAt = null;
+  } else if (d.contractPublished !== undefined) {
+    if (d.contractPublished && !current.contractUpdatedAt) {
+      return NextResponse.json(
+        { message: "Chưa có file hợp đồng" },
+        { status: 400 },
+      );
+    }
+    data.contractPublishedAt = d.contractPublished ? new Date() : null;
   }
 
   let contractNo = current.contractVersionNo;

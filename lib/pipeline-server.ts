@@ -24,6 +24,7 @@ export type PipelineState = {
   stageDates: Record<string, string>;
   contractVersionNo: number | null;
   contractUpdatedAt: string | null;
+  contractPublishedAt: string | null;
   projectId: string | null;
   createdAt: string;
   versions: PipelineVersionMeta[];
@@ -87,6 +88,7 @@ export async function loadPipelineState(
       stageDates: true,
       contractVersionNo: true,
       contractUpdatedAt: true,
+      contractPublishedAt: true,
       projectId: true,
       createdAt: true,
       versions: {
@@ -119,6 +121,9 @@ export async function loadPipelineState(
     contractVersionNo: p.contractVersionNo,
     contractUpdatedAt: p.contractUpdatedAt
       ? p.contractUpdatedAt.toISOString()
+      : null,
+    contractPublishedAt: p.contractPublishedAt
+      ? p.contractPublishedAt.toISOString()
       : null,
     projectId: p.projectId,
     createdAt: p.createdAt.toISOString(),
