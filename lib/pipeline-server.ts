@@ -46,6 +46,42 @@ export function injectPipelineEmbed(html: string): string {
     : html + inject;
 }
 
+// HĐ gửi khách khi CHƯA ký: chỉ xem, không in / lưu / sao chép.
+// File có bản xem A4 dạng ảnh (.a4v) → bỏ hẳn lớp chữ, khách chỉ nhận ảnh trang (không bôi đen / tìm chữ được).
+// Chặn chuột phải, bôi đen, kéo ảnh, Ctrl+P/S/C/A/U; khi in → trang trắng kèm lời nhắc.
+// Không chặn được chụp màn hình — lời nhắc trên cổng nói rõ.
+const NOCOPY_STYLE = `<style>html,body{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+img{pointer-events:none!important;-webkit-user-drag:none}
+.hg-nocopy{display:none}
+@media print{body>*:not(.hg-nocopy){display:none!important}.hg-nocopy{display:block!important;font:16px/1.5 system-ui,sans-serif;padding:40px;text-align:center}}</style>`;
+const NOCOPY_SCRIPT = `<script>(function(){function no(e){e.preventDefault();return false}
+["contextmenu","copy","cut","dragstart","selectstart"].forEach(function(t){document.addEventListener(t,no,true)});
+document.addEventListener("keydown",function(e){var k=(e.key||"").toLowerCase();if((e.ctrlKey||e.metaKey)&&"pscau".indexOf(k)>=0||k==="printscreen")no(e)},true)})();</script>`;
+const NOCOPY_NOTE = `<div class="hg-nocopy">Hợp đồng chưa ký — Huỳnh Gia không cho phép in hoặc lưu bản này.</div>`;
+
+export function guardPipelineContract(html: string): string {
+  const lower = html.toLowerCase();
+  const a4 = lower.indexOf('<div class="a4v">');
+  const head = lower.indexOf("</head>");
+  if (a4 >= 0 && head >= 0 && head < a4) {
+    const end = lower.indexOf("</div>", a4);
+    if (end > a4)
+      html =
+        html.slice(0, head) +
+        "</head><body>" +
+        html.slice(a4, end + 6) +
+        "</body></html>";
+  }
+  const h = html.toLowerCase().indexOf("</head>");
+  html =
+    h >= 0
+      ? html.slice(0, h) + NOCOPY_STYLE + html.slice(h)
+      : NOCOPY_STYLE + html;
+  const b = html.toLowerCase().lastIndexOf("</body>");
+  const tail = NOCOPY_NOTE + NOCOPY_SCRIPT;
+  return b >= 0 ? html.slice(0, b) + tail + html.slice(b) : html + tail;
+}
+
 // File báo giá có thể đặt {{HG_NGAY_BAO_GIA}} / {{HG_HAN_BAO_GIA}}: ngày anh bấm chốt (giờ Việt Nam)
 // và ngày hết hiệu lực (chốt + 30 ngày). Chưa chốt → ghi rõ để admin xem trước không nhầm.
 export const QUOTE_VALID_DAYS = 30;

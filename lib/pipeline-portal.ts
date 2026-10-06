@@ -53,8 +53,8 @@ main{max-width:1200px;margin:0 auto;padding:14px 20px 40px}
 .pvw iframe{display:block;border:0;width:100%;background:#fff}
 .empty{border:1px dashed rgba(46,20,10,.2);border-radius:11px;background:#fbf7ec;padding:70px 20px;text-align:center;color:rgba(46,20,10,.55)}
 .empty b{display:block;font-size:18px;color:#2e140a;margin-bottom:4px}
-.full{text-align:right;margin:0 0 8px;font-size:13px}
-.full a{color:#e36122;font-weight:600}
+.full{background:#fff7d6;border:1px solid #e0c27a;color:#8a3d1c;border-radius:9px;padding:9px 12px;font-size:13px;line-height:1.45;margin:0 0 10px}
+@media print{body{display:none!important}}
 [hidden]{display:none!important}
 @media (max-width:700px){
 .in{padding:8px 12px}
@@ -159,7 +159,7 @@ ${versionBar}
 </div></header>
 <main>
 <div class="old" id="old" hidden>Anh/chị đang xem bản cũ <b id="oldn"></b>. <a id="tolatest">Xem bản mới nhất V${latestNo}</a></div>
-<div class="full" id="full" hidden><a href="?doc=hop-dong" target="_blank" rel="noopener">Mở toàn trang để in / lưu PDF ↗</a></div>
+<div class="full" id="full" hidden>🔒 <b>Bản hợp đồng xem trước — chưa ký.</b> Anh/chị vui lòng chỉ xem, không in, lưu, chụp màn hình, sao chép hay chia sẻ nội dung cho bên khác. Huỳnh Gia sẽ giao bản chính khi hai bên ký hợp đồng.</div>
 <div class="pvw" id="pvw" hidden></div>
 <div class="empty" id="empty" hidden><b id="emt"></b>Huỳnh Gia sẽ cập nhật tại đây khi hoàn tất.</div>
 </main>

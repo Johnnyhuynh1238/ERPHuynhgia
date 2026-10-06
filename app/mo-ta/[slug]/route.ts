@@ -3,6 +3,7 @@ import { PIPELINE_CONTRACT_DOC_KEY, PIPELINE_DOC_KEYS } from "@/lib/pipeline";
 import { renderPipelinePortal } from "@/lib/pipeline-portal";
 import {
   fillPipelineQuoteDates,
+  guardPipelineContract,
   injectPipelineEmbed,
 } from "@/lib/pipeline-server";
 
@@ -24,7 +25,7 @@ function page(title: string, status: number) {
 // Link khách huynhgia6.com/<slug> (nginx proxy về đây) — 1 link cho cả dự án:
 //   không tham số        → trang cổng: tab Mô tả / Báo giá + chọn phiên bản V1, V2…
 //   ?doc=mo-ta|bao-gia&v=n → HTML admin tải lên của phiên bản đó (trang cổng và ERP nhúng vào khung).
-//   ?doc=hop-dong          → file hợp đồng (chỉ khi admin đã chốt gửi khách).
+//   ?doc=hop-dong          → file hợp đồng (chỉ khi admin đã chốt gửi khách; chặn in / lưu / sao chép).
 // HTML tải lên phục vụ kèm CSP sandbox → chạy ở origin "rỗng", không đọc được cookie/phiên của ERP hay website.
 export async function GET(
   request: Request,
@@ -96,10 +97,10 @@ export async function GET(
       select: { contractHtml: true },
     });
     if (!c?.contractHtml) return page("Hợp đồng đang được chuẩn bị", 200);
+    // HĐ chưa ký: khách chỉ xem trong cổng, không in / lưu / sao chép.
+    const html = guardPipelineContract(c.contractHtml);
     return docResponse(
-      q.get("embed") === "1"
-        ? injectPipelineEmbed(c.contractHtml)
-        : c.contractHtml,
+      q.get("embed") === "1" ? injectPipelineEmbed(html) : html,
     );
   }
 
