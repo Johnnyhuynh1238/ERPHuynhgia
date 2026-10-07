@@ -13,14 +13,16 @@ import {
   type Material,
   type Section,
   type SectionKind,
+  type Work,
 } from "./du-toan-data";
 import "./du-toan.css";
 
-type TabKey = "ct" | "vt" | "kh";
+// 3 tab: Công tác (KL + NC + VT theo phần) · Vật tư (gộp mua hàng) · Nhân công (khoán theo công tác).
+type TabKey = "ct" | "vt" | "nc";
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "ct", label: "Phần" },
+  { key: "ct", label: "Công tác" },
   { key: "vt", label: "Vật tư" },
-  { key: "kh", label: "Khoán" },
+  { key: "nc", label: "Nhân công" },
 ];
 
 const qfmt = (n: number, u: string) =>
@@ -36,25 +38,39 @@ const swatchOf = (s: string | null) => {
   return SWATCH[h % SWATCH.length];
 };
 
-// ── ô đơn giá sửa trực tiếp: chạm → input, blur/Enter lưu, Esc huỷ ──
-function PriceCell({ value, onSave }: { value: number; onSave: (n: number) => void }) {
+// ── ô số sửa trực tiếp: chạm → input, blur/Enter lưu, Esc huỷ ──
+// decimal=true cho khối lượng (vi-VN: "." ngăn nghìn, "," thập phân).
+function PriceCell({
+  value,
+  onSave,
+  decimal = false,
+}: {
+  value: number;
+  onSave: (n: number) => void;
+  decimal?: boolean;
+}) {
   const [edit, setEdit] = useState(false);
   const [flash, setFlash] = useState(false);
+  const show = (n: number) => (decimal ? n.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) : fmt(n));
+  const parse = (s: string) =>
+    decimal
+      ? Number(s.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "")) || 0
+      : Number(s.replace(/[^\d]/g, "")) || 0;
   if (edit) {
     return (
       <input
         className="dt-epin"
         autoFocus
-        inputMode="numeric"
+        inputMode={decimal ? "decimal" : "numeric"}
         type="text"
-        defaultValue={value ? fmt(value) : ""}
+        defaultValue={value ? show(value) : ""}
         onFocus={(e) => e.currentTarget.select()}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           else if (e.key === "Escape") setEdit(false);
         }}
         onBlur={(e) => {
-          const v = Number(e.target.value.replace(/[^\d]/g, "")) || 0;
+          const v = parse(e.target.value);
           setEdit(false);
           if (v !== value) {
             onSave(v);
@@ -67,21 +83,28 @@ function PriceCell({ value, onSave }: { value: number; onSave: (n: number) => vo
   }
   return (
     <span className={"dt-ep" + (flash ? " dt-flash" : "")} onClick={() => setEdit(true)}>
-      {fmt(value)}
+      {show(value)}
       <span className="pen">✎</span>
     </span>
   );
 }
 
-// Nhóm theo PHẦN dự án (thay công tác catalog).
+// Công tác + VT tiêu hao của nó.
+type WorkRow = Work & { mats: Material[]; vt: number };
+// Nhóm theo PHẦN dự án: công tác + VT chưa gắn công tác (dự toán cũ).
 type CtGroup = {
+  key: string; // sectionId | "__none"
   sectionId: string | null;
   name: string;
   kind: SectionKind | null;
   sortOrder: number;
-  mats: Material[];
-  value: number;
+  works: WorkRow[];
+  loose: Material[];
+  vt: number;
+  nc: number;
 };
+type LooseGroup = { name: string; kind: SectionKind | null; mats: Material[] };
+
 export function DuToanClient({
   projectId,
   projectCode,
@@ -93,19 +116,21 @@ export function DuToanClient({
   projectName: string;
   initialTab?: string;
 }) {
-  const validTab = TABS.some((t) => t.key === initialTab) ? (initialTab as TabKey) : "ct";
+  const tab0 = initialTab === "kh" ? "nc" : initialTab; // link cũ ?tab=kh
+  const validTab = TABS.some((t) => t.key === tab0) ? (tab0 as TabKey) : "ct";
   const [tab, setTab] = useState<TabKey>(validTab);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [works, setWorks] = useState<Work[]>([]);
   const [khoan, setKhoan] = useState<Khoan[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<{ kind: TabKey; id: string } | null>(null);
+  const [sheet, setSheet] = useState<{ kind: "work" | "loose" | "vt" | "kh"; id: string } | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
 
-  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
+  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup + tải lại số AI vừa ghi.
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       if (e.origin !== "https://huynhgia6.com") return;
@@ -115,71 +140,100 @@ export function DuToanClient({
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
-  useEffect(() => {
-    Promise.all([api.listSections(projectId), api.listMaterials(projectId), api.listKhoan(projectId)])
-      .then(([sec, mat, kh]) => {
-        setSections(sec.sections);
-        setMaterials(mat.items);
-        setKhoan(kh.items);
-      })
-      .catch((e) => setErr(e.message))
-      .finally(() => setLoading(false));
-  }, [projectId]);
-
-  // reload PHẦN + VT (xoá/đổi tên phần ảnh hưởng nhãn VT)
-  const reloadAll = async () => {
+  const loadAll = async () => {
     try {
-      const [sec, mat] = await Promise.all([
+      const [sec, mat, wk, kh] = await Promise.all([
         api.listSections(projectId),
         api.listMaterials(projectId),
+        api.listWorks(projectId),
+        api.listKhoan(projectId),
       ]);
       setSections(sec.sections);
       setMaterials(mat.items);
+      setWorks(wk.items);
+      setKhoan(kh.items);
     } catch (e) {
       setErr((e as Error).message);
+    } finally {
+      setLoading(false);
     }
+  };
+  useEffect(() => {
+    void loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // AI ghi DB trong lúc popup mở → đóng popup thì tải lại.
+  const closeAi = () => {
+    setAiOpen(false);
+    void loadAll();
   };
 
   const matTotal = useMemo(() => materials.reduce((s, m) => s + amountOf(m), 0), [materials]);
-  const khoanTotal = useMemo(() => khoan.reduce((s, k) => s + k.value, 0), [khoan]);
-  const grand = matTotal + khoanTotal;
+  const laborTotal = useMemo(() => works.reduce((s, w) => s + w.laborAmount, 0), [works]);
+  const khoanTotal = useMemo(() => khoan.reduce((s, k) => s + k.value, 0), [khoan]); // dự toán cũ
+  const ncTotal = laborTotal + khoanTotal;
+  const grand = matTotal + ncTotal;
   const vtPct = grand ? Math.round((matTotal / grand) * 100) : 0;
-  const khPct = grand ? 100 - vtPct : 0;
+  const ncPct = grand ? 100 - vtPct : 0;
 
-  // gộp theo PHẦN dự án (kể cả phần rỗng — để hiển thị & gán VT vào)
+  // gộp theo PHẦN: công tác (kèm VT tiêu hao) + VT lẻ chưa gắn công tác
   const ctGroups = useMemo<CtGroup[]>(() => {
     const map = new Map<string, CtGroup>();
-    for (const s of sections) {
-      map.set(s.id, {
-        sectionId: s.id,
-        name: s.name,
-        kind: s.kind,
-        sortOrder: s.sortOrder,
-        mats: [],
-        value: 0,
-      });
-    }
-    for (const m of materials) {
-      const key = m.sectionId ?? "__none";
+    const ensure = (sectionId: string | null, name: string | null, kind: SectionKind | null) => {
+      const key = sectionId ?? "__none";
       let g = map.get(key);
       if (!g) {
         g = {
-          sectionId: m.sectionId,
-          name: m.sectionName ?? "Chưa gán phần",
-          kind: m.sectionKind,
+          key,
+          sectionId,
+          name: name ?? "Chưa gán phần",
+          kind,
           sortOrder: Number.MAX_SAFE_INTEGER,
-          mats: [],
-          value: 0,
+          works: [],
+          loose: [],
+          vt: 0,
+          nc: 0,
         };
         map.set(key, g);
       }
-      g.mats.push(m);
-      g.value += amountOf(m);
+      return g;
+    };
+    for (const s of sections) ensure(s.id, s.name, s.kind).sortOrder = s.sortOrder;
+    const secById = new Map(sections.map((s) => [s.id, s]));
+    const rowById = new Map<string, WorkRow>();
+    for (const w of works) {
+      const s = w.sectionId ? secById.get(w.sectionId) : undefined;
+      const g = ensure(s ? s.id : null, s?.name ?? null, s?.kind ?? null);
+      const row: WorkRow = { ...w, mats: [], vt: 0 };
+      g.works.push(row);
+      g.nc += w.laborAmount;
+      rowById.set(w.id, row);
+    }
+    for (const m of materials) {
+      const row = m.workId ? rowById.get(m.workId) : undefined;
+      if (row) {
+        row.mats.push(m);
+        row.vt += amountOf(m);
+        const w = works.find((x) => x.id === row.id);
+        const s = w?.sectionId ? secById.get(w.sectionId) : undefined;
+        ensure(s ? s.id : null, s?.name ?? null, s?.kind ?? null).vt += amountOf(m);
+      } else {
+        const g = ensure(m.sectionId, m.sectionName, m.sectionKind);
+        g.loose.push(m);
+        g.vt += amountOf(m);
+      }
     }
     return Array.from(map.values()).sort(
       (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
     );
-  }, [materials, sections]);
+  }, [materials, sections, works]);
+
+  const workRowById = useMemo(() => {
+    const m = new Map<string, WorkRow>();
+    ctGroups.forEach((g) => g.works.forEach((w) => m.set(w.id, w)));
+    return m;
+  }, [ctGroups]);
 
   // gộp theo vật tư (tên + đvt) — nguồn chung với màn Mua hàng (lib/estimate-vt-groups)
   const vtGroups = useMemo<VtGroup<Material>[]>(
@@ -202,7 +256,7 @@ export function DuToanClient({
       setErr((e as Error).message);
     }
   };
-  // gán 1 VT vào PHẦN (hoặc bỏ gán)
+  // gán 1 VT lẻ vào PHẦN (hoặc bỏ gán)
   const saveMatSection = async (id: string, sectionId: string | null) => {
     const s = sections.find((x) => x.id === sectionId) ?? null;
     setMaterials((rows) =>
@@ -218,7 +272,38 @@ export function DuToanClient({
       setErr((e as Error).message);
     }
   };
-  // lưu giá trị 1 HĐ khoán
+  // sửa KL / đơn giá khoán NC 1 công tác
+  const saveWork = async (id: string, patch: { quantity?: number; laborPrice?: number }) => {
+    setWorks((rows) =>
+      rows.map((r) => {
+        if (r.id !== id) return r;
+        const n = { ...r, ...patch };
+        return { ...n, laborAmount: Math.round(n.quantity * n.laborPrice) };
+      }),
+    );
+    try {
+      await api.patchWork(id, patch);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  const delWork = async (w: WorkRow) => {
+    if (
+      !window.confirm(
+        `Xoá công tác “${w.name}”?\n${w.mats.length} vật tư tiêu hao của công tác cũng bị xoá.`,
+      )
+    )
+      return;
+    try {
+      await api.delWork(w.id);
+      setSheet(null);
+      setWorks((rows) => rows.filter((r) => r.id !== w.id));
+      setMaterials((rows) => rows.filter((r) => r.workId !== w.id));
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  // lưu giá trị 1 HĐ khoán (dự toán cũ)
   const saveKhoanValue = async (id: string, value: number) => {
     setKhoan((rows) => rows.map((r) => (r.id === id ? { ...r, value } : r)));
     try {
@@ -226,6 +311,11 @@ export function DuToanClient({
     } catch (e) {
       setErr((e as Error).message);
     }
+  };
+
+  const looseOf = (key: string): LooseGroup | undefined => {
+    const g = ctGroups.find((x) => x.key === key);
+    return g ? { name: g.name, kind: g.kind, mats: g.loose } : undefined;
   };
 
   return (
@@ -237,7 +327,7 @@ export function DuToanClient({
           </Link>
           <div className="dt-acts">
             <button type="button" className="dt-ibtn ai" onClick={() => setAiOpen(true)}>
-              🤖 AI bóc vật tư
+              🤖 AI bóc dự toán
             </button>
             <button
               type="button"
@@ -252,7 +342,7 @@ export function DuToanClient({
 
         <div className="dt-eyebrow">Dự toán · {projectCode}</div>
         <h1 className="dt-h1">{projectName}</h1>
-        <div className="dt-meta">Kho DB — AI bóc &amp; ghi, ERP hiển thị</div>
+        <div className="dt-meta">Khối lượng → khoán nhân công + vật tư tiêu hao · AI bóc &amp; ghi</div>
 
         {err && (
           <div className="dt-formula" style={{ marginTop: 12, color: "#b91c1c" }}>
@@ -262,32 +352,32 @@ export function DuToanClient({
 
         {/* THÔNG SỐ DỰ TOÁN */}
         <div className="dt-sum">
-          <div className="k">Tổng chi phí dự toán</div>
+          <div className="k">Tổng giá vốn dự toán</div>
           <div className="tot">
             {fmt(grand)}
             <span className="u">đ</span>
           </div>
-          <div className="note">Vật tư cấp + nhân công khoán · chưa gồm VAT</div>
+          <div className="note">Vật tư (giá NCC) + nhân công khoán gọn gồm máy · chưa gồm VAT</div>
           <div className="dt-split">
             <div className="c vt">
-              <div className="sk">Chi phí vật tư</div>
+              <div className="sk">Vật tư</div>
               <div className="sv">{fmt(matTotal)}</div>
               <div className="sp">
                 {vtPct}% · {vtGroups.length} chủng loại
               </div>
             </div>
             <div className="c kh">
-              <div className="sk">Chi phí khoán</div>
-              <div className="sv">{fmt(khoanTotal)}</div>
+              <div className="sk">Khoán nhân công</div>
+              <div className="sv">{fmt(ncTotal)}</div>
               <div className="sp">
-                {khPct}% · {khoan.length} hợp đồng
+                {ncPct}% · {works.length} công tác
               </div>
             </div>
           </div>
           {grand > 0 && (
             <div className="dt-track">
               <i style={{ width: `${vtPct}%`, background: "var(--dt-terra)" }} />
-              <i style={{ width: `${khPct}%`, background: "var(--dt-orange)" }} />
+              <i style={{ width: `${ncPct}%`, background: "var(--dt-orange)" }} />
             </div>
           )}
         </div>
@@ -295,8 +385,8 @@ export function DuToanClient({
         {/* TABS */}
         <div className="dt-tabs">
           {TABS.map((t) => {
-            const n = t.key === "ct" ? ctGroups.length : t.key === "vt" ? vtGroups.length : khoan.length;
-            const unit = t.key === "ct" ? "phần" : t.key === "vt" ? "loại" : "HĐ";
+            const n = t.key === "vt" ? vtGroups.length : works.length;
+            const unit = t.key === "vt" ? "loại" : t.key === "nc" ? fmt(ncTotal) + " đ" : "công tác";
             return (
               <button
                 key={t.key}
@@ -304,9 +394,7 @@ export function DuToanClient({
                 onClick={() => selectTab(t.key)}
               >
                 <span>{t.label}</span>
-                <span className="tn">
-                  {n} {unit}
-                </span>
+                <span className="tn">{t.key === "nc" ? unit : `${n} ${unit}`}</span>
               </button>
             );
           })}
@@ -317,14 +405,22 @@ export function DuToanClient({
         ) : tab === "ct" ? (
           <CongTacPanel
             groups={ctGroups}
-            total={matTotal}
-            onOpen={(id) => setSheet({ kind: "ct", id })}
+            total={grand}
+            onOpenWork={(id) => setSheet({ kind: "work", id })}
+            onOpenLoose={(key) => setSheet({ kind: "loose", id: key })}
             onManage={() => setManageOpen(true)}
           />
         ) : tab === "vt" ? (
           <VatTuPanel superGroups={vtSuperGroups} total={matTotal} onOpen={(id) => setSheet({ kind: "vt", id })} />
         ) : (
-          <KhoanPanel rows={khoan} total={khoanTotal} onOpen={(id) => setSheet({ kind: "kh", id })} />
+          <NhanCongPanel
+            groups={ctGroups}
+            laborTotal={laborTotal}
+            khoan={khoan}
+            khoanTotal={khoanTotal}
+            onOpenWork={(id) => setSheet({ kind: "work", id })}
+            onOpenKhoan={(id) => setSheet({ kind: "kh", id })}
+          />
         )}
 
         <div className="dt-foot">Đúng — Đẹp — Bền · Huỳnh Gia ERP</div>
@@ -338,9 +434,21 @@ export function DuToanClient({
             <div className="dt-scrim show" onClick={() => setSheet(null)} />
             <div className="dt-sheet show" role="dialog" aria-modal="true">
               <div className="dt-grip" />
-              {sheet.kind === "ct" && (
+              {sheet.kind === "work" && (
+                <WorkSheet
+                  work={workRowById.get(sheet.id)}
+                  sectionName={
+                    ctGroups.find((g) => g.works.some((w) => w.id === sheet.id))?.name ?? ""
+                  }
+                  onClose={() => setSheet(null)}
+                  onSaveWork={saveWork}
+                  onSavePrice={saveMatPrice}
+                  onDelete={delWork}
+                />
+              )}
+              {sheet.kind === "loose" && (
                 <CtSheet
-                  group={ctGroups.find((g) => (g.sectionId ?? "__none") === sheet.id)}
+                  group={looseOf(sheet.id)}
                   sections={sections}
                   onClose={() => setSheet(null)}
                   onSavePrice={saveMatPrice}
@@ -378,7 +486,7 @@ export function DuToanClient({
                 projectId={projectId}
                 sections={sections}
                 onClose={() => setManageOpen(false)}
-                onChanged={reloadAll}
+                onChanged={loadAll}
                 onError={(m) => setErr(m)}
               />
             </div>
@@ -390,17 +498,17 @@ export function DuToanClient({
       {aiOpen &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="dt-ai-scrim" onClick={() => setAiOpen(false)}>
+          <div className="dt-ai-scrim" onClick={closeAi}>
             <div className="dt-ai-box" onClick={(e) => e.stopPropagation()}>
               <div className="dt-ai-head">
-                <b>🤖 AI bóc vật tư — {projectCode}</b>
-                <button type="button" className="x" onClick={() => setAiOpen(false)} aria-label="Đóng">
+                <b>🤖 AI bóc dự toán — {projectCode}</b>
+                <button type="button" className="x" onClick={closeAi} aria-label="Đóng">
                   ✕
                 </button>
               </div>
               <iframe
                 src={`https://huynhgia6.com/claude/chat?arg=dutoan-${encodeURIComponent(projectCode)}`}
-                title="AI bóc vật tư"
+                title="AI bóc dự toán"
               />
             </div>
           </div>,
@@ -416,16 +524,21 @@ const kindRank = (k: SectionKind | null) => {
   const i = SECTION_KINDS.findIndex((x) => x.key === k);
   return i < 0 ? SECTION_KINDS.length : i;
 };
+const sortGroups = (groups: CtGroup[]) =>
+  [...groups].sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.sortOrder - b.sortOrder);
 
+// Tab Công tác: Loại (thô/hoàn thiện) ▸ PHẦN ▸ công tác (TT NC + VT).
 function CongTacPanel({
   groups,
   total,
-  onOpen,
+  onOpenWork,
+  onOpenLoose,
   onManage,
 }: {
   groups: CtGroup[];
   total: number;
-  onOpen: (id: string) => void;
+  onOpenWork: (id: string) => void;
+  onOpenLoose: (key: string) => void;
   onManage: () => void;
 }) {
   const manageBtn = (
@@ -437,25 +550,22 @@ function CongTacPanel({
     return (
       <div>
         {manageBtn}
-        <div className="dt-empty">Chưa có PHẦN nào. Bấm “Quản lý phần” để tạo theo HĐTK.</div>
+        <div className="dt-empty">Chưa có PHẦN nào. Bấm “Quản lý phần” để tạo theo HĐTK, rồi dùng 🤖 AI bóc công tác.</div>
       </div>
     );
 
-  // tổng theo loại (thô / hoàn thiện / …)
   const kindTotal = new Map<SectionKind | null, number>();
-  for (const g of groups) kindTotal.set(g.kind, (kindTotal.get(g.kind) ?? 0) + g.value);
+  for (const g of groups) kindTotal.set(g.kind, (kindTotal.get(g.kind) ?? 0) + g.vt + g.nc);
 
-  const sorted = [...groups].sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.sortOrder - b.sortOrder);
   let lastKind: SectionKind | null | undefined = undefined;
   let idx = 0;
   return (
     <div>
       {manageBtn}
-      {sorted.map((g) => {
-        idx++;
+      {sortGroups(groups).map((g) => {
         const header =
           g.kind !== lastKind ? (
-            <div className="dt-phead" key={"h-" + (g.kind ?? "none")}>
+            <div className="dt-phead">
               <span className="pi">{kindLabel(g.kind)}</span>
               <span className="pn" />
               <span className="pt dt-num">{fmt(kindTotal.get(g.kind) ?? 0)}</span>
@@ -463,34 +573,146 @@ function CongTacPanel({
           ) : null;
         lastKind = g.kind;
         return (
-          <div key={g.sectionId ?? "__none"}>
+          <div key={g.key}>
             {header}
-            <button className="dt-row" onClick={() => onOpen(g.sectionId ?? "__none")}>
-              <span className="stt dt-num">{idx}</span>
-              <span className="rb">
-                <span className="r1">
-                  <span className="rn">{g.name}</span>
-                  <span className="rav dt-num">{fmt(g.value)}</span>
-                </span>
-                <span className="r2">
-                  <span className="rs">
-                    {g.mats.length} vật tư{g.sectionId == null ? " · chưa gán phần" : ""}
-                  </span>
-                  <span className="rau">vật tư</span>
-                </span>
+            <div className="dt-sec">
+              <span className="sn">{g.name}</span>
+              <span className="sv dt-num">
+                NC {fmt(g.nc)} · VT {fmt(g.vt)}
               </span>
-              <span className="chev">›</span>
-            </button>
+            </div>
+            {g.works.length === 0 && g.loose.length === 0 && (
+              <div className="dt-secempty">Chưa có công tác</div>
+            )}
+            {g.works.map((w) => {
+              idx++;
+              return (
+                <button className="dt-row" key={w.id} onClick={() => onOpenWork(w.id)}>
+                  <span className="stt dt-num">{idx}</span>
+                  <span className="rb">
+                    <span className="r1">
+                      <span className="rn">{w.name}</span>
+                      <span className="rav dt-num">{fmt(w.laborAmount + w.vt)}</span>
+                    </span>
+                    <span className="r2">
+                      <span className="rs">
+                        <b className="dt-num">{qfmt(w.quantity, w.unit)}</b>
+                        {w.location ? " · " + w.location : ""}
+                      </span>
+                      <span className="rau">
+                        NC {fmt(w.laborAmount)} · VT {fmt(w.vt)}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="chev">›</span>
+                </button>
+              );
+            })}
+            {g.loose.length > 0 && (
+              <button className="dt-row" onClick={() => onOpenLoose(g.key)}>
+                <span className="stt dt-num">·</span>
+                <span className="rb">
+                  <span className="r1">
+                    <span className="rn">Vật tư chưa gắn công tác</span>
+                    <span className="rav dt-num">{fmt(g.loose.reduce((s, m) => s + amountOf(m), 0))}</span>
+                  </span>
+                  <span className="r2">
+                    <span className="rs">{g.loose.length} vật tư</span>
+                    <span className="rau">vật tư</span>
+                  </span>
+                </span>
+                <span className="chev">›</span>
+              </button>
+            )}
           </div>
         );
       })}
       <div className="dt-gstrip">
-        <span className="gk">Tổng vật tư {groups.length} phần</span>
+        <span className="gk">Tổng giá vốn</span>
         <span className="gv dt-num">
           {fmt(total)}
           <span className="u">đ</span>
         </span>
       </div>
+    </div>
+  );
+}
+
+// Tab Nhân công: bảng KL × đơn giá khoán từng công tác → tổng giá trị khoán (căn cứ HĐ nhân công).
+function NhanCongPanel({
+  groups,
+  laborTotal,
+  khoan,
+  khoanTotal,
+  onOpenWork,
+  onOpenKhoan,
+}: {
+  groups: CtGroup[];
+  laborTotal: number;
+  khoan: Khoan[];
+  khoanTotal: number;
+  onOpenWork: (id: string) => void;
+  onOpenKhoan: (id: string) => void;
+}) {
+  const withWorks = sortGroups(groups).filter((g) => g.works.length > 0);
+  return (
+    <div>
+      {withWorks.length === 0 ? (
+        <div className="dt-empty">Chưa có công tác. Dùng 🤖 AI bóc khối lượng + đơn giá khoán.</div>
+      ) : (
+        <table className="dt-t dt-nc">
+          <thead>
+            <tr>
+              <th>Công tác</th>
+              <th className="r">KL × đơn giá</th>
+              <th className="r">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {withWorks.map((g) => [
+              <tr className="grp" key={"g-" + g.key}>
+                <td colSpan={2}>{g.name}</td>
+                <td className="r">{fmt(g.nc)}</td>
+              </tr>,
+              ...g.works.map((w) => (
+                <tr key={w.id} className="clk" onClick={() => onOpenWork(w.id)}>
+                  <td>
+                    <div className="dn">{w.name}</div>
+                    {w.location && <div className="dsub">{w.location}</div>}
+                  </td>
+                  <td className="r">
+                    {qfmt(w.quantity, w.unit)}
+                    <div className="dsub">× {fmt(w.laborPrice)}</div>
+                  </td>
+                  <td className="r amt">{fmt(w.laborAmount)}</td>
+                </tr>
+              )),
+            ])}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="tk" colSpan={2}>
+                Tổng giá trị khoán
+              </td>
+              <td className="r">{fmt(laborTotal)} đ</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+
+      {khoan.length > 0 && (
+        <>
+          <div className="dt-phead">
+            <span className="pi">Cũ</span>
+            <span className="pn">Khoán trọn gói (dự toán cũ)</span>
+            <span className="pt dt-num">{fmt(khoanTotal)}</span>
+          </div>
+          <KhoanPanel rows={khoan} total={khoanTotal} onOpen={onOpenKhoan} />
+        </>
+      )}
+      <p className="dt-ephelp" style={{ marginTop: 14 }}>
+        Đơn giá khoán gọn (gồm máy móc thiết bị) theo giá khu vực. Lập HĐ nhân công ở màn Hợp đồng thầu phụ.
+      </p>
     </div>
   );
 }
@@ -627,6 +849,112 @@ function SheetHead({ eye, title, onClose }: { eye: string; title: string; onClos
   );
 }
 
+// Chi tiết 1 công tác: KL + đơn giá khoán (sửa được) + VT tiêu hao (giá NCC).
+function WorkSheet({
+  work,
+  sectionName,
+  onClose,
+  onSaveWork,
+  onSavePrice,
+  onDelete,
+}: {
+  work?: WorkRow;
+  sectionName: string;
+  onClose: () => void;
+  onSaveWork: (id: string, patch: { quantity?: number; laborPrice?: number }) => void;
+  onSavePrice: (id: string, price: number) => void;
+  onDelete: (w: WorkRow) => void;
+}) {
+  if (!work) return <SheetHead eye="Công tác" title="—" onClose={onClose} />;
+  return (
+    <>
+      <SheetHead eye={`Công tác · ${sectionName}`} title={work.name} onClose={onClose} />
+      <div className="dt-sbody">
+        <div className="dt-kpi">
+          <div className="ki">
+            <div className="kk">Khối lượng</div>
+            <div className="kv" style={{ fontSize: 13 }}>
+              <PriceCell decimal value={work.quantity} onSave={(v) => onSaveWork(work.id, { quantity: v })} />
+              <div className="dsub">{work.unit}</div>
+            </div>
+          </div>
+          <div className="ki">
+            <div className="kk">ĐG khoán NC</div>
+            <div className="kv" style={{ fontSize: 13 }}>
+              <PriceCell value={work.laborPrice} onSave={(v) => onSaveWork(work.id, { laborPrice: v })} />
+              <div className="dsub">đ/{work.unit}</div>
+            </div>
+          </div>
+          <div className="ki">
+            <div className="kk">TT nhân công</div>
+            <div className="kv hl">{fmt(work.laborAmount)}</div>
+          </div>
+        </div>
+        <p className="dt-ephelp">Chạm khối lượng / đơn giá để sửa · bấm ra ngoài để lưu</p>
+
+        {work.location && (
+          <>
+            <div className="dt-blabel">Vị trí · diễn giải khối lượng</div>
+            <div className="dt-prose">{work.location}</div>
+          </>
+        )}
+        {work.note && (
+          <>
+            <div className="dt-blabel">Ghi chú</div>
+            <div className="dt-prose lead">{work.note}</div>
+          </>
+        )}
+
+        <div className="dt-blabel">Vật tư tiêu hao ({work.mats.length})</div>
+        {work.mats.length === 0 ? (
+          <div className="dt-empty">Công tác chỉ có nhân công.</div>
+        ) : (
+          <table className="dt-t">
+            <thead>
+              <tr>
+                <th>Vật tư · SL</th>
+                <th className="r">Đơn giá</th>
+                <th className="r">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              {work.mats.map((m) => (
+                <tr key={m.id}>
+                  <td>
+                    <div className="dn">{m.name}</div>
+                    <div className="dsub">
+                      {qfmt(m.quantity, m.unit)}
+                      {m.supplierName ? " · giá " + m.supplierName : ""}
+                      {m.note ? " · " + m.note : ""}
+                    </div>
+                  </td>
+                  <td className="r">
+                    <PriceCell value={m.unitPrice} onSave={(v) => onSavePrice(m.id, v)} />
+                    <div className="dsub">đ/{m.unit}</div>
+                  </td>
+                  <td className="r amt">{fmt(amountOf(m))}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="tk">Cộng vật tư</td>
+                <td></td>
+                <td className="r">{fmt(work.vt)} đ</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+
+        <button type="button" className="dt-delwork" onClick={() => onDelete(work)}>
+          🗑 Xoá công tác
+        </button>
+      </div>
+    </>
+  );
+}
+
+// VT lẻ chưa gắn công tác trong 1 phần (dự toán cũ).
 function CtSheet({
   group,
   sections,
@@ -634,7 +962,7 @@ function CtSheet({
   onSavePrice,
   onSaveSection,
 }: {
-  group?: CtGroup;
+  group?: LooseGroup;
   sections: Section[];
   onClose: () => void;
   onSavePrice: (id: string, price: number) => void;
@@ -644,7 +972,7 @@ function CtSheet({
   const sub = group.mats.reduce((s, m) => s + amountOf(m), 0);
   return (
     <>
-      <SheetHead eye={`Phần · ${kindLabel(group.kind)}`} title={group.name} onClose={onClose} />
+      <SheetHead eye={`VT chưa gắn công tác · ${kindLabel(group.kind)}`} title={group.name} onClose={onClose} />
       <div className="dt-sbody">
         <div className="dt-kpi">
           <div className="ki">
@@ -802,10 +1130,10 @@ function KhSheet({
   onClose: () => void;
   onSaveValue: (id: string, value: number) => void;
 }) {
-  if (!khoan) return <SheetHead eye="Hợp đồng khoán" title="—" onClose={onClose} />;
+  if (!khoan) return <SheetHead eye="Khoán (dự toán cũ)" title="—" onClose={onClose} />;
   return (
     <>
-      <SheetHead eye="Hợp đồng khoán" title={khoan.name} onClose={onClose} />
+      <SheetHead eye="Khoán (dự toán cũ)" title={khoan.name} onClose={onClose} />
       <div className="dt-sbody">
         <div className="dt-kpi">
           <div className="ki">
@@ -891,7 +1219,7 @@ function ManageSections({
   const changeKind = (s: Section, k: SectionKind) =>
     void wrap(() => api.patchSection(projectId, s.id, { kind: k }));
   const del = (s: Section) => {
-    if (!window.confirm(`Xoá phần “${s.name}”?\nVật tư trong phần sẽ về “chưa gán” (không mất).`)) return;
+    if (!window.confirm(`Xoá phần “${s.name}”?\nCông tác + vật tư trong phần sẽ về “chưa gán phần” (không mất).`)) return;
     void wrap(() => api.delSection(projectId, s.id));
   };
   const move = (s: Section, dir: -1 | 1) => {

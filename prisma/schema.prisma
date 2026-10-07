@@ -763,6 +763,7 @@ model Project {
   estimateMaterialMaps      EstimateMaterialMap[]
   estimateDbKhoan           EstimateDbKhoan[]
   estimateDbMaterials       EstimateDbMaterial[]
+  estimateWorks             EstimateWork[]
   sections                  ProjectSection[]
   pipeline                  ProjectPipeline?
 
@@ -4409,6 +4410,31 @@ model EstimateDbKhoan {
   @@map("estimate_db_khoan")
 }
 
+// Dự toán khối lượng — 1 dòng = 1 CÔNG TÁC (thuộc 1 PHẦN): KL có vị trí + đơn giá khoán NC
+// (khoán gọn gồm máy, giá khu vực). TT NC = quantity × laborPrice (runtime). VT tiêu hao gắn
+// qua estimate_db_materials.work_id. Tổng khoán NC = Σ → căn cứ HĐ nhân công + ngân sách.
+model EstimateWork {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  sectionId  String?  @map("section_id") @db.Uuid
+  name       String
+  location   String?  @db.Text // vị trí / diễn giải KL (trục, phòng, công thức)
+  unit       String   @db.VarChar(20)
+  quantity   Decimal  @default(0) @db.Decimal(14, 3)
+  laborPrice BigInt   @default(0) @map("labor_price") // đơn giá khoán NC / đơn vị
+  note       String?  @db.Text // GIẢ ĐỊNH, nguồn giá NC…
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section   ProjectSection?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  materials EstimateDbMaterial[]
+
+  @@index([projectId, sectionId, sortOrder])
+  @@map("estimate_works")
+}
+
 // Bảng 2 — Vật tư theo công tác (flat: 1 dòng = 1 VT trong 1 công tác).
 // công tác = ref StandardTaskCatalog (mã GĐ-CT). Mục đích cuối = thống kê SL VT theo công tác/chủng loại.
 // thành tiền = quantity × unitPrice (tính runtime, không lưu).
@@ -4416,6 +4442,8 @@ model EstimateDbMaterial {
   id         String   @id @default(uuid()) @db.Uuid
   projectId  String   @map("project_id") @db.Uuid
   sectionId  String?  @map("section_id") @db.Uuid // → ProjectSection (PHẦN theo HĐTK, per-dự án)
+  workId     String?  @map("work_id") @db.Uuid // → EstimateWork (công tác tiêu hao VT)
+  supplierId String?  @map("supplier_id") @db.Uuid // NCC nguồn đơn giá (supplier_material_prices), FK chỉ ở SQL
   catalogId  String?  @map("catalog_id") @db.Uuid // → StandardTaskCatalog (công tác) — legacy, giữ để dự án cũ ko vỡ
   categoryId String?  @map("category_id") @db.Uuid // → MaterialCategory (chủng loại)
   name       String // tên vật tư chi tiết
@@ -4429,11 +4457,13 @@ model EstimateDbMaterial {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  work     EstimateWork?        @relation(fields: [workId], references: [id], onDelete: Cascade)
   section  ProjectSection?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   catalog  StandardTaskCatalog? @relation(fields: [catalogId], references: [id], onDelete: SetNull)
   category MaterialCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([projectId, sectionId])
+  @@index([workId])
   @@index([projectId, catalogId])
   @@index([projectId, categoryId])
   @@map("estimate_db_materials")
@@ -4454,6 +4484,7 @@ model ProjectSection {
 
   project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   materials EstimateDbMaterial[]
+  works     EstimateWork[]
 
   @@index([projectId, sortOrder])
   @@map("project_sections")

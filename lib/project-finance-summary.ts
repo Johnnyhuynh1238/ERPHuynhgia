@@ -36,9 +36,12 @@ export async function getProjectFinanceSummary(projectId: string): Promise<Proje
       // Dự toán mới (app /du-toan) — bảng 1: khoán trọn gói, tổng = SUM(value).
       prisma.estimateDbKhoan.aggregate({ where: { projectId }, _sum: { value: true } }),
       // Dự toán mới — bảng 2: vật tư, thành tiền = quantity × unit_price (tính runtime).
+      // + NC khoán theo công tác (estimate_works: KL × đơn giá khoán).
       prisma.$queryRaw<{ total: number }[]>`
-        SELECT COALESCE(SUM(quantity * unit_price), 0)::float8 AS total
-        FROM estimate_db_materials WHERE project_id = ${projectId}::uuid`,
+        SELECT (COALESCE((SELECT SUM(quantity * unit_price) FROM estimate_db_materials
+                           WHERE project_id = ${projectId}::uuid), 0)
+              + COALESCE((SELECT SUM(quantity * labor_price) FROM estimate_works
+                           WHERE project_id = ${projectId}::uuid), 0))::float8 AS total`,
       // Nợ NCC còn lại (cộng dồn theo dự án): SUM(nợ − đã trả), sàn 0 mỗi NCC.
       prisma.$queryRaw<{ con_lai: number }[]>`
         SELECT COALESCE(SUM(con_lai), 0)::float8 AS con_lai
@@ -62,7 +65,7 @@ export async function getProjectFinanceSummary(projectId: string): Promise<Proje
   const supplierDebt = Number(debtRows[0]?.con_lai ?? 0);
   const incurred = spent + supplierDebt;
 
-  // Tổng dự toán: chỉ lấy từ app /du-toan mới (khoán trọn gói + vật tư). Trống → null ("—").
+  // Tổng dự toán: app /du-toan (khoán cũ + vật tư + NC công tác). Trống → null ("—").
   const duToanKhoan = Number(khoanAgg._sum.value ?? 0);
   const duToanMaterial = Number(matRows[0]?.total ?? 0);
   const duToanNew = duToanKhoan + duToanMaterial;

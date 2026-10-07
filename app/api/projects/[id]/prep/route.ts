@@ -30,14 +30,18 @@ export async function GET(
       where: { projectId: params.id },
       select: { prepDone: true },
     }),
-    // Giá vốn dự toán = Σ khoán + Σ VT dự toán (giống Tổng quan dự án).
-    prisma.$queryRaw<{ gia_von: number; dong: number }[]>`
+    // Giá vốn dự toán = Σ khoán cũ + Σ VT + Σ NC công tác (giống Tổng quan dự án).
+    prisma.$queryRaw<{ gia_von: number; dong: number; cong_tac: number; nc: number }[]>`
       SELECT
         coalesce((SELECT sum(value) FROM estimate_db_khoan WHERE project_id = ${params.id}::uuid), 0)::float8
       + coalesce((SELECT sum(quantity * unit_price) FROM estimate_db_materials WHERE project_id = ${params.id}::uuid), 0)::float8
+      + coalesce((SELECT sum(quantity * labor_price) FROM estimate_works WHERE project_id = ${params.id}::uuid), 0)::float8
         AS gia_von,
         ((SELECT count(*) FROM estimate_db_khoan WHERE project_id = ${params.id}::uuid)
-       + (SELECT count(*) FROM estimate_db_materials WHERE project_id = ${params.id}::uuid))::int AS dong`,
+       + (SELECT count(*) FROM estimate_db_materials WHERE project_id = ${params.id}::uuid))::int AS dong,
+        (SELECT count(*) FROM estimate_works WHERE project_id = ${params.id}::uuid)::int AS cong_tac,
+        coalesce((SELECT sum(quantity * labor_price) FROM estimate_works WHERE project_id = ${params.id}::uuid), 0)::float8
+        AS nc`,
     buildBudgetPlan(params.id),
     prisma.subContract.findMany({
       where: { projectId: params.id, status: { not: SubContractStatus.cancelled } },
@@ -53,9 +57,11 @@ export async function GET(
   const staffTemp = pm.role === "admin" || ks.role === "admin";
 
   const info: Record<string, { text: string; warn?: boolean }> = {
-    du_toan: gv?.dong
-      ? { text: `${gv.dong} dòng · giá vốn ${money(gv.gia_von)}` }
-      : { text: "Chưa có dự toán", warn: true },
+    du_toan: gv?.cong_tac
+      ? { text: `${gv.cong_tac} công tác · NC ${money(gv.nc)} · giá vốn ${money(gv.gia_von)}` }
+      : gv?.dong
+        ? { text: `${gv.dong} dòng (dự toán cũ) · giá vốn ${money(gv.gia_von)}` }
+        : { text: "Chưa có dự toán", warn: true },
     ngan_sach: plan.exists
       ? {
           text: `${plan.lines.length} hạng mục · ${money(plan.totals.budget)}${plan.status === "locked" ? " · đã khoá" : ""}`,
@@ -105,6 +111,19 @@ export async function PATCH(
   });
   if (!pipe)
     return NextResponse.json({ message: "Dự án chưa gắn tiến độ" }, { status: 404 });
+
+  // Ngân sách phải KHOÁ trước khi chốt — thi công chỉ đối chiếu, không sửa.
+  if (parsed.data.step === "ngan_sach" && parsed.data.done) {
+    const plan = await prisma.projectBudgetPlan.findUnique({
+      where: { projectId: params.id },
+      select: { status: true },
+    });
+    if (plan?.status !== "locked")
+      return NextResponse.json(
+        { message: "Khoá ngân sách trước khi chốt (màn Ngân sách → Khoá)" },
+        { status: 400 },
+      );
+  }
 
   const next = { ...((pipe.prepDone || {}) as Record<string, string>) };
   if (parsed.data.done) next[parsed.data.step] = new Date().toISOString();

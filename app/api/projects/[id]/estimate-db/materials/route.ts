@@ -36,12 +36,21 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
   });
 
+  // Tên NCC nguồn đơn giá (supplier_id chỉ là scalar, không @relation).
+  const supIds = Array.from(new Set(rows.map((r) => r.supplierId).filter((x): x is string => !!x)));
+  const sups = supIds.length
+    ? await prisma.supplier.findMany({ where: { id: { in: supIds } }, select: { id: true, name: true } })
+    : [];
+  const supName = new Map(sups.map((x) => [x.id, x.name]));
+
   const items = rows.map((r) => {
     const qty = Number(r.quantity);
     const price = Number(r.unitPrice);
     return {
       id: r.id,
       sectionId: r.sectionId,
+      workId: r.workId,
+      supplierName: r.supplierId ? supName.get(r.supplierId) ?? null : null,
       sectionName: r.section?.name ?? null,
       sectionKind: r.section?.kind ?? null,
       catalogId: r.catalogId,

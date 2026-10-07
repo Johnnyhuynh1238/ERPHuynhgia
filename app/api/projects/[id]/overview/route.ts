@@ -83,11 +83,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount);
 
-  // Giá vốn dự toán = Σ khoán + Σ VT dự toán
+  // Giá vốn dự toán = Σ khoán (cũ) + Σ VT dự toán + Σ NC khoán theo công tác
   const gvRows = await prisma.$queryRaw<{ gia_von: number }[]>`
     SELECT
       coalesce((SELECT sum(value) FROM estimate_db_khoan WHERE project_id = ${id}::uuid), 0)::float8
     + coalesce((SELECT sum(quantity * unit_price) FROM estimate_db_materials WHERE project_id = ${id}::uuid), 0)::float8
+    + coalesce((SELECT sum(quantity * labor_price) FROM estimate_works WHERE project_id = ${id}::uuid), 0)::float8
       AS gia_von`;
   const budgetCost = Number(gvRows[0]?.gia_von ?? 0);
 

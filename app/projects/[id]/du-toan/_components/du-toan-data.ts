@@ -41,9 +41,25 @@ export type Khoan = {
   sortOrder: number;
 };
 
+// Công tác dự toán: KL có vị trí + đơn giá khoán NC (gồm máy). TT NC = KL × đơn giá.
+export type Work = {
+  id: string;
+  sectionId: string | null;
+  name: string;
+  location: string | null;
+  unit: string;
+  quantity: number;
+  laborPrice: number;
+  laborAmount: number;
+  note: string | null;
+  sortOrder: number;
+};
+
 export type Material = {
   id: string;
   sectionId: string | null;
+  workId: string | null;
+  supplierName: string | null;
   sectionName: string | null;
   sectionKind: SectionKind | null;
   catalogId: string | null;
@@ -107,6 +123,16 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => j(r)),
   delKhoan: (id: string) => fetch(`/api/estimate-db/khoan/${id}`, { method: "DELETE" }).then((r) => j(r)),
+
+  listWorks: (pid: string) =>
+    fetch(`/api/projects/${pid}/estimate-db/works`).then((r) => j<{ items: Work[]; laborTotal: number }>(r)),
+  patchWork: (id: string, body: Partial<Work>) =>
+    fetch(`/api/estimate-db/works/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => j<{ laborAmount: number }>(r)),
+  delWork: (id: string) => fetch(`/api/estimate-db/works/${id}`, { method: "DELETE" }).then((r) => j(r)),
 
   listMaterials: (pid: string) =>
     fetch(`/api/projects/${pid}/estimate-db/materials`).then((r) => j<{ items: Material[]; total: number }>(r)),
