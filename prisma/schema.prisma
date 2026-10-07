@@ -4590,6 +4590,8 @@ model ProjectPipeline {
   contractHtml         String?   @map("contract_html") @db.Text // file HĐ (.html) soạn sẵn, xem + in ở giai đoạn 3 (khách chỉ thấy khi đã chốt)
   contractUpdatedAt    DateTime? @map("contract_updated_at")
   contractPublishedAt  DateTime? @map("contract_published_at") // chốt gửi khách → tab "Hợp đồng" ở link cổng; thay file thì tự ẩn lại
+  // Số liệu HĐ (AI ghi lúc nạp file HĐ): {value, areaM2, installments:[{label, percent}]} → chốt HĐ tự tạo dự án + lịch thu.
+  contractTerms        Json?     @map("contract_terms")
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")

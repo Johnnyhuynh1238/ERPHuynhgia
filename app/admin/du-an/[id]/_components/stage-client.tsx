@@ -196,6 +196,26 @@ export function StageClient({
 
   const advance = async () => {
     if (stage >= 6) return;
+    // Chốt HĐ lần đầu → tạo dự án thật + lịch thu theo số liệu HĐ (contract_terms), rồi sang Thiết kế.
+    if (stage === 3 && !state.projectId) {
+      const t = state.contractTerms;
+      if (!t) {
+        setError(
+          "Hợp đồng chưa có số liệu (giá trị + các đợt thu). Nhờ AI nạp lại file HĐ kèm số liệu.",
+        );
+        return;
+      }
+      if (
+        !window.confirm(
+          `Chốt hợp đồng ${fmtMoney(t.value)} đ, ${t.installments.length} đợt thu?\n` +
+            "Hệ thống tạo dự án (chưa thi công) + lịch thu các đợt, rồi chuyển sang Thiết kế.",
+        )
+      )
+        return;
+      const r = await call("/open-project", "POST");
+      if (r) setView(r.stage);
+      return;
+    }
     const by =
       stage === 3 && contractVersionNo
         ? ` theo báo giá V${contractVersionNo}`
@@ -555,6 +575,35 @@ export function StageClient({
           );
         })}
       </div>
+
+      {state.projectId && view >= 3 ? (
+        <div className="pl-ok">
+          Đã tạo dự án + lịch thu theo hợp đồng ·{" "}
+          <Link href={`/projects/${state.projectId}`}>Mở dự án</Link> (lập lệnh
+          thu các đợt ở đây)
+        </div>
+      ) : null}
+
+      {view === 3 && !state.projectId ? (
+        state.contractTerms ? (
+          <div className="pl-ok">
+            Số liệu HĐ: {fmtMoney(state.contractTerms.value)} đ
+            {state.contractTerms.areaM2
+              ? ` · ${state.contractTerms.areaM2} m²`
+              : ""}{" "}
+            · {state.contractTerms.installments.length} đợt thu (
+            {state.contractTerms.installments
+              .map((x) => `${x.percent}%`)
+              .join(" / ")}
+            ). Chốt HĐ sẽ tạo dự án + lịch thu theo số này.
+          </div>
+        ) : state.contractUpdatedAt ? (
+          <div className="pl-err">
+            File HĐ chưa kèm số liệu (giá trị + các đợt thu) → chưa chốt được.
+            Nhờ AI nạp lại HĐ kèm số liệu.
+          </div>
+        ) : null
+      ) : null}
 
       {past ? (
         <div className="pl-review">
@@ -1013,7 +1062,7 @@ export function StageClient({
             Giai đoạn {view} · {stageName(view)}
           </b>
           Màn chi tiết của giai đoạn này sẽ làm ở đợt sau.
-          {state.projectId && view >= 5 ? (
+          {state.projectId && view >= 4 ? (
             <div>
               <Link className="pl-btn" href={`/projects/${state.projectId}`}>
                 Mở màn dự án thi công
@@ -1025,3 +1074,4 @@ export function StageClient({
     </div>
   );
 }
+

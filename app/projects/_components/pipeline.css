@@ -752,6 +752,21 @@
   margin-top: 16px;
 }
 
+/* ===== chốt HĐ → tạo dự án + đợt thu ===== */
+.pldoc .pl-ok {
+  background: var(--okbg);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.pldoc .pl-ok a {
+  color: var(--terra);
+  font-weight: 600;
+}
 @media (max-width: 900px) {
   .pldoc {
     padding: 14px 12px 60px;

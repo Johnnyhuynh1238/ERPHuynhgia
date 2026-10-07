@@ -12,6 +12,36 @@ export type PipelineVersionMeta = {
   createdAt: string;
 };
 
+export type ContractTerms = {
+  value: number;
+  areaM2?: number;
+  installments: { label: string; percent: number }[];
+};
+
+// contract_terms do AI ghi tay vào DB → kiểm tra lại cho chắc trước khi dùng.
+export function parseContractTerms(raw: unknown): ContractTerms | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const value = Number(r.value);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (!Array.isArray(r.installments) || r.installments.length === 0) return null;
+  const installments: ContractTerms["installments"] = [];
+  for (const x of r.installments as Record<string, unknown>[]) {
+    const label = String(x?.label ?? "").trim();
+    const percent = Number(x?.percent);
+    if (!label || !Number.isFinite(percent) || percent < 0) return null;
+    installments.push({ label, percent });
+  }
+  const sum = installments.reduce((a, x) => a + x.percent, 0);
+  if (Math.abs(sum - 100) > 0.001) return null;
+  const area = Number(r.areaM2);
+  return {
+    value: Math.round(value),
+    areaM2: Number.isFinite(area) && area > 0 ? area : undefined,
+    installments,
+  };
+}
+
 export type PipelineState = {
   id: string;
   name: string;
@@ -25,6 +55,7 @@ export type PipelineState = {
   contractVersionNo: number | null;
   contractUpdatedAt: string | null;
   contractPublishedAt: string | null;
+  contractTerms: ContractTerms | null;
   projectId: string | null;
   createdAt: string;
   versions: PipelineVersionMeta[];
@@ -125,6 +156,7 @@ export async function loadPipelineState(
       contractVersionNo: true,
       contractUpdatedAt: true,
       contractPublishedAt: true,
+      contractTerms: true,
       projectId: true,
       createdAt: true,
       versions: {
@@ -161,6 +193,7 @@ export async function loadPipelineState(
     contractPublishedAt: p.contractPublishedAt
       ? p.contractPublishedAt.toISOString()
       : null,
+    contractTerms: parseContractTerms(p.contractTerms),
     projectId: p.projectId,
     createdAt: p.createdAt.toISOString(),
     versions: p.versions.map((v) => ({
