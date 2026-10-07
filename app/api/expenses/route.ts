@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { fireAndForget, notifyExpenseCreated, notifyExpenseKtRequest } from "@/lib/notifications";
 import { nextReminderForPriority } from "@/lib/expense-reminder";
+import { DESIGN_EXPENSE_SOURCES } from "@/lib/design-steps";
 
 const ROLES_VIEW = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -44,7 +45,7 @@ const createSchema = z.object({
   payeeBankBin: z.string().trim().max(20).optional().nullable(),
   payeeAccountNumber: z.string().trim().max(40).optional().nullable(),
   payeeAccountName: z.string().trim().max(200).optional().nullable(),
-  sourceType: z.enum(["mua_hang_order", "ncc_congno", "sub_contract"]).optional().nullable(),
+  sourceType: z.enum(["mua_hang_order", "ncc_congno", "sub_contract", ...DESIGN_EXPENSE_SOURCES]).optional().nullable(),
   sourceId: z.string().uuid().optional().nullable(),
   // Gắn lệnh chi với 1 đợt thanh toán thầu phụ (mark-paid sẽ tự set đợt = paid).
   subPaymentId: z.string().uuid().optional().nullable(),

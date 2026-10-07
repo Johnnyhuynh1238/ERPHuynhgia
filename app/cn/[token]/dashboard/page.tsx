@@ -5,6 +5,7 @@ import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { getPortalExpiry as resolveExpiry } from "@/lib/customer-portal";
 import { getCustomerPortalOverview, normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { prisma } from "@/lib/prisma";
+import { designStepLabel } from "@/lib/design-steps";
 import { DesignPhotoCarousel, type DesignGroup } from "../_components/design-photo-carousel";
 import { TeamSection } from "../_components/team-section";
 
@@ -42,7 +43,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
 
-  const [overview, payments, drawings, projectComments, pendingAck, designGroupsRaw] = await Promise.all([
+  const [overview, payments, drawings, projectComments, pendingAck, designGroupsRaw, pipeline] = await Promise.all([
     getCustomerPortalOverview(project.id),
     prisma.paymentSchedule.findMany({
       where: { projectId: project.id },
@@ -70,8 +71,8 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
     prisma.projectDocument.findMany({
       where: { projectId: project.id, visibleToCustomer: true },
       orderBy: { uploadedAt: "desc" },
-      take: 12,
-      select: { id: true, title: true, category: true, fileName: true, fileSize: true, uploadedAt: true },
+      take: 50,
+      select: { id: true, title: true, category: true, fileName: true, fileSize: true, uploadedAt: true, designStep: true },
     }),
     prisma.customerComment.findMany({
       where: { projectId: project.id, targetType: CommentTargetType.project, targetId: project.id, parentId: null },
@@ -106,6 +107,11 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         },
       },
     }),
+    // Hợp đồng soạn ở dự án theo tiến độ (GĐ 3), đã chốt gửi khách.
+    prisma.projectPipeline.findUnique({
+      where: { projectId: project.id },
+      select: { contractHtml: true, contractPublishedAt: true },
+    }),
   ]);
 
   if (!overview) notFound();
@@ -119,6 +125,8 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   const expiry = resolveExpiry(project.actualEndDate);
   const showExpiryBanner = Boolean(expiry && daysBetween(new Date(), expiry) <= 7);
   const currentPhase = overview.project.currentPhase;
+  const hasContract = Boolean(pipeline?.contractHtml && pipeline.contractPublishedAt);
+  const docCount = drawings.length + (hasContract ? 1 : 0);
 
   const visibleGroups = designGroupsRaw.filter((group) => group.photos.length > 0);
   const designGroups: DesignGroup[] = shuffle(visibleGroups).map((group) => ({
@@ -205,14 +213,20 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
       <section className="owner-section">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="owner-section-title mb-0">HỒ SƠ</div>
-          <span className="text-xs owner-muted">{drawings.length} file</span>
+          <span className="text-xs owner-muted">{docCount} file</span>
         </div>
         <div className="space-y-2">
-          {drawings.length === 0 ? <div className="text-sm owner-muted">Chưa có hồ sơ được chia sẻ.</div> : null}
+          {docCount === 0 ? <div className="text-sm owner-muted">Chưa có hồ sơ được chia sẻ.</div> : null}
+          {hasContract ? (
+            <a href={`/api/customer/${params.token}/contract`} target="_blank" className="owner-card block text-sm">
+              <div className="font-semibold text-white">Hợp đồng thi công</div>
+              <div className="text-xs owner-muted">Hợp đồng</div>
+            </a>
+          ) : null}
           {drawings.map((doc) => (
             <a key={doc.id} href={`/api/projects/${project.id}/documents/${doc.id}/file?token=${params.token}`} target="_blank" className="owner-card block text-sm">
               <div className="font-semibold text-white">{doc.title}</div>
-              <div className="text-xs owner-muted">{CATEGORY_LABEL[doc.category]}</div>
+              <div className="text-xs owner-muted">{doc.designStep ? `Thiết kế · ${designStepLabel(doc.designStep)}` : CATEGORY_LABEL[doc.category]}</div>
             </a>
           ))}
         </div>

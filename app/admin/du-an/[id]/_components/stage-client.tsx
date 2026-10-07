@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { DesignStage } from "./design-stage";
 import { useRouter } from "next/navigation";
 import { plexMono, plexSans } from "@/lib/fonts";
 import {
@@ -1056,6 +1057,8 @@ export function StageClient({
             </div>
           )}
         </>
+      ) : view === 4 && state.projectId ? (
+        <DesignStage projectId={state.projectId} projectName={state.name} />
       ) : (
         <div className="pl-ph">
           <b>

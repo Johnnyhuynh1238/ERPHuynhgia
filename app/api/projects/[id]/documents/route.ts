@@ -7,6 +7,7 @@ import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 import { buildDocumentVisibilityWhere, sha256Hex } from "@/lib/project-document-permissions";
 import { logProjectActivity } from "@/lib/project-activity-log";
+import { designStepLabel, isDesignStep } from "@/lib/design-steps";
 
 export const runtime = "nodejs";
 
@@ -119,6 +120,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const titleRaw = String(formData.get("title") || "").trim();
   const categoryRaw = String(formData.get("category") || ProjectDocumentCategory.contract);
 
+  // Màn GĐ 4 Thiết kế gửi kèm designStep: file đã được khách duyệt → bật xem ở cổng chủ nhà luôn.
+  const designStepRaw = String(formData.get("designStep") || "").trim();
+  if (designStepRaw && (!isDesignStep(designStepRaw) || designStepRaw === "phoi_canh")) {
+    return NextResponse.json({ message: "Bước thiết kế không hợp lệ" }, { status: 400 });
+  }
+  const designStep = designStepRaw || null;
+
   const parsedCategory = categorySchema.safeParse(categoryRaw);
   if (!parsedCategory.success) return NextResponse.json({ message: "Loại hồ sơ không hợp lệ" }, { status: 400 });
   if (!(file instanceof File)) return NextResponse.json({ message: "File hồ sơ là bắt buộc" }, { status: 400 });
@@ -147,6 +155,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       mimeType: file.type || "application/octet-stream",
       contentHash,
       uploadedBy: current.id,
+      designStep,
+      visibleToCustomer: designStep !== null,
     },
     select: {
       id: true,
@@ -167,7 +177,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     entity: "project_document",
     entityId: doc.id,
     action: "upload",
-    summary: `Upload hồ sơ "${doc.title}" (${doc.category}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
+    summary: `Upload hồ sơ "${doc.title}"${designStep ? ` – thiết kế ${designStepLabel(designStep)}` : ""} (${doc.category}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
     metadata: { title: doc.title, category: doc.category, fileName: file.name, fileSize: file.size, mimeType: doc.mimeType },
   });
 

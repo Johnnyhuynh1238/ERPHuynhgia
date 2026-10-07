@@ -1540,6 +1540,8 @@ model ProjectDocument {
   uploadedAt        DateTime                @default(now()) @map("uploaded_at")
   updatedAt         DateTime                @updatedAt @map("updated_at")
   visibleToCustomer Boolean                 @default(false) @map("visible_to_customer")
+  // GĐ 4 Thiết kế: mat_bang | kien_truc | ket_cau | dien_nuoc; null = hồ sơ thường
+  designStep        String?                 @map("design_step") @db.VarChar(20)
 
   project    Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   uploader   User                    @relation("ProjectDocumentUploader", fields: [uploadedBy], references: [id])
@@ -2494,6 +2496,7 @@ model DesignPhotoGroup {
   description       String?  @db.Text
   visibleToCustomer Boolean  @default(false) @map("visible_to_customer")
   displayOrder      Int      @default(0) @map("display_order")
+  designStep        String?  @map("design_step") @db.VarChar(20) // "phoi_canh" = nhóm 3D của màn Thiết kế
   createdBy         String   @map("created_by") @db.Uuid
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")

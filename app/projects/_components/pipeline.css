@@ -767,6 +767,151 @@
   color: var(--terra);
   font-weight: 600;
 }
+/* ===== GĐ 4 Thiết kế ===== */
+.pldoc .pl-dsgroup {
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.pldoc .pl-dsgroup h3 {
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--terra);
+  border-bottom: 1px solid var(--line2);
+  background: var(--track);
+}
+.pldoc .pl-dsrow {
+  padding: 10px 14px 12px;
+}
+.pldoc .pl-dsrow.sub + .pl-dsrow.sub {
+  border-top: 1px solid var(--line);
+}
+.pldoc .pl-dshead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pldoc .pl-dshead b {
+  font-size: 14px;
+}
+.pldoc .pl-dsact {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.pldoc .pl-dsfiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.pldoc .pl-dsfiles li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pldoc .pl-dsfiles a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+}
+.pldoc .pl-dsfiles a:hover .pl-dsname {
+  color: var(--terra);
+  text-decoration: underline;
+}
+.pldoc .pl-dsfiles img,
+.pldoc .pl-dspdf {
+  width: 56px;
+  height: 42px;
+  border-radius: 6px;
+  border: 1px solid var(--line2);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #fff;
+}
+.pldoc .pl-dspdf {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--red);
+}
+.pldoc .pl-dsname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pldoc .pl-dsfiles small {
+  color: var(--mut);
+  flex-shrink: 0;
+}
+.pldoc .pl-x {
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.pldoc .pl-dsempty {
+  color: var(--mut2);
+  font-size: 13px;
+}
+.pldoc .pl-dsex {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.pldoc .pl-dsex td {
+  padding: 5px 6px;
+  border-top: 1px dashed var(--line2);
+  white-space: nowrap;
+}
+.pldoc .pl-dsex td:nth-child(2) {
+  white-space: normal;
+  width: 100%;
+}
+.pldoc .pl-dsex td.r {
+  text-align: right;
+}
+.pldoc .pl-dsex td.st {
+  font-weight: 600;
+  color: var(--orange);
+}
+.pldoc .pl-dsex td.st.paid {
+  color: var(--ok);
+}
+.pldoc .pl-dsex tr.off td {
+  color: var(--mut2);
+  text-decoration: line-through;
+}
+.pldoc .pl-dstotal {
+  text-align: right;
+  font-size: 14px;
+  color: var(--mut);
+  padding: 4px 2px;
+}
+.pldoc .pl-dstotal b {
+  color: var(--text);
+}
+
 @media (max-width: 900px) {
   .pldoc {
     padding: 14px 12px 60px;
