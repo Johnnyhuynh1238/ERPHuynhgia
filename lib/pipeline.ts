@@ -1,10 +1,11 @@
-// Dự án theo tiến độ 6 giai đoạn — hằng số + helper dùng chung client/server.
+// Dự án theo tiến độ 7 giai đoạn — hằng số + helper dùng chung client/server.
 
 export const PIPELINE_STAGES = [
   "Mô tả",
   "Báo giá",
   "Hợp đồng",
   "Thiết kế",
+  "Chuẩn bị",
   "Thi công",
   "Bàn giao",
 ];

@@ -1,5 +1,5 @@
 /* ============================================================
-   Dự án theo tiến độ 6 giai đoạn — brand Huỳnh Gia (ngà/terracotta, IBM Plex).
+   Dự án theo tiến độ 7 giai đoạn — brand Huỳnh Gia (ngà/terracotta, IBM Plex).
    Trang scope .pldoc; modal portal ra body scope .plportal
    (tránh app-shell .slide-up transform neo modal fixed).
    Dùng chung cho /projects (PC, admin) và /admin/du-an/[id].
@@ -140,10 +140,10 @@
   cursor: default;
 }
 
-/* dải 6 giai đoạn (đếm + lọc) */
+/* dải 7 giai đoạn (đếm + lọc) */
 .pldoc .pl-strip {
   display: grid;
-  grid-template-columns: 1.05fr repeat(6, minmax(0, 1fr));
+  grid-template-columns: 1.05fr repeat(7, minmax(0, 1fr));
   border: 1px solid var(--line2);
   border-radius: 11px;
   background: var(--card);
@@ -456,12 +456,12 @@
   color: var(--terra);
   white-space: nowrap;
 }
-.pldoc .pl-chip.s5 {
+.pldoc .pl-chip.s6 {
   color: var(--orange);
   border-color: var(--orange);
   background: var(--orbg);
 }
-.pldoc .pl-chip.s6 {
+.pldoc .pl-chip.s7 {
   color: var(--ok);
   border-color: var(--ok);
   background: var(--okbg);
@@ -520,7 +520,7 @@
 /* ===== màn giai đoạn /admin/du-an/[id] ===== */
 .pldoc .pl-steps {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border: 1px solid var(--line2);
   border-radius: 11px;
   background: var(--card);
@@ -996,6 +996,26 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.pldoc .pl-prepbar {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: var(--orbg);
+  color: var(--orange);
+  font-size: 14px;
+  font-weight: 600;
+}
+.pldoc .pl-design > .pl-ok {
+  margin-bottom: 12px;
+}
+.pldoc .pl-prepinfo {
+  font-size: 14px;
+  color: var(--text);
+}
+.pldoc .pl-prepinfo.warn {
+  color: var(--orange);
+  font-weight: 600;
+}
 .pldoc .pl-dstotal {
   text-align: right;
   font-size: 14px;
@@ -1011,7 +1031,7 @@
     padding: 14px 12px 60px;
   }
   .pldoc .pl-steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .pldoc .pl-stp {
     border-top: 1px solid var(--line);
@@ -1079,7 +1099,7 @@
   }
   .pldoc .pl-pv tr {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     border-bottom: 1px solid var(--line);
   }
   .pldoc .pl-pv tr:last-child {

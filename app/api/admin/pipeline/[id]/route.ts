@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { prepMissing } from "@/lib/prep-steps";
 import { requireAdmin } from "@/lib/estimate";
 import { loadPipelineState } from "@/lib/pipeline-server";
 
@@ -11,7 +12,7 @@ const PatchSchema = z.object({
   customerPhone: z.string().trim().nullable().optional(),
   address: z.string().trim().nullable().optional(),
   status: z.enum(["active", "paused", "done"]).optional(),
-  stage: z.number().int().min(1).max(6).optional(),
+  stage: z.number().int().min(1).max(7).optional(),
   contractVersionNo: z.number().int().min(1).optional(),
   contractHtml: z.string().max(3 * 1024 * 1024).nullable().optional(),
   contractPublished: z.boolean().optional(),
@@ -48,6 +49,7 @@ export async function PATCH(
       stageDates: true,
       contractVersionNo: true,
       contractUpdatedAt: true,
+      prepDone: true,
       versions: { select: { versionNo: true } },
     },
   });
@@ -94,6 +96,17 @@ export async function PATCH(
   }
 
   if (d.stage !== undefined && d.stage !== current.stage) {
+    // Sang Thi công (GĐ 6) phải chốt đủ checklist GĐ 5 Chuẩn bị.
+    if (d.stage > 5 && current.stage <= 5) {
+      const missing = prepMissing(current.prepDone as Record<string, string>);
+      if (missing.length)
+        return NextResponse.json(
+          {
+            message: `Chưa chốt đủ Chuẩn bị: ${missing.map((m) => m.label).join(", ")}`,
+          },
+          { status: 400 },
+        );
+    }
     // Giai đoạn < stage mới = đã chốt (giữ ngày cũ, thiếu thì ghi lúc này); từ stage mới trở đi = bỏ ngày chốt.
     // Lùi giai đoạn KHÔNG xoá mô tả / báo giá của các phiên bản.
     const old = (current.stageDates || {}) as Record<string, string>;

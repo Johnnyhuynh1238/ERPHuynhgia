@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DesignStage } from "./design-stage";
+import { PrepStage } from "./prep-stage";
 import { useRouter } from "next/navigation";
 import { plexMono, plexSans } from "@/lib/fonts";
 import {
@@ -16,7 +17,7 @@ import type { PipelineDocKind } from "@/lib/pipeline";
 import type { PipelineState } from "@/lib/pipeline-server";
 import "@/app/projects/_components/pipeline.css";
 
-const STAGE_NUMS = [1, 2, 3, 4, 5, 6];
+const STAGE_NUMS = [1, 2, 3, 4, 5, 6, 7];
 const MAX_HTML_CHARS = 3 * 1024 * 1024;
 
 function fmtDay(iso: string | null | undefined, withTime = false) {
@@ -196,7 +197,7 @@ export function StageClient({
   };
 
   const advance = async () => {
-    if (stage >= 6) return;
+    if (stage >= 7) return;
     // Chốt HĐ lần đầu → tạo dự án thật + lịch thu theo số liệu HĐ (contract_terms), rồi sang Thiết kế.
     if (stage === 3 && !state.projectId) {
       const t = state.contractTerms;
@@ -511,7 +512,7 @@ export function StageClient({
             >
               ↩ Mở lại giai đoạn này
             </button>
-          ) : stage < 6 ? (
+          ) : stage < 7 ? (
             <button
               type="button"
               className="pl-btn"
@@ -1059,6 +1060,8 @@ export function StageClient({
         </>
       ) : view === 4 && state.projectId ? (
         <DesignStage projectId={state.projectId} projectName={state.name} />
+      ) : view === 5 && state.projectId ? (
+        <PrepStage projectId={state.projectId} />
       ) : (
         <div className="pl-ph">
           <b>

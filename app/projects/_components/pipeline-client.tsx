@@ -43,7 +43,7 @@ type Cell = {
   pct: number | null;
 };
 
-const STAGE_NUMS = [1, 2, 3, 4, 5, 6];
+const STAGE_NUMS = [1, 2, 3, 4, 5, 6, 7];
 
 function fmtDay(iso: string | null | undefined, withYear = false) {
   if (!iso) return "";
@@ -96,7 +96,7 @@ function cellOf(r: Row, n: number): Cell {
     return { cls: "todo", label: "Chưa tới", detail: "", pct: null };
   }
 
-  // Dự án thi công có sẵn (tạo theo luồng cũ): coi như đã qua 1→4.
+  // Dự án thi công có sẵn (tạo theo luồng cũ): coi như đã qua 1→5.
   if (n === 1)
     return { cls: "done", label: "Đã tiếp nhận", detail: "", pct: null };
   if (n === 2)
@@ -113,9 +113,10 @@ function cellOf(r: Row, n: number): Cell {
       detail: fmtDay(r.startDate, true),
       pct: null,
     };
-  if (n === 4) return { cls: "done", label: "Đã xong", detail: "", pct: null };
-  if (n === 5) {
-    if (r.stage === 6)
+  if (n === 4 || n === 5)
+    return { cls: "done", label: "Đã xong", detail: "", pct: null };
+  if (n === 6) {
+    if (r.stage === 7)
       return {
         cls: "done",
         label: "Đã xong",
@@ -125,7 +126,7 @@ function cellOf(r: Row, n: number): Cell {
     if (r.planning || r.taskCount === 0) {
       return {
         cls: "doing",
-        label: "Chuẩn bị",
+        label: "Sắp thi công",
         detail: "Chưa lập tiến độ",
         pct: 0,
       };
@@ -137,7 +138,7 @@ function cellOf(r: Row, n: number): Cell {
       pct: r.progressPercent,
     };
   }
-  if (r.stage === 6)
+  if (r.stage === 7)
     return { cls: "done", label: "Đã bàn giao", detail: "", pct: null };
   return { cls: "todo", label: "Chưa tới", detail: "", pct: null };
 }
@@ -406,7 +407,7 @@ export function PipelineClient() {
                       return (
                         <td
                           key={n}
-                          className={`sc ${c.cls} ${n === 1 ? "first" : ""} ${n === 6 ? "last" : ""} ${clickable ? "click" : ""}`}
+                          className={`sc ${c.cls} ${n === 1 ? "first" : ""} ${n === 7 ? "last" : ""} ${clickable ? "click" : ""}`}
                           title={
                             clickable
                               ? `Xem giai đoạn ${n} · ${PIPELINE_STAGES[n - 1]}`

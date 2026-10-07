@@ -16,7 +16,7 @@ const CreateSchema = z.object({
 const DAY_MS = 86400000;
 
 // Danh sách màn Dự án (admin, PC): dự án theo tiến độ (project_pipelines) + dự án thi công
-// có sẵn chưa gắn pipeline (projects) — dự án cũ coi như đang ở giai đoạn 5/6.
+// có sẵn chưa gắn pipeline (projects) — dự án cũ coi như đang ở giai đoạn 6/7 (Thi công/Bàn giao).
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -126,7 +126,7 @@ export async function GET() {
       customerName: p.customerName,
       address: p.address || "",
       slug: null as string | null,
-      stage: done ? 6 : 5,
+      stage: done ? 7 : 6,
       status: done ? "done" : p.status === "paused" ? "paused" : "active",
       lateDays: late > 0 ? late : 0,
       stageDates: {} as Record<string, string>,
@@ -143,7 +143,7 @@ export async function GET() {
     };
   });
 
-  // Dự án đi càng xa càng xuống dưới: GĐ 1 Mô tả ở đầu → GĐ 6 đã bàn giao ở cuối.
+  // Dự án đi càng xa càng xuống dưới: GĐ 1 Mô tả ở đầu → GĐ 7 đã bàn giao ở cuối.
   // Cùng GĐ: đang chạy trước, tạm dừng/xong sau; rồi mới nhất trước.
   const statusRank = (s: string) => (s === "done" ? 2 : s === "paused" ? 1 : 0);
   const rows = [...pipelineRows, ...projectRows].sort(

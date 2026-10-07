@@ -4585,7 +4585,7 @@ model ProjectPipeline {
   slug                 String    @unique
   stage                Int       @default(1) // 1..6
   status               String    @default("active") @db.VarChar(20) // active | paused | done
-  stageDates           Json      @default("{}") @map("stage_dates") // {"1": ISO lúc chốt giai đoạn 1, ...}
+  stageDates           Json      @default("{}") @map("stage_dates") // {"1": ISO lúc chốt giai đoạn 1, ...} — 7 GĐ, 5 = Chuẩn bị
   // LEGACY: mô tả giờ nằm ở ProjectPipelineVersion (đã chép sang V1), 2 cột dưới không còn đọc/ghi.
   descriptionHtml      String?   @map("description_html") @db.Text
   descriptionUpdatedAt DateTime? @map("description_updated_at")
@@ -4596,6 +4596,7 @@ model ProjectPipeline {
   // Số liệu HĐ (AI ghi lúc nạp file HĐ): {value, areaM2, installments:[{label, percent}]} → chốt HĐ tự tạo dự án + lịch thu.
   contractTerms        Json?     @map("contract_terms")
   designDone           Json      @default("{}") @map("design_done") // GĐ 4: {"mat_bang": ISO lúc chốt bước, ...}
+  prepDone             Json      @default("{}") @map("prep_done") // GĐ 5 Chuẩn bị: {"du_toan": ISO lúc chốt mục, ...}
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")
