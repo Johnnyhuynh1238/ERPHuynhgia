@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
-import { DESIGN_EXPENSE_SOURCES } from "@/lib/design-steps";
+import { z } from "zod";
+import { DESIGN_EXPENSE_SOURCES, DESIGN_STEPS } from "@/lib/design-steps";
 
 // Màn GĐ 4 Thiết kế: dùng lại hồ sơ có sẵn của dự án.
 // - Mặt bằng + bộ bản vẽ thi công = project_documents.design_step (bật khách xem → mục HỒ SƠ cổng chủ nhà).
 // - 3D phối cảnh = nhóm ảnh thiết kế design_step 'phoi_canh' (băng ảnh trang chủ cổng).
 // - Lệnh chi thiết kế thuê ngoài: expenses.source_type = thiet_ke_<bước>.
+// - Chốt từng bước: project_pipelines.design_done {bước: ISO}.
 export async function GET(
   _request: Request,
   { params }: { params: { id: string } },
@@ -14,7 +16,7 @@ export async function GET(
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const [docs, group, expenses] = await Promise.all([
+  const [docs, group, expenses, pipe] = await Promise.all([
     prisma.projectDocument.findMany({
       where: { projectId: params.id, designStep: { not: null } },
       orderBy: { uploadedAt: "asc" },
@@ -53,6 +55,10 @@ export async function GET(
         sourceType: true,
       },
     }),
+    prisma.projectPipeline.findUnique({
+      where: { projectId: params.id },
+      select: { designDone: true },
+    }),
   ]);
 
   const docBase = `/api/projects/${params.id}/documents`;
@@ -81,6 +87,7 @@ export async function GET(
   ];
 
   return NextResponse.json({
+    done: (pipe?.designDone || {}) as Record<string, string>,
     files,
     expenses: expenses.map((e) => ({
       id: e.id,
@@ -127,4 +134,39 @@ export async function POST(
     select: { id: true },
   });
   return NextResponse.json({ groupId: created.id });
+}
+
+const DoneSchema = z.object({
+  step: z.enum(DESIGN_STEPS.map((s) => s.key) as [string, ...string[]]),
+  done: z.boolean(),
+});
+
+// Chốt / mở lại 1 bước thiết kế.
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } },
+) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
+  const parsed = DoneSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success)
+    return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
+
+  const pipe = await prisma.projectPipeline.findUnique({
+    where: { projectId: params.id },
+    select: { id: true, designDone: true },
+  });
+  if (!pipe)
+    return NextResponse.json({ message: "Dự án chưa gắn tiến độ" }, { status: 404 });
+
+  const next = { ...((pipe.designDone || {}) as Record<string, string>) };
+  if (parsed.data.done) next[parsed.data.step] = new Date().toISOString();
+  else delete next[parsed.data.step];
+
+  await prisma.projectPipeline.update({
+    where: { id: pipe.id },
+    data: { designDone: next },
+  });
+  return NextResponse.json({ done: next });
 }

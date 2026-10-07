@@ -4595,6 +4595,7 @@ model ProjectPipeline {
   contractPublishedAt  DateTime? @map("contract_published_at") // chốt gửi khách → tab "Hợp đồng" ở link cổng; thay file thì tự ẩn lại
   // Số liệu HĐ (AI ghi lúc nạp file HĐ): {value, areaM2, installments:[{label, percent}]} → chốt HĐ tự tạo dự án + lịch thu.
   contractTerms        Json?     @map("contract_terms")
+  designDone           Json      @default("{}") @map("design_done") // GĐ 4: {"mat_bang": ISO lúc chốt bước, ...}
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")

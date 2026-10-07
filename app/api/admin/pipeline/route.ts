@@ -143,7 +143,17 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ rows: [...pipelineRows, ...projectRows] });
+  // Dự án đi càng xa càng xuống dưới: GĐ 1 Mô tả ở đầu → GĐ 6 đã bàn giao ở cuối.
+  // Cùng GĐ: đang chạy trước, tạm dừng/xong sau; rồi mới nhất trước.
+  const statusRank = (s: string) => (s === "done" ? 2 : s === "paused" ? 1 : 0);
+  const rows = [...pipelineRows, ...projectRows].sort(
+    (a, b) =>
+      a.stage - b.stage ||
+      statusRank(a.status) - statusRank(b.status) ||
+      b.startDate.localeCompare(a.startDate),
+  );
+
+  return NextResponse.json({ rows });
 }
 
 // Tạo dự án mới ở giai đoạn 1 · Mô tả. Link khách = huynhgia6.com/<slug> (tự sinh từ tên dự án nếu bỏ trống).

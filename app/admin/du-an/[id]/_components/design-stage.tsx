@@ -65,6 +65,8 @@ export function DesignStage({
   const [busyStep, setBusyStep] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [payStep, setPayStep] = useState<DesignStepKey | null>(null);
+  const [done, setDone] = useState<Record<string, string>>({});
+  const [sel, setSel] = useState<DesignStepKey | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadStep = useRef<DesignStepKey | null>(null);
 
@@ -80,6 +82,14 @@ export function DesignStage({
       }
       setFiles(json.files || []);
       setExpenses(json.expenses || []);
+      const d: Record<string, string> = json.done || {};
+      setDone(d);
+      // Mở sẵn bước đầu tiên chưa chốt.
+      setSel(
+        (cur) =>
+          cur ??
+          (DESIGN_STEPS.find((s) => !d[s.key])?.key || DESIGN_STEPS[0].key),
+      );
     } catch {
       setError("Lỗi mạng, thử lại");
     } finally {
@@ -179,6 +189,34 @@ export function DesignStage({
     load();
   };
 
+  const toggleDone = async (key: DesignStepKey, label: string) => {
+    const next = !done[key];
+    if (
+      !window.confirm(
+        next
+          ? `Chốt bước "${label}"? Sau khi chốt sẽ khoá tải/xoá file của bước này.`
+          : `Mở lại bước "${label}" để sửa file?`,
+      )
+    )
+      return;
+    setError("");
+    const res = await fetch(`/api/projects/${projectId}/design`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: key, done: next }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(json.message || "Không lưu được");
+      return;
+    }
+    setDone(json.done || {});
+    if (next) {
+      const after = DESIGN_STEPS.find((s) => !(json.done || {})[s.key]);
+      if (after) setSel(after.key);
+    }
+  };
+
   const live = expenses.filter((e) => e.status !== "cancelled");
   const paid = live
     .filter((e) => e.status === "paid")
@@ -188,78 +226,37 @@ export function DesignStage({
     .reduce((s, e) => s + e.amount, 0);
   const payLabel = DESIGN_STEPS.find((s) => s.key === payStep)?.label || "";
 
-  const stepRow = (key: DesignStepKey, label: string, sub: boolean) => {
-    const mine = files.filter((f) => f.designStep === key);
-    const ex = expenses.filter((e) => e.step === key);
+  const dateVn = (iso: string) =>
+    new Date(iso).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+
+  const treeItem = (key: DesignStepKey, label: string, sub: boolean) => {
+    const n = files.filter((f) => f.designStep === key).length;
     return (
-      <div className={`pl-dsrow${sub ? " sub" : ""}`} key={key}>
-        <div className="pl-dshead">
-          {sub ? <b>{label}</b> : <span />}
-          <div className="pl-dsact">
-            <button
-              type="button"
-              className="pl-btn ghost"
-              onClick={() => pick(key)}
-              disabled={busyStep !== null}
-            >
-              {busyStep === key ? "Đang tải…" : "⬆ Tải file"}
-            </button>
-            <button
-              type="button"
-              className="pl-btn ghost"
-              onClick={() => setPayStep(key)}
-            >
-              + Lệnh chi
-            </button>
-          </div>
-        </div>
-        {mine.length ? (
-          <ul className="pl-dsfiles">
-            {mine.map((f) => (
-              <li key={f.id}>
-                <a href={f.viewUrl} target="_blank" rel="noreferrer">
-                  {f.isImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={f.thumbUrl} alt="" loading="lazy" />
-                  ) : (
-                    <span className="pl-dspdf">PDF</span>
-                  )}
-                  <span className="pl-dsname">{f.name}</span>
-                </a>
-                <small className="pl-num">{mb(f.sizeBytes)}</small>
-                <button
-                  type="button"
-                  className="pl-x"
-                  title="Xoá file"
-                  onClick={() => remove(f)}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="pl-dsempty">
-            {loaded ? "Chưa có file — khách duyệt xong mới tải lên." : "…"}
-          </div>
-        )}
-        {ex.length ? (
-          <table className="pl-dsex">
-            <tbody>
-              {ex.map((e) => (
-                <tr key={e.id} className={e.status === "cancelled" ? "off" : ""}>
-                  <td className="pl-num">{e.code}</td>
-                  <td>{e.payee || "—"}</td>
-                  <td className="pl-num r">{money(e.amount)}</td>
-                  <td className={`st ${e.status}`}>{statusText(e.status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        key={key}
+        className={`pl-dsnode${sub ? " sub" : ""}${sel === key ? " on" : ""}${done[key] ? " ok" : ""}`}
+        onClick={() => setSel(key)}
+      >
+        <span className="dot">{done[key] ? "✓" : ""}</span>
+        <span className="lb">{label}</span>
+        <small className="pl-num">
+          {done[key] ? dateVn(done[key]) : n ? `${n} file` : ""}
+        </small>
+      </button>
     );
   };
+
+  const step = DESIGN_STEPS.find((s) => s.key === sel) || null;
+  const stepGroup = step
+    ? DESIGN_GROUPS.find((g) => g.group === step.group)
+    : null;
+  const mine = step ? files.filter((f) => f.designStep === step.key) : [];
+  const ex = step ? expenses.filter((e) => e.step === step.key) : [];
+  const locked = step ? Boolean(done[step.key]) : false;
 
   return (
     <div className="pl-design">
@@ -273,15 +270,128 @@ export function DesignStage({
       />
       {error ? <div className="pl-err">{error}</div> : null}
 
-      {DESIGN_GROUPS.map((g) => {
-        const steps = DESIGN_STEPS.filter((s) => s.group === g.group);
-        return (
-          <section className="pl-dsgroup" key={g.group}>
-            <h3>{g.title}</h3>
-            {steps.map((s) => stepRow(s.key, s.label, steps.length > 1))}
+      <div className="pl-dsgrid">
+        <nav className="pl-dstree">
+          {DESIGN_GROUPS.map((g) => {
+            const steps = DESIGN_STEPS.filter((s) => s.group === g.group);
+            if (steps.length === 1) return treeItem(steps[0].key, g.title, false);
+            const allDone = steps.every((s) => done[s.key]);
+            return (
+              <div key={g.group}>
+                <div className={`pl-dsnode head${allDone ? " ok" : ""}`}>
+                  <span className="dot">{allDone ? "✓" : ""}</span>
+                  <span className="lb">{g.title}</span>
+                </div>
+                {steps.map((s) => treeItem(s.key, s.label, true))}
+              </div>
+            );
+          })}
+        </nav>
+
+        {step ? (
+          <section className="pl-dsgroup">
+            <h3>
+              {stepGroup && stepGroup.group === 3
+                ? `${stepGroup.title} · ${step.label}`
+                : stepGroup?.title}
+            </h3>
+            <div className="pl-dsrow">
+              <div className="pl-dshead">
+                {locked ? (
+                  <span className="pl-dsok">
+                    ✓ Đã chốt {dateVn(done[step.key])}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <div className="pl-dsact">
+                  {!locked ? (
+                    <button
+                      type="button"
+                      className="pl-btn ghost"
+                      onClick={() => pick(step.key)}
+                      disabled={busyStep !== null}
+                    >
+                      {busyStep === step.key ? "Đang tải…" : "⬆ Tải file"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="pl-btn ghost"
+                    onClick={() => setPayStep(step.key)}
+                  >
+                    + Lệnh chi
+                  </button>
+                  <button
+                    type="button"
+                    className={`pl-btn${locked ? " ghost" : ""}`}
+                    onClick={() => toggleDone(step.key, step.label)}
+                    disabled={!locked && mine.length === 0}
+                    title={
+                      !locked && mine.length === 0
+                        ? "Tải file trước khi chốt"
+                        : undefined
+                    }
+                  >
+                    {locked ? "Mở lại" : "✓ Chốt bước"}
+                  </button>
+                </div>
+              </div>
+              {mine.length ? (
+                <ul className="pl-dsfiles">
+                  {mine.map((f) => (
+                    <li key={f.id}>
+                      <a href={f.viewUrl} target="_blank" rel="noreferrer">
+                        {f.isImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={f.thumbUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span className="pl-dspdf">PDF</span>
+                        )}
+                        <span className="pl-dsname">{f.name}</span>
+                      </a>
+                      <small className="pl-num">{mb(f.sizeBytes)}</small>
+                      {!locked ? (
+                        <button
+                          type="button"
+                          className="pl-x"
+                          title="Xoá file"
+                          onClick={() => remove(f)}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="pl-dsempty">
+                  {loaded ? "Chưa có file — khách duyệt xong mới tải lên." : "…"}
+                </div>
+              )}
+              {ex.length ? (
+                <table className="pl-dsex">
+                  <tbody>
+                    {ex.map((e) => (
+                      <tr
+                        key={e.id}
+                        className={e.status === "cancelled" ? "off" : ""}
+                      >
+                        <td className="pl-num">{e.code}</td>
+                        <td>{e.payee || "—"}</td>
+                        <td className="pl-num r">{money(e.amount)}</td>
+                        <td className={`st ${e.status}`}>
+                          {statusText(e.status)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
           </section>
-        );
-      })}
+        ) : null}
+      </div>
 
       <div className="pl-dstotal">
         Chi phí thiết kế thuê ngoài: đã chi <b className="pl-num">{money(paid)} đ</b>
