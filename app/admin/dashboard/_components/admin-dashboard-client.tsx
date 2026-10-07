@@ -85,8 +85,13 @@ type AppKey =
   | "ky-thuat"
   | "nhan-su"
   | "kpi"
+  | "tai-lieu"
   | "cau-hinh"
   | "tro-giup";
+
+// Nhóm tile cùng mục tiêu — giữa các nhóm có line mỏng ngăn cách.
+type AppGroup = "kinh-doanh" | "thi-cong" | "tai-chinh" | "nhan-su" | "he-thong";
+const GROUP_ORDER: AppGroup[] = ["kinh-doanh", "thi-cong", "tai-chinh", "nhan-su", "he-thong"];
 
 type PopItem = {
   label: string;
@@ -97,6 +102,7 @@ type PopItem = {
 
 type AppDef = {
   key: AppKey;
+  group: AppGroup;
   label: string;
   Icon: LucideIcon;
   // App nhiều mục → popup (buildItems). App 1 đích → bấm thẳng (href).
@@ -107,6 +113,7 @@ type AppDef = {
 const APPS: AppDef[] = [
   {
     key: "kinh-doanh",
+    group: "kinh-doanh",
     label: "Kinh doanh",
     Icon: TrendingUp,
     buildItems: (data) => [
@@ -117,12 +124,14 @@ const APPS: AppDef[] = [
   },
   {
     key: "hop-dong",
+    group: "kinh-doanh",
     label: "Hợp đồng",
     Icon: FileSignature,
     href: "/admin/contracts",
   },
   {
     key: "du-an",
+    group: "thi-cong",
     label: "Dự án",
     Icon: FolderKanban,
     buildItems: (data) => [
@@ -136,6 +145,7 @@ const APPS: AppDef[] = [
   },
   {
     key: "thau-phu",
+    group: "thi-cong",
     label: "Thầu phụ",
     Icon: HardHat,
     buildItems: () => [
@@ -146,6 +156,7 @@ const APPS: AppDef[] = [
   },
   {
     key: "tai-chinh",
+    group: "tai-chinh",
     label: "Tài chính",
     Icon: Banknote,
     buildItems: (data) => [
@@ -158,24 +169,28 @@ const APPS: AppDef[] = [
   },
   {
     key: "ke-hoach",
+    group: "tai-chinh",
     label: "Kế hoạch thu-chi",
     Icon: CalendarDays,
     href: "/cash-plan",
   },
   {
     key: "vay-tam-ung",
+    group: "tai-chinh",
     label: "Vay & Tạm ứng",
     Icon: Wallet,
     href: "/admin/debts",
   },
   {
     key: "ky-thuat",
+    group: "thi-cong",
     label: "Kỹ thuật thi công",
     Icon: ClipboardCheck,
     href: "/ky-thuat-thi-cong",
   },
   {
     key: "nhan-su",
+    group: "nhan-su",
     label: "Nhân sự",
     Icon: Users,
     buildItems: () => [
@@ -190,6 +205,7 @@ const APPS: AppDef[] = [
   },
   {
     key: "kpi",
+    group: "nhan-su",
     label: "KPI",
     Icon: Target,
     buildItems: () => [
@@ -198,7 +214,15 @@ const APPS: AppDef[] = [
     ],
   },
   {
+    key: "tai-lieu",
+    group: "he-thong",
+    label: "Tài liệu chung",
+    Icon: Library,
+    href: "/tai-lieu-chung",
+  },
+  {
     key: "cau-hinh",
+    group: "he-thong",
     label: "Cấu hình",
     Icon: Settings,
     buildItems: () => [
@@ -210,6 +234,7 @@ const APPS: AppDef[] = [
   },
   {
     key: "tro-giup",
+    group: "he-thong",
     label: "Trợ giúp",
     Icon: BookOpen,
     buildItems: () => [
@@ -229,6 +254,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "ky-thuat": [],
   "nhan-su": [],
   "kpi": [],
+  "tai-lieu": [],
   "cau-hinh": [],
   "tro-giup": [],
 };
@@ -297,25 +323,40 @@ export function AdminDashboardClient() {
               }}
             />
           </div>
-          <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6 lg:grid-cols-8">
-            {APPS.map((app, idx) => {
-              const badge = data
-                ? APP_BADGE_KEYS[app.key].reduce(
-                    (sum, k) => sum + (data.todos[k] ?? 0),
-                    0,
-                  )
-                : 0;
-              return (
-                <AppIcon
-                  key={app.key}
-                  app={app}
-                  delayClass={`delay-${Math.min(idx + 1, 6)}`}
-                  badge={badge}
-                  onClick={() => (app.href ? router.push(app.href) : setOpen(app))}
-                />
-              );
-            })}
-          </div>
+          {GROUP_ORDER.map((g, gi) => {
+            const apps = APPS.filter((a) => a.group === g);
+            if (apps.length === 0) return null;
+            return (
+              <div key={g}>
+                {gi > 0 && (
+                  <div
+                    className="my-4 h-px sm:my-5"
+                    style={{ background: "rgba(249,115,22,0.16)" }}
+                  />
+                )}
+                <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-6 lg:grid-cols-8">
+                  {apps.map((app) => {
+                    const idx = APPS.indexOf(app);
+                    const badge = data
+                      ? APP_BADGE_KEYS[app.key].reduce(
+                          (sum, k) => sum + (data.todos[k] ?? 0),
+                          0,
+                        )
+                      : 0;
+                    return (
+                      <AppIcon
+                        key={app.key}
+                        app={app}
+                        delayClass={`delay-${Math.min(idx + 1, 6)}`}
+                        badge={badge}
+                        onClick={() => (app.href ? router.push(app.href) : setOpen(app))}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <WorkQueue data={data} loading={loading} />

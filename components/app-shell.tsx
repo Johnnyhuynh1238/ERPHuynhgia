@@ -87,6 +87,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: "Việc TPTC", href: "/tptc/assignments" },
     { label: "Chấm Đóng góp", href: "/tptc/contribution-rating" },
     { label: "Hướng dẫn", href: "/huongdanapp" },
+    { label: "Tài liệu chung", href: "/tai-lieu-chung" },
     { label: "User", href: "/admin/users" },
     { label: "Template", href: "/admin/templates" },
     { label: "Danh mục chuẩn", href: "/admin/catalog/standard-tasks" },
