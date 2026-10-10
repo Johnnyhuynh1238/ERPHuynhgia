@@ -19,11 +19,12 @@ const schema = z.object({
     .max(500),
 });
 
-// POST: đổi hạng mục ngân sách cho nhiều khoản chi cùng lúc (admin).
+// POST: đổi hạng mục ngân sách cho nhiều khoản chi cùng lúc (admin + kế toán).
 //   source = mh_order | sub | expense. budgetLineId = null để bỏ gắn.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (user?.role !== UserRole.admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (user?.role !== UserRole.admin && user?.role !== UserRole.accountant)
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)

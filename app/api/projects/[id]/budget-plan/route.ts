@@ -29,10 +29,10 @@ const putSchema = z.object({
   lines: z.array(lineSchema).max(100),
 });
 
-// PUT: lưu/thay toàn bộ hạng mục (chỉ khi chưa khoá).
+// PUT: lưu/thay toàn bộ hạng mục (chỉ khi chưa khoá). Chỉ admin chốt số — kế toán chỉ xem.
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (!canAccess(user?.role) || !user?.id)
+  if (user?.role !== UserRole.admin || !user.id)
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const parsed = putSchema.safeParse(await req.json().catch(() => null));

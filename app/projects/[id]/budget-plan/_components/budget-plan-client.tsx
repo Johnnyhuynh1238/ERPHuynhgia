@@ -343,7 +343,7 @@ export function BudgetPlanClient({
 
         {/* actions */}
         <div className="bp-actions">
-          {!edit && !locked && (
+          {!edit && !locked && canLock && (
             <button className="bp-btn solid" onClick={startEdit}>
               {data?.exists ? "✎ Sửa ngân sách" : "＋ Lập ngân sách"}
             </button>
@@ -430,29 +430,27 @@ export function BudgetPlanClient({
                       label={g.label}
                       lines={ls}
                       sum={gsum}
-                      onOpen={canLock ? openDetail : undefined}
+                      onOpen={openDetail}
                     />
                   );
                 })}
                 {(data.unassigned.spent > 0 || data.unassigned.debt > 0) &&
                   (() => {
                     const ua = { id: null, name: "Chưa gắn hạng mục" };
-                    const cell = canLock
-                      ? (kind: DetailKind) => ({
-                          className: "num strong bp-cellbtn",
-                          onClick: () => openDetail(ua, kind),
-                          title: "Gán hạng mục cho khoản mồ côi",
-                        })
-                      : () => ({ className: "num strong" });
+                    const cell = (kind: DetailKind) => ({
+                      className: "num strong bp-cellbtn",
+                      onClick: () => openDetail(ua, kind),
+                      title: "Gán hạng mục cho khoản mồ côi",
+                    });
                     return (
                       <tr className="bp-unassigned">
                         <td className="l">⚠ Chưa gắn hạng mục</td>
                         <td className="num">—</td>
                         <td {...cell("total")}>{fmt(data.unassigned.spent + data.unassigned.debt)}</td>
-                        <td {...cell("spent")} className={canLock ? "num bp-cellbtn" : "num"}>
+                        <td {...cell("spent")} className="num bp-cellbtn">
                           {fmt(data.unassigned.spent)}
                         </td>
-                        <td {...cell("debt")} className={canLock ? "num warn bp-cellbtn" : "num warn"}>
+                        <td {...cell("debt")} className="num warn bp-cellbtn">
                           {fmt(data.unassigned.debt)}
                         </td>
                         <td className="num">—</td>
