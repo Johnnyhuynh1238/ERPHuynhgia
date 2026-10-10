@@ -631,10 +631,10 @@ function ReceiptsSection({
           <div className="cx-fld"><span className="cx-lbl">Số tiền đợt (đ)</span><input className="cx-ctrl num" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
           <div className="cx-fld"><span className="cx-lbl">Ghi chú</span><input className="cx-ctrl" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Đợt 1 — ký HĐ" /></div>
           <button type="button" className="cx-btn primary block" onClick={createReceipt} disabled={busy}>
-            {isAdmin ? "Gửi lệnh thu (kế toán chọn quỹ & thu)" : "Gửi lệnh thu cho admin duyệt"}
+            {isAdmin ? "Gửi lệnh thu (kế toán chọn quỹ & thu)" : "Tạo lệnh thu"}
           </button>
           <div style={{ fontSize: 11, color: "var(--mut2)", marginTop: 6 }}>
-            {isAdmin ? "Kế toán sẽ chọn quỹ & xác nhận thu." : "Đợt ở trạng thái “Chờ duyệt” tới khi admin duyệt."}
+            {isAdmin ? "Kế toán sẽ chọn quỹ & xác nhận thu." : "Không cần admin duyệt — xác nhận đã thu khi tiền về."}
           </div>
         </div>
       )}

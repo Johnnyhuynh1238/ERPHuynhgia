@@ -679,11 +679,11 @@ export function ReceiptsClient({
                   </div>
                 </div>
 
-                {isKt && (<div className="rt-callout">Lệnh do <b>kế toán</b> tạo sẽ ở trạng thái <b>Chờ duyệt</b>; admin duyệt xong mới xác nhận thu.</div>)}
+                {isKt && (<div className="rt-callout">Lệnh do <b>kế toán</b> tạo vào thẳng <b>Chờ thu</b>, không cần admin duyệt.</div>)}
 
                 <div className="rt-acts">
                   <button type="button" className="rt-btn ghost" onClick={() => { setShowCreate(false); setForm(emptyCreate); }}>Huỷ</button>
-                  <button type="submit" className="rt-btn primary block" disabled={creating}>{creating ? "Đang lưu…" : isKt ? "Gửi admin duyệt →" : "Tạo lệnh thu →"}</button>
+                  <button type="submit" className="rt-btn primary block" disabled={creating}>{creating ? "Đang lưu…" : "Tạo lệnh thu →"}</button>
                 </div>
               </form>
             </ModalShell>

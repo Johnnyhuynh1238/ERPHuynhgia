@@ -695,7 +695,7 @@ function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setBusy(false);
     if (res.ok) {
-      toast.success(isKt ? "Đã tạo, chờ admin duyệt" : "Đã tạo lệnh — vào Lệnh chi/thu để chi/thu");
+      toast.success(isKt && isExpense ? "Đã tạo, chờ admin duyệt" : isKt ? "Đã tạo lệnh thu — vào Lệnh thu xác nhận khi tiền về" : "Đã tạo lệnh — vào Lệnh chi/thu để chi/thu");
       onSaved();
     } else toast.error((await res.json().catch(() => ({}))).message || "Lỗi");
   };
@@ -720,7 +720,7 @@ function TxnForm({ theme, ctx, categoryIds, isKt, onClose, onSaved }: {
         </div>
         <div className="dt-callout">
           {isExpense ? "Tạo lệnh chi" : "Tạo lệnh thu"} gắn vào {ctx.refCode}.{" "}
-          {isKt ? "KT tạo → admin duyệt → ghi sổ quỹ." : "Sau khi tạo, vào màn Lệnh chi/Lệnh thu để xác nhận chi/thu (ghi sổ quỹ)."}
+          {isKt && isExpense ? "KT tạo → admin duyệt → ghi sổ quỹ." : isKt ? "KT tạo → vào Lệnh thu xác nhận đã thu (ghi sổ quỹ), không cần admin duyệt." : "Sau khi tạo, vào màn Lệnh chi/Lệnh thu để xác nhận chi/thu (ghi sổ quỹ)."}
         </div>
         <div className="dt-acts">
           <button type="button" className="dt-btn ghost block" onClick={onClose}>Huỷ</button>

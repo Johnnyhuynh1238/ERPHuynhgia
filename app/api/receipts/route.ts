@@ -3,7 +3,7 @@ import { Prisma, ReceiptSource, ReceiptStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { fireAndForget, notifyReceiptCreated, notifyReceiptKtRequest } from "@/lib/notifications";
+import { fireAndForget, notifyReceiptCreated } from "@/lib/notifications";
 
 const VIEW_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -129,8 +129,9 @@ export async function POST(request: Request) {
   }
 
   const code = await nextReceiptCode();
+  // KT tạo lệnh thu KHÔNG cần admin duyệt — vào thẳng "Chờ thu" như admin tạo.
   const isKtCreated = user.role === UserRole.accountant;
-  const initialStatus = isKtCreated ? ReceiptStatus.awaiting_approval : ReceiptStatus.pending;
+  const initialStatus = ReceiptStatus.pending;
 
   const receipt = await prisma.receipt.create({
     data: {
@@ -156,38 +157,23 @@ export async function POST(request: Request) {
   const projectLabel = receipt.project ? `${receipt.project.code} — ${receipt.project.name}` : null;
   const actorName = user.name || user.email || (isKtCreated ? "KT" : "Admin");
 
-  if (isKtCreated) {
-    fireAndForget(
-      notifyReceiptKtRequest({
-        receiptId: receipt.id,
-        code: receipt.code,
-        amount: Number(receipt.amount),
-        source: receipt.source,
-        payer: receipt.payer,
-        projectLabel,
-        actorUserId: user.id,
-        actorName,
-      }),
-    );
-  } else {
-    fireAndForget(
-      notifyReceiptCreated({
-        receiptId: receipt.id,
-        code: receipt.code,
-        amount: Number(receipt.amount),
-        source: receipt.source,
-        payer: receipt.payer,
-        projectLabel,
-        actorUserId: user.id,
-        actorName,
-      }),
-    );
-  }
+  fireAndForget(
+    notifyReceiptCreated({
+      receiptId: receipt.id,
+      code: receipt.code,
+      amount: Number(receipt.amount),
+      source: receipt.source,
+      payer: receipt.payer,
+      projectLabel,
+      actorUserId: user.id,
+      actorName,
+    }),
+  );
 
   return NextResponse.json({
     receipt: { ...receipt, amount: Number(receipt.amount), receivedAmount: null },
     message: isKtCreated
-      ? "Đã gửi yêu cầu thu. Đang chờ admin duyệt."
+      ? "Đã tạo lệnh thu. Bấm \"Xác nhận đã thu\" khi tiền về."
       : "Đã tạo lệnh thu. Đang chờ KT xác nhận đã thu.",
   });
 }
