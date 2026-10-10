@@ -43,3 +43,11 @@
 .tlc-hide-m{display:none}
 @media (min-width:700px){ .tlc-hide-m{display:table-cell} .tlc-sub{display:none} }
 @media (max-width:699px){ .tlc-act .tlc-btn{padding:0 9px} }
+/* Nhánh thư mục */
+.tlc-folder td{background:var(--t-chip);padding:6px 12px}
+.tlc-folder-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tlc-folder-btn{border:0;background:none;padding:6px 0;font:inherit;font-weight:700;color:var(--t-text);cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-align:left;min-width:0}
+.tlc-caret{width:12px;color:var(--t-terra);font-size:12px}
+.tlc-folder-ico{font-size:15px}
+.tlc-count{font-size:11px;font-weight:700;color:var(--t-terra);border:1px solid var(--t-line2);border-radius:20px;padding:1px 8px;margin-left:2px}
+.tlc-in .tlc-name{padding-left:34px}

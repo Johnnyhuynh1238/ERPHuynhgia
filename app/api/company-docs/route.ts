@@ -8,6 +8,7 @@ import {
   fileExtension,
   isCompanyDocKey,
   listCompanyDocs,
+  moveCompanyDoc,
 } from "@/lib/company-docs";
 
 export const runtime = "nodejs";
@@ -46,7 +47,8 @@ export async function POST(request: Request) {
   if (!COMPANY_DOCS_EXTENSIONS.has(fileExtension(file.name))) {
     return NextResponse.json({ message: "Chỉ nhận PDF, Word, Excel, PowerPoint, ảnh" }, { status: 400 });
   }
-  const key = buildCompanyDocKey(file.name);
+  const folder = formData.get("folder");
+  const key = buildCompanyDocKey(file.name, typeof folder === "string" ? folder : "");
   await putObjectToMinio({
     key,
     body: Buffer.from(await file.arrayBuffer()),
@@ -65,4 +67,18 @@ export async function DELETE(request: Request) {
   if (!isCompanyDocKey(key)) return NextResponse.json({ message: "Tài liệu không hợp lệ" }, { status: 400 });
   await deleteObjectFromMinio(key);
   return NextResponse.json({ ok: true });
+}
+
+// Chuyển tài liệu sang thư mục khác. body: { key, folder } — folder rỗng = đưa ra ngoài thư mục.
+export async function PATCH(request: Request) {
+  try {
+    await requireRole(["admin"]);
+  } catch (error) {
+    return authError(error);
+  }
+  const body = (await request.json().catch(() => null)) as { key?: unknown; folder?: unknown } | null;
+  const key = typeof body?.key === "string" ? body.key : "";
+  if (!isCompanyDocKey(key)) return NextResponse.json({ message: "Tài liệu không hợp lệ" }, { status: 400 });
+  const newKey = await moveCompanyDoc(key, typeof body?.folder === "string" ? body.folder : "");
+  return NextResponse.json({ key: newKey });
 }
