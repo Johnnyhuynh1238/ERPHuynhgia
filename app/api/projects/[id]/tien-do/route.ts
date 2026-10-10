@@ -17,7 +17,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json(prog);
 }
 
-// PATCH: cập nhật 1 dòng ngân sách. Body { refType:'budget', refId=TÊN dòng, percent?, done? }.
+// PATCH: cập nhật tiến độ 1 dòng. Body { refType:'line'|'section', refId=id dòng NS / id phần,
+//  percent?, done? }.
 //  - done=true → percent=100. percent<100 → done=false. percent>0 & done chưa set → giữ done cũ nếu 100.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireAdmin();
@@ -29,11 +30,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     percent?: number;
     done?: boolean;
   };
-  const refType = body.refType === "budget" ? "budget" : null;
+  const refType = body.refType === "line" || body.refType === "section" ? body.refType : null;
   const refId = typeof body.refId === "string" ? body.refId.trim() : "";
-  if (!refType || !refId) {
+  if (!refType || !/^[0-9a-f-]{36}$/i.test(refId)) {
     return NextResponse.json({ message: "Thiếu công tác" }, { status: 400 });
   }
+  // refId phải thuộc dự án.
+  const owned =
+    refType === "line"
+      ? await prisma.projectBudgetPlanLine.count({ where: { id: refId, plan: { projectId: params.id } } })
+      : await prisma.projectSection.count({ where: { id: refId, projectId: params.id } });
+  if (!owned) return NextResponse.json({ message: "Không thấy công tác" }, { status: 404 });
 
   let percent: number | undefined;
   let done: boolean | undefined;

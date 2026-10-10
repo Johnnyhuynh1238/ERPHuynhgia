@@ -12,6 +12,7 @@ type LineStat = {
   id: string;
   name: string;
   groupKind: string;
+  sectionId: string | null;
   budget: number;
   spent: number;
   debt: number;
@@ -25,11 +26,20 @@ type PlanData = {
   contractValue: number;
   addendumRevenue: number;
   lines: LineStat[];
+  sections: { id: string; name: string; kind: string }[];
   unassigned: { spent: number; debt: number };
   totals: { budget: number; spent: number; debt: number; remaining: number };
 };
 
-type EditLine = { name: string; groupKind: string; amount: string };
+// id = dòng cũ (giữ nguyên id khi lưu); locked = đã gắn phần/chi phí → không xoá, chỉ đặt 0.
+type EditLine = {
+  id: string | null;
+  name: string;
+  groupKind: string;
+  amount: string;
+  sectionId: string;
+  locked: boolean;
+};
 
 type Goods = { name: string; unit: string; qty: number; price: number };
 // Cột nào của hàng được bấm: tổng chi phí (mọi nguồn) / đã chi (sổ quỹ) / công nợ.
@@ -201,14 +211,27 @@ export function BudgetPlanClient({
 
   const startEdit = () => {
     setRows(
-      (data?.lines ?? []).map((l) => ({ name: l.name, groupKind: l.groupKind, amount: String(l.budget) })),
+      (data?.lines ?? []).map((l) => ({
+        id: l.id,
+        name: l.name,
+        groupKind: l.groupKind,
+        amount: String(l.budget),
+        sectionId: l.sectionId ?? "",
+        locked: !!l.sectionId || l.spent !== 0 || l.debt !== 0,
+      })),
     );
     setEdit(true);
   };
-  const addRow = () => setRows((r) => [...r, { name: "", groupKind: "tho", amount: "" }]);
+  const addRow = () =>
+    setRows((r) => [...r, { id: null, name: "", groupKind: "tho", amount: "", sectionId: "", locked: false }]);
   const setRow = (i: number, patch: Partial<EditLine>) =>
     setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const delRow = (i: number) => setRows((r) => r.filter((_, j) => j !== i));
+  const delRow = (i: number) => {
+    const row = rows[i];
+    if (row?.locked) return toast.error("Hạng mục đã gắn phần tiến độ/chi phí — đặt ngân sách = 0, không xoá");
+    if (row?.id && !confirm(`Xoá hạng mục "${row.name}"?`)) return;
+    setRows((r) => r.filter((_, j) => j !== i));
+  };
   const editTotal = useMemo(() => rows.reduce((s, r) => s + (Number(r.amount) || 0), 0), [rows]);
 
   const save = async () => {
@@ -219,7 +242,13 @@ export function BudgetPlanClient({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        lines: clean.map((r) => ({ name: r.name.trim(), groupKind: r.groupKind, amount: Number(r.amount) })),
+        lines: clean.map((r) => ({
+          id: r.id,
+          sectionId: r.sectionId || null,
+          name: r.name.trim(),
+          groupKind: r.groupKind,
+          amount: Number(r.amount),
+        })),
       }),
     });
     setSaving(false);
@@ -382,6 +411,19 @@ export function BudgetPlanClient({
                     <option key={g.key} value={g.key}>{g.label}</option>
                   ))}
                 </select>
+                {(data?.sections.length ?? 0) > 0 && (
+                  <select
+                    className="bp-esec"
+                    title="Phần tiến độ (ngày dự kiến)"
+                    value={r.sectionId}
+                    onChange={(e) => setRow(i, { sectionId: e.target.value })}
+                  >
+                    <option value="">— Phần tiến độ —</option>
+                    {data!.sections.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
                 <input
                   className="bp-eamt num"
                   type="number"
@@ -389,7 +431,14 @@ export function BudgetPlanClient({
                   value={r.amount}
                   onChange={(e) => setRow(i, { amount: e.target.value })}
                 />
-                <button className="bp-del" onClick={() => delRow(i)}>🗑</button>
+                <button
+                  className="bp-del"
+                  disabled={r.locked}
+                  title={r.locked ? "Đã gắn phần/chi phí — đặt ngân sách = 0 thay vì xoá" : "Xoá"}
+                  onClick={() => delRow(i)}
+                >
+                  🗑
+                </button>
               </div>
             ))}
             {rows.length === 0 && <p className="bp-empty">Chưa có hạng mục. Bấm ＋ Hạng mục.</p>}

@@ -89,6 +89,9 @@
 .bpdoc .bp-eamt { width: 150px; text-align: right; }
 .bpdoc .bp-del { background: transparent; border: 1px solid var(--line2); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
 .bpdoc .bp-del:hover { border-color: var(--red); }
+.bpdoc .bp-del:disabled { opacity: .35; cursor: not-allowed; }
+.bpdoc .bp-esec { width: 180px; min-width: 0; }
+@media (max-width: 640px) { .bpdoc .bp-erow { flex-wrap: wrap; } .bpdoc .bp-ename { flex-basis: 100%; } .bpdoc .bp-esec { flex: 1; width: auto; } }
 
 /* table */
 .bpdoc .bp-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }

@@ -14,6 +14,7 @@ export type BudgetLineStat = {
   id: string;
   name: string;
   groupKind: string;
+  sectionId: string | null; // PHẦN tiến độ gắn với dòng (null = chưa gắn)
   budget: number;
   spent: number;
   debt: number;
@@ -29,6 +30,8 @@ export type BudgetPlanData = {
   // Doanh thu phụ lục phát sinh = Σ đợt thu type=addendum (giá bán khách đã duyệt).
   addendumRevenue: number;
   lines: BudgetLineStat[];
+  // PHẦN của dự án (để chọn "Phần tiến độ" cho từng dòng khi sửa ngân sách).
+  sections: { id: string; name: string; kind: string }[];
   // phần chi/nợ chưa gắn hạng mục (item thiếu hm / HĐ chưa gắn) — cần soát.
   unassigned: { spent: number; debt: number };
   totals: { budget: number; spent: number; debt: number; remaining: number };
@@ -40,7 +43,7 @@ const num = (d: Prisma.Decimal | number | bigint | null | undefined): number =>
 const MH_ACTIVE: MhOrderStatus[] = [MhOrderStatus.ordered, MhOrderStatus.received, MhOrderStatus.paid];
 
 export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData> {
-  const [plan, project, orders, subContracts, expenses, addendumAgg] = await Promise.all([
+  const [plan, project, orders, subContracts, expenses, addendumAgg, sections] = await Promise.all([
     prisma.projectBudgetPlan.findUnique({
       where: { projectId },
       include: { lines: { orderBy: { sortRank: "asc" } } },
@@ -79,6 +82,11 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       where: { projectId, type: "addendum" },
       _sum: { amount: true },
     }),
+    prisma.projectSection.findMany({
+      where: { projectId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, kind: true },
+    }),
   ]);
 
   const addendumRevenue = num(addendumAgg._sum.amount);
@@ -91,6 +99,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       contractValue: num(project?.contractValue),
       addendumRevenue,
       lines: [],
+      sections,
       unassigned: { spent: 0, debt: 0 },
       totals: { budget: 0, spent: 0, debt: 0, remaining: 0 },
     };
@@ -241,6 +250,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
       id: l.id,
       name: l.name,
       groupKind: l.groupKind,
+      sectionId: l.sectionId,
       budget,
       spent: Math.round(sp),
       debt: Math.round(dt),
@@ -267,6 +277,7 @@ export async function buildBudgetPlan(projectId: string): Promise<BudgetPlanData
     contractValue: num(project?.contractValue),
     addendumRevenue,
     lines,
+    sections,
     unassigned: { spent: Math.round(unassigned.spent), debt: Math.round(unassigned.debt) },
     totals,
   };

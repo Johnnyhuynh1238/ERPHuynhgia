@@ -7,9 +7,9 @@ import "./tien-do.css";
 
 
 type Task = {
-  refType: "budget";
-  refId: string; // = tên dòng ngân sách
-  sectionId: string | null; // section khớp tên (để set ngày dự kiến)
+  refType: "line" | "section";
+  refId: string; // id dòng ngân sách (line) / id phần chưa có dòng NS (section)
+  sectionId: string | null; // phần gắn với dòng (để set ngày dự kiến)
   groupKey: string; // kind ("tho"…)
   groupLabel: string; // "Thô" / "Hoàn thiện" / …
   name: string;
@@ -176,6 +176,8 @@ export function TienDoClient({
   }, []);
   const dispPct = total.amt > 0 ? Math.round((dispEarned / total.amt) * 100) : 0;
 
+  const undated = useMemo(() => tasks.filter((t) => !t.planStart || !t.planEnd), [tasks]);
+
   const groups = useMemo(() => {
     const map = new Map<string, { groupKey: string; groupLabel: string; items: Task[] }>();
     for (const t of tasks) {
@@ -215,7 +217,7 @@ export function TienDoClient({
   const savePlan = async (t: Task, patch: { planStart?: string | null; planEnd?: string | null }) => {
     setTasks((prev) => prev.map((x) => (keyOf(x) === keyOf(t) ? { ...x, ...patch } : x)));
     if (!t.sectionId) {
-      toast("Dòng này không gắn PHẦN dự toán — không đặt ngày được");
+      toast("Dòng chưa gắn PHẦN — vào Ngân sách chọn “Phần tiến độ” trước");
       return;
     }
     const r = await fetch(`/api/projects/${projectId}/sections/${t.sectionId}`, {
@@ -334,10 +336,25 @@ export function TienDoClient({
             Chưa có PHẦN nào. Vào Dự toán → “Quản lý phần” tạo theo HĐTK trước.
           </div>
         ) : view === "gantt" ? (
-          <GanttView
-            tasks={tasks}
-            onPlan={(t, patch) => savePlan(t, patch)}
-          />
+          <>
+            {undated.length > 0 && (
+              // Hạng mục thiếu ngày KHÔNG vẽ được trên timeline → báo rõ, không ẩn im lặng.
+              <div className="undated">
+                <b>⚠ {undated.length} hạng mục chưa hiện trên timeline (chưa có ngày):</b>{" "}
+                {undated.map((t) => t.name).join(" · ")}.{" "}
+                <button onClick={() => setView("list")}>Đặt ngày ở danh sách ☰</button>
+                {undated.some((t) => !t.sectionId) && (
+                  <span className="hint">
+                    {" "}Dòng chưa gắn PHẦN → vào Ngân sách, chọn “Phần tiến độ” cho dòng đó.
+                  </span>
+                )}
+              </div>
+            )}
+            <GanttView
+              tasks={tasks}
+              onPlan={(t, patch) => savePlan(t, patch)}
+            />
+          </>
         ) : (
           <>
             {groups.map((g) => {

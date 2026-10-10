@@ -3272,12 +3272,17 @@ model ProjectBudgetPlanLine {
   groupKind BudgetPlanGroup @default(tho) @map("group_kind")
   amount    BigInt          @default(0)
   sortRank  Float           @default(0) @map("sort_rank")
+  // PHẦN tiến độ (ngày dự kiến) — nối bằng MÃ, không khớp tên. Dòng gắn phần KHÔNG xoá được
+  // (trigger DB budget_line_block_delete) — bỏ hạng mục thì đặt amount = 0.
+  sectionId String?         @map("section_id") @db.Uuid
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
 
-  plan ProjectBudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan    ProjectBudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  section ProjectSection?   @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([planId])
+  @@index([sectionId])
   @@map("project_budget_plan_lines")
 }
 
@@ -4483,8 +4488,9 @@ model ProjectSection {
   updatedAt DateTime        @updatedAt @map("updated_at")
 
   project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  materials EstimateDbMaterial[]
-  works     EstimateWork[]
+  materials   EstimateDbMaterial[]
+  works       EstimateWork[]
+  budgetLines ProjectBudgetPlanLine[]
 
   @@index([projectId, sortOrder])
   @@map("project_sections")

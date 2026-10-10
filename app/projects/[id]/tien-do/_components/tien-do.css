@@ -239,3 +239,8 @@
 .tddoc .rbuy2 { font-size: 11px; color: var(--mut); white-space: nowrap; }
 .tddoc .rbuy2 b { color: var(--terra); font-weight: 600; }
 .tddoc .rbuy2 b.over { color: #d1503f; }
+
+/* Cảnh báo hạng mục thiếu ngày (không vẽ được trên timeline) */
+.tddoc .undated { font-size: 12px; line-height: 1.5; color: var(--text); background: color-mix(in srgb, #d97706 12%, transparent); border: 1px solid color-mix(in srgb, #d97706 45%, transparent); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
+.tddoc .undated button { font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: 1px 8px; cursor: pointer; }
+.tddoc .undated .hint { color: var(--mut2); }
