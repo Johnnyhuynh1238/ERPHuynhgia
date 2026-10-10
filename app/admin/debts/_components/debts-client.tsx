@@ -25,6 +25,7 @@ type LoanRow = {
   principalPaid: number;
   interestPaid: number;
   outstanding: number;
+  createdAt: string;
 };
 
 type AdvanceRow = {
@@ -39,6 +40,7 @@ type AdvanceRow = {
   paidOut: number;
   returned: number;
   outstanding: number;
+  createdAt: string;
 };
 
 type Txn = {
@@ -76,6 +78,10 @@ const TXN_META: Record<TxnType, { title: string; whoLabel: string; dir: "in" | "
   "advance-return": { title: "Hoàn ứng", whoLabel: "Người hoàn", dir: "in" },
 };
 
+// Đã về 0 = dư ≤ 0.5đ; phiếu ứng mở chưa chi đồng nào (dư cũng 0) vẫn hiện.
+const isCleared = (r: { outstanding: number; status: string; paidOut?: number }) =>
+  r.outstanding <= 0.5 && !(r.status === "open" && (r.paidOut ?? 0) === 0);
+
 export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: CategoryIds }) {
   const isAdmin = role === "admin";
   const isKt = role === "accountant";
@@ -108,6 +114,9 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
   // Popup chi tiết khi bấm 1 dòng. reloadKey ép modal nạp lại sau khi có thay đổi.
   const [detailCtx, setDetailCtx] = useState<{ kind: "loans" | "advances"; id: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Mặc định ẩn khoản đã về 0; sắp mới nhất trước, có nút đổi sang số lớn nhất trước.
+  const [showAll, setShowAll] = useState(false);
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -146,6 +155,20 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
     const open = advances.filter((a) => a.status === "open");
     return { count: open.length, outstanding: open.reduce((s, a) => s + a.outstanding, 0) };
   }, [advances]);
+
+  const sortRows = useCallback(
+    <T extends { outstanding: number; status: string; createdAt: string; paidOut?: number }>(rows: T[], dateOf: (r: T) => string | null) => {
+      const visible = showAll ? rows : rows.filter((r) => !isCleared(r));
+      const ts = (r: T) => new Date(dateOf(r) ?? r.createdAt).getTime();
+      return [...visible].sort((a, b) =>
+        sortBy === "amount" ? b.outstanding - a.outstanding || ts(b) - ts(a) : ts(b) - ts(a) || b.outstanding - a.outstanding,
+      );
+    },
+    [showAll, sortBy],
+  );
+  const shownLoans = useMemo(() => sortRows(loans, (l) => l.disbursedAt), [loans, sortRows]);
+  const shownAdvances = useMemo(() => sortRows(advances, (a) => a.advancedAt), [advances, sortRows]);
+  const hiddenCount = (tab === "loans" ? loans.length - shownLoans.length : advances.length - shownAdvances.length);
 
   return (
     <div className={`dtdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
@@ -189,25 +212,32 @@ export function DebtsClient({ role, categoryIds }: { role: string; categoryIds: 
             <button className={`dt-tab ${tab === "loans" ? "on" : ""}`} onClick={() => setTab("loans")}>Khoản vay</button>
             <button className={`dt-tab ${tab === "advances" ? "on" : ""}`} onClick={() => setTab("advances")}>Tạm ứng</button>
           </div>
+          <div className="dt-tabs dt-tools">
+            <button className={`dt-tab ${sortBy === "date" ? "on" : ""}`} onClick={() => setSortBy("date")}>Mới nhất</button>
+            <button className={`dt-tab ${sortBy === "amount" ? "on" : ""}`} onClick={() => setSortBy("amount")}>Lớn nhất</button>
+            <button className={`dt-tab ${showAll ? "on" : ""}`} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Ẩn khoản đã hết" : `Xem tất cả${hiddenCount > 0 ? ` (+${hiddenCount})` : ""}`}
+            </button>
+          </div>
         </div>
 
         {loading ? (
           <div className="dt-empty">Đang tải…</div>
         ) : tab === "loans" ? (
-          loans.length === 0 ? (
-            <div className="dt-empty">Chưa có khoản vay nào.</div>
+          shownLoans.length === 0 ? (
+            <div className="dt-empty">{loans.length === 0 ? "Chưa có khoản vay nào." : "Không còn khoản vay nào đang nợ."}</div>
           ) : (
             <div className="dt-list">
-              {loans.map((l) => (
+              {shownLoans.map((l) => (
                 <LoanCard key={l.id} loan={l} onOpen={() => setDetailCtx({ kind: "loans", id: l.id })} />
               ))}
             </div>
           )
-        ) : advances.length === 0 ? (
-          <div className="dt-empty">Chưa có phiếu tạm ứng nào.</div>
+        ) : shownAdvances.length === 0 ? (
+          <div className="dt-empty">{advances.length === 0 ? "Chưa có phiếu tạm ứng nào." : "Không còn phiếu tạm ứng nào chưa hoàn."}</div>
         ) : (
           <div className="dt-list">
-            {advances.map((a) => (
+            {shownAdvances.map((a) => (
               <AdvanceCard key={a.id} adv={a} onOpen={() => setDetailCtx({ kind: "advances", id: a.id })} />
             ))}
           </div>

@@ -59,6 +59,7 @@
 .dt-tabs{display:flex;gap:6px;overflow-x:auto;flex:1;padding-bottom:2px;-webkit-overflow-scrolling:touch}
 .dt-tab{flex:0 0 auto;border:1px solid var(--line2);background:none;color:var(--mut);border-radius:999px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
 .dt-tab.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.dt-tools{flex:0 1 auto}
 .dt-search{position:relative;flex:1;min-width:150px}
 .dt-search input{width:100%;border:1px solid var(--line2);background:var(--card);color:var(--text);border-radius:10px;padding:9px 11px 9px 30px;font-size:12.5px;font-family:inherit}
 .dt-search input::placeholder{color:var(--mut2)}
