@@ -23,6 +23,7 @@ import {
   Library,
   ListChecks,
   Package,
+  PieChart,
   Receipt,
   RefreshCw,
   Settings,
@@ -79,6 +80,7 @@ type AppKey =
   | "hop-dong"
   | "du-an"
   | "thau-phu"
+  | "tai-chinh-tq"
   | "tai-chinh"
   | "ke-hoach"
   | "vay-tam-ung"
@@ -153,6 +155,13 @@ const APPS: AppDef[] = [
       { label: "HĐ thầu phụ", href: "/sub-contracts" },
       { label: "Chi thầu phụ", href: "/sub-payments" },
     ],
+  },
+  {
+    key: "tai-chinh-tq",
+    group: "tai-chinh",
+    label: "Tài chính tổng quan",
+    Icon: PieChart,
+    href: "/admin/finance-overview",
   },
   {
     key: "tai-chinh",
@@ -248,6 +257,7 @@ const APP_BADGE_KEYS: Record<AppKey, Array<keyof SummaryDto["todos"]>> = {
   "hop-dong": [],
   "du-an": [],
   "thau-phu": [],
+  "tai-chinh-tq": [],
   "tai-chinh": ["expensePending", "receiptAwaitingApproval", "paymentDue7d"],
   "ke-hoach": [],
   "vay-tam-ung": [],

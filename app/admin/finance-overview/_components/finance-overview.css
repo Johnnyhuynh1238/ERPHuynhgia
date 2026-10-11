@@ -1,0 +1,119 @@
+/* ============================================================
+   Tài chính tổng quan — Design system Huỳnh Gia (.fodoc)
+   Brand Ngà (sáng) / Mahogany (tối), IBM Plex. Phẳng, kẻ mảnh.
+   Mỗi module = 1 <section class="fo-mod">, ngăn bằng line ngang.
+   ============================================================ */
+.fodoc {
+  --bg:#f5efe1; --card:#fbf7ec; --card2:#f7f1e3;
+  --text:#2e140a; --mut:rgba(46,20,10,.55); --mut2:rgba(46,20,10,.38);
+  --line:rgba(46,20,10,.1); --line2:rgba(46,20,10,.16);
+  --orange:#e36122; --terra:#8a3d1c; --gold:#b8934a; --red:#b5432e;
+  font-family:var(--font-plex-sans),"IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+.fodoc[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#3a1608; --card:#4a1d0c; --card2:#431a0a;
+  --text:#f7f2e4; --mut:rgba(247,242,228,.6); --mut2:rgba(247,242,228,.4);
+  --line:rgba(247,242,228,.12); --line2:rgba(247,242,228,.2);
+  --orange:#f0752f; --terra:#d8996a; --gold:#d8b25e; --red:#e07a5f;
+}
+.fodoc{background:var(--bg);color:var(--text);min-height:100dvh;line-height:1.4;letter-spacing:-.006em;padding-bottom:calc(48px + env(safe-area-inset-bottom));overflow-x:hidden}
+.fodoc *{box-sizing:border-box}
+.fodoc .num{font-family:var(--font-plex-mono),"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.fowrap{max-width:960px;margin:0 auto;padding:0 clamp(14px,4.5vw,24px)}
+
+/* header */
+.fo-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:16px 0 4px}
+.fo-head>div:first-child{min-width:0}
+.fo-eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--terra)}
+.fo-h1{font-size:clamp(20px,6vw,25px);font-weight:600;letter-spacing:-.022em;margin:6px 0 0;line-height:1.12}
+.fo-iconbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:none;color:var(--text);cursor:pointer;font-size:15px;display:grid;place-items:center;line-height:1;flex-shrink:0}
+
+/* module + line ngang ngăn cách */
+.fo-mod{padding:20px 0 24px}
+.fo-mod+.fo-mod{border-top:1px solid var(--line2)}
+.fo-mod-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
+.fo-h2{font-size:16px;font-weight:600;letter-spacing:-.015em;margin:0}
+.fo-sub{font-size:11.5px;color:var(--mut)}
+
+/* bộ lọc thời gian */
+.fo-chips{display:flex;gap:6px;overflow-x:auto;margin:12px 0 0;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.fo-chip{flex:0 0 auto;border:1px solid var(--line2);background:none;color:var(--mut);border-radius:999px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.fo-chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.fo-range{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px}
+.fo-range label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut)}
+.fo-range input{background:var(--card);border:1px solid var(--line2);border-radius:9px;color:var(--text);font:inherit;font-size:13px;padding:6px 9px;min-width:0}
+
+.fo-empty{padding:36px 0;text-align:center;color:var(--mut);font-size:13px}
+.fo-empty.err{color:var(--red)}
+
+/* biểu đồ + bảng */
+.fo-spend{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:16px;transition:opacity .15s}
+.fo-spend.dim{opacity:.55}
+@media(min-width:760px){.fo-spend{grid-template-columns:300px minmax(0,1fr);align-items:center;gap:28px}}
+.fo-pie{position:relative;width:min(100%,300px);aspect-ratio:1;margin:0 auto}
+.fo-pie svg{outline:none}
+.fo-pie path{cursor:pointer;outline:none}
+.fo-pie-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center;padding:0 26%}
+.fo-pie-c .k{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fo-pie-c .v{font-size:clamp(17px,5.4vw,21px);font-weight:600;letter-spacing:-.03em;margin-top:3px;white-space:nowrap}
+.fo-pie-c .s{font-size:11px;color:var(--terra);margin-top:1px}
+
+.fo-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.fo-tbl th{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:0 6px 7px;border-bottom:1px solid var(--line2)}
+.fo-tbl td{padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.fo-tbl td:first-child{white-space:normal}
+.fo-tbl tbody tr{cursor:pointer}
+.fo-tbl tbody tr.on td{background:var(--card)}
+@media(hover:hover){.fo-tbl tbody tr:hover td{background:var(--card2)}}
+.fo-tbl .r{text-align:right}
+.fo-tbl .mut{color:var(--mut)}
+.fo-tbl .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:8px;vertical-align:0}
+.fo-tbl .cnt{font-size:10.5px;color:var(--mut2);margin-left:6px}
+.fo-tbl tfoot td{font-weight:600;border-bottom:none;border-top:1px solid var(--line2)}
+
+/* Module 2–4 */
+.fodoc{--ok:#5b7a52}
+.fodoc[data-theme="dark"]{--ok:#89ab78}
+.fo-grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;margin-top:14px}
+@media(min-width:760px){.fo-grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}}
+.fo-verdict{border-radius:13px;padding:12px 14px;border:1px solid var(--line);background:var(--card);margin-bottom:10px}
+.fo-verdict .k{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.fo-verdict .v{font-size:clamp(22px,7vw,28px);font-weight:600;letter-spacing:-.03em;margin-top:3px;white-space:nowrap}
+.fo-verdict .s{font-size:11.5px;color:var(--mut);margin-top:2px}
+.fo-verdict.good .k,.fo-verdict.good .v{color:var(--ok)}
+.fo-verdict.bad .k,.fo-verdict.bad .v{color:var(--red)}
+.fo-kv{width:100%;border-collapse:collapse;font-size:13px}
+.fo-kv td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.fo-kv td.r{white-space:nowrap;padding-left:10px}
+.fo-kv .r{text-align:right}
+.fo-kv .ok{color:var(--ok)} .fo-kv .bad{color:var(--red)}
+.fo-kv tr.sub td{font-weight:600;background:var(--card2)}
+.fo-kv tr.grp td{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding-top:12px}
+.fo-kv tfoot td{font-weight:600;border-bottom:none;border-top:1px solid var(--line2)}
+.fo-kv .hint{display:block;font-size:10.5px;color:var(--mut2);margin-top:1px}
+.fo-cap{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.fo-bar{width:100%;height:210px}
+.fo-legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:6px}
+.fo-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.fo-legend .mut{margin-left:auto;color:var(--mut2)}
+.fo-tip{background:var(--card);border:1px solid var(--line2);border-radius:9px;padding:7px 10px;font-size:12px;color:var(--text);line-height:1.5}
+.fo-tip .num{font-weight:600}
+.fo-note{font-size:11.5px;color:var(--mut);margin-top:8px;line-height:1.45}
+.fo-note.bad{color:var(--red)}
+.fo-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+@media(min-width:600px){.fo-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.fo-tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;min-width:0}
+.fo-tile .k{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fo-tile .v{font-size:16px;font-weight:600;margin-top:4px;letter-spacing:-.03em;white-space:nowrap}
+.fo-tile .v.ok{color:var(--ok)} .fo-tile .v.bad{color:var(--red)}
+.fo-ins{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.fo-in{display:flex;gap:11px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--mut2);border-radius:11px;padding:10px 12px}
+.fo-in .ic{flex:0 0 22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;background:var(--mut2)}
+.fo-in .t{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.fo-in .d{font-size:12.5px;color:var(--mut);margin-top:3px;line-height:1.5}
+.fo-in.bad{border-left-color:var(--red)} .fo-in.bad .ic{background:var(--red)}
+.fo-in.warn{border-left-color:var(--gold)} .fo-in.warn .ic{background:var(--gold)}
+.fo-in.info{border-left-color:var(--terra)} .fo-in.info .ic{background:var(--terra)}
+.fo-in.good{border-left-color:var(--ok)} .fo-in.good .ic{background:var(--ok)}
