@@ -36,7 +36,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const row = await prisma.projectPipeline.findUnique({ where: { id: params.id }, select: SELECT });
   if (!row) return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
-  const docs = (await listCompanyDocs().catch(() => []))
+  const docs = (await listCompanyDocs().then((r) => r.docs).catch(() => []))
     .filter((d) => isBidViewableDoc(d.key))
     .map((d) => ({ key: d.key, folder: d.folder, fileName: d.fileName }));
   return NextResponse.json({ bid: shape(row), docs });
