@@ -4649,6 +4649,11 @@ model ProjectPipeline {
   contractTerms        Json?     @map("contract_terms")
   designDone           Json      @default("{}") @map("design_done") // GĐ 4: {"mat_bang": ISO lúc chốt bước, ...}
   prepDone             Json      @default("{}") @map("prep_done") // GĐ 5 Chuẩn bị: {"du_toan": ISO lúc chốt mục, ...}
+  // Mời thầu nhân công: link <PUBLIC_SITE_URL>/<bidSlug> (moi-thau-<mã>) — chỉ mở khi bidPublishedAt có giá trị.
+  bidSlug              String?   @unique @map("bid_slug")
+  bidPublishedAt       DateTime? @map("bid_published_at")
+  bidNote              String?   @map("bid_note") @db.Text // phạm vi / yêu cầu / liên hệ admin ghi cho nhà thầu
+  bidDocKeys           Json      @default("[]") @map("bid_doc_keys") // key Tài liệu chung (company-docs/…) — HĐ thầu phụ mẫu
   projectId            String?   @unique @map("project_id") @db.Uuid
   createdById          String?   @map("created_by_id") @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at")

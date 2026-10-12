@@ -46,6 +46,9 @@ export function validateSlug(slug: string): string | null {
     return "Link chỉ gồm chữ thường không dấu, số, dấu gạch và phải có ít nhất 2 từ (vd: nha-anh-bin)";
   }
   if (slug.length > 60) return "Link quá dài (tối đa 60 ký tự)";
+  // moi-thau-<mã> = link mời thầu nhân công (lib/bid-invite.ts).
+  if (slug.startsWith("moi-thau-"))
+    return "Link bắt đầu bằng moi-thau- dành cho trang mời thầu, chọn tên khác";
   if (RESERVED_SLUGS.indexOf(slug) >= 0)
     return "Link này trùng trang có sẵn trên website, chọn tên khác";
   return null;

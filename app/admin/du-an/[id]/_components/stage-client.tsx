@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DesignStage } from "./design-stage";
 import { PrepStage } from "./prep-stage";
+import { BidPanel } from "./bid-panel";
 import { useRouter } from "next/navigation";
 import { plexMono, plexSans } from "@/lib/fonts";
 import {
@@ -1059,9 +1060,15 @@ export function StageClient({
           )}
         </>
       ) : view === 4 && state.projectId ? (
-        <DesignStage projectId={state.projectId} projectName={state.name} />
+        <>
+          <DesignStage projectId={state.projectId} projectName={state.name} />
+          <BidPanel pipelineId={state.id} />
+        </>
       ) : view === 5 && state.projectId ? (
-        <PrepStage projectId={state.projectId} />
+        <>
+          <PrepStage projectId={state.projectId} />
+          <BidPanel pipelineId={state.id} />
+        </>
       ) : (
         <div className="pl-ph">
           <b>
