@@ -21,8 +21,17 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export function TaiLieuClient({ initial, canEdit }: { initial: CompanyDoc[]; canEdit: boolean }) {
+export function TaiLieuClient({
+  initial,
+  initialFolders,
+  canEdit,
+}: {
+  initial: CompanyDoc[];
+  initialFolders: string[];
+  canEdit: boolean;
+}) {
   const [docs, setDocs] = useState(initial);
+  const [folderList, setFolderList] = useState(initialFolders);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
@@ -35,10 +44,13 @@ export function TaiLieuClient({ initial, canEdit }: { initial: CompanyDoc[]; can
     return s ? docs.filter((d) => d.fileName.toLowerCase().includes(s) || d.folder.toLowerCase().includes(s)) : docs;
   }, [docs, q]);
 
-  // Nhánh thư mục (A→Z) lên trước, file lẻ ngoài thư mục xếp sau. Đang tìm thì chỉ hiện nhánh có kết quả.
+  // Nhánh thư mục (A→Z, gồm cả thư mục rỗng) lên trước, file lẻ ngoài thư mục xếp sau. Đang tìm thì chỉ hiện nhánh có kết quả.
   const folders = useMemo(
-    () => Array.from(new Set(docs.map((d) => d.folder).filter(Boolean))).sort((a, b) => a.localeCompare(b, "vi")),
-    [docs],
+    () =>
+      Array.from(new Set(folderList.concat(docs.map((d) => d.folder)).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, "vi"),
+      ),
+    [docs, folderList],
   );
   const groups = useMemo(
     () =>
@@ -62,15 +74,48 @@ export function TaiLieuClient({ initial, canEdit }: { initial: CompanyDoc[]; can
     inputRef.current?.click();
   };
 
-  const newFolder = () => {
-    const name = window.prompt("Tên thư mục mới (sau đó chọn file để tải vào):", "")?.trim();
-    if (!name) return;
-    pickFiles(name);
-  };
-
   const reload = async () => {
     const res = await fetch("/api/company-docs", { cache: "no-store" });
-    if (res.ok) setDocs(((await res.json()) as { docs: CompanyDoc[] }).docs);
+    if (!res.ok) return;
+    const j = (await res.json()) as { docs: CompanyDoc[]; folders: string[] };
+    setDocs(j.docs);
+    setFolderList(j.folders);
+  };
+
+  // Tạo thư mục ngay cả khi chưa có file (server ghi object đánh dấu).
+  const newFolder = async () => {
+    const name = window.prompt("Tên thư mục mới:", "")?.trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("createFolder", name);
+      const res = await fetch("/api/company-docs", { method: "POST", body: fd });
+      const j = (await res.json().catch(() => null)) as { folder?: string; message?: string } | null;
+      if (!res.ok || !j?.folder) return void toast.error(j?.message || "Tạo thư mục lỗi");
+      const created = j.folder;
+      await reload();
+      setOpenFolders((prev) => new Set(Array.from(prev).concat(created)));
+      toast.success(`Đã tạo thư mục "${created}"`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeFolder = async (folder: string) => {
+    const ok = await confirmDialog({
+      title: "Xoá thư mục?",
+      message: `Xoá thư mục rỗng "${folder}".`,
+      confirmText: "Xoá",
+    });
+    if (!ok) return;
+    const res = await fetch(`/api/company-docs?folder=${encodeURIComponent(folder)}`, { method: "DELETE" });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => null)) as { message?: string } | null;
+      return toast.error(j?.message || "Xoá thư mục lỗi");
+    }
+    await reload();
+    toast.success("Đã xoá thư mục");
   };
 
   const upload = async (files: FileList | null) => {
@@ -231,7 +276,7 @@ export function TaiLieuClient({ initial, canEdit }: { initial: CompanyDoc[]; can
             </tr>
           </thead>
           <tbody>
-            {shown.length === 0 && (
+            {shown.length === 0 && groups.length === 0 && (
               <tr>
                 <td colSpan={4} className="tlc-empty">
                   {docs.length === 0 ? "Chưa có tài liệu nào." : "Không tìm thấy tài liệu."}
@@ -252,13 +297,32 @@ export function TaiLieuClient({ initial, canEdit }: { initial: CompanyDoc[]; can
                           <span className="tlc-count">{g.items.length}</span>
                         </button>
                         {canEdit && (
-                          <button type="button" className="tlc-btn" disabled={busy} onClick={() => pickFiles(g.folder)}>
-                            + Thêm file
-                          </button>
+                          <div className="tlc-act">
+                            {g.items.length === 0 && (
+                              <button
+                                type="button"
+                                className="tlc-btn del"
+                                disabled={busy}
+                                onClick={() => removeFolder(g.folder)}
+                              >
+                                Xoá
+                              </button>
+                            )}
+                            <button type="button" className="tlc-btn" disabled={busy} onClick={() => pickFiles(g.folder)}>
+                              + Thêm file
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
                   </tr>
+                  {open && g.items.length === 0 && (
+                    <tr className="tlc-in">
+                      <td colSpan={4} className="tlc-empty">
+                        Thư mục trống.
+                      </td>
+                    </tr>
+                  )}
                   {open && g.items.map((d) => renderDoc(d, true))}
                 </Fragment>
               );

@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function TaiLieuChungPage() {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) redirect("/login");
-  const docs = await listCompanyDocs();
+  const { docs, folders } = await listCompanyDocs();
 
   return (
     <ProtectedLayout>
-      <TaiLieuClient initial={docs} canEdit={user.role === "admin"} />
+      <TaiLieuClient initial={docs} initialFolders={folders} canEdit={user.role === "admin"} />
     </ProtectedLayout>
   );
 }

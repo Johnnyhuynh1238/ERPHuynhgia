@@ -5,9 +5,11 @@ import { getMinioBucket, getMinioClient } from "@/lib/minio";
 // Tài liệu chung công ty — lưu thẳng MinIO prefix company-docs/ (KHÔNG bảng DB).
 // Key: company-docs/<uuid>/<tên file gốc>, hoặc trong thư mục (nhánh):
 //      company-docs/<thư mục>/<uuid>/<tên file gốc> → tên hiển thị lấy từ đoạn cuối key.
+// Thư mục rỗng: MinIO ko có thư mục thật → giữ bằng object đánh dấu company-docs/<thư mục>/.folder.
 
 export const COMPANY_DOCS_PREFIX = "company-docs/";
 export const COMPANY_DOCS_MAX_BYTES = 50 * 1024 * 1024;
+export const COMPANY_DOCS_FOLDER_MARKER = ".folder";
 export const COMPANY_DOCS_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg", "webp"]);
 
 export type CompanyDoc = {
@@ -27,6 +29,7 @@ export function fileExtension(name: string) {
 export function isCompanyDocKey(key: string) {
   if (!key.startsWith(COMPANY_DOCS_PREFIX) || key.includes("..")) return false;
   const parts = key.split("/");
+  if (parts[parts.length - 1] === COMPANY_DOCS_FOLDER_MARKER) return false;
   return (parts.length === 3 || parts.length === 4) && parts.every(Boolean);
 }
 
@@ -42,6 +45,11 @@ export function companyDocFolder(key: string) {
 // Tên thư mục: bỏ "/", ký tự điều khiển, gộp khoảng trắng. Rỗng = ngoài thư mục.
 export function cleanFolderName(raw: string) {
   return raw.replace(/[\\/\u0000-\u001f]/g, " ").replace(/\s+/g, " ").replace(/\.{2,}/g, ".").replace(/^\.+/, "").trim().slice(0, 80);
+}
+
+export function companyFolderMarkerKey(folder: string) {
+  const dir = cleanFolderName(folder);
+  return dir ? `${COMPANY_DOCS_PREFIX}${dir}/${COMPANY_DOCS_FOLDER_MARKER}` : "";
 }
 
 export function buildCompanyDocKey(originalName: string, folder = "") {
@@ -70,17 +78,26 @@ export async function moveCompanyDoc(key: string, folder: string) {
   return newKey;
 }
 
-export async function listCompanyDocs(): Promise<CompanyDoc[]> {
+// Trả file + danh sách thư mục (gồm cả thư mục rỗng chỉ có object đánh dấu).
+export async function listCompanyDocs(): Promise<{ docs: CompanyDoc[]; folders: string[] }> {
   const client = getMinioClient();
   const bucket = getMinioBucket();
   const docs: CompanyDoc[] = [];
+  const folders = new Set<string>();
   let token: string | undefined;
   do {
     const res = await client.send(
       new ListObjectsV2Command({ Bucket: bucket, Prefix: COMPANY_DOCS_PREFIX, ContinuationToken: token }),
     );
     for (const o of res.Contents ?? []) {
-      if (!o.Key || !isCompanyDocKey(o.Key)) continue;
+      if (!o.Key) continue;
+      const parts = o.Key.split("/");
+      if (parts.length === 3 && parts[1] && parts[2] === COMPANY_DOCS_FOLDER_MARKER) {
+        folders.add(parts[1]);
+        continue;
+      }
+      if (!isCompanyDocKey(o.Key)) continue;
+      if (companyDocFolder(o.Key)) folders.add(companyDocFolder(o.Key));
       const fileName = companyDocFileName(o.Key);
       docs.push({
         key: o.Key,
@@ -93,5 +110,8 @@ export async function listCompanyDocs(): Promise<CompanyDoc[]> {
     }
     token = res.IsTruncated ? res.NextContinuationToken : undefined;
   } while (token);
-  return docs.sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || ""));
+  return {
+    docs: docs.sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || "")),
+    folders: Array.from(folders),
+  };
 }

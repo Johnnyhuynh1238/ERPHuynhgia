@@ -5,6 +5,8 @@ import {
   COMPANY_DOCS_EXTENSIONS,
   COMPANY_DOCS_MAX_BYTES,
   buildCompanyDocKey,
+  cleanFolderName,
+  companyFolderMarkerKey,
   fileExtension,
   isCompanyDocKey,
   listCompanyDocs,
@@ -29,8 +31,7 @@ export async function GET() {
   } catch (error) {
     return authError(error);
   }
-  const docs = await listCompanyDocs();
-  return NextResponse.json({ docs });
+  return NextResponse.json(await listCompanyDocs());
 }
 
 export async function POST(request: Request) {
@@ -40,6 +41,14 @@ export async function POST(request: Request) {
     return authError(error);
   }
   const formData = await request.formData();
+  // Tạo thư mục rỗng (chưa có file): ghi object đánh dấu .folder.
+  const newFolder = formData.get("createFolder");
+  if (typeof newFolder === "string") {
+    const markerKey = companyFolderMarkerKey(newFolder);
+    if (!markerKey) return NextResponse.json({ message: "Tên thư mục không hợp lệ" }, { status: 400 });
+    await putObjectToMinio({ key: markerKey, body: Buffer.alloc(0), contentType: "application/x-directory" });
+    return NextResponse.json({ folder: cleanFolderName(newFolder) });
+  }
   const file = formData.get("file");
   if (!(file instanceof File)) return NextResponse.json({ message: "Chưa chọn file" }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ message: "File rỗng" }, { status: 400 });
@@ -63,7 +72,20 @@ export async function DELETE(request: Request) {
   } catch (error) {
     return authError(error);
   }
-  const key = new URL(request.url).searchParams.get("key") || "";
+  const params = new URL(request.url).searchParams;
+  // Xoá thư mục: chỉ khi đã rỗng (xoá object đánh dấu).
+  const folder = params.get("folder");
+  if (folder !== null) {
+    const markerKey = companyFolderMarkerKey(folder);
+    if (!markerKey) return NextResponse.json({ message: "Thư mục không hợp lệ" }, { status: 400 });
+    const { docs } = await listCompanyDocs();
+    if (docs.some((d) => d.folder === cleanFolderName(folder))) {
+      return NextResponse.json({ message: "Thư mục còn file, chuyển/xoá file trước" }, { status: 400 });
+    }
+    await deleteObjectFromMinio(markerKey);
+    return NextResponse.json({ ok: true });
+  }
+  const key = params.get("key") || "";
   if (!isCompanyDocKey(key)) return NextResponse.json({ message: "Tài liệu không hợp lệ" }, { status: 400 });
   await deleteObjectFromMinio(key);
   return NextResponse.json({ ok: true });
