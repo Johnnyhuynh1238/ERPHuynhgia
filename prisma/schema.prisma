@@ -3827,6 +3827,21 @@ model CompanyCash {
   @@map("company_cash")
 }
 
+/// Chi phí chung công ty hàng tháng (admin nhập tay) — dùng cho dự báo "đến khi xong các HĐ"
+/// ở màn Tài chính tổng quan. group_key: van_hanh | no_tai_chinh | ca_nhan.
+model CompanyOverheadItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(200)
+  groupKey      String   @default("van_hanh") @map("group_key") @db.VarChar(20)
+  monthlyAmount Decimal  @default(0) @map("monthly_amount") @db.Decimal(15, 0)
+  note          String?  @db.Text
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("company_overhead_items")
+}
+
 /// Danh mục chi (admin quản lý). Vật tư / Máy móc / Văn phòng …
 model ExpenseCategory {
   id        String   @id @default(uuid()) @db.Uuid

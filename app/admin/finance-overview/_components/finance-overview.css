@@ -117,3 +117,30 @@
 .fo-in.warn{border-left-color:var(--gold)} .fo-in.warn .ic{background:var(--gold)}
 .fo-in.info{border-left-color:var(--terra)} .fo-in.info .ic{background:var(--terra)}
 .fo-in.good{border-left-color:var(--ok)} .fo-in.good .ic{background:var(--ok)}
+
+/* Module 5 — dự báo đến khi xong HĐ + chi phí chung */
+.fo-stats.fo-stats3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fo-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:6px}
+.fo-scroll .fo-tbl{min-width:640px}
+.fo-tbl.plain tbody tr{cursor:default}
+.fo-tbl .ok{color:var(--ok)}
+.fo-tbl .bad{color:var(--red)}
+.fo-tag{display:inline-block;margin-left:6px;font-size:10px;font-weight:600;padding:1px 6px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);white-space:nowrap;vertical-align:1px}
+.fo-tag.assumed{color:var(--orange);border-color:var(--orange)}
+.fo-tag.budget{color:var(--ok);border-color:var(--ok)}
+.fo-oh{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:8px;transition:opacity .15s}
+.fo-oh.dim{opacity:.55;pointer-events:none}
+.fo-oh-grp{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 10px}
+.fo-oh-h{display:flex;justify-content:space-between;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--terra);padding:4px 0 6px;border-bottom:1px solid var(--line)}
+.fo-oh-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 28px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.fo-oh-row:last-child{border-bottom:none}
+.fo-oh-row .nm{display:flex;flex-direction:column;min-width:0}
+.fo-oh input,.fo-oh select{background:none;border:1px solid transparent;border-radius:7px;color:var(--text);font:inherit;font-size:13px;padding:4px 6px;min-width:0;width:100%}
+.fo-oh input:focus,.fo-oh select:focus{outline:none;border-color:var(--orange);background:var(--bg)}
+.fo-oh input.nt{font-size:11.5px;color:var(--mut);padding-top:0}
+.fo-oh input.amt{text-align:right;border-color:var(--line2)}
+.fo-oh .del{width:28px;height:28px;border-radius:7px;border:1px solid var(--line2);background:none;color:var(--mut);cursor:pointer;font-size:16px;line-height:1}
+.fo-oh-add{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,130px) 78px auto;gap:8px;align-items:center}
+.fo-oh-add input,.fo-oh-add select{border-color:var(--line2);background:var(--card)}
+@media(max-width:520px){.fo-oh-add{grid-template-columns:minmax(0,1fr) 78px}.fo-oh-add select{grid-column:1}.fo-oh-add button{grid-column:2}}
+.fo-oh-total{display:flex;justify-content:space-between;font-weight:600;font-size:14px;padding:4px 2px}

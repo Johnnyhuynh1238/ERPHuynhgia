@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { CompanyFinance, Pnl } from "@/lib/company-finance";
+import { OVERHEAD_GROUPS, type CompanyForecast, type OverheadItem } from "@/lib/company-forecast";
 import { plexSans, plexMono } from "@/lib/fonts";
 import "./finance-overview.css";
 
@@ -270,6 +271,7 @@ function FinanceModules({ theme }: { theme: "light" | "dark" }) {
     <>
       <PnlModule data={data} theme={theme} />
       <PositionModule data={data} />
+      <ForecastModule />
       <InsightModule data={data} />
     </>
   );
@@ -446,6 +448,227 @@ function PositionModule({ data }: { data: CompanyFinance }) {
         </>
       )}
     </section>
+  );
+}
+
+// Số triệu gọn cho bảng HĐ: 1.234,5
+const fmtTr = (n: number) => (n / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+const signedTr = (n: number) => `${n < 0 ? "−" : "+"}${fmtTr(Math.abs(n))}`;
+const pct = (m: number) => `${(m * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+
+function ForecastModule() {
+  const [data, setData] = useState<CompanyForecast | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = () =>
+    fetch("/api/admin/finance-overview/forecast", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => null))?.message ?? "Lỗi tải dữ liệu");
+        return r.json() as Promise<CompanyForecast>;
+      })
+      .then((d) => {
+        setData(d);
+        setError(null);
+      })
+      .catch((e: Error) => setError(e.message));
+  useEffect(() => {
+    load();
+  }, []);
+
+  if (error) return <section className="fo-mod"><div className="fo-empty err">{error}</div></section>;
+  if (!data) return <section className="fo-mod"><div className="fo-empty">Đang tính dự báo các HĐ…</div></section>;
+
+  const b = data.base;
+  const assumed = data.projects.filter((p) => p.costSource === "assumed");
+  return (
+    <section className="fo-mod">
+      <div className="fo-mod-head">
+        <h2 className="fo-h2">Đến khi xong các HĐ đang chạy</h2>
+        <div className="fo-sub">đến {fmtDay(data.horizonEnd)} · {data.months.toLocaleString("vi-VN")} tháng</div>
+      </div>
+
+      <div className="fo-grid2">
+        <div>
+          <Verdict
+            good={data.end >= 0}
+            label={data.end >= 0 ? "Dự kiến dư khi xong HĐ" : "Dự kiến vẫn nợ khi xong HĐ"}
+            amount={data.end}
+            note={assumed.length ? `Có ${assumed.length} HĐ chưa có ngân sách — đang giả định lãi gộp 25%` : "Tính theo ngân sách từng HĐ"}
+          />
+          <table className="fo-kv">
+            <tbody>
+              <tr className="grp"><td colSpan={2}>Nợ ròng hiện tại</td></tr>
+              <tr><td>Tiền quỹ</td><td className="r num">{fmtN(b.cash)}</td></tr>
+              <tr><td>Dư nợ vay</td><td className="r num">−{fmtN(b.loans)}</td></tr>
+              {data.finished.map((p) => (
+                <tr key={p.code}>
+                  <td>{p.name}<span className="hint">đã xong · nợ NCC/thầu phụ {fmtN(p.debt)}{p.receivable > 0 ? ` · khách còn nợ ${fmtN(p.receivable)}` : ""}</span></td>
+                  <td className="r num">{signed(p.receivable - p.debt)}</td>
+                </tr>
+              ))}
+              {b.otherDebt > 0.5 && <tr><td>Nợ chưa gắn dự án</td><td className="r num">−{fmtN(b.otherDebt)}</td></tr>}
+              <tr className="sub"><td>= Nợ ròng hiện tại</td><td className={`r num ${b.total >= 0 ? "ok" : "bad"}`}>{signed(b.total)}</td></tr>
+              <tr className="grp"><td colSpan={2}>HĐ đang chạy (còn thu − còn phải chi)</td></tr>
+              {data.projects.map((p) => (
+                <tr key={p.id}><td>{p.name}<span className="hint">xong {fmtDay(p.endDate)}</span></td><td className="r num">{signed(p.net)}</td></tr>
+              ))}
+              <tr className="grp"><td colSpan={2}>Chi phí chung</td></tr>
+              <tr><td>{fmtShort(data.overhead.monthly)}/tháng × {data.months.toLocaleString("vi-VN")} tháng</td><td className="r num">−{fmtN(data.overhead.total)}</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td>= Cuối kỳ</td><td className={`r num ${data.end >= 0 ? "ok" : "bad"}`}>{signed(data.end)}</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <div>
+          {data.scenarios.length > 0 && (
+            <>
+              <div className="fo-cap">Nếu lãi gộp các HĐ chưa có ngân sách là…</div>
+              <div className="fo-stats fo-stats3">
+                {data.scenarios.map((s) => (
+                  <div key={s.margin} className="fo-tile">
+                    <div className="k">{pct(s.margin)}</div>
+                    <div className={`v num ${s.end < 0 ? "bad" : "ok"}`}>{s.end < 0 ? "−" : "+"}{fmtShort(Math.abs(s.end))}</div>
+                  </div>
+                ))}
+              </div>
+              {data.breakEvenMargin != null && (
+                <div className={`fo-note ${data.breakEvenMargin > 0.3 ? "bad" : ""}`}>
+                  Muốn hết nợ khi xong HĐ: lãi gộp các HĐ này cần đạt khoảng <b>{pct(Math.max(0, data.breakEvenMargin))}</b>.
+                </div>
+              )}
+            </>
+          )}
+          <div className="fo-note">
+            Chưa tính: tạm ứng chưa hoàn {fmtShort(data.advances)}, đợt thu bảo hành (thu sau 12 tháng)
+            {data.projects.some((p) => p.warrantyIn > 0) ? ` ${fmtShort(data.projects.reduce((s, p) => s + p.warrantyIn, 0))}` : ""}. HĐ chưa có ngân sách: vốn = 75% giá trị HĐ, trừ phần đã chi.
+          </div>
+        </div>
+      </div>
+
+      <div className="fo-cap" style={{ marginTop: 18 }}>Từng HĐ đang chạy · triệu đồng</div>
+      <div className="fo-scroll">
+        <table className="fo-tbl plain">
+          <thead>
+            <tr>
+              <th>HĐ</th>
+              <th className="r">Giá trị</th>
+              <th className="r">Đã thu</th>
+              <th className="r">Lãi gộp</th>
+              <th className="r">Còn thu</th>
+              <th className="r">Còn phải chi</th>
+              <th className="r">Dư / thiếu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.projects.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  {p.name}
+                  <span className={`fo-tag ${p.costSource}`}>{p.costSource === "budget" ? (p.budgetStatus === "locked" ? "ngân sách đã khoá" : "ngân sách nháp") : "giả định"}</span>
+                </td>
+                <td className="r num">{fmtTr(p.revenue)}</td>
+                <td className="r num">{fmtTr(p.collected)}</td>
+                <td className="r num">{fmtTr(p.gross)}<span className="cnt">{p.margin != null ? pct(p.margin) : ""}</span></td>
+                <td className="r num">{fmtTr(p.remainingIn)}</td>
+                <td className="r num">{fmtTr(p.remainingOut)}</td>
+                <td className={`r num ${p.net >= 0 ? "ok" : "bad"}`}>{signedTr(p.net)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <OverheadEditor items={data.overhead.items} monthly={data.overhead.monthly} onChanged={load} />
+    </section>
+  );
+}
+
+const parseTr = (s: string) => {
+  const v = Number(s.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(v) && v >= 0 ? Math.round(v * 1e6) : null;
+};
+const trInput = (n: number) => (n / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 3, useGrouping: false });
+
+function OverheadEditor({ items, monthly, onChanged }: { items: OverheadItem[]; monthly: number; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [add, setAdd] = useState({ name: "", groupKey: "van_hanh", amount: "" });
+
+  const call = async (url: string, method: string, body?: unknown) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.message ?? "Lỗi lưu");
+      onChanged();
+      return true;
+    } catch (e) {
+      setMsg((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const patch = (it: OverheadItem, data: Partial<{ name: string; monthlyAmount: number; note: string | null }>) =>
+    call(`/api/admin/finance-overview/overhead/${it.id}`, "PATCH", data);
+  const remove = (it: OverheadItem) => {
+    if (!window.confirm(`Xoá khoản "${it.name}" khỏi chi phí chung?`)) return;
+    call(`/api/admin/finance-overview/overhead/${it.id}`, "DELETE");
+  };
+  const create = async () => {
+    const amount = parseTr(add.amount);
+    if (!add.name.trim() || amount == null) return setMsg("Nhập tên khoản và số tiền (triệu)");
+    if (await call("/api/admin/finance-overview/overhead", "POST", { name: add.name, groupKey: add.groupKey, monthlyAmount: amount })) setAdd({ name: "", groupKey: add.groupKey, amount: "" });
+  };
+
+  return (
+    <>
+      <div className="fo-cap" style={{ marginTop: 18 }}>Chi phí chung hàng tháng · sửa trực tiếp (triệu)</div>
+      <div className={`fo-oh ${busy ? "dim" : ""}`}>
+        {OVERHEAD_GROUPS.map((g) => {
+          const rows = items.filter((i) => i.groupKey === g.key);
+          const sum = rows.reduce((s, i) => s + i.monthlyAmount, 0);
+          return (
+            <div key={g.key} className="fo-oh-grp">
+              <div className="fo-oh-h"><span>{g.label}</span><span className="num">{fmtTr(sum)}</span></div>
+              {rows.map((it) => (
+                <div key={`${it.id}:${it.name}:${it.monthlyAmount}:${it.note ?? ""}`} className="fo-oh-row">
+                  <div className="nm">
+                    <input defaultValue={it.name} aria-label="Tên khoản" onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== it.name && patch(it, { name: e.target.value.trim() })} />
+                    <input className="nt" defaultValue={it.note ?? ""} placeholder="ghi chú" aria-label="Ghi chú" onBlur={(e) => e.target.value.trim() !== (it.note ?? "") && patch(it, { note: e.target.value.trim() || null })} />
+                  </div>
+                  <input
+                    className="amt num"
+                    inputMode="decimal"
+                    defaultValue={trInput(it.monthlyAmount)}
+                    aria-label="Số tiền/tháng (triệu)"
+                    onBlur={(e) => {
+                      const v = parseTr(e.target.value);
+                      if (v == null) {
+                        e.target.value = trInput(it.monthlyAmount);
+                        return;
+                      }
+                      if (v !== it.monthlyAmount) patch(it, { monthlyAmount: v });
+                    }}
+                  />
+                  <button className="del" title="Xoá" onClick={() => remove(it)} disabled={busy}>×</button>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        <div className="fo-oh-add">
+          <input placeholder="Thêm khoản…" value={add.name} onChange={(e) => setAdd({ ...add, name: e.target.value })} />
+          <select value={add.groupKey} onChange={(e) => setAdd({ ...add, groupKey: e.target.value })}>
+            {OVERHEAD_GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+          </select>
+          <input className="amt num" inputMode="decimal" placeholder="tr/tháng" value={add.amount} onChange={(e) => setAdd({ ...add, amount: e.target.value })} />
+          <button className="fo-chip on" onClick={create} disabled={busy}>Thêm</button>
+        </div>
+        <div className="fo-oh-total"><span>Tổng chi phí chung</span><span className="num">{fmtTr(monthly)} tr/tháng</span></div>
+        {msg && <div className="fo-note bad">{msg}</div>}
+      </div>
+    </>
   );
 }
 
