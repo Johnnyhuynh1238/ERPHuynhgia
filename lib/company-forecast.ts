@@ -15,11 +15,7 @@ const DEBT_SOURCES = new Set(["sub_payment", "mh_order", "ncc_congno", "sub_debt
 const WARRANTY_RE = /bảo hành|sau 12 tháng/i;
 const DAY_MS = 86_400_000;
 
-export const OVERHEAD_GROUPS = [
-  { key: "van_hanh", label: "Vận hành công ty" },
-  { key: "no_tai_chinh", label: "Nợ & tài chính" },
-  { key: "ca_nhan", label: "Anh & gia đình" },
-] as const;
+export { OVERHEAD_GROUPS } from "@/lib/company-overhead-groups";
 
 export type OverheadItem = { id: string; name: string; groupKey: string; monthlyAmount: number; note: string | null; sortOrder: number };
 

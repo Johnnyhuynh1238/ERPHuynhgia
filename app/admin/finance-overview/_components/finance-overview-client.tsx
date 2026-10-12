@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { CompanyFinance, Pnl } from "@/lib/company-finance";
-import { OVERHEAD_GROUPS, type CompanyForecast, type OverheadItem } from "@/lib/company-forecast";
+import type { CompanyForecast, OverheadItem } from "@/lib/company-forecast";
+import { OVERHEAD_GROUPS } from "@/lib/company-overhead-groups";
 import { plexSans, plexMono } from "@/lib/fonts";
 import "./finance-overview.css";
 
