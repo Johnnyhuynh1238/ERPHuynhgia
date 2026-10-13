@@ -93,7 +93,7 @@ document.addEventListener("keydown",function(e){var k=(e.key||"").toLowerCase();
 const NOCOPY_NOTE = `<div class="hg-nocopy">Hợp đồng chưa ký — Huỳnh Gia không cho phép in hoặc lưu bản này.</div>`;
 
 // Dấu chìm logo HuynhGia6.com phủ chéo mọi trang (mờ, so le) — khách chụp màn hình vẫn dính.
-// Ảnh public/hd-watermark.png (2 logo so le, độ mờ in sẵn) nhúng data URI vì link khách ở huynhgia6.com, khác host ERP.
+// Ảnh public/hd-watermark.png (2 logo xoay chéo so le, độ mờ in sẵn) nhúng data URI vì link khách ở huynhgia6.com, khác host ERP.
 // Lớp fixed phủ khung nhìn, không bắt chuột; khi in đã ẩn cùng nội dung (NOCOPY_STYLE).
 let watermarkCache: string | null = null;
 
@@ -105,8 +105,9 @@ function watermarkLayer() {
       ).toString("base64");
       // Màn hẹp (điện thoại) thu nhỏ ô lặp để dấu chìm vẫn dày.
       watermarkCache =
-        `<style>.hg-wm{position:fixed;top:-50%;left:-50%;width:200%;height:200%;z-index:2147483646;pointer-events:none;` +
-        `transform:rotate(-28deg);background:url(data:image/png;base64,${b64}) 0 0/460px 300px repeat}` +
+        // Logo đã xoay sẵn trong ảnh — KHÔNG xoay cả lớp: khung nhúng cao cả chục trang thì lớp xoay hở góc trên/dưới.
+        `<style>.hg-wm{position:fixed;inset:0;z-index:2147483646;pointer-events:none;` +
+        `background:url(data:image/png;base64,${b64}) 0 0/460px 300px repeat}` +
         `@media (max-width:640px){.hg-wm{background-size:300px 196px}}</style>` +
         `<div class="hg-wm" aria-hidden="true"></div>`;
     } catch (e) {
