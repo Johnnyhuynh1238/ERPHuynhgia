@@ -48,7 +48,17 @@ main{max-width:1100px;margin:0 auto;padding:16px 20px 48px}
 .kv th{text-align:left;font-weight:500;color:rgba(46,20,10,.6);padding:7px 12px 7px 0;width:38%;vertical-align:top;border-top:1px solid rgba(46,20,10,.08)}
 .kv td{padding:7px 0;font-weight:600;border-top:1px solid rgba(46,20,10,.08)}
 .kv tr:first-child th,.kv tr:first-child td{border-top:0}
-.note{white-space:pre-wrap;margin:0}
+.note{white-space:pre-wrap;margin:0 0 8px}
+.note:last-child{margin-bottom:0}
+.nh{font-size:15px;font-weight:700;color:#8a3d1c;margin:16px 0 8px}
+.nh:first-child{margin-top:0}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 10px;border:1px solid rgba(46,20,10,.14);border-radius:9px;background:#fff}
+.tb{width:100%;border-collapse:collapse;font-size:14px}
+.tb th{background:#2e140a;color:#fbf7ec;font-weight:600;text-align:left;padding:8px 10px;white-space:nowrap}
+.tb td{padding:7px 10px;border-top:1px solid rgba(46,20,10,.1);vertical-align:top}
+.tb tr.grp td{background:#f5efe1;font-weight:700;color:#8a3d1c}
+.tb td.n{text-align:right;white-space:nowrap;font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600}
+.tb td.c{text-align:center;white-space:nowrap}
 .warn{background:#fff7d6;border:1px solid #e0c27a;color:#8a3d1c;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
 .prev{background:#2e140a;color:#fbf7ec;text-align:center;font-size:13px;padding:6px 10px}
 .list{display:flex;flex-direction:column;gap:6px}
@@ -84,6 +94,10 @@ main{padding:12px 12px 40px}
 .kv th{width:42%}
 .grid{grid-template-columns:1fr}
 .lb.big img{width:300%}
+.tb{font-size:13px}
+.tb th,.tb td{padding:6px 5px}
+.tb th{white-space:normal}
+.tb .x{display:none}
 }
 `;
 
@@ -132,6 +146,49 @@ function fileList(prefix: string, files: BidPortalFile[]) {
     .join("");
 }
 
+// Ô "Phạm vi" viết dạng chữ đơn giản: dòng "## Tiêu đề" → tiêu đề; các dòng liền nhau bắt đầu "|" → bảng
+// (dòng đầu là hàng tiêu đề, dòng "|---|" bỏ qua, hàng chỉ có 1 ô → hàng nhóm trải hết bảng); còn lại → đoạn văn.
+// Cột "ĐVT" căn giữa, cột "Khối lượng"/"KL" căn phải, cột "Cách tính" ẩn trên điện thoại cho vừa màn.
+function noteHtml(note: string): string {
+  const out: string[] = [];
+  const lines = note.split(/\r?\n/);
+  let i = 0;
+  const cells = (l: string) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\s*\|/.test(l)) {
+      const rows: string[][] = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) {
+        if (!/^\s*\|[\s:|-]+\|?\s*$/.test(lines[i])) rows.push(cells(lines[i]));
+        i++;
+      }
+      const head = rows.shift() || [];
+      const cls = head.map((h) =>
+        /^(đvt|đơn vị)$/i.test(h) ? "c" : /^(kl|khối lượng)/i.test(h) ? "n" : /^(cách tính|diễn giải)/i.test(h) ? "x" : "",
+      );
+      out.push(
+        `<div class="tw"><table class="tb"><thead><tr>${head.map((h, k) => `<th${cls[k] === "x" ? ' class="x"' : ""}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows
+          .map((r) =>
+            r.length === 1
+              ? `<tr class="grp"><td colspan="${head.length || 1}">${esc(r[0])}</td></tr>`
+              : `<tr>${r.map((c, k) => `<td${cls[k] ? ` class="${cls[k]}"` : ""}>${esc(c)}</td>`).join("")}</tr>`,
+          )
+          .join("")}</tbody></table></div>`,
+      );
+      continue;
+    }
+    if (/^\s*##\s+/.test(l)) out.push(`<h3 class="nh">${esc(l.replace(/^\s*##\s+/, ""))}</h3>`);
+    else if (l.trim()) {
+      const para: string[] = [];
+      while (i < lines.length && lines[i].trim() && !/^\s*(\||##\s)/.test(lines[i])) para.push(lines[i++]);
+      out.push(`<p class="note">${esc(para.join("\n"))}</p>`);
+      continue;
+    }
+    i++;
+  }
+  return out.join("");
+}
+
 function secHead(title: string, count?: string) {
   return `<h2 class="sec">${title}${count ? `<small>${count}</small>` : ""}</h2>`;
 }
@@ -158,7 +215,7 @@ export function renderBidPortal(d: BidPortalData): string {
 <div class="card"><h2>Thông tin công trình</h2><table class="kv">${rows
     .map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`)
     .join("")}</table></div>
-${d.note.trim() ? `<div class="card"><h2>Phạm vi &amp; yêu cầu mời thầu</h2><p class="note">${esc(d.note.trim())}</p></div>` : ""}
+${d.note.trim() ? `<div class="card"><h2>Phạm vi &amp; yêu cầu mời thầu</h2>${noteHtml(d.note.trim())}</div>` : ""}
 ${toc ? `<div class="card"><h2>Hồ sơ kèm theo</h2><div class="list">${toc}</div></div>` : ""}
 </section>`);
 

@@ -44,7 +44,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
 const PatchSchema = z.object({
   published: z.boolean().optional(),
-  note: z.string().max(5000).optional(),
+  note: z.string().max(20000).optional(),
   docKeys: z.array(z.string().max(400)).max(10).optional(),
   // Đổi mã link: link cũ chết ngay (thu hồi khi gửi nhầm / hết mời thầu).
   newLink: z.literal(true).optional(),
