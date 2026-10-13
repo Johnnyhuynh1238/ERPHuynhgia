@@ -113,7 +113,7 @@ export function ProjectHubGrid({
 
   const customer: HubItem[] = [
     ...(caps.canViewAcceptance
-      ? [{ href: `${base}/acceptance`, label: "Nghiệm thu", icon: FileSignature, desc: "Chủ nhà ký · Biên bản" } as HubItem]
+      ? [{ href: `${base}/acceptance`, label: "Nghiệm thu", icon: FileSignature, desc: "Mốc · BB ký giấy · Ảnh" } as HubItem]
       : []),
     ...(caps.canViewConstructionLog
       ? [{ href: `${base}/construction-log`, label: "Nhật ký thi công", icon: BookText, desc: "Sự kiện công trường" } as HubItem]

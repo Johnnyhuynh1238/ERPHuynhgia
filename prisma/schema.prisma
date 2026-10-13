@@ -4213,6 +4213,10 @@ model AcceptanceMilestone {
   ipAddress    String?                   @map("ip_address")
   userAgent    String?                   @map("user_agent") @db.Text
   customerNote String?                   @map("customer_note") @db.Text
+  // BB giấy đã ký (ảnh chụp / PDF scan) + ảnh công trình lúc nghiệm thu — KS/admin tải lên.
+  // Có ≥1 ảnh BB → status = signed (đã nghiệm thu).
+  bienBanPhotos Json                     @default("[]") @map("bien_ban_photos")
+  sitePhotos    Json                     @default("[]") @map("site_photos")
   createdBy    String                    @map("created_by") @db.Uuid
   createdAt    DateTime                  @default(now()) @map("created_at")
   updatedAt    DateTime                  @updatedAt @map("updated_at")

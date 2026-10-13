@@ -77,7 +77,7 @@ export default async function CustomerTimelinePage({ params }: { params: { token
       {acceptanceMilestones.length > 0 ? (
         <section className="owner-section">
           <div className="owner-section-title">MỐC NGHIỆM THU</div>
-          <div className="text-sm owner-muted">Bấm vào mốc để xem và ký nghiệm thu.</div>
+          <div className="text-sm owner-muted">Bấm vào mốc để xem biên bản đã ký và ảnh nghiệm thu.</div>
           <div className="mt-3 space-y-2">
             {acceptanceMilestones.map((m) => (
               <Link key={m.id} href={`/cn/${params.token}/acceptance/${m.id}`} className="owner-card block">
@@ -87,7 +87,7 @@ export default async function CustomerTimelinePage({ params }: { params: { token
                     <div className="font-semibold text-white">{m.title}</div>
                     {m.status === "signed" && m.signedAt ? (
                       <div className="mt-1 text-xs text-emerald-300">
-                        Đã ký lúc {m.signedAt.toLocaleString("vi-VN")}
+                        Nghiệm thu ngày {m.signedAt.toLocaleDateString("vi-VN")}
                       </div>
                     ) : null}
                   </div>
@@ -98,7 +98,7 @@ export default async function CustomerTimelinePage({ params }: { params: { token
                         : "border-orange-500/30 bg-orange-500/10 text-orange-200"
                     }`}
                   >
-                    {m.status === "signed" ? "Đã nghiệm thu" : "Chờ ký nghiệm thu"}
+                    {m.status === "signed" ? "Đã nghiệm thu" : "Chưa nghiệm thu"}
                   </span>
                 </div>
               </Link>

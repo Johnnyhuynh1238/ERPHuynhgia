@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { FileText, Pencil, Trash2, Plus } from "lucide-react";
+import { AcceptancePhotoSection, type AcceptancePhotoItem } from "./acceptance-photo-section";
 
 type Milestone = {
   id: string;
@@ -14,13 +15,24 @@ type Milestone = {
   signerName: string | null;
   signedAt: string | null;
   customerNote: string | null;
+  hasSignature: boolean;
+  bienBanPhotos: AcceptancePhotoItem[];
+  sitePhotos: AcceptancePhotoItem[];
   createdAt: string;
   creator: { fullName: string } | null;
 };
 
 const emptyForm = { seq: "", title: "", description: "" };
 
-export function AcceptanceManageClient({ projectId, canManage }: { projectId: string; canManage: boolean }) {
+export function AcceptanceManageClient({
+  projectId,
+  canManage,
+  userId,
+}: {
+  projectId: string;
+  canManage: boolean;
+  userId: string;
+}) {
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -195,20 +207,22 @@ export function AcceptanceManageClient({ projectId, canManage }: { projectId: st
                       m.status === "signed" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"
                     }`}
                   >
-                    {m.status === "signed" ? "CN đã ký" : "Chờ CN ký"}
+                    {m.status === "signed" ? "Đã nghiệm thu" : "Chưa nghiệm thu"}
                   </span>
                 </div>
                 <div className="mt-1 font-medium text-[#f0f2ff]">{m.title}</div>
                 {m.description ? <div className="mt-0.5 text-xs text-[#8892b0]">{m.description}</div> : null}
                 {m.status === "signed" && (
                   <div className="mt-1 text-xs text-emerald-300">
-                    Ký bởi {m.signerName || "chủ nhà"} lúc{" "}
-                    {m.signedAt ? new Date(m.signedAt).toLocaleString("vi-VN") : "—"}
+                    {m.hasSignature
+                      ? `CN ký trên cổng: ${m.signerName || "chủ nhà"} lúc ${m.signedAt ? new Date(m.signedAt).toLocaleString("vi-VN") : "—"}`
+                      : `Nghiệm thu ngày ${m.signedAt ? new Date(m.signedAt).toLocaleDateString("vi-VN") : "—"}`}
                     {m.customerNote ? ` · Ghi chú: ${m.customerNote}` : ""}
                   </div>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
+                {m.hasSignature && (
                 <Link
                   href={`/projects/${projectId}/acceptance/${m.id}/bien-ban`}
                   className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#cfd4e8] hover:bg-[#22263a]"
@@ -216,7 +230,8 @@ export function AcceptanceManageClient({ projectId, canManage }: { projectId: st
                 >
                   <FileText className="h-3.5 w-3.5" /> BB
                 </Link>
-                {canManage && m.status === "pending" && (
+                )}
+                {canManage && !m.hasSignature && (
                   <>
                     <button
                       type="button"
@@ -237,6 +252,28 @@ export function AcceptanceManageClient({ projectId, canManage }: { projectId: st
                   </>
                 )}
               </div>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <AcceptancePhotoSection
+                projectId={projectId}
+                milestoneId={m.id}
+                kind="bien_ban"
+                title="Biên bản đã ký"
+                photos={m.bienBanPhotos}
+                userId={userId}
+                canDeleteAll={canManage}
+                onChanged={load}
+              />
+              <AcceptancePhotoSection
+                projectId={projectId}
+                milestoneId={m.id}
+                kind="site"
+                title="Ảnh nghiệm thu công trình"
+                photos={m.sitePhotos}
+                userId={userId}
+                canDeleteAll={canManage}
+                onChanged={load}
+              />
             </div>
           </div>
         ))}

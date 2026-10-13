@@ -7,7 +7,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 export const dynamic = "force-dynamic";
 
-// KSQL/TPTC chỉ xem + tải biên bản; tạo/sửa/xoá mốc là việc của admin.
+// Tạo/sửa/xoá mốc là việc của admin; KS/TPTC tải ảnh BB giấy + ảnh công trình (route photos).
 const MANAGE_ROLES = new Set<string>([UserRole.admin]);
 
 async function findMilestone(userId: string, role: string, projectId: string, milestoneId: string) {
@@ -33,8 +33,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const current = await findMilestone(user.id, user.role, params.id, params.milestoneId);
   if (!current) return NextResponse.json({ message: "Không tìm thấy mốc nghiệm thu" }, { status: 404 });
-  if (current.status === "signed") {
-    return NextResponse.json({ message: "Mốc đã được chủ nhà ký — không sửa được nữa" }, { status: 409 });
+  if (current.signatureUrl) {
+    return NextResponse.json({ message: "Mốc đã được chủ nhà ký trên cổng — không sửa được nữa" }, { status: 409 });
   }
 
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
@@ -61,8 +61,14 @@ export async function DELETE(_req: Request, { params }: { params: { id: string; 
 
   const current = await findMilestone(user.id, user.role, params.id, params.milestoneId);
   if (!current) return NextResponse.json({ message: "Không tìm thấy mốc nghiệm thu" }, { status: 404 });
-  if (current.status === "signed") {
-    return NextResponse.json({ message: "Mốc đã được chủ nhà ký — không xoá được" }, { status: 409 });
+  if (current.signatureUrl) {
+    return NextResponse.json({ message: "Mốc đã được chủ nhà ký trên cổng — không xoá được" }, { status: 409 });
+  }
+  const fileCount =
+    (Array.isArray(current.bienBanPhotos) ? current.bienBanPhotos.length : 0) +
+    (Array.isArray(current.sitePhotos) ? current.sitePhotos.length : 0);
+  if (fileCount > 0) {
+    return NextResponse.json({ message: `Mốc đang có ${fileCount} ảnh/biên bản — xoá ảnh trước rồi mới xoá mốc` }, { status: 409 });
   }
 
   await prisma.acceptanceMilestone.delete({ where: { id: current.id } });

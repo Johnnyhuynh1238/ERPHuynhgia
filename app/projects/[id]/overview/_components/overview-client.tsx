@@ -167,7 +167,7 @@ export function OverviewClient({
     { href: `${base}/eod`, emoji: "🌇", name: "Cuối ngày", sub: "Chấm công · sản lượng", show: isSelf },
     { href: `${base}/qc-mapping`, emoji: "✅", name: "QC Mapping", sub: "Checklist NC", show: isSelf },
     { href: `${base}/payroll`, emoji: "🏦", name: "Lương tuần", sub: "Bonus · payslip", show: isSelf },
-    { href: `${base}/acceptance`, emoji: "📋", name: "Nghiệm thu", sub: `${Math.max(0, data.tiles.acceptance.total - data.tiles.acceptance.signed)} mốc chờ ký`, badge: { cls: "ok", text: `${data.tiles.acceptance.signed}/${data.tiles.acceptance.total} mốc` } },
+    { href: `${base}/acceptance`, emoji: "📋", name: "Nghiệm thu", sub: `${Math.max(0, data.tiles.acceptance.total - data.tiles.acceptance.signed)} mốc chưa nghiệm thu`, badge: { cls: "ok", text: `${data.tiles.acceptance.signed}/${data.tiles.acceptance.total} mốc` } },
     { href: `${base}/construction-log`, emoji: "📖", name: "Nhật ký", sub: `${data.tiles.diary.count} bản ghi`, badge: data.diary[0] ? { cls: "info", text: ddmm(data.diary[0].date) } : undefined },
     { href: `${base}/diary-approval`, emoji: "📝", name: "Duyệt nhật ký", sub: "Nhật ký KS QL", badge: pendingDiaries ? { cls: "warn", text: `${pendingDiaries} chờ` } : undefined },
     { href: `${base}/documents`, emoji: "📁", name: "Hồ sơ", sub: "File · ảnh · HĐ" },

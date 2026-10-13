@@ -47,7 +47,7 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
       <BigCard
         icon={<FileSignature className="h-8 w-8" />}
         title="NGHIỆM THU"
-        subtitle="Mốc nghiệm thu · Chủ nhà ký · Biên bản"
+        subtitle="Mốc nghiệm thu · Ảnh BB đã ký · Ảnh công trình"
         href={`/projects/${project.id}/acceptance`}
       />
     </SubLayout>

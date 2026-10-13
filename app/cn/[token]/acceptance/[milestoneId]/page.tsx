@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCustomerPortalSessionByToken } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { AcceptanceSignForm } from "../../_components/acceptance-sign-form";
+import { isPdfPhoto, readAcceptancePhotos, type AcceptancePhoto } from "@/lib/acceptance-photos";
+import { CustomerPhotoAlbum } from "../../_components/customer-photo-album";
 
 export const dynamic = "force-dynamic";
 
+// Nghiệm thu ký giấy tại công trình — cổng CN chỉ xem ảnh BB đã ký + ảnh công trình.
 export default async function CustomerAcceptancePage({ params }: { params: { token: string; milestoneId: string } }) {
   const { project, session } = await getCustomerPortalSessionByToken(params.token);
   if (!project || !session) notFound();
@@ -14,6 +16,14 @@ export default async function CustomerAcceptancePage({ params }: { params: { tok
     where: { id: params.milestoneId, projectId: project.id },
   });
   if (!milestone) notFound();
+
+  const fileUrl = (p: AcceptancePhoto) =>
+    `/api/customer/${params.token}/acceptance/${milestone.id}/file?key=${encodeURIComponent(p.key)}`;
+  const bienBan = readAcceptancePhotos(milestone.bienBanPhotos);
+  const bbImages = bienBan.filter((p) => !isPdfPhoto(p));
+  const bbPdfs = bienBan.filter(isPdfPhoto);
+  const site = readAcceptancePhotos(milestone.sitePhotos);
+  const done = milestone.status === "signed";
 
   return (
     <div className="owner-portal-page">
@@ -26,21 +36,43 @@ export default async function CustomerAcceptancePage({ params }: { params: { tok
         {milestone.description ? (
           <p className="mt-2 whitespace-pre-wrap text-sm owner-muted">{milestone.description}</p>
         ) : null}
+        <div className={`mt-3 text-sm ${done ? "text-emerald-300" : "owner-muted"}`}>
+          {done
+            ? `✓ Đã nghiệm thu${milestone.signedAt ? ` · ${milestone.signedAt.toLocaleDateString("vi-VN")}` : ""}`
+            : "Chưa nghiệm thu — biên bản sẽ được cập nhật sau khi các bên ký tại công trình."}
+        </div>
       </section>
 
-      {milestone.status === "signed" ? (
-        <section className="owner-section border border-emerald-500/30 bg-emerald-500/10">
-          <div className="text-sm text-emerald-200">
-            ✓ Đã ký nghiệm thu lúc {milestone.signedAt?.toLocaleString("vi-VN")}
-            {milestone.signerName ? ` bởi ${milestone.signerName}` : ""}. Cảm ơn quý chủ nhà.
+      <section className="owner-section">
+        <div className="owner-section-title">BIÊN BẢN ĐÃ KÝ</div>
+        {bienBan.length === 0 ? (
+          <div className="mt-2 text-sm owner-muted">Chưa có biên bản.</div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <CustomerPhotoAlbum
+              photos={bbImages.map((p) => ({ id: p.key, url: fileUrl(p), caption: "Biên bản nghiệm thu" }))}
+              gridClassName="grid grid-cols-2 gap-2"
+              thumbnailClassName="h-40"
+            />
+            {bbPdfs.map((p) => (
+              <a key={p.key} href={fileUrl(p)} target="_blank" rel="noreferrer" className="owner-card block text-sm text-white">
+                📄 {p.name}
+              </a>
+            ))}
           </div>
-        </section>
-      ) : (
-        <AcceptanceSignForm
-          action={`/cn/${params.token}/acceptance/${milestone.id}/sign`}
-          defaultSignerName={project.customerName}
-        />
-      )}
+        )}
+      </section>
+
+      <section className="owner-section">
+        <div className="owner-section-title">ẢNH NGHIỆM THU CÔNG TRÌNH</div>
+        {site.length === 0 ? (
+          <div className="mt-2 text-sm owner-muted">Chưa có ảnh.</div>
+        ) : (
+          <div className="mt-3">
+            <CustomerPhotoAlbum photos={site.map((p) => ({ id: p.key, url: fileUrl(p), caption: milestone.title }))} />
+          </div>
+        )}
+      </section>
     </div>
   );
 }

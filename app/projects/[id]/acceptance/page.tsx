@@ -21,14 +21,13 @@ export default async function ProjectAcceptancePage({ params }: { params: { id: 
   return (
       <div className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-orange-300">Nghiệm thu chủ nhà</h2>
+          <h2 className="text-lg font-semibold text-orange-300">Nghiệm thu</h2>
           <p className="mt-0.5 text-xs text-[#8892b0]">
-            {canManage
-              ? "Tạo mốc nghiệm thu để chủ nhà ký trên cổng CN (tab Tiến độ). Mốc đã ký sinh biên bản, bấm BB để xem / tải."
-              : "Xem trạng thái ký của chủ nhà và tải biên bản nghiệm thu (bấm BB)."}
+            Ký biên bản giấy tại công trình, sau đó chụp biên bản đã ký + ảnh công trình đưa lên mốc. Có ảnh biên bản →
+            mốc thành &quot;Đã nghiệm thu&quot;. Chủ nhà xem trên cổng CN (tab Tiến độ).
           </p>
         </div>
-        <AcceptanceManageClient projectId={project.id} canManage={canManage} />
+        <AcceptanceManageClient projectId={project.id} canManage={canManage} userId={user.id} />
       </div>
   );
 }

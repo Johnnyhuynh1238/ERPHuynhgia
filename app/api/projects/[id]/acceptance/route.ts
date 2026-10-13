@@ -7,7 +7,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 export const dynamic = "force-dynamic";
 
-// KSQL/TPTC chỉ xem + tải biên bản; tạo/sửa/xoá mốc là việc của admin.
+// Tạo/sửa/xoá mốc là việc của admin; KS/TPTC tải ảnh BB giấy + ảnh công trình (route photos).
 const MANAGE_ROLES = new Set<string>([UserRole.admin]);
 
 async function findAccessibleProject(userId: string, role: string, projectId: string) {
@@ -36,12 +36,18 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       signerName: true,
       signedAt: true,
       customerNote: true,
+      signatureUrl: true,
+      bienBanPhotos: true,
+      sitePhotos: true,
       createdAt: true,
       creator: { select: { fullName: true } },
     },
   });
 
-  return NextResponse.json({ milestones });
+  // Không gửi data-URL chữ ký (nặng) — chỉ cờ có chữ ký cổng CN cũ.
+  return NextResponse.json({
+    milestones: milestones.map(({ signatureUrl, ...m }) => ({ ...m, hasSignature: !!signatureUrl })),
+  });
 }
 
 const createSchema = z.object({
