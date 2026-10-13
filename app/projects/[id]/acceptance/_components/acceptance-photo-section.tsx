@@ -15,16 +15,27 @@ export type AcceptancePhotoItem = {
 type Props = {
   projectId: string;
   milestoneId: string;
-  kind: "bien_ban" | "site";
+  kind: "bien_ban" | "site" | "mau";
   title: string;
   photos: AcceptancePhotoItem[];
   userId: string;
   canDeleteAll: boolean;
+  canUpload?: boolean;
   onChanged: () => void;
 };
 
 // Ảnh BB giấy đã ký / ảnh công trình của 1 mốc: xem (mở tab mới), thêm, xoá ảnh mình tải.
-export function AcceptancePhotoSection({ projectId, milestoneId, kind, title, photos, userId, canDeleteAll, onChanged }: Props) {
+export function AcceptancePhotoSection({
+  projectId,
+  milestoneId,
+  kind,
+  title,
+  photos,
+  userId,
+  canDeleteAll,
+  canUpload = true,
+  onChanged,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const base = `/api/projects/${projectId}/acceptance/${milestoneId}/photos`;
@@ -36,7 +47,10 @@ export function AcceptancePhotoSection({ projectId, milestoneId, kind, title, ph
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("files", f));
-      const r = await fetch(`${base}?kind=${kind}`, { method: "POST", body: fd });
+      const r = await fetch(`${base}?kind=${kind}`, {
+        method: "POST",
+        body: fd,
+      });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message || "Tải lên thất bại");
       toast.success(j.message || "Đã tải lên");
@@ -67,19 +81,21 @@ export function AcceptancePhotoSection({ projectId, milestoneId, kind, title, ph
         <span className="text-xs font-semibold text-[#cfd4e8]">
           {title} ({photos.length})
         </span>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1 rounded-lg bg-orange-500 px-2.5 py-1 text-xs font-semibold text-[#0b0d16] disabled:opacity-50"
-        >
-          <ImagePlus className="h-3.5 w-3.5" /> {busy ? "Đang tải…" : "Thêm"}
-        </button>
+        {canUpload && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-1 rounded-lg bg-orange-500 px-2.5 py-1 text-xs font-semibold text-[#0b0d16] disabled:opacity-50"
+          >
+            <ImagePlus className="h-3.5 w-3.5" /> {busy ? "Đang tải…" : "Thêm"}
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept={kind === "bien_ban" ? "image/*,application/pdf" : "image/*"}
+          accept={kind === "site" ? "image/*" : "image/*,application/pdf"}
           className="hidden"
           onChange={(e) => void upload(e.target.files)}
         />
@@ -90,15 +106,22 @@ export function AcceptancePhotoSection({ projectId, milestoneId, kind, title, ph
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           {photos.map((p) => (
             <div key={p.key} className="relative">
-              <a href={fileUrl(p)} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md bg-[#22263a]">
+              <a
+                href={fileUrl(p)}
+                target="_blank"
+                rel="noreferrer"
+                className="block overflow-hidden rounded-md bg-[#22263a]"
+              >
                 {p.contentType === "application/pdf" ? (
-                  <div className="flex h-16 items-center justify-center px-1 text-center text-[10px] text-[#cfd4e8]">📄 PDF</div>
+                  <div className="flex h-16 items-center justify-center break-all px-1 text-center text-[10px] text-[#cfd4e8]">
+                    📄 {kind === "mau" ? p.name : "PDF"}
+                  </div>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={fileUrl(p)} alt={p.name} loading="lazy" className="h-16 w-full object-cover" />
                 )}
               </a>
-              {(canDeleteAll || p.uploadedBy === userId) && (
+              {canUpload && (canDeleteAll || p.uploadedBy === userId) && (
                 <button
                   type="button"
                   onClick={() => void remove(p)}

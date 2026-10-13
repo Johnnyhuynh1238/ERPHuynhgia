@@ -2,8 +2,9 @@ import { UserRole } from "@prisma/client";
 
 // Nghiệm thu ký giấy: KS/admin chụp BB đã ký + ảnh công trình, đính vào mốc.
 // Cổng CN chỉ xem. Có ≥1 ảnh BB → mốc "Đã nghiệm thu" (status = signed).
+// "mau" = BB mẫu trắng để in: admin tải, admin + KS xem/in, cổng CN không bao giờ thấy.
 
-export type AcceptancePhotoKind = "bien_ban" | "site";
+export type AcceptancePhotoKind = "bien_ban" | "site" | "mau";
 
 export type AcceptancePhoto = {
   key: string;
@@ -28,10 +29,11 @@ export const ACCEPTANCE_MAX_BYTES = 25 * 1024 * 1024;
 export const ACCEPTANCE_MAX_PER_KIND = 30;
 
 export function parseAcceptanceKind(raw: string | null): AcceptancePhotoKind | null {
-  return raw === "bien_ban" || raw === "site" ? raw : null;
+  return raw === "bien_ban" || raw === "site" || raw === "mau" ? raw : null;
 }
 
 export function acceptancePhotoField(kind: AcceptancePhotoKind) {
+  if (kind === "mau") return "templateFiles";
   return kind === "bien_ban" ? "bienBanPhotos" : "sitePhotos";
 }
 
@@ -44,6 +46,7 @@ export function isPdfPhoto(p: { contentType: string }) {
 }
 
 // Tìm file trong mốc theo key — chặn đọc key tuỳ ý từ MinIO.
+// Chỉ BB đã ký + ảnh công trình (dùng cho cổng CN) — KHÔNG gồm BB mẫu.
 export function findAcceptancePhoto(
   milestone: { bienBanPhotos: unknown; sitePhotos: unknown },
   key: string,
@@ -51,4 +54,12 @@ export function findAcceptancePhoto(
   return [...readAcceptancePhotos(milestone.bienBanPhotos), ...readAcceptancePhotos(milestone.sitePhotos)].find(
     (p) => p.key === key,
   );
+}
+
+// Staff: gồm cả BB mẫu để in.
+export function findAcceptanceStaffFile(
+  milestone: { bienBanPhotos: unknown; sitePhotos: unknown; templateFiles: unknown },
+  key: string,
+): AcceptancePhoto | undefined {
+  return findAcceptancePhoto(milestone, key) ?? readAcceptancePhotos(milestone.templateFiles).find((p) => p.key === key);
 }

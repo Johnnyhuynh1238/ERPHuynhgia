@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getObjectFromMinio } from "@/lib/minio";
-import { findAcceptancePhoto } from "@/lib/acceptance-photos";
+import { findAcceptanceStaffFile } from "@/lib/acceptance-photos";
 
 export const runtime = "nodejs";
 
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string; 
       projectId: params.id,
       project: buildProjectAccessWhere({ id: user.id, role: user.role }),
     },
-    select: { bienBanPhotos: true, sitePhotos: true },
+    select: { bienBanPhotos: true, sitePhotos: true, templateFiles: true },
   });
   if (!milestone) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
-  const photo = findAcceptancePhoto(milestone, key);
+  const photo = findAcceptanceStaffFile(milestone, key);
   if (!photo) return NextResponse.json({ message: "Không tìm thấy file" }, { status: 404 });
 
   const { buffer, contentType } = await getObjectFromMinio(photo.key);

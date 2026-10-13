@@ -4217,6 +4217,8 @@ model AcceptanceMilestone {
   // Có ≥1 ảnh BB → status = signed (đã nghiệm thu).
   bienBanPhotos Json                     @default("[]") @map("bien_ban_photos")
   sitePhotos    Json                     @default("[]") @map("site_photos")
+  // BB mẫu (trắng) để in — admin tải lên, chỉ staff thấy, KHÔNG lộ ra cổng CN.
+  templateFiles Json                     @default("[]") @map("template_files")
   createdBy    String                    @map("created_by") @db.Uuid
   createdAt    DateTime                  @default(now()) @map("created_at")
   updatedAt    DateTime                  @updatedAt @map("updated_at")

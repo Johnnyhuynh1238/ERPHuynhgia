@@ -39,6 +39,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       signatureUrl: true,
       bienBanPhotos: true,
       sitePhotos: true,
+      templateFiles: true,
       createdAt: true,
       creator: { select: { fullName: true } },
     },

@@ -60,7 +60,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
   if (!ACCEPTANCE_UPLOAD_ROLES.has(user.role)) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
 
   const kind = parseAcceptanceKind(req.nextUrl.searchParams.get("kind"));
-  if (!kind) return NextResponse.json({ message: "kind phải là bien_ban|site" }, { status: 400 });
+  if (!kind) return NextResponse.json({ message: "kind phải là bien_ban|site|mau" }, { status: 400 });
+  if (kind === "mau" && user.role !== "admin") {
+    return NextResponse.json({ message: "Chỉ admin tải BB mẫu" }, { status: 403 });
+  }
 
   const milestone = await loadMilestone({ id: user.id, role: user.role }, params.id, params.milestoneId);
   if (!milestone) return NextResponse.json({ message: "Không tìm thấy mốc nghiệm thu" }, { status: 404 });
@@ -76,10 +79,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
   if (files.length > MAX_FILES_PER_REQUEST) {
     return NextResponse.json({ message: `Tối đa ${MAX_FILES_PER_REQUEST} file / lần` }, { status: 400 });
   }
-  const allowed = kind === "bien_ban" ? ACCEPTANCE_BB_TYPES : ACCEPTANCE_IMAGE_TYPES;
+  const allowed = kind === "site" ? ACCEPTANCE_IMAGE_TYPES : ACCEPTANCE_BB_TYPES;
   for (const f of files) {
     if (!allowed.includes(f.type)) {
-      const hint = kind === "bien_ban" ? "JPG/PNG/WEBP/PDF" : "JPG/PNG/WEBP";
+      const hint = kind === "site" ? "JPG/PNG/WEBP" : "JPG/PNG/WEBP/PDF";
       return NextResponse.json({ message: `${f.name}: chỉ nhận ${hint}` }, { status: 400 });
     }
     if (f.size > ACCEPTANCE_MAX_BYTES) return NextResponse.json({ message: `${f.name}: vượt 25MB` }, { status: 400 });
@@ -129,6 +132,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const kind = parseAcceptanceKind(req.nextUrl.searchParams.get("kind"));
   const key = req.nextUrl.searchParams.get("key");
   if (!kind || !key) return NextResponse.json({ message: "Thiếu kind / key" }, { status: 400 });
+  if (kind === "mau" && user.role !== "admin") {
+    return NextResponse.json({ message: "Chỉ admin xoá BB mẫu" }, { status: 403 });
+  }
 
   const milestone = await loadMilestone({ id: user.id, role: user.role }, params.id, params.milestoneId);
   if (!milestone) return NextResponse.json({ message: "Không tìm thấy mốc nghiệm thu" }, { status: 404 });

@@ -18,6 +18,7 @@ type Milestone = {
   hasSignature: boolean;
   bienBanPhotos: AcceptancePhotoItem[];
   sitePhotos: AcceptancePhotoItem[];
+  templateFiles: AcceptancePhotoItem[];
   createdAt: string;
   creator: { fullName: string } | null;
 };
@@ -43,7 +44,9 @@ export function AcceptanceManageClient({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/projects/${projectId}/acceptance`, { cache: "no-store" });
+      const r = await fetch(`/api/projects/${projectId}/acceptance`, {
+        cache: "no-store",
+      });
       const j = await r.json();
       if (!r.ok) throw new Error(j.message || "Lỗi tải dữ liệu");
       setRows(j.milestones);
@@ -67,7 +70,11 @@ export function AcceptanceManageClient({
 
   function openEdit(m: Milestone) {
     setEditing(m);
-    setForm({ seq: String(m.seq), title: m.title, description: m.description ?? "" });
+    setForm({
+      seq: String(m.seq),
+      title: m.title,
+      description: m.description ?? "",
+    });
     setShowForm(true);
   }
 
@@ -104,7 +111,9 @@ export function AcceptanceManageClient({
 
   async function remove(m: Milestone) {
     if (!window.confirm(`Xoá mốc #${m.seq} — ${m.title}?`)) return;
-    const r = await fetch(`/api/projects/${projectId}/acceptance/${m.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/projects/${projectId}/acceptance/${m.id}`, {
+      method: "DELETE",
+    });
     const j = await r.json();
     if (!r.ok) {
       toast.error(j.message || "Không xoá được");
@@ -187,7 +196,9 @@ export function AcceptanceManageClient({
       )}
 
       {loading && (
-        <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">Đang tải…</div>
+        <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
+          Đang tải…
+        </div>
       )}
       {!loading && rows.length === 0 && (
         <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
@@ -223,13 +234,13 @@ export function AcceptanceManageClient({
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {m.hasSignature && (
-                <Link
-                  href={`/projects/${projectId}/acceptance/${m.id}/bien-ban`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#cfd4e8] hover:bg-[#22263a]"
-                  title="Xem / tải biên bản"
-                >
-                  <FileText className="h-3.5 w-3.5" /> BB
-                </Link>
+                  <Link
+                    href={`/projects/${projectId}/acceptance/${m.id}/bien-ban`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#cfd4e8] hover:bg-[#22263a]"
+                    title="Xem / tải biên bản"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> BB
+                  </Link>
                 )}
                 {canManage && !m.hasSignature && (
                   <>
@@ -253,6 +264,21 @@ export function AcceptanceManageClient({
                 )}
               </div>
             </div>
+            {(canManage || m.templateFiles.length > 0) && (
+              <div className="mt-3">
+                <AcceptancePhotoSection
+                  projectId={projectId}
+                  milestoneId={m.id}
+                  kind="mau"
+                  title="🖨 BB mẫu để in (chủ nhà không thấy)"
+                  photos={m.templateFiles}
+                  userId={userId}
+                  canDeleteAll={canManage}
+                  canUpload={canManage}
+                  onChanged={load}
+                />
+              </div>
+            )}
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <AcceptancePhotoSection
                 projectId={projectId}

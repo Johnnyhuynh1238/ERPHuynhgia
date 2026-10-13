@@ -66,7 +66,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string; 
   }
   const fileCount =
     (Array.isArray(current.bienBanPhotos) ? current.bienBanPhotos.length : 0) +
-    (Array.isArray(current.sitePhotos) ? current.sitePhotos.length : 0);
+    (Array.isArray(current.sitePhotos) ? current.sitePhotos.length : 0) +
+    (Array.isArray(current.templateFiles) ? current.templateFiles.length : 0);
   if (fileCount > 0) {
     return NextResponse.json({ message: `Mốc đang có ${fileCount} ảnh/biên bản — xoá ảnh trước rồi mới xoá mốc` }, { status: 409 });
   }
