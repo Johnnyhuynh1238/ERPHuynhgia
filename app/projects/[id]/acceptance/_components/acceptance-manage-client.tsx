@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FileText, Pencil, Trash2, Plus } from "lucide-react";
-import { AcceptancePhotoSection, type AcceptancePhotoItem } from "./acceptance-photo-section";
+import { plexSans, plexMono } from "@/lib/fonts";
+import "./nghiem-thu.css";
+
+export type AcceptancePhotoItem = {
+  key: string;
+  contentType: string;
+  name: string;
+  uploadedBy: string;
+  uploadedAt: string;
+};
+
+type Kind = "bien_ban" | "site" | "mau";
 
 type Milestone = {
   id: string;
@@ -23,30 +33,62 @@ type Milestone = {
   creator: { fullName: string } | null;
 };
 
-const emptyForm = { seq: "", title: "", description: "" };
+type ProjectInfo = { code: string; name: string; customerName: string | null; statusLabel: string };
 
+const emptyForm = { seq: "", title: "", description: "" };
+const THUMBS = 4;
+
+const fmtDay = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) : "";
+
+// Màn Nghiệm thu: ký BB giấy tại công trình → KS/admin chụp BB đã ký + ảnh công trình đưa lên mốc.
+// Admin + KS in BB mẫu (chủ nhà không thấy). Admin bấm tên mốc để sửa / xoá / đổi BB mẫu.
 export function AcceptanceManageClient({
   projectId,
+  project,
   canManage,
   userId,
+  backHref,
 }: {
   projectId: string;
+  project: ProjectInfo;
   canManage: boolean;
   userId: string;
+  backHref: string;
 }) {
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Milestone | null>(null);
+  const [panel, setPanel] = useState<string | null>(null); // "new" = tạo mốc, id = sửa mốc
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null); // `${milestoneId}:${kind}` đang tải lên
+  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // dải ảnh đang mở hết
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const target = useRef<{ id: string; kind: Kind } | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("nghiemthu-theme");
+      if (saved === "light" || saved === "dark") setTheme(saved);
+    } catch {
+      /* noop */
+    }
+  }, []);
+  const toggleTheme = () =>
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("nghiemthu-theme", next);
+      } catch {
+        /* noop */
+      }
+      return next;
+    });
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
-      const r = await fetch(`/api/projects/${projectId}/acceptance`, {
-        cache: "no-store",
-      });
+      const r = await fetch(`/api/projects/${projectId}/acceptance`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.message || "Lỗi tải dữ liệu");
       setRows(j.milestones);
@@ -61,21 +103,56 @@ export function AcceptanceManageClient({
     void load();
   }, [load]);
 
+  const photoBase = (mid: string) => `/api/projects/${projectId}/acceptance/${mid}/photos`;
+  const fileUrl = (mid: string, p: AcceptancePhotoItem) => `${photoBase(mid)}/file?key=${encodeURIComponent(p.key)}`;
+
+  function pick(id: string, kind: Kind) {
+    target.current = { id, kind };
+    if (fileRef.current) {
+      fileRef.current.accept = kind === "site" ? "image/*" : "image/*,application/pdf";
+      fileRef.current.click();
+    }
+  }
+
+  async function upload(files: FileList | null) {
+    const t = target.current;
+    if (!t || !files?.length) return;
+    setBusyKey(`${t.id}:${t.kind}`);
+    try {
+      const fd = new FormData();
+      Array.from(files).forEach((f) => fd.append("files", f));
+      const r = await fetch(`${photoBase(t.id)}?kind=${t.kind}`, { method: "POST", body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Tải lên thất bại");
+      toast.success(j.message || "Đã tải lên");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Tải lên thất bại");
+    } finally {
+      setBusyKey(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function removeFile(mid: string, kind: Kind, p: AcceptancePhotoItem) {
+    if (!window.confirm(`Xoá file "${p.name}"?`)) return;
+    const r = await fetch(`${photoBase(mid)}?kind=${kind}&key=${encodeURIComponent(p.key)}`, { method: "DELETE" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return void toast.error(j.message || "Không xoá được");
+    toast.success(j.message || "Đã xoá");
+    void load();
+  }
+
   function openCreate() {
     const nextSeq = rows.reduce((m, r) => Math.max(m, r.seq), 0) + 1;
-    setEditing(null);
     setForm({ ...emptyForm, seq: String(nextSeq) });
-    setShowForm(true);
+    setPanel("new");
   }
 
   function openEdit(m: Milestone) {
-    setEditing(m);
-    setForm({
-      seq: String(m.seq),
-      title: m.title,
-      description: m.description ?? "",
-    });
-    setShowForm(true);
+    if (panel === m.id) return setPanel(null);
+    setForm({ seq: String(m.seq), title: m.title, description: m.description ?? "" });
+    setPanel(m.id);
   }
 
   async function submit(e: React.FormEvent) {
@@ -87,8 +164,9 @@ export function AcceptanceManageClient({
         title: form.title.trim(),
         description: form.description.trim() || undefined,
       };
+      const editing = panel && panel !== "new" ? panel : null;
       const url = editing
-        ? `/api/projects/${projectId}/acceptance/${editing.id}`
+        ? `/api/projects/${projectId}/acceptance/${editing}`
         : `/api/projects/${projectId}/acceptance`;
       const r = await fetch(url, {
         method: editing ? "PATCH" : "POST",
@@ -98,9 +176,8 @@ export function AcceptanceManageClient({
       const j = await r.json();
       if (!r.ok) throw new Error(j.message || "Lỗi lưu");
       toast.success(j.message);
-      setShowForm(false);
+      setPanel(null);
       setForm(emptyForm);
-      setEditing(null);
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi lưu");
@@ -111,198 +188,297 @@ export function AcceptanceManageClient({
 
   async function remove(m: Milestone) {
     if (!window.confirm(`Xoá mốc #${m.seq} — ${m.title}?`)) return;
-    const r = await fetch(`/api/projects/${projectId}/acceptance/${m.id}`, {
-      method: "DELETE",
-    });
+    const r = await fetch(`/api/projects/${projectId}/acceptance/${m.id}`, { method: "DELETE" });
     const j = await r.json();
-    if (!r.ok) {
-      toast.error(j.message || "Không xoá được");
-      return;
-    }
+    if (!r.ok) return void toast.error(j.message || "Không xoá được");
     toast.success(j.message);
+    setPanel(null);
     void load();
   }
 
-  return (
-    <div className="space-y-3">
-      {canManage && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#0b0d16]"
-          >
-            <Plus className="h-4 w-4" /> Mốc nghiệm thu
-          </button>
-        </div>
-      )}
+  const signedCount = rows.filter((m) => m.status === "signed").length;
+  const nextPendingId = rows.find((m) => m.status !== "signed")?.id;
 
-      {showForm && (
-        <form onSubmit={submit} className="space-y-3 rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
-          <div className="grid gap-3 sm:grid-cols-[100px_1fr]">
-            <label className="block">
-              <span className="text-xs text-[#8b95b7]">Số TT *</span>
-              <input
-                type="number"
-                min={1}
-                value={form.seq}
-                onChange={(e) => setForm({ ...form, seq: e.target.value })}
-                required
-                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-[#8b95b7]">Tên mốc nghiệm thu *</span>
-              <input
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                required
-                placeholder="VD: Nghiệm thu sắt thép, coppha móng"
-                className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="text-xs text-[#8b95b7]">Mô tả / nội dung nghiệm thu (hiện trong biên bản)</span>
-            <textarea
-              rows={3}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="VD: Kiểm tra chủng loại, đường kính, khoảng cách thép; coppha kín khít, đúng kích thước…"
-              className="mt-1 w-full rounded-lg border border-[#2d3249] bg-[#0b0d16] px-3 py-2 text-sm text-[#f0f2ff]"
-            />
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#0b0d16] disabled:opacity-50"
-            >
-              {saving ? "Đang lưu…" : editing ? "Cập nhật" : "Tạo mốc"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setEditing(null);
-                setForm(emptyForm);
-              }}
-              className="rounded-lg border border-[#2d3249] px-3 py-1.5 text-sm text-[#8b95b7]"
-            >
-              Huỷ
-            </button>
-          </div>
-        </form>
-      )}
-
-      {loading && (
-        <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
-          Đang tải…
-        </div>
-      )}
-      {!loading && rows.length === 0 && (
-        <div className="rounded-xl border border-[#2d3249] bg-[#13151f] p-6 text-center text-sm text-[#8892b0]">
-          Chưa có mốc nghiệm thu nào.
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {rows.map((m) => (
-          <div key={m.id} className="rounded-xl border border-[#2d3249] bg-[#13151f] p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#8892b0]">#{m.seq}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      m.status === "signed" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"
-                    }`}
-                  >
-                    {m.status === "signed" ? "Đã nghiệm thu" : "Chưa nghiệm thu"}
-                  </span>
-                </div>
-                <div className="mt-1 font-medium text-[#f0f2ff]">{m.title}</div>
-                {m.description ? <div className="mt-0.5 text-xs text-[#8892b0]">{m.description}</div> : null}
-                {m.status === "signed" && (
-                  <div className="mt-1 text-xs text-emerald-300">
-                    {m.hasSignature
-                      ? `CN ký trên cổng: ${m.signerName || "chủ nhà"} lúc ${m.signedAt ? new Date(m.signedAt).toLocaleString("vi-VN") : "—"}`
-                      : `Nghiệm thu ngày ${m.signedAt ? new Date(m.signedAt).toLocaleDateString("vi-VN") : "—"}`}
-                    {m.customerNote ? ` · Ghi chú: ${m.customerNote}` : ""}
-                  </div>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {m.hasSignature && (
-                  <Link
-                    href={`/projects/${projectId}/acceptance/${m.id}/bien-ban`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#cfd4e8] hover:bg-[#22263a]"
-                    title="Xem / tải biên bản"
-                  >
-                    <FileText className="h-3.5 w-3.5" /> BB
-                  </Link>
-                )}
-                {canManage && !m.hasSignature && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(m)}
-                      className="rounded-lg border border-[#2d3249] p-1.5 text-[#cfd4e8] hover:bg-[#22263a]"
-                      title="Sửa"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => remove(m)}
-                      className="rounded-lg border border-red-900/60 p-1.5 text-red-400 hover:bg-red-950/40"
-                      title="Xoá"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            {(canManage || m.templateFiles.length > 0) && (
-              <div className="mt-3">
-                <AcceptancePhotoSection
-                  projectId={projectId}
-                  milestoneId={m.id}
-                  kind="mau"
-                  title="🖨 BB mẫu để in (chủ nhà không thấy)"
-                  photos={m.templateFiles}
-                  userId={userId}
-                  canDeleteAll={canManage}
-                  canUpload={canManage}
-                  onChanged={load}
-                />
-              </div>
+  // Dải ảnh: tối đa 4 ảnh + "+N" (bấm mở hết) + nút thêm. Nút × xoá: admin hoặc ảnh mình tải.
+  const strip = (m: Milestone, kind: "bien_ban" | "site", photos: AcceptancePhotoItem[]) => {
+    const k = `${m.id}:${kind}`;
+    const all = expanded.has(k);
+    const shown = all ? photos : photos.slice(0, THUMBS);
+    return (
+      <div className="ths">
+        {photos.length === 0 && <span className="empty">Chưa có</span>}
+        {shown.map((p) => (
+          <div key={p.key} className="th">
+            <a href={fileUrl(m.id, p)} target="_blank" rel="noreferrer" title={p.name}>
+              {p.contentType === "application/pdf" ? (
+                <span className="pdf">PDF</span>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fileUrl(m.id, p)} alt={p.name} loading="lazy" />
+              )}
+            </a>
+            {(canManage || p.uploadedBy === userId) && (
+              <button type="button" className="x" onClick={() => void removeFile(m.id, kind, p)} title="Xoá">
+                ×
+              </button>
             )}
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <AcceptancePhotoSection
-                projectId={projectId}
-                milestoneId={m.id}
-                kind="bien_ban"
-                title="Biên bản đã ký"
-                photos={m.bienBanPhotos}
-                userId={userId}
-                canDeleteAll={canManage}
-                onChanged={load}
-              />
-              <AcceptancePhotoSection
-                projectId={projectId}
-                milestoneId={m.id}
-                kind="site"
-                title="Ảnh nghiệm thu công trình"
-                photos={m.sitePhotos}
-                userId={userId}
-                canDeleteAll={canManage}
-                onChanged={load}
-              />
-            </div>
           </div>
         ))}
+        {!all && photos.length > THUMBS && (
+          <button
+            type="button"
+            className="more"
+            onClick={() => setExpanded((prev) => new Set(Array.from(prev).concat(k)))}
+            title="Xem hết"
+          >
+            +{photos.length - THUMBS}
+          </button>
+        )}
+        <button
+          type="button"
+          className="add"
+          disabled={busyKey === k}
+          onClick={() => pick(m.id, kind)}
+          title={kind === "bien_ban" ? "Thêm ảnh BB đã ký" : "Thêm ảnh công trình"}
+        >
+          {busyKey === k ? "…" : "＋"}
+        </button>
+      </div>
+    );
+  };
+
+  const formPanel = (m: Milestone | null) => (
+    <form className="panel" onSubmit={submit}>
+      <h3>{m ? `Sửa mốc #${m.seq}` : "Tạo mốc nghiệm thu"}</h3>
+      <div className="fgrid">
+        <label className="fld">
+          <span>Số TT *</span>
+          <input
+            type="number"
+            min={1}
+            value={form.seq}
+            onChange={(e) => setForm({ ...form, seq: e.target.value })}
+            required
+          />
+        </label>
+        <label className="fld">
+          <span>Tên mốc *</span>
+          <input
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            required
+            placeholder="VD: Móng, giằng móng"
+          />
+        </label>
+      </div>
+      <label className="fld">
+        <span>Mô tả / nội dung nghiệm thu</span>
+        <textarea
+          rows={2}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="VD: CT6 – CT9 theo bộ tài liệu giám sát"
+        />
+      </label>
+      {m && (
+        <div className="fld">
+          <span>BB mẫu để in (chủ nhà không thấy)</span>
+          <div className="mau-list">
+            {m.templateFiles.map((p) => (
+              <span key={p.key} className="mau-item">
+                <a href={fileUrl(m.id, p)} target="_blank" rel="noreferrer">
+                  🖨 {p.name}
+                </a>
+                <button type="button" onClick={() => void removeFile(m.id, "mau", p)} title="Xoá BB mẫu">
+                  ×
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              className="qbtn"
+              disabled={busyKey === `${m.id}:mau`}
+              onClick={() => pick(m.id, "mau")}
+            >
+              {busyKey === `${m.id}:mau` ? "Đang tải…" : "＋ BB mẫu"}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="pacts">
+        <button type="submit" className="btn pri" disabled={saving}>
+          {saving ? "Đang lưu…" : m ? "Cập nhật" : "Tạo mốc"}
+        </button>
+        <button type="button" className="btn" onClick={() => setPanel(null)}>
+          Đóng
+        </button>
+        {m && !m.hasSignature && (
+          <button type="button" className="btn del" onClick={() => void remove(m)}>
+            Xoá mốc
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  return (
+    <div className={`ntdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+      <input ref={fileRef} type="file" multiple hidden onChange={(e) => void upload(e.target.files)} />
+      <div className="wrap">
+        <div className="topbar">
+          <div className="brand">
+            <Link href={backHref} className="iconbtn" aria-label="Quay lại">
+              ←
+            </Link>
+            <div className="mark">HG</div>
+            <div>
+              <b>HUỲNH GIA</b>
+              <span className="brand-sub">Nghiệm thu</span>
+            </div>
+          </div>
+          <div className="tbtns">
+            <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
+              ◑
+            </button>
+            {canManage && (
+              <button className="iconbtn pri" onClick={openCreate} type="button" aria-label="Thêm mốc">
+                ＋<span className="txt"> Mốc</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="eyebrow">Nghiệm thu · {project.code}</div>
+        <h1>{project.name}</h1>
+        <div className="meta">
+          {project.customerName ? (
+            <>
+              <span>Chủ nhà: {project.customerName}</span>
+              <span className="d">·</span>
+            </>
+          ) : null}
+          <span>{project.statusLabel}</span>
+        </div>
+
+        <div className="tot">
+          <div className="tot-top">
+            <b>Đã nghiệm thu</b>
+            <span className="tot-pc num">
+              {signedCount}/{rows.length}
+            </span>
+          </div>
+          <div className="bar">
+            <i style={{ width: `${rows.length ? (signedCount / rows.length) * 100 : 0}%` }} />
+          </div>
+          <div className="tot-m">
+            Ký giấy tại công trình → chụp BB đã ký đưa lên mốc → mốc thành “Đã nghiệm thu”. Chủ nhà chỉ thấy BB đã ký +
+            ảnh công trình.
+          </div>
+        </div>
+
+        {panel === "new" && <div style={{ marginTop: 10 }}>{formPanel(null)}</div>}
+
+        {loading ? (
+          <div className="state">Đang tải…</div>
+        ) : rows.length === 0 ? (
+          <div className="state">Chưa có mốc nghiệm thu nào.</div>
+        ) : (
+          <>
+            <div className="hd">
+              <span>#</span>
+              <span>Mốc</span>
+              <span>BB mẫu</span>
+              <span>BB đã ký</span>
+              <span>Ảnh công trình</span>
+            </div>
+            {rows.map((m) => {
+              const signed = m.status === "signed";
+              const cls = signed ? "ok" : m.id === nextPendingId ? "cur" : "";
+              const bare = m.bienBanPhotos.length === 0 && m.sitePhotos.length === 0;
+              return (
+                <Fragment key={m.id}>
+                  <div className={`row ${cls}${bare ? " bare" : ""}`}>
+                    <div className="c-no num">{String(m.seq).padStart(2, "0")}</div>
+                    <div className="c-name">
+                      {canManage ? (
+                        <button type="button" className="nm" onClick={() => openEdit(m)} title="Sửa mốc">
+                          {m.title}
+                        </button>
+                      ) : (
+                        <span className="nm">{m.title}</span>
+                      )}
+                      {m.description ? <div className="desc">{m.description}</div> : null}
+                      <div className="chips">
+                        {signed ? (
+                          <span className="chip ok">Đã nghiệm thu{m.signedAt ? ` · ${fmtDay(m.signedAt)}` : ""}</span>
+                        ) : (
+                          <span className={`chip${cls === "cur" ? " cur" : ""}`}>
+                            {cls === "cur" ? "Đang chờ ký" : "Chưa"}
+                          </span>
+                        )}
+                        {m.hasSignature && (
+                          <Link href={`/projects/${projectId}/acceptance/${m.id}/bien-ban`} className="lnk">
+                            BB ký cổng CN{m.signerName ? ` (${m.signerName})` : ""}
+                          </Link>
+                        )}
+                        {m.customerNote ? <span className="desc">Ghi chú: {m.customerNote}</span> : null}
+                      </div>
+                    </div>
+                    <div className="c-mau">
+                      {m.templateFiles.length === 0 ? (
+                        <span className="none">—</span>
+                      ) : (
+                        m.templateFiles.map((p, i) => (
+                          <a
+                            key={p.key}
+                            href={fileUrl(m.id, p)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="pbtn"
+                            title={p.name}
+                          >
+                            🖨 In BB{m.templateFiles.length > 1 ? ` ${i + 1}` : ""}
+                          </a>
+                        ))
+                      )}
+                    </div>
+                    <div className="c-bb">
+                      <span className="lab">BB đã ký</span>
+                      {strip(m, "bien_ban", m.bienBanPhotos)}
+                    </div>
+                    <div className="c-site">
+                      <span className="lab">Ảnh công trình</span>
+                      {strip(m, "site", m.sitePhotos)}
+                    </div>
+                    <div className="c-quick">
+                      <button
+                        type="button"
+                        className="qbtn"
+                        disabled={busyKey === `${m.id}:bien_ban`}
+                        onClick={() => pick(m.id, "bien_ban")}
+                      >
+                        {busyKey === `${m.id}:bien_ban` ? "Đang tải…" : "＋ BB đã ký"}
+                      </button>
+                      <button
+                        type="button"
+                        className="qbtn"
+                        disabled={busyKey === `${m.id}:site`}
+                        onClick={() => pick(m.id, "site")}
+                      >
+                        {busyKey === `${m.id}:site` ? "Đang tải…" : "＋ Ảnh"}
+                      </button>
+                    </div>
+                  </div>
+                  {panel === m.id && formPanel(m)}
+                </Fragment>
+              );
+            })}
+            <div className="note">
+              🖨 BB mẫu chỉ admin + giám sát thấy để in.
+              {canManage ? " Sửa / xoá mốc, đổi BB mẫu: bấm vào tên mốc." : ""}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -3,13 +3,16 @@ import { CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@a
 import { getMinioBucket, getMinioClient } from "@/lib/minio";
 
 // Tài liệu chung công ty — lưu thẳng MinIO prefix company-docs/ (KHÔNG bảng DB).
-// Key: company-docs/<uuid>/<tên file gốc>, hoặc trong thư mục (nhánh):
-//      company-docs/<thư mục>/<uuid>/<tên file gốc> → tên hiển thị lấy từ đoạn cuối key.
+// Key: company-docs/<uuid>/<tên file gốc>, hoặc trong thư mục (nhánh, tối đa 2 cấp):
+//      company-docs/<thư mục>/<uuid>/<tên file gốc>
+//      company-docs/<thư mục>/<thư mục con>/<uuid>/<tên file gốc> → tên hiển thị lấy từ đoạn cuối key.
+// Đường dẫn thư mục dạng "Cha/Con".
 // Thư mục rỗng: MinIO ko có thư mục thật → giữ bằng object đánh dấu company-docs/<thư mục>/.folder.
 
 export const COMPANY_DOCS_PREFIX = "company-docs/";
 export const COMPANY_DOCS_MAX_BYTES = 50 * 1024 * 1024;
 export const COMPANY_DOCS_FOLDER_MARKER = ".folder";
+export const COMPANY_DOCS_MAX_DEPTH = 2;
 export const COMPANY_DOCS_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg", "webp"]);
 
 export type CompanyDoc = {
@@ -30,7 +33,7 @@ export function isCompanyDocKey(key: string) {
   if (!key.startsWith(COMPANY_DOCS_PREFIX) || key.includes("..")) return false;
   const parts = key.split("/");
   if (parts[parts.length - 1] === COMPANY_DOCS_FOLDER_MARKER) return false;
-  return (parts.length === 3 || parts.length === 4) && parts.every(Boolean);
+  return parts.length >= 3 && parts.length <= 3 + COMPANY_DOCS_MAX_DEPTH && parts.every(Boolean);
 }
 
 export function companyDocFileName(key: string) {
@@ -38,13 +41,23 @@ export function companyDocFileName(key: string) {
 }
 
 export function companyDocFolder(key: string) {
-  const parts = key.split("/");
-  return parts.length === 4 ? parts[1] : "";
+  return key.split("/").slice(1, -2).join("/");
 }
 
-// Tên thư mục: bỏ "/", ký tự điều khiển, gộp khoảng trắng. Rỗng = ngoài thư mục.
-export function cleanFolderName(raw: string) {
+// Tên 1 cấp thư mục: bỏ "/", ký tự điều khiển, gộp khoảng trắng.
+function cleanFolderSegment(raw: string) {
   return raw.replace(/[\\/\u0000-\u001f]/g, " ").replace(/\s+/g, " ").replace(/\.{2,}/g, ".").replace(/^\.+/, "").trim().slice(0, 80);
+}
+
+// Đường dẫn thư mục "Cha/Con": làm sạch từng cấp, bỏ cấp rỗng, cắt còn tối đa 2 cấp. Rỗng = ngoài thư mục.
+export function cleanFolderName(raw: string) {
+  return raw.split("/").map(cleanFolderSegment).filter(Boolean).slice(0, COMPANY_DOCS_MAX_DEPTH).join("/");
+}
+
+// "Cha/Con" → ["Cha", "Cha/Con"]: mọi cấp cha của 1 thư mục (để thư mục cha luôn hiện).
+export function folderWithParents(folder: string) {
+  const parts = folder.split("/").filter(Boolean);
+  return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
 }
 
 export function companyFolderMarkerKey(folder: string) {
@@ -92,12 +105,15 @@ export async function listCompanyDocs(): Promise<{ docs: CompanyDoc[]; folders: 
     for (const o of res.Contents ?? []) {
       if (!o.Key) continue;
       const parts = o.Key.split("/");
-      if (parts.length === 3 && parts[1] && parts[2] === COMPANY_DOCS_FOLDER_MARKER) {
-        folders.add(parts[1]);
+      if (parts[parts.length - 1] === COMPANY_DOCS_FOLDER_MARKER) {
+        const dir = parts.slice(1, -1);
+        if (dir.length >= 1 && dir.length <= COMPANY_DOCS_MAX_DEPTH && dir.every(Boolean)) {
+          folderWithParents(dir.join("/")).forEach((f) => folders.add(f));
+        }
         continue;
       }
       if (!isCompanyDocKey(o.Key)) continue;
-      if (companyDocFolder(o.Key)) folders.add(companyDocFolder(o.Key));
+      folderWithParents(companyDocFolder(o.Key)).forEach((f) => folders.add(f));
       const fileName = companyDocFileName(o.Key);
       docs.push({
         key: o.Key,

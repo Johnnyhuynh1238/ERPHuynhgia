@@ -78,9 +78,13 @@ export async function DELETE(request: Request) {
   if (folder !== null) {
     const markerKey = companyFolderMarkerKey(folder);
     if (!markerKey) return NextResponse.json({ message: "Thư mục không hợp lệ" }, { status: 400 });
-    const { docs } = await listCompanyDocs();
-    if (docs.some((d) => d.folder === cleanFolderName(folder))) {
+    const dir = cleanFolderName(folder);
+    const { docs, folders } = await listCompanyDocs();
+    if (docs.some((d) => d.folder === dir || d.folder.startsWith(`${dir}/`))) {
       return NextResponse.json({ message: "Thư mục còn file, chuyển/xoá file trước" }, { status: 400 });
+    }
+    if (folders.some((f) => f.startsWith(`${dir}/`))) {
+      return NextResponse.json({ message: "Thư mục còn thư mục con, xoá thư mục con trước" }, { status: 400 });
     }
     await deleteObjectFromMinio(markerKey);
     return NextResponse.json({ ok: true });

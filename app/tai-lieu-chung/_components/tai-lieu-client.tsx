@@ -52,13 +52,22 @@ export function TaiLieuClient({
       ),
     [docs, folderList],
   );
-  const groups = useMemo(
-    () =>
-      folders
-        .map((f) => ({ folder: f, items: shown.filter((d) => d.folder === f) }))
-        .filter((g) => !searching || g.items.length > 0),
-    [folders, shown, searching],
-  );
+  // Cây 2 cấp: thư mục gốc → thư mục con ("Cha/Con"). total = file trong cả nhánh.
+  const groups = useMemo(() => {
+    const inTree = (f: string) => shown.filter((d) => d.folder === f || d.folder.startsWith(`${f}/`));
+    return folders
+      .filter((f) => !f.includes("/"))
+      .map((f) => ({
+        folder: f,
+        items: shown.filter((d) => d.folder === f),
+        total: inTree(f).length,
+        subs: folders
+          .filter((c) => c.startsWith(`${f}/`))
+          .map((c) => ({ folder: c, items: shown.filter((d) => d.folder === c) }))
+          .filter((c) => !searching || c.items.length > 0),
+      }))
+      .filter((g) => !searching || g.total > 0);
+  }, [folders, shown, searching]);
   const looseDocs = shown.filter((d) => !d.folder);
 
   const toggleFolder = (f: string) =>
@@ -83,9 +92,10 @@ export function TaiLieuClient({
   };
 
   // Tạo thư mục ngay cả khi chưa có file (server ghi object đánh dấu).
-  const newFolder = async () => {
-    const name = window.prompt("Tên thư mục mới:", "")?.trim();
-    if (!name) return;
+  const newFolder = async (parent = "") => {
+    const input = window.prompt(parent ? `Tên thư mục con trong "${parent}":` : "Tên thư mục mới:", "")?.trim();
+    if (!input) return;
+    const name = parent ? `${parent}/${input.replace(/\//g, " ")}` : input.replace(/\//g, " ");
     setBusy(true);
     try {
       const fd = new FormData();
@@ -95,7 +105,7 @@ export function TaiLieuClient({
       if (!res.ok || !j?.folder) return void toast.error(j?.message || "Tạo thư mục lỗi");
       const created = j.folder;
       await reload();
-      setOpenFolders((prev) => new Set(Array.from(prev).concat(created)));
+      setOpenFolders((prev) => new Set(Array.from(prev).concat(created, parent || created)));
       toast.success(`Đã tạo thư mục "${created}"`);
     } finally {
       setBusy(false);
@@ -133,7 +143,8 @@ export function TaiLieuClient({
         }
       }
       await reload();
-      if (uploadFolderRef.current) setOpenFolders((prev) => new Set(Array.from(prev).concat(uploadFolderRef.current)));
+      const up = uploadFolderRef.current;
+      if (up) setOpenFolders((prev) => new Set(Array.from(prev).concat(up, up.split("/")[0])));
       toast.success("Đã tải lên");
     } finally {
       setBusy(false);
@@ -155,7 +166,7 @@ export function TaiLieuClient({
   };
 
   const move = async (d: CompanyDoc) => {
-    const hint = folders.length ? `\nThư mục đang có: ${folders.join(", ")}` : "";
+    const hint = folders.length ? `\nThư mục đang có (thư mục con ghi "Cha/Con"): ${folders.join(", ")}` : "";
     const name = window.prompt(`Chuyển "${d.fileName}" vào thư mục (để trống = ngoài thư mục):${hint}`, d.folder);
     if (name === null || name.trim() === d.folder) return;
     const res = await fetch("/api/company-docs", {
@@ -165,7 +176,8 @@ export function TaiLieuClient({
     });
     if (!res.ok) return toast.error("Chuyển lỗi");
     await reload();
-    if (name.trim()) setOpenFolders((prev) => new Set(Array.from(prev).concat(name.trim())));
+    const to = name.trim();
+    if (to) setOpenFolders((prev) => new Set(Array.from(prev).concat(to, to.split("/")[0])));
     toast.success("Đã chuyển");
   };
 
@@ -190,8 +202,8 @@ export function TaiLieuClient({
     document.body.appendChild(frame);
   };
 
-  const renderDoc = (d: CompanyDoc, inFolder: boolean) => (
-    <tr key={d.key} className={inFolder ? "tlc-in" : undefined}>
+  const renderDoc = (d: CompanyDoc, depth: number) => (
+    <tr key={d.key} className={depth === 2 ? "tlc-in tlc-in2" : depth === 1 ? "tlc-in" : undefined}>
       <td className="tlc-name">
         <button type="button" onClick={() => view(d)}>
           <span className="tlc-ext">{d.ext || "file"}</span>
@@ -231,6 +243,38 @@ export function TaiLieuClient({
     </tr>
   );
 
+  const folderRow = (folder: string, label: string, count: number, open: boolean, empty: boolean, sub: boolean) => (
+    <tr className={sub ? "tlc-folder tlc-folder-sub" : "tlc-folder"}>
+      <td colSpan={4}>
+        <div className="tlc-folder-row">
+          <button type="button" className="tlc-folder-btn" onClick={() => toggleFolder(folder)}>
+            <span className="tlc-caret">{open ? "▾" : "▸"}</span>
+            <span className="tlc-folder-ico">📁</span>
+            {label}
+            <span className="tlc-count">{count}</span>
+          </button>
+          {canEdit && (
+            <div className="tlc-act">
+              {empty && (
+                <button type="button" className="tlc-btn del" disabled={busy} onClick={() => removeFolder(folder)}>
+                  Xoá
+                </button>
+              )}
+              {!sub && (
+                <button type="button" className="tlc-btn" disabled={busy} onClick={() => newFolder(folder)}>
+                  + Thư mục con
+                </button>
+              )}
+              <button type="button" className="tlc-btn" disabled={busy} onClick={() => pickFiles(folder)}>
+                + Thêm file
+              </button>
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="tlc-app">
       <div className="tlc-wrap">
@@ -253,7 +297,7 @@ export function TaiLieuClient({
                 onChange={(e) => upload(e.target.files)}
               />
               <div className="tlc-act">
-                <button type="button" className="tlc-btn" disabled={busy} onClick={newFolder}>
+                <button type="button" className="tlc-btn" disabled={busy} onClick={() => newFolder()}>
                   + Thư mục
                 </button>
                 <button type="button" className="tlc-btn pri" disabled={busy} onClick={() => pickFiles("")}>
@@ -287,47 +331,36 @@ export function TaiLieuClient({
               const open = searching || openFolders.has(g.folder);
               return (
                 <Fragment key={`f:${g.folder}`}>
-                  <tr className="tlc-folder">
-                    <td colSpan={4}>
-                      <div className="tlc-folder-row">
-                        <button type="button" className="tlc-folder-btn" onClick={() => toggleFolder(g.folder)}>
-                          <span className="tlc-caret">{open ? "▾" : "▸"}</span>
-                          <span className="tlc-folder-ico">📁</span>
-                          {g.folder}
-                          <span className="tlc-count">{g.items.length}</span>
-                        </button>
-                        {canEdit && (
-                          <div className="tlc-act">
-                            {g.items.length === 0 && (
-                              <button
-                                type="button"
-                                className="tlc-btn del"
-                                disabled={busy}
-                                onClick={() => removeFolder(g.folder)}
-                              >
-                                Xoá
-                              </button>
-                            )}
-                            <button type="button" className="tlc-btn" disabled={busy} onClick={() => pickFiles(g.folder)}>
-                              + Thêm file
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {open && g.items.length === 0 && (
+                  {folderRow(g.folder, g.folder, g.total, open, g.total === 0 && g.subs.length === 0, false)}
+                  {open && g.total === 0 && g.subs.length === 0 && (
                     <tr className="tlc-in">
                       <td colSpan={4} className="tlc-empty">
                         Thư mục trống.
                       </td>
                     </tr>
                   )}
-                  {open && g.items.map((d) => renderDoc(d, true))}
+                  {open &&
+                    g.subs.map((c) => {
+                      const subOpen = searching || openFolders.has(c.folder);
+                      return (
+                        <Fragment key={`f:${c.folder}`}>
+                          {folderRow(c.folder, c.folder.slice(g.folder.length + 1), c.items.length, subOpen, c.items.length === 0, true)}
+                          {subOpen && c.items.length === 0 && (
+                            <tr className="tlc-in tlc-in2">
+                              <td colSpan={4} className="tlc-empty">
+                                Thư mục trống.
+                              </td>
+                            </tr>
+                          )}
+                          {subOpen && c.items.map((d) => renderDoc(d, 2))}
+                        </Fragment>
+                      );
+                    })}
+                  {open && g.items.map((d) => renderDoc(d, 1))}
                 </Fragment>
               );
             })}
-            {looseDocs.map((d) => renderDoc(d, false))}
+            {looseDocs.map((d) => renderDoc(d, 0))}
           </tbody>
         </table>
       </div>

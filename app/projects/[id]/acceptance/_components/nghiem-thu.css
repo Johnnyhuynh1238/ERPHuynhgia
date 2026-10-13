@@ -1,0 +1,150 @@
+/* ============================================================
+   Nghiệm thu theo mốc — Design system Huỳnh Gia (bám .tddoc).
+   Ngà (sáng, mặc định) / Mahogany (tối). IBM Plex. PHẲNG, kẻ mảnh.
+   PC: bảng 5 cột. Mobile: mỗi mốc 1 khối, mốc chưa có ảnh gọn 1 dòng nút.
+   Scope trong .ntdoc để không đụng app shell.
+   ============================================================ */
+
+.ntdoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --mut2: rgba(46, 20, 10, 0.38);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --terra: #8a3d1c;
+  --ok: #5b7a52;
+  --red: #b3412a;
+  --track: rgba(46, 20, 10, 0.07);
+
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  color-scheme: light;
+}
+.ntdoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --mut2: rgba(247, 242, 228, 0.4);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --terra: #d8996a;
+  --ok: #89ab78;
+  --red: #e98a6f;
+  --track: rgba(247, 242, 228, 0.09);
+}
+
+.ntdoc * { box-sizing: border-box; margin: 0; padding: 0; }
+.ntdoc .num { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.ntdoc .wrap { max-width: 1080px; margin: 0 auto; padding: 0 clamp(14px, 4.5vw, 20px); }
+
+/* topbar */
+.ntdoc .topbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 12px; gap: 10px; }
+.ntdoc .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.ntdoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
+.ntdoc .brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.ntdoc .brand-sub { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.ntdoc .tbtns { display: flex; align-items: center; gap: 8px; }
+.ntdoc .iconbtn { min-width: 34px; height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font: inherit; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; line-height: 1; text-decoration: none; white-space: nowrap; }
+.ntdoc .iconbtn.pri { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 600; font-size: 13px; }
+.ntdoc .iconbtn:active { transform: scale(0.94); }
+
+/* header */
+.ntdoc .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--terra); margin-top: 6px; }
+.ntdoc h1 { font-size: clamp(20px, 6vw, 25px); font-weight: 600; letter-spacing: -0.022em; margin: 6px 0; line-height: 1.12; }
+.ntdoc .meta { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 3px 9px; }
+.ntdoc .meta .d { color: var(--line2); }
+
+/* tổng */
+.ntdoc .tot { margin-top: 16px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ntdoc .tot-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.ntdoc .tot-top b { font-size: 13.5px; font-weight: 600; }
+.ntdoc .tot-pc { font-size: 22px; font-weight: 600; color: var(--orange); line-height: 1; }
+.ntdoc .bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.ntdoc .bar > i { display: block; height: 100%; border-radius: 4px; background: var(--orange); }
+.ntdoc .tot-m { font-size: 11px; color: var(--mut); margin-top: 8px; }
+
+/* bảng mốc */
+.ntdoc .hd,
+.ntdoc .row { display: grid; grid-template-columns: 34px minmax(0, 1.3fr) 104px minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; align-items: center; }
+.ntdoc .hd { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut2); padding: 14px 0 6px; border-bottom: 1px solid var(--line2); }
+.ntdoc .row { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.ntdoc .lab { display: none; }
+.ntdoc .c-no { font-size: 12px; font-weight: 600; color: var(--mut2); }
+.ntdoc .row.ok .c-no { color: var(--ok); }
+.ntdoc .row.cur .c-no { color: var(--orange); }
+.ntdoc .c-name { min-width: 0; }
+.ntdoc .c-name .nm { display: block; font: inherit; font-size: 14px; font-weight: 600; color: var(--text); background: none; border: 0; text-align: left; padding: 0; cursor: default; }
+.ntdoc .c-name button.nm { cursor: pointer; }
+.ntdoc .c-name button.nm:hover { color: var(--orange); }
+.ntdoc .c-name .desc { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.ntdoc .chips { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin-top: 3px; }
+.ntdoc .chip { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: var(--track); color: var(--mut); }
+.ntdoc .chip.ok { background: rgba(91, 122, 82, 0.14); color: var(--ok); }
+.ntdoc .chip.cur { background: rgba(227, 97, 34, 0.12); color: var(--orange); }
+.ntdoc .lnk { font-size: 11px; font-weight: 600; color: var(--terra); text-decoration: underline; }
+
+.ntdoc .c-mau { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.ntdoc .pbtn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 5px 10px; border: 1px solid var(--line2); border-radius: 8px; color: var(--terra); white-space: nowrap; text-decoration: none; background: none; cursor: pointer; }
+.ntdoc .none { font-size: 11.5px; color: var(--mut2); }
+
+.ntdoc .ths { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.ntdoc .th { position: relative; width: 38px; height: 38px; border-radius: 6px; overflow: hidden; background: var(--track); flex: none; }
+.ntdoc .th a { display: block; width: 100%; height: 100%; }
+.ntdoc .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ntdoc .th .pdf { width: 100%; height: 100%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--terra); }
+.ntdoc .th .x { position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 10px; line-height: 16px; cursor: pointer; }
+.ntdoc .more { width: 38px; height: 38px; border-radius: 6px; border: 0; background: var(--track); font: inherit; font-size: 11px; font-weight: 600; color: var(--mut); cursor: pointer; flex: none; }
+.ntdoc .add { width: 38px; height: 38px; border-radius: 6px; border: 1px dashed var(--line2); background: none; display: grid; place-items: center; color: var(--orange); font-size: 18px; cursor: pointer; flex: none; }
+.ntdoc .add:disabled, .ntdoc .qbtn:disabled { opacity: 0.5; }
+.ntdoc .empty { font-size: 11.5px; color: var(--mut2); margin-right: 4px; }
+.ntdoc .c-quick { display: none; }
+.ntdoc .qbtn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px; border: 1px dashed var(--line2); border-radius: 8px; color: var(--orange); background: none; white-space: nowrap; cursor: pointer; }
+
+/* panel sửa mốc / tạo mốc */
+.ntdoc .panel { grid-column: 1 / -1; margin: 4px 0 2px; padding: 12px; border: 1px solid var(--line2); border-radius: 10px; background: var(--card); display: grid; gap: 10px; }
+.ntdoc .panel h3 { font-size: 13px; font-weight: 600; }
+.ntdoc .fgrid { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+.ntdoc .fld span { display: block; font-size: 11px; color: var(--mut); margin-bottom: 3px; }
+.ntdoc .fld input,
+.ntdoc .fld textarea { width: 100%; font: inherit; font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--line2); border-radius: 8px; padding: 7px 9px; }
+.ntdoc .pacts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ntdoc .btn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; }
+.ntdoc .btn.pri { background: var(--orange); border-color: var(--orange); color: #fff; }
+.ntdoc .btn.del { color: var(--red); margin-left: auto; }
+.ntdoc .btn:disabled { opacity: 0.5; }
+.ntdoc .mau-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ntdoc .mau-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border: 1px solid var(--line2); border-radius: 8px; }
+.ntdoc .mau-item a { color: var(--terra); text-decoration: none; }
+.ntdoc .mau-item button { border: 0; background: none; color: var(--red); cursor: pointer; font-size: 12px; }
+
+.ntdoc .note { font-size: 11.5px; color: var(--mut); padding: 10px 0 4px; }
+.ntdoc .state { padding: 28px 0; text-align: center; font-size: 13px; color: var(--mut); }
+
+@media (hover: hover) {
+  .ntdoc .pbtn:hover, .ntdoc .qbtn:hover, .ntdoc .add:hover { border-color: var(--orange); }
+}
+
+@media (max-width: 700px) {
+  .ntdoc .hd { display: none; }
+  .ntdoc .row { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 6px 10px; padding: 13px 0; }
+  .ntdoc .c-no { grid-row: 1; align-self: start; padding-top: 2px; }
+  .ntdoc .c-mau { grid-column: 3; grid-row: 1; align-self: start; align-items: flex-end; }
+  .ntdoc .c-bb, .ntdoc .c-site { grid-column: 2 / 4; }
+  .ntdoc .lab { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut2); margin-bottom: 3px; }
+  .ntdoc .th, .ntdoc .add, .ntdoc .more { width: 44px; height: 44px; }
+  .ntdoc .tbtns .txt { display: none; }
+  .ntdoc .row.bare .c-bb, .ntdoc .row.bare .c-site { display: none; }
+  .ntdoc .row.bare .c-quick { display: flex; gap: 8px; grid-column: 2 / 4; }
+  .ntdoc .fgrid { grid-template-columns: 70px minmax(0, 1fr); }
+}
