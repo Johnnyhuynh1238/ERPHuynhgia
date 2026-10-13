@@ -108,8 +108,8 @@ export async function GET(
       select: { contractHtml: true },
     });
     if (!c?.contractHtml) return page("Hợp đồng đang được chuẩn bị", 200);
-    // HĐ chưa ký: khách chỉ xem trong cổng, không in / lưu / sao chép.
-    const html = guardPipelineContract(c.contractHtml);
+    // HĐ chưa ký: khách chỉ xem trong cổng, không in / lưu / sao chép; mọi trang phủ dấu chìm.
+    const html = guardPipelineContract(c.contractHtml, { watermark: true });
     return docResponse(
       q.get("embed") === "1" ? injectPipelineEmbed(html) : html,
     );

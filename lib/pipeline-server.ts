@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { prisma } from "@/lib/prisma";
 
 export type PipelineVersionMeta = {
@@ -90,7 +92,35 @@ const NOCOPY_SCRIPT = `<script>(function(){function no(e){e.preventDefault();ret
 document.addEventListener("keydown",function(e){var k=(e.key||"").toLowerCase();if((e.ctrlKey||e.metaKey)&&"pscau".indexOf(k)>=0||k==="printscreen")no(e)},true)})();</script>`;
 const NOCOPY_NOTE = `<div class="hg-nocopy">Hợp đồng chưa ký — Huỳnh Gia không cho phép in hoặc lưu bản này.</div>`;
 
-export function guardPipelineContract(html: string): string {
+// Dấu chìm logo HuynhGia6.com phủ chéo mọi trang (mờ, so le) — khách chụp màn hình vẫn dính.
+// Ảnh public/hd-watermark.png (2 logo so le, độ mờ in sẵn) nhúng data URI vì link khách ở huynhgia6.com, khác host ERP.
+// Lớp fixed phủ khung nhìn, không bắt chuột; khi in đã ẩn cùng nội dung (NOCOPY_STYLE).
+let watermarkCache: string | null = null;
+
+function watermarkLayer() {
+  if (watermarkCache === null) {
+    try {
+      const b64 = readFileSync(
+        join(process.cwd(), "public", "hd-watermark.png"),
+      ).toString("base64");
+      // Màn hẹp (điện thoại) thu nhỏ ô lặp để dấu chìm vẫn dày.
+      watermarkCache =
+        `<style>.hg-wm{position:fixed;top:-50%;left:-50%;width:200%;height:200%;z-index:2147483646;pointer-events:none;` +
+        `transform:rotate(-28deg);background:url(data:image/png;base64,${b64}) 0 0/460px 300px repeat}` +
+        `@media (max-width:640px){.hg-wm{background-size:300px 196px}}</style>` +
+        `<div class="hg-wm" aria-hidden="true"></div>`;
+    } catch (e) {
+      console.error("[pipeline] thiếu ảnh dấu chìm hd-watermark.png", e);
+      watermarkCache = "";
+    }
+  }
+  return watermarkCache;
+}
+
+export function guardPipelineContract(
+  html: string,
+  opts: { watermark?: boolean } = {},
+): string {
   const lower = html.toLowerCase();
   const a4 = lower.indexOf('<div class="a4v">');
   const head = lower.indexOf("</head>");
@@ -109,7 +139,8 @@ export function guardPipelineContract(html: string): string {
       ? html.slice(0, h) + NOCOPY_STYLE + html.slice(h)
       : NOCOPY_STYLE + html;
   const b = html.toLowerCase().lastIndexOf("</body>");
-  const tail = NOCOPY_NOTE + NOCOPY_SCRIPT;
+  const tail =
+    (opts.watermark ? watermarkLayer() : "") + NOCOPY_NOTE + NOCOPY_SCRIPT;
   return b >= 0 ? html.slice(0, b) + tail + html.slice(b) : html + tail;
 }
 
