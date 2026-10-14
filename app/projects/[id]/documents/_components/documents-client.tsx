@@ -193,7 +193,7 @@ export function DocumentsClient({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.dwg,.dxf,.dwf,.rvt,.skp,.zip,.rar,.7z"
                 className="text-xs text-[#8892b0]"
               />
               <button

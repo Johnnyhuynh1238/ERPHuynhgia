@@ -14,7 +14,9 @@ export const runtime = "nodejs";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const categorySchema = z.nativeEnum(ProjectDocumentCategory);
 
-const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg"]);
+// File CAD/nén chỉ để lưu trữ + tải về: không bật khách xem, không render ảnh ở link mời thầu.
+const CAD_EXTENSIONS = new Set(["dwg", "dxf", "dwf", "rvt", "skp", "zip", "rar", "7z"]);
+const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg", ...Array.from(CAD_EXTENSIONS)]);
 
 function authError(error: unknown) {
   const msg = error instanceof Error ? error.message : "UNKNOWN";
@@ -134,7 +136,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (file.size > MAX_FILE_BYTES) return NextResponse.json({ message: "File hồ sơ tối đa 50MB" }, { status: 400 });
   const ext = fileExtension(file.name);
   if (!ALLOWED_EXTENSIONS.has(ext)) {
-    return NextResponse.json({ message: "Chỉ hỗ trợ PDF/DOC/DOCX/XLS/XLSX/PNG/JPG" }, { status: 400 });
+    return NextResponse.json({ message: "Chỉ hỗ trợ PDF/DOC/DOCX/XLS/XLSX/PNG/JPG/DWG/DXF/RVT/SKP/ZIP/RAR" }, { status: 400 });
   }
 
   const id = randomUUID();
@@ -156,7 +158,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       contentHash,
       uploadedBy: current.id,
       designStep,
-      visibleToCustomer: designStep !== null,
+      visibleToCustomer: designStep !== null && !CAD_EXTENSIONS.has(ext),
     },
     select: {
       id: true,

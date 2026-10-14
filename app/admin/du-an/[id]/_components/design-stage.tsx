@@ -13,6 +13,7 @@ type DesignFile = {
   name: string;
   designStep: string;
   isImage: boolean;
+  ext?: string;
   sizeBytes: number;
   viewUrl: string;
   thumbUrl: string;
@@ -31,7 +32,8 @@ type DesignExpense = {
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
-const DOC_ACCEPT = "application/pdf,image/jpeg,image/png";
+// CAD/nén chỉ lưu trữ (không hiện cho khách).
+const DOC_ACCEPT = "application/pdf,image/jpeg,image/png,.dwg,.dxf,.dwf,.rvt,.skp,.zip,.rar,.7z";
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
 
 function money(n: number) {
@@ -346,7 +348,7 @@ export function DesignStage({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={f.thumbUrl} alt="" loading="lazy" />
                         ) : (
-                          <span className="pl-dspdf">PDF</span>
+                          <span className="pl-dspdf">{f.ext || "PDF"}</span>
                         )}
                         <span className="pl-dsname">{f.name}</span>
                       </a>

@@ -23,6 +23,7 @@ export async function GET(
       select: {
         id: true,
         title: true,
+        fileName: true,
         designStep: true,
         mimeType: true,
         fileSize: true,
@@ -69,6 +70,7 @@ export async function GET(
       name: d.title,
       designStep: d.designStep as string,
       isImage: d.mimeType.startsWith("image/"),
+      ext: (d.fileName.split(".").pop() || "").toUpperCase().slice(0, 4),
       sizeBytes: d.fileSize,
       viewUrl: `${docBase}/${d.id}/file`,
       thumbUrl: `${docBase}/${d.id}/file`,
