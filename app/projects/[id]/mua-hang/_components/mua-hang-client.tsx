@@ -2249,7 +2249,7 @@ function EditSheet({
         <div className="sbody">
           <div className="esh">Thông tin đơn</div>
           {/* NCC nằm NGOÀI fieldset khoá → KT vẫn sửa được NCC trên đơn đã nhận. */}
-          <div className="fld">
+          <div className="fld fld-ncc">
             <label>Nhà cung cấp (NCC)</label>
             {/* Combobox tự làm (KHÔNG <datalist>): Safari/Firefox/Zalo không có nút xổ của datalist. */}
             <div className="ncccb" ref={nccComboRef}>
