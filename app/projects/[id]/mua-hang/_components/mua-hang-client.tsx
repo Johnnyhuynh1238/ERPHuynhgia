@@ -2050,6 +2050,26 @@ function EditSheet({
     setSupplierName(v);
     if (isReceivedOrder) setStatus(v.trim() ? "received" : "paid");
   };
+  const [nccOpen, setNccOpen] = useState(false);
+  const nccComboRef = useRef<HTMLDivElement>(null);
+  // Lọc NCC theo chữ đang gõ; đúng y tên đã chọn → hiện đủ danh sách để đổi NCC khác.
+  const nccMatches = useMemo(() => {
+    const q = supplierName.trim().toLowerCase();
+    if (!q || suppliers.some((s) => s.name.trim().toLowerCase() === q)) return suppliers;
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [suppliers, supplierName]);
+  useEffect(() => {
+    if (!nccOpen) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (nccComboRef.current && !nccComboRef.current.contains(e.target as Node)) setNccOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [nccOpen]);
   // Bản sao vật tư để sửa tên/đvt/SL/đơn giá (KT + admin đều được, không thêm/bớt dòng).
   const [items, setItems] = useState<OrderItem[]>(order.items.map((it) => ({ ...it })));
   // Phân bổ hạng mục ngân sách (nhiều hạng mục theo số tiền). Admin sửa được kể cả đơn đã trả.
@@ -2231,18 +2251,49 @@ function EditSheet({
           {/* NCC nằm NGOÀI fieldset khoá → KT vẫn sửa được NCC trên đơn đã nhận. */}
           <div className="fld">
             <label>Nhà cung cấp (NCC)</label>
-            <input
-              list="mh-ncc-edit"
-              value={supplierName}
-              onChange={(e) => onNccChange(e.target.value)}
-              placeholder="Chọn hoặc gõ tên NCC / cửa hàng"
-              disabled={lockedPaid}
-            />
-            <datalist id="mh-ncc-edit">
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.name} />
-              ))}
-            </datalist>
+            {/* Combobox tự làm (KHÔNG <datalist>): Safari/Firefox/Zalo không có nút xổ của datalist. */}
+            <div className="ncccb" ref={nccComboRef}>
+              <input
+                value={supplierName}
+                onChange={(e) => {
+                  onNccChange(e.target.value);
+                  setNccOpen(true);
+                }}
+                onFocus={() => setNccOpen(true)}
+                placeholder="Chọn hoặc gõ tên NCC / cửa hàng"
+                disabled={lockedPaid}
+                autoComplete="off"
+              />
+              {!lockedPaid && suppliers.length > 0 && (
+                <button
+                  type="button"
+                  className="ncccb-tg"
+                  aria-label="Chọn NCC"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setNccOpen((v) => !v)}
+                >
+                  ▾
+                </button>
+              )}
+              {nccOpen && !lockedPaid && nccMatches.length > 0 && (
+                <div className="ncccb-pop" role="listbox">
+                  {nccMatches.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={s.name === supplierName ? "on" : ""}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onNccChange(s.name);
+                        setNccOpen(false);
+                      }}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {lockedPaid && (
               <div
                 style={{
