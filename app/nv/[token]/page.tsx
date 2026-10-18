@@ -8,7 +8,37 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Huỳnh Gia · Nhiệm vụ KS", robots: { index: false, follow: false } };
 
 /** Link nhiệm vụ KS gửi qua Zalo — không cần đăng nhập, token HMAC tự xác thực. */
+const DEMO_ROWS = [
+  { id: "d1", projectName: "Nhà anh Phi (thử)", tasksDone: "", issues: "", photoCount: 0, locked: false },
+  { id: "d2", projectName: "Nhà anh Hiếu (thử)", tasksDone: "Xây tường bao tầng 1 trục A–C ~32m²", issues: "", photoCount: 2, locked: false },
+];
+
+/** Link xem thử: /nv/demo-headcount, /nv/demo-eod — dữ liệu giả, bấm Lưu không gửi gì lên server. */
+function DemoPage({ kind }: { kind: "headcount" | "eod" }) {
+  const task = KS_TASKS[kind];
+  return (
+    <div className="bt-body">
+      <style dangerouslySetInnerHTML={{ __html: BT_CSS }} />
+      <div className="bt-wrap">
+        <div className="bt-head">
+          <div className="bt-eyebrow">Huỳnh Gia · {task.title}</div>
+          <h1>Ngày 18/10</h1>
+          <div className="bt-sub">KS Nguyễn Văn Hoàng · hạn {task.closeHour}:00</div>
+        </div>
+        <div className="bt-banner off">Bản xem thử — dữ liệu giả, bấm Lưu không ghi vào ERP</div>
+        {kind === "headcount" ? (
+          <HeadcountFormClient token="demo" demo rows={DEMO_ROWS} />
+        ) : (
+          <EodFormClient token="demo" demo rows={DEMO_ROWS} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default async function KsTaskPage({ params }: { params: { token: string } }) {
+  if (params.token === "demo-headcount") return <DemoPage kind="headcount" />;
+  if (params.token === "demo-eod") return <DemoPage kind="eod" />;
   const form = await getKsTaskForm(params.token);
 
   if (!form) {

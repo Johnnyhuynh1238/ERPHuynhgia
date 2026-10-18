@@ -25,7 +25,7 @@ async function compress(file: File): Promise<Blob> {
   }
 }
 
-export function EodFormClient({ token, rows }: { token: string; rows: Row[] }) {
+export function EodFormClient({ token, rows, demo = false }: { token: string; rows: Row[]; demo?: boolean }) {
   const [text, setText] = useState<Record<string, { tasksDone: string; issues: string }>>(() =>
     Object.fromEntries(rows.map((r) => [r.id, { tasksDone: r.tasksDone, issues: r.issues }])),
   );
@@ -85,6 +85,11 @@ export function EodFormClient({ token, rows }: { token: string; rows: Row[] }) {
     }
     if (!window.confirm("Lưu báo cáo cuối ngày?\nLưu xong không sửa được.")) return;
 
+    if (demo) {
+      setSaved(true);
+      window.scrollTo({ top: 0 });
+      return;
+    }
     const fd = new FormData();
     fd.append("data", JSON.stringify(text));
     for (const r of rows) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type Row = { id: string; projectName: string };
 
-export function HeadcountFormClient({ token, rows }: { token: string; rows: Row[] }) {
+export function HeadcountFormClient({ token, rows, demo = false }: { token: string; rows: Row[]; demo?: boolean }) {
   const [vals, setVals] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +25,10 @@ export function HeadcountFormClient({ token, rows }: { token: string; rows: Row[
     }
     const lines = rows.map((r) => `${r.projectName}: ${vals[r.id]} thợ`).join("\n");
     if (!window.confirm(`Lưu số thợ?\n\n${lines}\n\nLưu xong không sửa được.`)) return;
+    if (demo) {
+      setSaved(Object.fromEntries(rows.map((r) => [r.id, Number(vals[r.id])])));
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/nv/${encodeURIComponent(token)}/submit`, {
