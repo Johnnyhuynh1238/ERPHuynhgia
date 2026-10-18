@@ -1,6 +1,6 @@
 // CSS trang /nv (số thợ + báo cáo cuối ngày) — nhúng inline (trang public, không qua AppShell). Brand giấy ngà / terracotta.
 export const BT_CSS = `
-.bt-body{position:fixed;inset:0;overflow-y:auto;background:#f5efe1;color:#2e140a;
+.bt-body{color-scheme:light;position:fixed;inset:0;overflow-y:auto;background:#f5efe1;color:#2e140a;
   font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 .bt-wrap{max-width:460px;margin:0 auto;padding:28px 16px 40px}
 .bt-head{margin-bottom:18px}
@@ -47,4 +47,9 @@ export const BT_CSS = `
 .eo-had{font-size:13px;color:#3f5a38;margin-top:6px}
 .eo-lock{font-size:14px;color:rgba(46,20,10,.6)}
 .eo-text{white-space:pre-wrap;font-size:15px;margin:0}
+/* Ô nhập sáng theo brand — ép !important vì CSS chung app (nền tối) đè background/màu chữ input. */
+.bt-step input,.eo-ta{background:#fffdf8 !important;color:#2e140a !important;-webkit-text-fill-color:#2e140a !important;
+  border:1.5px solid rgba(138,61,28,.28) !important;box-shadow:none !important;opacity:1 !important}
+.bt-step input:focus,.eo-ta:focus{border-color:#e36122 !important;outline:none !important;box-shadow:0 0 0 3px rgba(227,97,34,.15) !important}
+.bt-step input::placeholder,.eo-ta::placeholder{color:rgba(46,20,10,.38) !important;-webkit-text-fill-color:rgba(46,20,10,.38) !important}
 `;
