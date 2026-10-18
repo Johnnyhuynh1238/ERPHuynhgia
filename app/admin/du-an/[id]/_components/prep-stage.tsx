@@ -21,14 +21,13 @@ function dateVn(iso: string) {
   });
 }
 
-// GĐ 5 Chuẩn bị: checklist trước thi công (menu cây + chốt từng mục như GĐ 4).
-// Mỗi mục mở màn có sẵn của dự án; chốt đủ hết mới được sang GĐ 6 Thi công (API chặn).
+// GĐ 5 Chuẩn bị: checklist trước thi công.
+// Mỗi dòng = tiêu đề mục + file PDF (Xem/Tải) + nút chốt; chốt đủ mới sang GĐ 6 Thi công (API chặn).
 export function PrepStage({ projectId }: { projectId: string }) {
   const [done, setDone] = useState<Record<string, string>>({});
   const [info, setInfo] = useState<Info>({});
   const [contracts, setContracts] = useState<SubDoc[]>([]);
   const [docs, setDocs] = useState<Record<string, string>>({});
-  const [sel, setSel] = useState<PrepStepKey | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -42,16 +41,10 @@ export function PrepStage({ projectId }: { projectId: string }) {
         setError(json.message || "Không tải được checklist");
         return;
       }
-      const d: Record<string, string> = json.done || {};
-      setDone(d);
+      setDone(json.done || {});
       setInfo(json.info || {});
       setContracts(json.contracts || []);
       setDocs(json.docs || {});
-      // Mở sẵn mục đầu tiên chưa chốt.
-      setSel(
-        (cur) =>
-          cur ?? (PREP_STEPS.find((s) => !d[s.key])?.key || PREP_STEPS[0].key),
-      );
     } catch {
       setError("Lỗi mạng, thử lại");
     }
@@ -82,12 +75,7 @@ export function PrepStage({ projectId }: { projectId: string }) {
         setError(json.message || "Không lưu được");
         return;
       }
-      const d: Record<string, string> = json.done || {};
-      setDone(d);
-      if (next) {
-        const after = PREP_STEPS.find((s) => !d[s.key]);
-        if (after) setSel(after.key);
-      }
+      setDone(json.done || {});
     } catch {
       setError("Lỗi mạng, thử lại");
     } finally {
@@ -97,30 +85,69 @@ export function PrepStage({ projectId }: { projectId: string }) {
 
   const doneCount = PREP_STEPS.filter((s) => done[s.key]).length;
 
-  const treeItem = (key: PrepStepKey, label: string, sub: boolean) => (
-    <button
-      type="button"
-      key={key}
-      className={`pl-dsnode${sub ? " sub" : ""}${sel === key ? " on" : ""}${done[key] ? " ok" : ""}`}
-      onClick={() => setSel(key)}
-    >
-      <span className="dot">{done[key] ? "✓" : ""}</span>
-      <span className="lb">{label}</span>
-      <small className="pl-num">{done[key] ? dateVn(done[key]) : ""}</small>
-    </button>
-  );
+  // File của 1 mục: hồ sơ PDF làm tay (MinIO) hoặc file PDF HĐ thầu phụ.
+  const filesOf = (key: PrepStepKey, label: string) =>
+    key === "thau_phu"
+      ? contracts.flatMap((c) => {
+          const pdf = c.files.find((f) => f.pdf);
+          return pdf ? [{ id: c.id, name: pdf.fileName, url: pdf.url, sub: `${c.code} · ${c.subcontractor}` }] : [];
+        })
+      : docs[key]
+        ? [
+            {
+              id: key,
+              name: `${label}.pdf`,
+              url: `/api/projects/${projectId}/prep/doc/${key}`,
+              sub: `Cập nhật ${dateVn(docs[key])}`,
+            },
+          ]
+        : [];
 
-  const step = PREP_STEPS.find((s) => s.key === sel) || null;
-  const group = step ? PREP_GROUPS.find((g) => g.group === step.group) : null;
-  const groupSize = step
-    ? PREP_STEPS.filter((s) => s.group === step.group).length
-    : 0;
-  const locked = step ? Boolean(done[step.key]) : false;
-  const stepInfo = step ? info[step.key] : undefined;
-  // Mục hồ sơ = file thô làm tay (PDF), không nối số liệu: chưa có file thì trống.
-  // Thầu phụ = file HĐ đính ở hợp đồng; Nhân sự = không file, giữ dòng tóm tắt + nút mở.
-  const isDoc = step ? step.key !== "nhan_su" : false;
-  const docUrl = step ? `/api/projects/${projectId}/prep/doc/${step.key}` : "";
+  // 1 dòng mục: tiêu đề + file (Xem / Tải) ngay bên cạnh + nút chốt. Không có khung chi tiết riêng.
+  const row = (key: PrepStepKey, label: string, path: string, sub: boolean) => {
+    const ok = Boolean(done[key]);
+    const files = filesOf(key, label);
+    return (
+      <div key={key} className={`pl-pr${sub ? " sub" : ""}${ok ? " ok" : ""}`}>
+        <span className="dot">{ok ? "✓" : ""}</span>
+        <div className="pl-pr-main">
+          <div className="pl-pr-t">
+            <b>{label}</b>
+            {ok ? <small>Đã chốt {dateVn(done[key])}</small> : null}
+          </div>
+          {key === "nhan_su" ? (
+            <div className={`pl-pr-info${info[key]?.warn ? " warn" : ""}`}>
+              {info[key]?.text || "…"}{" "}
+              <Link href={`/projects/${projectId}/${path}`}>Mở ›</Link>
+            </div>
+          ) : null}
+          {files.map((f) => (
+            <div className="pl-pr-file" key={f.id}>
+              <span className="pl-fileIc">PDF</span>
+              <span className="pl-fileNm">
+                {f.name}
+                <small>{f.sub}</small>
+              </span>
+              <a className="pl-btn ghost" href={f.url} target="_blank" rel="noreferrer">
+                Xem
+              </a>
+              <a className="pl-btn ghost" href={f.url} download={f.name}>
+                Tải
+              </a>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`pl-btn pl-pr-chot${ok ? " ghost" : ""}`}
+          onClick={() => toggle(key, label)}
+          disabled={busy}
+        >
+          {ok ? "Mở lại" : "✓ Chốt"}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="pl-design">
@@ -133,88 +160,19 @@ export function PrepStage({ projectId }: { projectId: string }) {
           : `Đã chốt ${doneCount}/${PREP_STEPS.length} mục — chốt đủ mới được sang Thi công.`}
       </div>
 
-      <div className="pl-dsgrid">
-        <nav className="pl-dstree">
-          {PREP_GROUPS.map((g) => {
-            const steps = PREP_STEPS.filter((s) => s.group === g.group);
-            if (steps.length === 1) return treeItem(steps[0].key, g.title, false);
-            const allDone = steps.every((s) => done[s.key]);
-            return (
-              <div key={g.group}>
-                <div className={`pl-dsnode head${allDone ? " ok" : ""}`}>
-                  <span className="dot">{allDone ? "✓" : ""}</span>
-                  <span className="lb">{g.title}</span>
-                </div>
-                {steps.map((s) => treeItem(s.key, s.label, true))}
+      <div className="pl-prlist">
+        {PREP_GROUPS.map((g) => {
+          const steps = PREP_STEPS.filter((s) => s.group === g.group);
+          if (steps.length === 1) return row(steps[0].key, g.title, steps[0].path, false);
+          return (
+            <div key={g.group}>
+              <div className={`pl-pr-head${steps.every((s) => done[s.key]) ? " ok" : ""}`}>
+                {g.title}
               </div>
-            );
-          })}
-        </nav>
-
-        {step ? (
-          <section className="pl-dsgroup">
-            <h3>
-              {group && groupSize > 1 ? `${group.title} · ${step.label}` : group?.title}
-            </h3>
-            <div className="pl-dsrow">
-              <div className="pl-dshead">
-                {locked ? (
-                  <span className="pl-dsok">✓ Đã chốt {dateVn(done[step.key])}</span>
-                ) : (
-                  <span />
-                )}
-                <div className="pl-dsact">
-                  {isDoc ? null : (
-                    <Link className="pl-btn ghost" href={`/projects/${projectId}/${step.path}`}>
-                      Mở {step.label} ›
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    className={`pl-btn${locked ? " ghost" : ""}`}
-                    onClick={() => toggle(step.key, step.label)}
-                    disabled={busy}
-                  >
-                    {locked ? "Mở lại" : "✓ Chốt"}
-                  </button>
-                </div>
-              </div>
-              {isDoc ? null : (
-                <div className={`pl-prepinfo${stepInfo?.warn ? " warn" : ""}`}>
-                  {stepInfo?.text || "…"}
-                </div>
-              )}
-              {isDoc && step.key !== "thau_phu" && docs[step.key] ? (
-                <div className="pl-subdoc">
-                  <div className="pl-subdoc-h">
-                    <b>{step.label}</b>
-                    <a href={docUrl} target="_blank" rel="noreferrer">
-                      Mở toàn màn hình ›
-                    </a>
-                  </div>
-                  <iframe className="pl-subdoc-pdf" src={docUrl} title={step.label} />
-                </div>
-              ) : null}
-              {step.key === "thau_phu"
-                ? contracts.map((c) => {
-                    const pdf = c.files.find((f) => f.pdf);
-                    if (!pdf) return null;
-                    return (
-                      <div className="pl-subdoc" key={c.id}>
-                        <div className="pl-subdoc-h">
-                          <b>{c.code}</b> · {c.subcontractor}
-                          <a href={pdf.url} target="_blank" rel="noreferrer">
-                            Mở toàn màn hình ›
-                          </a>
-                        </div>
-                        <iframe className="pl-subdoc-pdf" src={pdf.url} title={pdf.fileName} />
-                      </div>
-                    );
-                  })
-                : null}
+              {steps.map((s) => row(s.key, s.label, s.path, true))}
             </div>
-          </section>
-        ) : null}
+          );
+        })}
       </div>
     </div>
   );
