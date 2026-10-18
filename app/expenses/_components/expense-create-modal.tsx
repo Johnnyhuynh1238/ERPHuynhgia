@@ -44,6 +44,7 @@ export type ExpenseCreatePrefill = Partial<{
   sourceType: string;
   sourceId: string;
   subPaymentId: string;
+  attachmentUrls: string[];
 }>;
 
 type CreatedExpense = { id: string; code: string; status: string; message?: string };
@@ -60,6 +61,10 @@ type Props = {
   projects?: ProjectOption[];
   categories?: CategoryOption[];
   designContracts?: DesignContractOption[];
+  // Chế độ SỬA (admin duyệt): PATCH /api/expenses/[editId] thay vì tạo mới.
+  editId?: string | null;
+  // Lệnh gắn nguồn (mua hàng/thầu phụ/vay…) → khoá "Chi cho" + danh mục khi sửa.
+  editLocked?: boolean;
 };
 
 type CreateForm = {
@@ -133,6 +138,7 @@ function formFromPrefill(prefill: ExpenseCreatePrefill | undefined, categories: 
     sourceType: p.sourceType || "",
     sourceId: p.sourceId || "",
     subPaymentId: p.subPaymentId || "",
+    attachmentUrls: p.attachmentUrls ? [...p.attachmentUrls] : [],
   };
 }
 
@@ -221,8 +227,11 @@ export function ExpenseCreateModal({
   projects = [],
   categories: categoriesProp,
   designContracts = [],
+  editId = null,
+  editLocked = false,
 }: Props) {
   const isKt = role === "accountant";
+  const isEdit = !!editId;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -578,7 +587,8 @@ export function ExpenseCreateModal({
     }
     // Chi thầu phụ: nhiều thầu phụ không có SĐT (flow cũ /pay không bắt) → không chặn.
     // VietQR/Zalo cho kế toán chỉ cần ngân hàng + STK, không cần SĐT người nhận.
-    if (form.sourceType !== "sub_contract" && !form.payeePhone.trim()) {
+    // Sửa lệnh cũ (KT/vay/tạm ứng có thể ko có SĐT) → không bắt.
+    if (!isEdit && form.sourceType !== "sub_contract" && !form.payeePhone.trim()) {
       toast.error("Nhập SĐT người nhận");
       return;
     }
@@ -587,6 +597,37 @@ export function ExpenseCreateModal({
       return;
     }
     setCreating(true);
+    if (isEdit) {
+      const res = await fetch(`/api/expenses/${editId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: form.projectId || null,
+          designContractId: form.designContractId || null,
+          categoryId: form.categoryId,
+          amount: amt,
+          payee: form.payee.trim() || null,
+          payeePhone: form.payeePhone.trim() || null,
+          paymentMethod: form.paymentMethod,
+          priority: form.priority,
+          note: form.note.trim() || null,
+          attachmentUrls: form.attachmentUrls,
+          payeeBankBin: form.payeeBankBin || null,
+          payeeAccountNumber: form.payeeAccountNumber.trim() || null,
+          payeeAccountName: form.payeeAccountName.trim() || null,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { message?: string; expense?: CreatedExpense };
+      setCreating(false);
+      if (!res.ok) {
+        toast.error(j.message || "Không sửa được lệnh chi");
+        return;
+      }
+      toast.success(j.message || "Đã sửa lệnh chi");
+      onCreated?.({ id: j.expense?.id || "", code: j.expense?.code || "", status: j.expense?.status || "", message: j.message });
+      close();
+      return;
+    }
     const res = await fetch("/api/expenses", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -632,7 +673,7 @@ export function ExpenseCreateModal({
       <form className="sheet" onSubmit={submitCreate}>
         <div className="sheet-hd">
           <div>
-            <h3 className="orange">+ Lệnh chi mới</h3>
+            <h3 className="orange">{isEdit ? "✏️ Sửa lệnh chi" : "+ Lệnh chi mới"}</h3>
             <div className="sub">
               Số dư quỹ: {balance == null ? "…" : money(balance)}
               {balanceAfterForm != null && Number(form.amount) > 0
@@ -646,10 +687,10 @@ export function ExpenseCreateModal({
         </div>
 
         <div className="formgrid" style={{ marginBottom: 12 }}>
-          {lockContext ? (
+          {lockContext || (isEdit && editLocked) ? (
             <label className="fld" style={{ marginBottom: 0 }}>
               <span className="lbl">Chi cho hợp đồng</span>
-              <input className="ctrl" value={lockContext} disabled readOnly />
+              <input className="ctrl" value={lockContext || "Gắn nguồn — không đổi được"} disabled readOnly />
             </label>
           ) : (
             <label className="fld" style={{ marginBottom: 0 }}>
@@ -703,6 +744,7 @@ export function ExpenseCreateModal({
                 }
                 setForm({ ...form, categoryId: id });
               }}
+              disabled={isEdit && editLocked}
               required
             >
               <option value="">— Chọn —</option>
@@ -931,14 +973,14 @@ export function ExpenseCreateModal({
           />
         </label>
 
-        {isKt && <div className="kt-note">Lệnh chi do KT tạo sẽ chờ admin duyệt trước khi thanh toán.</div>}
+        {isKt && !isEdit && <div className="kt-note">Lệnh chi do KT tạo sẽ chờ admin duyệt trước khi thanh toán.</div>}
 
         <div className="acts">
           <button className="btn ghost" type="button" onClick={close}>
             Huỷ
           </button>
           <button className="btn primary block" type="submit" disabled={creating}>
-            {creating ? "Đang tạo…" : isKt ? "Gửi admin duyệt" : "Gửi KT thanh toán"}
+            {creating ? (isEdit ? "Đang lưu…" : "Đang tạo…") : isEdit ? "Lưu thay đổi" : isKt ? "Gửi admin duyệt" : "Gửi KT thanh toán"}
           </button>
         </div>
       </form>

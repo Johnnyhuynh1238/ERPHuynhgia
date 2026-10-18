@@ -45,6 +45,11 @@ type Expense = {
   payeeAccountNumber: string | null;
   payeeAccountName: string | null;
   payeeQrUrl: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  subPaymentId: string | null;
+  loanId: string | null;
+  advanceId: string | null;
   project: ProjectOption | null;
   designContractId: string | null;
   designContract: { id: string; customerName: string } | null;
@@ -189,6 +194,8 @@ export function ExpensesClient({
     return () => window.removeEventListener("message", onMsg);
   }, []);
   const [showCreate, setShowCreate] = useState(false);
+  // Admin sửa lệnh chi (chờ duyệt / chờ chi) — dùng lại ExpenseCreateModal chế độ edit.
+  const [editRow, setEditRow] = useState<Expense | null>(null);
   const [createPrefill, setCreatePrefill] = useState<ExpenseCreatePrefill | undefined>(undefined);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -438,6 +445,9 @@ export function ExpensesClient({
       setLinkBusyId(null);
     }
   }
+
+  const canEditRow = (r: Expense) => isAdmin && (r.status === "tptc_pending" || r.status === "pending");
+  const isLinkedRow = (r: Expense) => !!(r.sourceType || r.subPaymentId || r.loanId || r.advanceId);
 
   async function approveExpense(r: Expense) {
     if (!(await confirmDialog(`Duyệt lệnh chi ${r.code}?`))) return;
@@ -791,6 +801,11 @@ export function ExpensesClient({
                           🏦 {r.payeeAccountNumber ? "Sửa STK" : "Thêm STK"}
                         </button>
                       )}
+                      {canEditRow(r) && (
+                        <button className="actbtn a-link" onClick={() => setEditRow(r)}>
+                          ✏️ Sửa
+                        </button>
+                      )}
                       {r.status === "tptc_pending" && isAdmin && (
                         <>
                           <button className="actbtn a-approve" onClick={() => approveExpense(r)}>
@@ -1011,6 +1026,17 @@ export function ExpensesClient({
                     💵 Ghi nhận đã chi
                   </button>
                 )}
+                {canEditRow(dr) && (
+                  <button
+                    className="actbtn a-link"
+                    onClick={() => {
+                      setDetailRow(null);
+                      setEditRow(dr);
+                    }}
+                  >
+                    ✏️ Sửa
+                  </button>
+                )}
                 {dr.status === "tptc_pending" && isAdmin && (
                   <>
                     <button
@@ -1208,6 +1234,50 @@ export function ExpensesClient({
           onCreated={() => { load(); loadBalance(); }}
           role={role}
           prefill={createPrefill}
+          projects={projects}
+          categories={categories}
+          designContracts={designContracts}
+        />
+      )}
+
+      {/* ===== POPUP: Admin sửa lệnh chi (cùng form tạo, chế độ edit) ===== */}
+      {isAdmin && (
+        <ExpenseCreateModal
+          open={!!editRow}
+          onClose={() => setEditRow(null)}
+          onCreated={() => { load(); loadBalance(); }}
+          role={role}
+          editId={editRow?.id ?? null}
+          editLocked={!!editRow && isLinkedRow(editRow)}
+          lockContext={
+            editRow && isLinkedRow(editRow)
+              ? editRow.project
+                ? `${editRow.project.code} — ${editRow.project.name}`
+                : editRow.designContract
+                  ? `TK — ${editRow.designContract.customerName}`
+                  : "Chi chung công ty"
+              : null
+          }
+          prefill={
+            editRow
+              ? {
+                  projectId: editRow.projectId || "",
+                  designContractId: editRow.designContractId || "",
+                  categoryId: editRow.categoryId,
+                  amount: String(editRow.amount),
+                  payee: editRow.payee || "",
+                  payeePhone: editRow.payeePhone || "",
+                  paymentMethod: editRow.paymentMethod === "cash" ? "cash" : "transfer",
+                  priority: editRow.priority,
+                  note: editRow.note || "",
+                  payeeBankBin: editRow.payeeBankBin || "",
+                  payeeAccountNumber: editRow.payeeAccountNumber || "",
+                  payeeAccountName: editRow.payeeAccountName || "",
+                  sourceType: editRow.sourceType || "",
+                  attachmentUrls: attachmentList(editRow),
+                }
+              : undefined
+          }
           projects={projects}
           categories={categories}
           designContracts={designContracts}
