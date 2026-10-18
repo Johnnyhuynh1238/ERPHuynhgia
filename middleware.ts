@@ -105,6 +105,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Link nhiệm vụ Zalo gửi KS hằng ngày (/nv/[token] + /submit: số thợ sáng, báo cáo chiều).
+  // Tự auth bằng token HMAC (loại + KS + ngày) trên URL, hết hạn theo giờ chốt — không gắn session.
+  if (pathname.startsWith("/nv/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Bảng đối chiếu công nợ công khai cho đối tác (NCC / thầu phụ) — để 2 bên chốt sổ.
   // Tự auth bằng publicToken random trên URL, CHỈ ĐỌC, không gắn user.
   if (pathname.startsWith("/doi-tac/")) {

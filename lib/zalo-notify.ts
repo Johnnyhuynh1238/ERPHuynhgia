@@ -55,8 +55,10 @@ export async function sendZaloAccountant(input: {
  * Gửi tin qua bridge tới đích chỉ định: kế toán (mặc định) hoặc "admin" = anh Huỳnh Luận.
  * Hỗ trợ ảnh dạng URL (VietQR/CDN) hoặc base64 (bill đọc từ MinIO — MinIO không public).
  */
-async function sendZaloBridge(input: {
+export async function sendZaloBridge(input: {
   to?: "admin" | "ketoan";
+  /** Gửi thẳng thread Zalo bất kỳ (vd KS 1-1) — ưu tiên hơn `to`. */
+  threadId?: string | null;
   text: string;
   imageUrl?: string | null;
   imageBase64?: string | null;
@@ -72,6 +74,7 @@ async function sendZaloBridge(input: {
       },
       body: JSON.stringify({
         to: input.to || "ketoan",
+        threadId: input.threadId || null,
         text: input.text,
         imageUrl: input.imageUrl || null,
         imageBase64: input.imageBase64 || null,
@@ -88,6 +91,31 @@ async function sendZaloBridge(input: {
   } catch (err) {
     console.error("[zalo-notify] gọi bridge thất bại:", err);
     return false;
+  }
+}
+
+/**
+ * Tra Zalo userId theo SĐT qua bridge (openzca friend find) — để gửi tin 1-1 cho KS
+ * mà không cần KS nhắn đăng ký. null nếu không tìm thấy / bridge lỗi.
+ */
+export async function lookupZaloUserByPhone(phone: string): Promise<string | null> {
+  if (!BRIDGE_URL || !BRIDGE_TOKEN) return null;
+  try {
+    const res = await fetch(`${BRIDGE_URL}/lookup`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${BRIDGE_TOKEN}`,
+      },
+      body: JSON.stringify({ phone }),
+      signal: AbortSignal.timeout(35000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json().catch(() => null)) as { userId?: string | null } | null;
+    return data?.userId && /^\d{5,25}$/.test(data.userId) ? data.userId : null;
+  } catch (err) {
+    console.error("[zalo-notify] lookup Zalo thất bại:", err);
+    return null;
   }
 }
 

@@ -443,6 +443,7 @@ model User {
   isActive           Boolean  @default(true) @map("is_active")
   mustChangePassword Boolean  @default(true) @map("must_change_password")
   avatarUrl          String?  @map("avatar_url")
+  zaloThreadId       String?  @unique @map("zalo_thread_id") // Zalo 1-1 với nick cty (KS nhận nhiệm vụ qua Zalo)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -577,6 +578,7 @@ model User {
   receiptsApproved                 Receipt[]                     @relation("ReceiptApprover")
   cashTransactionsCreated          CashTransaction[]             @relation("CashTransactionCreator")
   acceptanceMilestonesCreated      AcceptanceMilestone[]         @relation("AcceptanceMilestoneCreator")
+  ksDailyReports                   KsDailyReport[]               @relation("KsDailyReportKs")
 
   @@map("users")
 }
@@ -749,6 +751,7 @@ model Project {
   taskDailyAssignments      TaskDailyAssignment[]
   materialProposals         MaterialProposal[]
   constructionDiaries       ConstructionDiary[]
+  ksDailyReports            KsDailyReport[]
   designContract            DesignContract?
   purchaseGuideAdjusts      PurchaseGuideAdjust[]
   projectBudget             ProjectBudget?
@@ -4749,4 +4752,31 @@ model ConstructionTechnique {
 
   @@index([sortOrder])
   @@map("construction_techniques")
+}
+
+/// Nhiệm vụ hằng ngày của KS qua LINK Zalo (không đăng nhập): mỗi `kind` 1 khung giờ.
+///  - headcount: 7:00 gửi link → KS nhập số thợ mọi dự án → hạn 8:00
+///  - eod:       16:00 gửi link → KS báo khối lượng + ảnh mọi dự án → hạn 17:00
+/// 1 dòng / dự án / ngày / kind. status: pending (đã gửi link, chờ báo) | done | expired.
+/// Nội dung báo ghi vào construction_diaries (nhật ký thi công) của ngày đó.
+model KsDailyReport {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  ksId        String    @map("ks_id") @db.Uuid
+  reportDate  DateTime  @map("report_date") @db.Date
+  kind        String    @db.VarChar(20)
+  workerCount Int?      @map("worker_count")
+  status      String    @default("pending") @db.VarChar(20)
+  askedAt     DateTime? @map("asked_at")
+  remindedAt  DateTime? @map("reminded_at")
+  answeredAt  DateTime? @map("answered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ks      User    @relation("KsDailyReportKs", fields: [ksId], references: [id])
+
+  @@unique([projectId, reportDate, kind])
+  @@index([ksId, reportDate, kind])
+  @@map("ks_daily_reports")
 }

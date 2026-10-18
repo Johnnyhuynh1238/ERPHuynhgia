@@ -10,6 +10,7 @@ import { ExpenseStatus, ReceiptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getProjectFinanceSummary } from "@/lib/project-finance-summary";
 import { computeEstimateProgress } from "@/lib/estimate-progress";
+import { headcountSummaryText } from "@/lib/ks-daily-report";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ const HELP =
   "• chi tháng — đã chi tháng này\n" +
   "• thu tháng — đã thu tháng này\n" +
   "• hôm nay — thu/chi hôm nay\n" +
+  "• số thợ — số thợ KS báo sáng nay\n" +
   "• nợ ncc — công nợ nhà cung cấp\n" +
   "• nợ khách — khách còn phải thu\n" +
   "• dự án — đếm dự án đang chạy\n" +
@@ -352,6 +354,8 @@ export async function POST(request: Request) {
       reply = `🔴 Đã chi tháng này: ${fmtVnd(await sumRaw(SQL_CHI_THANG))}`;
     } else if (/(thu thang|da thu thang|thu trong thang)/.test(text)) {
       reply = `🟢 Đã thu tháng này: ${fmtVnd(await sumRaw(SQL_THU_THANG))}`;
+    } else if (/(so tho|tho hom nay|nhan cong)/.test(text)) {
+      reply = (await headcountSummaryText()) || "👷 Hôm nay chưa hỏi số thợ công trình nào.";
     } else if (/(hom nay|hnay|thu chi hom nay|ngay hom nay)/.test(text)) {
       const [chi, thu] = await Promise.all([sumRaw(SQL_CHI_HOMNAY), sumRaw(SQL_THU_HOMNAY)]);
       reply = `📅 Hôm nay:\n• Thu: ${fmtVnd(thu)}\n• Chi: ${fmtVnd(chi)}`;
