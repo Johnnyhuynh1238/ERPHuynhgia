@@ -16,7 +16,7 @@ const ALLOWED: UserRole[] = [
   UserRole.construction_manager,
 ];
 
-// Hướng dẫn mua hàng = phụ lục vật tư HĐ ký với khách (quote_data của HĐ gắn dự án)
+// Hướng dẫn mua hàng = phụ lục vật tư HĐ thi công ký với khách (projects.guide_data, AI soạn tay)
 // + điều chỉnh theo phụ lục (AI ghi thẳng bảng purchase_guide_adjusts, không sửa trên UI).
 // KT: căn cứ mua. Giám sát: căn cứ nhận hàng.
 export default async function HuongDanMuaHangPage({ params }: { params: { id: string } }) {
@@ -32,13 +32,14 @@ export default async function HuongDanMuaHangPage({ params }: { params: { id: st
       code: true,
       name: true,
       customerName: true,
-      designContract: { select: { id: true, signedAt: true, quoteData: true, quoteUpdatedAt: true } },
+      guideData: true,
+      guideBasis: true,
+      guideUpdatedAt: true,
       purchaseGuideAdjusts: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!project) notFound();
 
-  const dc = project.designContract;
   const adjusts: GuideAdjust[] = project.purchaseGuideAdjusts.map((a) => ({
     itemKey: a.itemKey,
     mode: a.mode as GuideMode,
@@ -49,7 +50,7 @@ export default async function HuongDanMuaHangPage({ params }: { params: { id: st
     note: a.note,
     source: a.source,
   }));
-  const guide = dc?.quoteData ? buildPurchaseGuide(dc.quoteData, adjusts) : null;
+  const guide = project.guideData ? buildPurchaseGuide(project.guideData, adjusts) : null;
 
   // Tab "Sắp cần mua": tiến độ DỰ KIẾN theo phần (project_sections, tên = hạng mục HĐ)
   // + đơn mua đã đặt theo hạng mục ngân sách (tên dòng = tên hạng mục, có thể kèm "(...)").
@@ -86,7 +87,7 @@ export default async function HuongDanMuaHangPage({ params }: { params: { id: st
   // Nhóm VT phần thô = nhomVt, có thể gom nhiều PHẦN (VD "MÓNG – KHUNG BÊ TÔNG – XÂY TÔ")
   // → lịch nhóm = từ ngày bắt đầu sớm nhất đến ngày kết thúc muộn nhất của các PHẦN con.
   const phanOf = new Map<string, string[]>();
-  const qd = (dc?.quoteData ?? {}) as { thoPhanBaoGia?: { name?: string; nhomVt?: string }[] };
+  const qd = (project.guideData ?? {}) as { thoPhanBaoGia?: { name?: string; nhomVt?: string }[] };
   for (const ph of Array.isArray(qd.thoPhanBaoGia) ? qd.thoPhanBaoGia : []) {
     const key = (ph.nhomVt || ph.name || "").trim();
     if (!key || !ph.name) continue;
@@ -119,9 +120,8 @@ export default async function HuongDanMuaHangPage({ params }: { params: { id: st
       projectCode={project.code}
       projectName={project.name}
       customerName={project.customerName}
-      contractId={dc?.id ?? null}
-      signedAt={dc?.signedAt ? dc.signedAt.toISOString() : null}
-      quoteUpdatedAt={dc?.quoteUpdatedAt ? dc.quoteUpdatedAt.toISOString() : null}
+      basis={project.guideBasis}
+      quoteUpdatedAt={project.guideUpdatedAt ? project.guideUpdatedAt.toISOString() : null}
       guide={guide}
       schedule={schedule}
       today={today}

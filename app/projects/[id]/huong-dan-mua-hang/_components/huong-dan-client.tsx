@@ -48,8 +48,7 @@ export function HuongDanClient({
   projectCode,
   projectName,
   customerName,
-  contractId,
-  signedAt,
+  basis,
   quoteUpdatedAt,
   guide,
   schedule,
@@ -60,8 +59,7 @@ export function HuongDanClient({
   projectCode: string;
   projectName: string;
   customerName: string | null;
-  contractId: string | null;
-  signedAt: string | null;
+  basis: string | null;
   quoteUpdatedAt: string | null;
   guide: PurchaseGuide | null;
   schedule: SapSchedule[];
@@ -166,8 +164,8 @@ export function HuongDanClient({
         <h1 className="hdm-h1">{projectName}</h1>
         <div className="hdm-meta">
           {customerName ? `Chủ đầu tư: ${customerName} · ` : ""}
-          Căn cứ: phụ lục vật tư HĐ ký {fmtDate(signedAt)}
-          {quoteUpdatedAt ? ` (báo giá cập nhật ${fmtDate(quoteUpdatedAt)})` : ""}
+          Căn cứ: {basis || "—"}
+          {quoteUpdatedAt ? ` (cập nhật ${fmtDate(quoteUpdatedAt)})` : ""}
           {guide ? ` · ${stats.total} vật tư` : ""}
           {stats.kc ? ` · ${stats.kc} khách cấp` : ""}
           {stats.doi ? ` · ${stats.doi} cập nhật theo phụ lục` : ""}
@@ -187,19 +185,8 @@ export function HuongDanClient({
 
         {!guide ? (
           <div className="hdm-empty">
-            {contractId ? (
-              <>Hợp đồng gắn dự án này chưa có báo giá / phụ lục vật tư.</>
-            ) : (
-              <>Dự án chưa gắn hợp đồng có phụ lục vật tư.</>
-            )}{" "}
-            {isAdmin ? (
-              <>
-                Vào <Link href={contractId ? `/admin/contracts/${contractId}` : "/admin/contracts"}>Hợp đồng</Link>{" "}
-                để lập báo giá / gắn dự án — hướng dẫn mua hàng tự lấy từ đó.
-              </>
-            ) : (
-              <>Liên hệ admin để bổ sung.</>
-            )}
+            Chưa có hướng dẫn mua hàng cho dự án này.{" "}
+            {isAdmin ? <>Gửi HĐ thi công + phụ lục cho AI dự toán để soạn và ghi vào.</> : <>Liên hệ admin để bổ sung.</>}
           </div>
         ) : (
           <>

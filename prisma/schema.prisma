@@ -698,6 +698,11 @@ model Project {
   actualEndDate          DateTime?        @map("actual_end_date") @db.Date
   goLiveDate             DateTime?        @map("go_live_date") @db.Date
   customerPortalToken    String?          @unique @map("customer_portal_token") @db.Uuid
+  // HD mua hàng + HD thi công: AI soạn tay từ HĐ thi công rồi ghi thẳng (cùng cấu trúc quote_data cũ:
+  // thoPhanBaoGia / thoHangMuc / hoanThien / khongBaoGom). Không đọc HĐTK nữa.
+  guideData              Json?            @map("guide_data")
+  guideBasis             String?          @map("guide_basis") // VD "HĐ thi công ký 10/10/2026 + PL01"
+  guideUpdatedAt         DateTime?        @map("guide_updated_at")
   customerPortalEnabled  Boolean          @default(true) @map("customer_portal_enabled")
   customerPortalPassword String?          @map("customer_portal_password")
   projectManagerId       String           @map("project_manager_id") @db.Uuid

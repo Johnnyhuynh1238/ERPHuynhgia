@@ -14,7 +14,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "ht", label: "Hoàn thiện" },
 ];
 
-const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
 const pad = (n: number) => String(n).padStart(2, "0");
 const norm = (s: string) =>
   s
@@ -28,8 +27,7 @@ export function HdThiCongClient({
   projectCode,
   projectName,
   customerName,
-  contractId,
-  signedAt,
+  basis,
   guide,
   isAdmin,
   backHref,
@@ -38,8 +36,7 @@ export function HdThiCongClient({
   projectCode: string;
   projectName: string;
   customerName: string;
-  contractId: string | null;
-  signedAt: string | null;
+  basis: string | null;
   guide: ConstructionGuide | null;
   isAdmin: boolean;
   backHref: string;
@@ -124,7 +121,7 @@ export function HdThiCongClient({
         <h1 className="hdm-h1">{projectName}</h1>
         <div className="hdm-meta">
           {customerName ? `Chủ đầu tư: ${customerName} · ` : ""}
-          Căn cứ: HĐ ký {fmtDate(signedAt)}
+          Căn cứ: {basis || "—"}
           {guide ? ` · ${guide.items.length} hạng mục · ${stageCount} điểm dừng nghiệm thu` : ""}
         </div>
 
@@ -141,15 +138,8 @@ export function HdThiCongClient({
 
         {!guide ? (
           <div className="hdm-empty">
-            {contractId ? <>Hợp đồng gắn dự án này chưa có báo giá / phụ lục vật tư.</> : <>Dự án chưa gắn hợp đồng.</>}{" "}
-            {isAdmin ? (
-              <>
-                Vào <Link href={contractId ? `/admin/contracts/${contractId}` : "/admin/contracts"}>Hợp đồng</Link>{" "}
-                để lập báo giá / gắn dự án — HD thi công tự lấy hạng mục từ đó.
-              </>
-            ) : (
-              <>Liên hệ admin để bổ sung.</>
-            )}
+            Chưa có HD thi công cho dự án này.{" "}
+            {isAdmin ? <>Gửi HĐ thi công + phụ lục cho AI dự toán để soạn và ghi vào.</> : <>Liên hệ admin để bổ sung.</>}
           </div>
         ) : (
           <>

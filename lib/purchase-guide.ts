@@ -1,5 +1,5 @@
-// Hướng dẫn mua hàng — dựng từ PHỤ LỤC VẬT TƯ trong báo giá HĐ đã ký với khách
-// (design_contracts.quote_data: thoPhanBaoGia[].vt + hoanThien[].vt/vtGia + khongBaoGom),
+// Hướng dẫn mua hàng — dựng từ PHỤ LỤC VẬT TƯ của HĐ thi công đã ký với khách
+// (projects.guide_data — AI soạn tay từ HĐ thi công: thoPhanBaoGia[].vt + hoanThien[].vt/vtGia + khongBaoGom),
 // rồi chồng điều chỉnh theo phụ lục HĐ (purchase_guide_adjusts). KHÔNG lấy từ dự toán.
 // Không trả giá — KT mua theo chủng loại/quy cách, giám sát đối chiếu khi nhận hàng.
 

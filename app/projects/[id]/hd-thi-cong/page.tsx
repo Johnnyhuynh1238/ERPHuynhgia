@@ -28,7 +28,8 @@ export default async function HdThiCongPage({ params }: { params: { id: string }
       code: true,
       name: true,
       customerName: true,
-      designContract: { select: { id: true, signedAt: true, quoteData: true } },
+      guideData: true,
+      guideBasis: true,
       purchaseGuideAdjusts: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -44,9 +45,8 @@ export default async function HdThiCongPage({ params }: { params: { id: string }
     note: a.note,
     source: a.source,
   }));
-  const dc = project.designContract;
   // điểm dừng + trình tự lấy từ thư viện mẫu Kỹ thuật thi công (tile /ky-thuat-thi-cong)
-  const guide = dc?.quoteData ? buildConstructionGuide(dc.quoteData, adjusts, await loadTechniques()) : null;
+  const guide = project.guideData ? buildConstructionGuide(project.guideData, adjusts, await loadTechniques()) : null;
 
   return (
     <HdThiCongClient
@@ -54,8 +54,7 @@ export default async function HdThiCongPage({ params }: { params: { id: string }
       projectCode={project.code}
       projectName={project.name}
       customerName={project.customerName}
-      contractId={dc?.id ?? null}
-      signedAt={dc?.signedAt ? dc.signedAt.toISOString() : null}
+      basis={project.guideBasis}
       guide={guide}
       isAdmin={role === UserRole.admin}
       backHref={role === UserRole.engineer ? `/ks-ql/project/${project.id}` : `/projects/${project.id}`}

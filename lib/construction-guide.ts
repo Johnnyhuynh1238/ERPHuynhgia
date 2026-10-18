@@ -1,5 +1,5 @@
 // Hướng dẫn thi công & nghiệm thu — tài liệu IN cho giám sát dùng giấy tại công trình.
-// Mỗi hạng mục của HĐ (quote_data: thoPhanBaoGia + hoanThien) = 1 hướng dẫn gồm:
+// Mỗi hạng mục của HĐ (projects.guide_data: thoPhanBaoGia + hoanThien) = 1 hướng dẫn gồm:
 //   phạm vi theo HĐ + vật tư sử dụng (mới nhất theo phụ lục, từ buildPurchaseGuide)
 //   + các điểm dừng nghiệm thu = công tác con của mẫu Kỹ thuật thi công khớp tên hạng mục
 //     (thư viện chung bảng construction_techniques, sửa ở tile /ky-thuat-thi-cong).

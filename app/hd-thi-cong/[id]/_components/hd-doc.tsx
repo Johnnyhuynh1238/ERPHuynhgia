@@ -2,7 +2,6 @@ import type { CgItem, ConstructionGuide } from "@/lib/construction-guide";
 import { PrintBar } from "./print-bar";
 import "./hd-thi-cong.css";
 
-const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
 const pad = (n: number) => String(n).padStart(2, "0");
 
 type Props = {
@@ -10,7 +9,7 @@ type Props = {
   projectName: string;
   customerName: string;
   address: string;
-  signedAt: string | null;
+  basis: string | null;
   plSources: string[];
   guide: ConstructionGuide | null;
   backHref: string;
@@ -59,7 +58,7 @@ export function HdDoc(p: Props) {
                 <tr>
                   <th>Căn cứ</th>
                   <td colSpan={3}>
-                    Hợp đồng thi công ký {fmtDate(p.signedAt)}
+                    {p.basis || "—"}
                     {p.plSources.length ? ` · ${p.plSources.join(" · ")}` : ""}
                   </td>
                 </tr>
