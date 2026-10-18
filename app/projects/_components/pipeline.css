@@ -1147,6 +1147,11 @@
     flex: 1 1 100%;
     min-width: 0;
     padding-left: 30px;
+  }  .pldoc .pl-pr-file {
+    gap: 6px;
+  }
+  .pldoc .pl-pr-file .pl-btn {
+    padding: 6px 9px;
   }
 }
 .pldoc .pl-dstotal {

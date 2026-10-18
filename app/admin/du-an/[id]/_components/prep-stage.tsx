@@ -11,7 +11,7 @@ type SubDoc = {
   title: string;
   subcontractor: string;
   value: number;
-  files: { id: string; fileName: string; pdf: boolean; url: string }[];
+  files: { id: string; fileName: string; pdf: boolean; url: string; shareUrl: string }[];
 };
 
 function dateVn(iso: string) {
@@ -83,6 +83,19 @@ export function PrepStage({ projectId }: { projectId: string }) {
     }
   };
 
+  // Sao chép link công khai HĐ thầu phụ để gửi bên B đọc.
+  const [copied, setCopied] = useState("");
+  const copyLink = async (id: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Sao chép link gửi bên B:", url);
+      return;
+    }
+    setCopied(id);
+    setTimeout(() => setCopied((c) => (c === id ? "" : c)), 2000);
+  };
+
   const doneCount = PREP_STEPS.filter((s) => done[s.key]).length;
 
   // File của 1 mục: hồ sơ PDF làm tay (MinIO) hoặc file PDF HĐ thầu phụ.
@@ -90,7 +103,9 @@ export function PrepStage({ projectId }: { projectId: string }) {
     key === "thau_phu"
       ? contracts.flatMap((c) => {
           const pdf = c.files.find((f) => f.pdf);
-          return pdf ? [{ id: c.id, name: pdf.fileName, url: pdf.url, sub: `${c.code} · ${c.subcontractor}` }] : [];
+          return pdf
+            ? [{ id: c.id, name: pdf.fileName, url: pdf.url, shareUrl: pdf.shareUrl, sub: `${c.code} · ${c.subcontractor}` }]
+            : [];
         })
       : docs[key]
         ? [
@@ -99,6 +114,7 @@ export function PrepStage({ projectId }: { projectId: string }) {
               name: `${label}.pdf`,
               url: `/api/projects/${projectId}/prep/doc/${key}`,
               sub: `Cập nhật ${dateVn(docs[key])}`,
+              shareUrl: "",
             },
           ]
         : [];
@@ -134,6 +150,11 @@ export function PrepStage({ projectId }: { projectId: string }) {
               <a className="pl-btn ghost" href={f.url} download={f.name}>
                 Tải
               </a>
+              {f.shareUrl ? (
+                <button type="button" className="pl-btn ghost" onClick={() => copyLink(f.id, f.shareUrl)}>
+                  {copied === f.id ? "✓ Đã chép" : "🔗 Link"}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>

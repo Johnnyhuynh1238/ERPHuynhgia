@@ -111,6 +111,11 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // File HĐ thầu phụ công khai cho bên B đọc (/hd/<fileId>.<hmac>), CHỈ ĐỌC, không gắn user.
+  if (pathname.startsWith("/hd/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Bảng đối chiếu công nợ công khai cho đối tác (NCC / thầu phụ) — để 2 bên chốt sổ.
   // Tự auth bằng publicToken random trên URL, CHỈ ĐỌC, không gắn user.
   if (pathname.startsWith("/doi-tac/")) {

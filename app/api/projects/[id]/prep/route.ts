@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/estimate";
 import { buildBudgetPlan } from "@/lib/budget-plan";
 import { PREP_STEPS } from "@/lib/prep-steps";
 import { listPrepDocs } from "@/lib/prep-docs";
+import { subContractFileShareUrl } from "@/lib/sub-contract-share";
 
 // Màn GĐ 5 Chuẩn bị: tóm tắt từng mục checklist + ngày chốt (project_pipelines.prep_done).
 export async function GET(
@@ -107,6 +108,7 @@ export async function GET(
       fileName: f.fileName,
       pdf: f.fileType === "application/pdf",
       url: `/api/sub-contracts/${c.id}/files/${f.id}/file`,
+      shareUrl: subContractFileShareUrl(f.id),
     })),
   }));
 
