@@ -5,6 +5,14 @@ import { useCallback, useEffect, useState } from "react";
 import { PREP_GROUPS, PREP_STEPS, type PrepStepKey } from "@/lib/prep-steps";
 
 type Info = Record<string, { text: string; warn?: boolean }>;
+type SubDoc = {
+  id: string;
+  code: string;
+  title: string;
+  subcontractor: string;
+  value: number;
+  files: { id: string; fileName: string; pdf: boolean; url: string }[];
+};
 
 function dateVn(iso: string) {
   return new Date(iso).toLocaleDateString("vi-VN", {
@@ -18,6 +26,8 @@ function dateVn(iso: string) {
 export function PrepStage({ projectId }: { projectId: string }) {
   const [done, setDone] = useState<Record<string, string>>({});
   const [info, setInfo] = useState<Info>({});
+  const [contracts, setContracts] = useState<SubDoc[]>([]);
+  const [docs, setDocs] = useState<Record<string, string>>({});
   const [sel, setSel] = useState<PrepStepKey | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,6 +45,8 @@ export function PrepStage({ projectId }: { projectId: string }) {
       const d: Record<string, string> = json.done || {};
       setDone(d);
       setInfo(json.info || {});
+      setContracts(json.contracts || []);
+      setDocs(json.docs || {});
       // Mở sẵn mục đầu tiên chưa chốt.
       setSel(
         (cur) =>
@@ -105,6 +117,10 @@ export function PrepStage({ projectId }: { projectId: string }) {
     : 0;
   const locked = step ? Boolean(done[step.key]) : false;
   const stepInfo = step ? info[step.key] : undefined;
+  // Mục hồ sơ = file thô làm tay (PDF), không nối số liệu: chưa có file thì trống.
+  // Thầu phụ = file HĐ đính ở hợp đồng; Nhân sự = không file, giữ dòng tóm tắt + nút mở.
+  const isDoc = step ? step.key !== "nhan_su" : false;
+  const docUrl = step ? `/api/projects/${projectId}/prep/doc/${step.key}` : "";
 
   return (
     <div className="pl-design">
@@ -148,12 +164,11 @@ export function PrepStage({ projectId }: { projectId: string }) {
                   <span />
                 )}
                 <div className="pl-dsact">
-                  <Link
-                    className="pl-btn ghost"
-                    href={`/projects/${projectId}/${step.path}`}
-                  >
-                    Mở {step.label} ›
-                  </Link>
+                  {isDoc ? null : (
+                    <Link className="pl-btn ghost" href={`/projects/${projectId}/${step.path}`}>
+                      Mở {step.label} ›
+                    </Link>
+                  )}
                   <button
                     type="button"
                     className={`pl-btn${locked ? " ghost" : ""}`}
@@ -164,9 +179,39 @@ export function PrepStage({ projectId }: { projectId: string }) {
                   </button>
                 </div>
               </div>
-              <div className={`pl-prepinfo${stepInfo?.warn ? " warn" : ""}`}>
-                {stepInfo?.text || "…"}
-              </div>
+              {isDoc ? null : (
+                <div className={`pl-prepinfo${stepInfo?.warn ? " warn" : ""}`}>
+                  {stepInfo?.text || "…"}
+                </div>
+              )}
+              {isDoc && step.key !== "thau_phu" && docs[step.key] ? (
+                <div className="pl-subdoc">
+                  <div className="pl-subdoc-h">
+                    <b>{step.label}</b>
+                    <a href={docUrl} target="_blank" rel="noreferrer">
+                      Mở toàn màn hình ›
+                    </a>
+                  </div>
+                  <iframe className="pl-subdoc-pdf" src={docUrl} title={step.label} />
+                </div>
+              ) : null}
+              {step.key === "thau_phu"
+                ? contracts.map((c) => {
+                    const pdf = c.files.find((f) => f.pdf);
+                    if (!pdf) return null;
+                    return (
+                      <div className="pl-subdoc" key={c.id}>
+                        <div className="pl-subdoc-h">
+                          <b>{c.code}</b> · {c.subcontractor}
+                          <a href={pdf.url} target="_blank" rel="noreferrer">
+                            Mở toàn màn hình ›
+                          </a>
+                        </div>
+                        <iframe className="pl-subdoc-pdf" src={pdf.url} title={pdf.fileName} />
+                      </div>
+                    );
+                  })
+                : null}
             </div>
           </section>
         ) : null}

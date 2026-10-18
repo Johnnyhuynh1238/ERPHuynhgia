@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
 import { buildBudgetPlan } from "@/lib/budget-plan";
 import { PREP_STEPS } from "@/lib/prep-steps";
+import { listPrepDocs } from "@/lib/prep-docs";
 
 // Màn GĐ 5 Chuẩn bị: tóm tắt từng mục checklist + ngày chốt (project_pipelines.prep_done).
 export async function GET(
@@ -25,7 +26,7 @@ export async function GET(
   if (!project)
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
-  const [pipe, gvRows, plan, subs, adjusts] = await Promise.all([
+  const [pipe, gvRows, plan, subs, adjusts, docs] = await Promise.all([
     prisma.projectPipeline.findUnique({
       where: { projectId: params.id },
       select: { prepDone: true },
@@ -45,9 +46,21 @@ export async function GET(
     buildBudgetPlan(params.id),
     prisma.subContract.findMany({
       where: { projectId: params.id, status: { not: SubContractStatus.cancelled } },
-      select: { contractValue: true },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        contractValue: true,
+        subcontractor: { select: { name: true } },
+        files: {
+          orderBy: { uploadedAt: "desc" },
+          select: { id: true, fileName: true, fileType: true },
+        },
+      },
     }),
     prisma.purchaseGuideAdjust.count({ where: { projectId: params.id } }),
+    listPrepDocs(params.id).catch(() => ({}) as Record<string, string>),
   ]);
 
   const money = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
@@ -82,9 +95,26 @@ export async function GET(
     },
   };
 
+  // Mục ③: đính thẳng file HĐ thầu phụ (PDF) để đọc ngay trong checklist.
+  const contracts = subs.map((c) => ({
+    id: c.id,
+    code: c.code,
+    title: c.title,
+    subcontractor: c.subcontractor.name,
+    value: Number(c.contractValue),
+    files: c.files.map((f) => ({
+      id: f.id,
+      fileName: f.fileName,
+      pdf: f.fileType === "application/pdf",
+      url: `/api/sub-contracts/${c.id}/files/${f.id}/file`,
+    })),
+  }));
+
   return NextResponse.json({
     done: (pipe?.prepDone || {}) as Record<string, string>,
     info,
+    contracts,
+    docs,
   });
 }
 
