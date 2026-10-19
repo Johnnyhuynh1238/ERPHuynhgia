@@ -3,7 +3,7 @@ import { Download, FileText } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout } from "@/app/ks-ql/sub/_components/sub-layout";
-import { findKsProject, ksDesignGroupWhere, ksDocWhere } from "@/lib/ks-ql-project-docs";
+import { findKsProject, ksDocWhere } from "@/lib/ks-ql-project-docs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ function fmtDate(d: Date) {
   return d.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// Hồ sơ dự án cho KS: file PDF + ảnh thiết kế admin đã cấp quyền — bấm xem, nút tải về.
+// Hồ sơ dự án cho KS: file PDF admin đã cấp quyền (bấm xem, nút tải) + toàn bộ ảnh 3D của dự án.
 export default async function KsProjectDocsPage({ params }: { params: { projectId: string } }) {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
@@ -39,7 +39,7 @@ export default async function KsProjectDocsPage({ params }: { params: { projectI
       orderBy: [{ category: "asc" }, { uploadedAt: "desc" }],
     }),
     prisma.designPhotoGroup.findMany({
-      where: { projectId: project.id, photos: { some: {} }, ...ksDesignGroupWhere(user.id) },
+      where: { projectId: project.id, photos: { some: {} } },
       select: {
         id: true,
         title: true,
