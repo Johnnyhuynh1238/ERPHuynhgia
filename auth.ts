@@ -5,8 +5,9 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
+// Ô đăng nhập nhận email HOẶC số điện thoại (users.phone). Field vẫn tên "email" để khỏi đổi form/next-auth.
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(1),
   password: z.string().min(1),
 });
 
@@ -44,6 +45,19 @@ function recordLoginFail(email: string) {
   }
 }
 
+// SĐT: bỏ ký tự thừa, +84/84 → 0. Chỉ nhận khi đúng 1 user active khớp (trùng số → từ chối).
+async function findActiveUserByPhone(input: string) {
+  let digits = input.replace(/[^\d]/g, "");
+  if (digits.startsWith("84") && digits.length === 11) digits = `0${digits.slice(2)}`;
+  if (!/^0\d{9}$/.test(digits)) return null;
+  const rest = digits.slice(1);
+  const users = await prisma.user.findMany({
+    where: { isActive: true, phone: { in: [digits, `84${rest}`, `+84${rest}`] } },
+    take: 2,
+  });
+  return users.length === 1 ? users[0] : null;
+}
+
 function clearLoginAttempts(email: string) {
   loginAttempts.delete(email);
 }
@@ -74,7 +88,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (isLoginBlocked(normalizedEmail)) return null;
 
-        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+        const user = normalizedEmail.includes("@")
+          ? await prisma.user.findUnique({ where: { email: normalizedEmail } })
+          : await findActiveUserByPhone(normalizedEmail);
 
         if (!user || !user.isActive) {
           recordLoginFail(normalizedEmail);

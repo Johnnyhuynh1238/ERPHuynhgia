@@ -10,7 +10,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 
 const loginSchema = z.object({
-  email: z.string().trim().email("Email không hợp lệ"),
+  email: z.string().trim().min(1, "Nhập email hoặc số điện thoại"),
   password: z.string().min(1, "Vui lòng nhập mật khẩu"),
 });
 
@@ -47,7 +47,7 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
 
     if (!result || result.error) {
       toast.error("Đăng nhập thất bại", {
-        description: "Email hoặc mật khẩu không đúng.",
+        description: "Tài khoản hoặc mật khẩu không đúng.",
       });
       return;
     }
@@ -62,17 +62,18 @@ export function LoginForm({ callbackUrl, hasCredentialError }: LoginFormProps) {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       {hasCredentialError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          Email hoặc mật khẩu không đúng.
+          Tài khoản hoặc mật khẩu không đúng.
         </div>
       ) : null}
 
       <div className="space-y-1">
         <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-          Email
+          Email hoặc số điện thoại
         </label>
         <input
           id="email"
-          type="email"
+          type="text"
+          inputMode="email"
           className="w-full rounded-md border px-3 py-2 text-sm outline-none ring-orange-400/50 focus:ring-2"
           {...form.register("email")}
         />

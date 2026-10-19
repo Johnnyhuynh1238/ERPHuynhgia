@@ -14,7 +14,6 @@ export default async function DiaryPage({ params }: { params: { projectId: strin
   const project = await prisma.project.findFirst({
     where: {
       id: params.projectId,
-      laborMode: "subcontract",
       memberAssignments: { some: { userId: user.id, role: "pm_engineer" } },
     },
     select: { id: true, name: true, customerName: true },

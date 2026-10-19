@@ -5,6 +5,7 @@ import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { getReportProjectsForUser } from "@/lib/reporting";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { KS_QL_ENGINEER_IDS } from "@/lib/ks-ql-engineers";
 import { getTodayDateVn } from "@/lib/task-centric";
 
 function startOfTodayUtc() {
@@ -410,8 +411,8 @@ export async function GET() {
   }
 
   if (user.role === UserRole.engineer) {
-    // KS Phúc (DA-2026-002 a Ngân — giao khoán) đi flow /ks-ql/sub, không vào dashboard cũ.
-    if (user.id === "aa42319b-e694-4be2-bae0-faef83601ab5") {
+    // KS màn gọn (lib/ks-ql-engineers) đi flow /ks-ql/sub, không vào dashboard cũ.
+    if (KS_QL_ENGINEER_IDS.has(user.id)) {
       return NextResponse.json({ role: user.role, landing: "/ks-ql/sub" });
     }
     const projectAccess = buildProjectAccessWhere({ id: user.id, role: user.role });

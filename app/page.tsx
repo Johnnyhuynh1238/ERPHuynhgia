@@ -3,6 +3,7 @@ import { ProtectedLayout } from "@/components/protected-layout";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { RouteToast } from "./_components/route-toast";
 import { DashboardLoaderClient } from "./_components/dashboard-loader-client";
+import { KS_QL_ENGINEER_IDS } from "@/lib/ks-ql-engineers";
 
 type HomePageProps = {
   searchParams?: {
@@ -10,8 +11,6 @@ type HomePageProps = {
   };
 };
 
-// KS Phúc (DA-2026-002 a Ngân — giao khoán) đi flow /ks-ql/sub — mirror /api/dashboard.
-const KS_QL_ENGINEER_IDS = new Set(["aa42319b-e694-4be2-bae0-faef83601ab5"]);
 
 export const revalidate = 60;
 

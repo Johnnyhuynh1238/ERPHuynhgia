@@ -10,7 +10,7 @@ export default async function SubLandingPage() {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
 
-  // Lấy các dự án subcontract mà user này là member (pm_engineer).
+  // Lấy các dự án user này là KS phụ trách (pm_engineer) — cả giao khoán lẫn tự làm.
   const memberRows = await prisma.projectMemberAssignment.findMany({
     where: { userId: user.id, role: "pm_engineer" },
     select: { projectId: true },
@@ -18,7 +18,7 @@ export default async function SubLandingPage() {
   const projectIds = memberRows.map((r) => r.projectId);
   const projects = projectIds.length
     ? await prisma.project.findMany({
-        where: { id: { in: projectIds }, laborMode: "subcontract" },
+        where: { id: { in: projectIds } },
         select: { id: true, name: true, customerName: true, address: true },
         orderBy: { startDate: "desc" },
       })
@@ -30,7 +30,7 @@ export default async function SubLandingPage() {
 
   if (projects.length === 0) {
     return (
-      <SubLayout title="Chọn dự án" subtitle="Chưa có dự án giao khoán nào được gán cho anh">
+      <SubLayout title="Chọn dự án" subtitle="Chưa có dự án nào được gán cho anh">
         <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] px-5 py-8 text-center text-base text-[#8892b0]">
           Liên hệ TPTC để được gán dự án.
         </div>

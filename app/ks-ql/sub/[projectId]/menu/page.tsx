@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { Package, HardHat, BookOpen, FileSignature } from "lucide-react";
+import { FolderOpen, HardHat, BookOpen, FileSignature } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
@@ -13,7 +13,6 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
   const project = await prisma.project.findFirst({
     where: {
       id: params.projectId,
-      laborMode: "subcontract",
       memberAssignments: { some: { userId: user.id, role: "pm_engineer" } },
     },
     select: { id: true, name: true, customerName: true },
@@ -26,10 +25,10 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
       subtitle={`Chủ nhà: ${project.customerName}`}
     >
       <BigCard
-        icon={<Package className="h-8 w-8" />}
-        title="VẬT TƯ"
-        subtitle="Đề xuất · Nhận · Kiểm kê"
-        href={`/ks-ql/sub/${project.id}/material`}
+        icon={<FolderOpen className="h-8 w-8" />}
+        title="HỒ SƠ DỰ ÁN"
+        subtitle="Bản vẽ thi công · Phối cảnh 3D"
+        href={`/ks-ql/sub/${project.id}/ho-so`}
       />
       <BigCard
         icon={<HardHat className="h-8 w-8" />}
