@@ -69,7 +69,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
       },
     }),
     prisma.projectDocument.findMany({
-      where: { projectId: project.id, visibleToCustomer: true },
+      where: { projectId: project.id, visibleToCustomer: true, isCurrent: true },
       orderBy: { uploadedAt: "desc" },
       take: 50,
       select: { id: true, title: true, category: true, fileName: true, fileSize: true, uploadedAt: true, designStep: true },

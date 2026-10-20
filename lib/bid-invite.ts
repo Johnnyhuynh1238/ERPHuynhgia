@@ -118,12 +118,16 @@ async function fileEntry(id: string, title: string, key: string | null): Promise
   return IMAGE_EXT.has(ext) ? { id, title, pages: 1 } : null;
 }
 
-// Bản vẽ = hồ sơ dự án loại drawing (GĐ 4 tải lên), phối cảnh = nhóm ảnh 3D, HĐ mẫu = Tài liệu chung đã chọn.
+// Bản vẽ = hồ sơ dự án thuộc nhóm bật quyền Thầu phụ (mặc định nhóm Bản vẽ) + file GĐ 4, phối cảnh = nhóm ảnh 3D, HĐ mẫu = Tài liệu chung đã chọn.
 export async function loadBidAssets(projectId: string | null, docKeys: string[]): Promise<BidAssets> {
   const [docs, photos] = projectId
     ? await Promise.all([
         prisma.projectDocument.findMany({
-          where: { projectId, OR: [{ category: "drawing" }, { designStep: { not: null } }] },
+          where: {
+            projectId,
+            isCurrent: true,
+            OR: [{ accessMode: "group", group: { permSubcontractor: true } }, { designStep: { not: null } }],
+          },
           orderBy: [{ uploadedAt: "asc" }],
           select: { id: true, title: true, fileUrl: true },
         }),

@@ -740,6 +740,7 @@ model Project {
   subContracts              SubContract[]
   tptcAssignments           TptcAssignment[]
   documents                 ProjectDocument[]
+  docGroups                 ProjectDocGroup[]
   aiAnalysisCaches          ProjectAiAnalysisCache[]
   designPhotoGroups         DesignPhotoGroup[]
   staffNotifications        StaffNotification[]
@@ -1551,15 +1552,57 @@ model ProjectDocument {
   visibleToCustomer Boolean                 @default(false) @map("visible_to_customer")
   // GĐ 4 Thiết kế: mat_bang | kien_truc | ket_cau | dien_nuoc; null = hồ sơ thường
   designStep        String?                 @map("design_step") @db.VarChar(20)
+  // Nhóm hồ sơ theo chức năng (trigger DB tự xếp theo category khi insert thiếu group_id)
+  groupId           String?                 @map("group_id") @db.Uuid
+  subfolder         String?                 @db.VarChar(60)
+  // approved | pending | signed | reference; null = chưa đánh dấu
+  status            String?                 @db.VarChar(20)
+  // group = xem theo quyền nhóm; custom = chỉ người được cấp riêng (accessList)
+  accessMode        String                  @default("group") @map("access_mode") @db.VarChar(10)
+  // Phiên bản: bản mới trỏ về bản gốc (V1); chỉ bản isCurrent hiện ngoài cổng khách / mời thầu
+  versionOfId       String?                 @map("version_of_id") @db.Uuid
+  versionNo         Int                     @default(1) @map("version_no")
+  isCurrent         Boolean                 @default(true) @map("is_current")
 
   project    Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   uploader   User                    @relation("ProjectDocumentUploader", fields: [uploadedBy], references: [id])
   accessList ProjectDocumentAccess[]
+  group      ProjectDocGroup?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  versionOf  ProjectDocument?        @relation("ProjectDocumentVersions", fields: [versionOfId], references: [id], onDelete: SetNull)
+  versions   ProjectDocument[]       @relation("ProjectDocumentVersions")
 
   @@index([projectId, category])
   @@index([projectId, uploadedAt])
   @@index([projectId, visibleToCustomer])
+  @@index([groupId])
+  @@index([versionOfId])
   @@map("project_documents")
+}
+
+// Nhóm hồ sơ dự án. projectId null = nhóm mẫu (copy sang dự án mới qua ensure_project_doc_groups()).
+model ProjectDocGroup {
+  id                String            @id @default(uuid()) @db.Uuid
+  projectId         String?           @map("project_id") @db.Uuid
+  // ban_ve | hd_chu_nha | hd_thau_phu | hd_giam_sat | hd_ke_toan; null = nhóm admin tự tạo
+  systemKey         String?           @map("system_key") @db.VarChar(30)
+  name              String
+  icon              String            @default("📁") @db.VarChar(16)
+  description       String?
+  subfolders        Json              @default("[]")
+  displayOrder      Int               @default(0) @map("display_order")
+  permEngineer      Boolean           @default(false) @map("perm_engineer")
+  permAccountant    Boolean           @default(false) @map("perm_accountant")
+  permSubcontractor Boolean           @default(false) @map("perm_subcontractor")
+  permCustomer      Boolean           @default(false) @map("perm_customer")
+  createdBy         String?           @map("created_by") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  project   Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documents ProjectDocument[]
+
+  @@index([projectId, displayOrder])
+  @@map("project_doc_groups")
 }
 
 model ProjectDocumentAccess {

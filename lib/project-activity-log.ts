@@ -58,6 +58,7 @@ export type LogEntity =
   | "project_member"
   | "project_drawing"
   | "project_document"
+  | "project_doc_group"
   | "project_phase"
   | "task"
   | "task_attachment"

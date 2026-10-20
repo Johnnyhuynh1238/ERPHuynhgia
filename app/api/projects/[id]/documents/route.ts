@@ -5,7 +5,17 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { putObjectToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
-import { buildDocumentVisibilityWhere, sha256Hex } from "@/lib/project-document-permissions";
+import { sha256Hex } from "@/lib/project-document-permissions";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import {
+  CAD_EXTENSIONS,
+  DOC_STATUSES,
+  categoryForGroup,
+  customerVisibleByGroup,
+  ensureProjectDocGroups,
+  fileExtension,
+  loadProjectDocsView,
+} from "@/lib/project-doc-groups";
 import { logProjectActivity } from "@/lib/project-activity-log";
 import { designStepLabel, isDesignStep } from "@/lib/design-steps";
 
@@ -14,8 +24,6 @@ export const runtime = "nodejs";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const categorySchema = z.nativeEnum(ProjectDocumentCategory);
 
-// File CAD/nén chỉ để lưu trữ + tải về: không bật khách xem, không render ảnh ở link mời thầu.
-const CAD_EXTENSIONS = new Set(["dwg", "dxf", "dwf", "rvt", "skp", "zip", "rar", "7z"]);
 const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg", ...Array.from(CAD_EXTENSIONS)]);
 
 function authError(error: unknown) {
@@ -29,15 +37,6 @@ function safeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "document";
 }
 
-function fileExtension(name: string) {
-  const match = name.toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match?.[1] || "";
-}
-
-function fileViewUrl(projectId: string, docId: string) {
-  return `/api/projects/${projectId}/documents/${docId}/file`;
-}
-
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   let current;
   try {
@@ -46,64 +45,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return authError(error);
   }
 
-  const project = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true } });
+  const project = await prisma.project.findFirst({
+    where: { id: params.id, ...buildProjectAccessWhere({ id: current.id, role: current.role }) },
+    select: { id: true },
+  });
   if (!project) return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
-  const isAdmin = current.role === "admin";
-
-  const baseSelect = {
-    id: true,
-    title: true,
-    category: true,
-    fileName: true,
-    fileSize: true,
-    mimeType: true,
-    uploadedBy: true,
-    uploadedAt: true,
-    visibleToCustomer: true,
-    uploader: { select: { id: true, fullName: true } },
-  } as const;
-
-  const documents = isAdmin
-    ? await prisma.projectDocument.findMany({
-        where: { projectId: params.id },
-        select: {
-          ...baseSelect,
-          accessList: {
-            select: { user: { select: { id: true, fullName: true, role: true } } },
-          },
-        },
-        orderBy: { uploadedAt: "desc" },
-      })
-    : await prisma.projectDocument.findMany({
-        where: {
-          projectId: params.id,
-          ...buildDocumentVisibilityWhere({ id: current.id, role: current.role }),
-        },
-        select: baseSelect,
-        orderBy: { uploadedAt: "desc" },
-      });
-
-  const result = documents.map((doc) => {
-    const accessList = "accessList" in doc
-      ? (doc.accessList as Array<{ user: { id: string; fullName: string; role: string } }>)
-      : undefined;
-    return {
-      id: doc.id,
-      title: doc.title,
-      category: doc.category,
-      fileName: doc.fileName,
-      fileSize: doc.fileSize,
-      mimeType: doc.mimeType,
-      uploader: doc.uploader,
-      uploadedAt: doc.uploadedAt,
-      visibleToCustomer: doc.visibleToCustomer,
-      viewUrl: fileViewUrl(params.id, doc.id),
-      grantedUsers: accessList ? accessList.map((a) => a.user) : undefined,
-    };
-  });
-
-  return NextResponse.json({ documents: result });
+  const data = await loadProjectDocsView(params.id, { id: current.id, role: current.role });
+  return NextResponse.json(data);
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -139,38 +88,115 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Chỉ hỗ trợ PDF/DOC/DOCX/XLS/XLSX/PNG/JPG/DWG/DXF/RVT/SKP/ZIP/RAR" }, { status: 400 });
   }
 
+  // Màn Hồ sơ dự án gửi groupId/subfolder/status; replaceId = tải bản mới thay cho 1 hồ sơ (lên phiên bản).
+  const groupIdRaw = String(formData.get("groupId") || "").trim();
+  const subfolderRaw = String(formData.get("subfolder") || "").trim().slice(0, 60);
+  const statusRaw = String(formData.get("status") || "").trim();
+  const replaceIdRaw = String(formData.get("replaceId") || "").trim();
+  if (statusRaw && !(DOC_STATUSES as readonly string[]).includes(statusRaw)) {
+    return NextResponse.json({ message: "Trạng thái không hợp lệ" }, { status: 400 });
+  }
+
+  const replaced = replaceIdRaw
+    ? await prisma.projectDocument.findFirst({
+        where: { id: replaceIdRaw, projectId: params.id },
+        select: {
+          id: true, versionOfId: true, groupId: true, subfolder: true, status: true, accessMode: true,
+          category: true, designStep: true, visibleToCustomer: true, title: true,
+          accessList: { select: { userId: true } },
+        },
+      })
+    : null;
+  if (replaceIdRaw && !replaced) return NextResponse.json({ message: "Không tìm thấy hồ sơ cần thay" }, { status: 404 });
+
+  let group: { id: string; systemKey: string | null; permCustomer: boolean } | null = null;
+  const targetGroupId = replaced ? replaced.groupId : groupIdRaw || null;
+  if (targetGroupId) {
+    await ensureProjectDocGroups(params.id);
+    group = await prisma.projectDocGroup.findFirst({
+      where: { id: targetGroupId, projectId: params.id },
+      select: { id: true, systemKey: true, permCustomer: true },
+    });
+    if (!group) return NextResponse.json({ message: "Nhóm hồ sơ không hợp lệ" }, { status: 400 });
+  }
+
   const id = randomUUID();
   const key = `projects/${params.id}/documents/${id}_${safeFilename(file.name)}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const contentHash = sha256Hex(buffer);
   await putObjectToMinio({ key, body: buffer, contentType: file.type || "application/octet-stream" });
 
-  const doc = await prisma.projectDocument.create({
-    data: {
-      id,
-      projectId: params.id,
-      title: titleRaw || file.name,
-      category: parsedCategory.data,
-      fileUrl: `minio://${key}`,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type || "application/octet-stream",
-      contentHash,
-      uploadedBy: current.id,
-      designStep,
-      visibleToCustomer: designStep !== null && !CAD_EXTENSIONS.has(ext),
-    },
-    select: {
-      id: true,
-      title: true,
-      category: true,
-      fileName: true,
-      fileSize: true,
-      mimeType: true,
-      uploadedAt: true,
-      visibleToCustomer: true,
-      uploader: { select: { id: true, fullName: true } },
-    },
+  const accessMode = replaced?.accessMode ?? "group";
+  const category = replaced
+    ? replaced.category
+    : group
+      ? categoryForGroup(group.systemKey, parsedCategory.data)
+      : parsedCategory.data;
+  const effectiveDesignStep = replaced ? replaced.designStep : designStep;
+  const isCad = CAD_EXTENSIONS.has(ext);
+  let visibleToCustomer: boolean;
+  if (effectiveDesignStep) visibleToCustomer = !isCad;
+  else if (accessMode === "custom") visibleToCustomer = !!replaced?.visibleToCustomer && !isCad;
+  else visibleToCustomer = customerVisibleByGroup(group, file.name);
+
+  const rootId = replaced ? replaced.versionOfId ?? replaced.id : null;
+
+  const doc = await prisma.$transaction(async (tx) => {
+    let versionNo = 1;
+    if (rootId) {
+      const agg = await tx.projectDocument.aggregate({
+        where: { OR: [{ id: rootId }, { versionOfId: rootId }] },
+        _max: { versionNo: true },
+      });
+      versionNo = (agg._max.versionNo ?? 1) + 1;
+      // Bản cũ: giữ để đối chiếu, ẩn khỏi cổng khách / mời thầu.
+      await tx.projectDocument.updateMany({
+        where: { OR: [{ id: rootId }, { versionOfId: rootId }] },
+        data: { isCurrent: false, visibleToCustomer: false },
+      });
+    }
+    const created = await tx.projectDocument.create({
+      data: {
+        id,
+        projectId: params.id,
+        title: titleRaw || replaced?.title || file.name,
+        category,
+        fileUrl: `minio://${key}`,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        contentHash,
+        uploadedBy: current.id,
+        designStep: effectiveDesignStep,
+        visibleToCustomer,
+        groupId: group?.id ?? null,
+        subfolder: replaced ? replaced.subfolder : subfolderRaw || null,
+        status: statusRaw || replaced?.status || null,
+        accessMode,
+        versionOfId: rootId,
+        versionNo,
+        isCurrent: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        uploadedAt: true,
+        visibleToCustomer: true,
+        versionNo: true,
+        uploader: { select: { id: true, fullName: true } },
+      },
+    });
+    if (replaced && replaced.accessList.length > 0) {
+      await tx.projectDocumentAccess.createMany({
+        data: replaced.accessList.map((a) => ({ documentId: id, userId: a.userId, grantedBy: current.id })),
+        skipDuplicates: true,
+      });
+    }
+    return created;
   });
 
   await logProjectActivity(prisma, {
@@ -179,12 +205,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     entity: "project_document",
     entityId: doc.id,
     action: "upload",
-    summary: `Upload hồ sơ "${doc.title}"${designStep ? ` – thiết kế ${designStepLabel(designStep)}` : ""} (${doc.category}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
-    metadata: { title: doc.title, category: doc.category, fileName: file.name, fileSize: file.size, mimeType: doc.mimeType },
+    summary: `Upload hồ sơ "${doc.title}"${replaced ? ` – phiên bản V${doc.versionNo}` : ""}${effectiveDesignStep ? ` – thiết kế ${designStepLabel(effectiveDesignStep)}` : ""} (${doc.category}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
+    metadata: { title: doc.title, category: doc.category, fileName: file.name, fileSize: file.size, mimeType: doc.mimeType, versionNo: doc.versionNo },
   });
 
   return NextResponse.json({
-    document: { ...doc, viewUrl: fileViewUrl(params.id, doc.id), grantedUsers: [] },
-    message: "Đã upload hồ sơ",
+    document: { ...doc, viewUrl: `/api/projects/${params.id}/documents/${doc.id}/file`, grantedUsers: [] },
+    message: replaced ? `Đã tải phiên bản V${doc.versionNo}` : "Đã upload hồ sơ",
   });
 }

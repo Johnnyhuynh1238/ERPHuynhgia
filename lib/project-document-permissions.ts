@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { docVisibilityWhere } from "@/lib/project-doc-groups";
+import { buildProjectAccessWhere } from "@/lib/project-permissions";
 
 export type DocumentViewer = {
   id: string;
@@ -31,24 +33,20 @@ export function canViewProjectDocumentSync(
 
 export async function canViewProjectDocument(viewer: DocumentViewer, documentId: string) {
   if (viewer.role === UserRole.admin) return true;
-  const access = await prisma.projectDocumentAccess.findUnique({
-    where: { documentId_userId: { documentId, userId: viewer.id } },
+  const doc = await prisma.projectDocument.findFirst({
+    where: { id: documentId, ...docVisibilityWhere({ id: viewer.id, role: String(viewer.role) }) },
+    select: { projectId: true, uploadedBy: true, accessList: { where: { userId: viewer.id }, select: { id: true } } },
+  });
+  if (!doc) return false;
+  if (doc.uploadedBy === viewer.id || doc.accessList.length > 0) return true;
+  // Xem theo quyền nhóm → phải là thành viên dự án.
+  const member = await prisma.project.findFirst({
+    where: { id: doc.projectId, ...buildProjectAccessWhere({ id: viewer.id, role: String(viewer.role) }) },
     select: { id: true },
   });
-  if (access) return true;
-  const doc = await prisma.projectDocument.findUnique({
-    where: { id: documentId },
-    select: { uploadedBy: true },
-  });
-  return !!doc && doc.uploadedBy === viewer.id;
+  return !!member;
 }
 
 export function buildDocumentVisibilityWhere(viewer: DocumentViewer) {
-  if (viewer.role === UserRole.admin) return {};
-  return {
-    OR: [
-      { uploadedBy: viewer.id },
-      { accessList: { some: { userId: viewer.id } } },
-    ],
-  };
+  return docVisibilityWhere({ id: viewer.id, role: String(viewer.role) });
 }
