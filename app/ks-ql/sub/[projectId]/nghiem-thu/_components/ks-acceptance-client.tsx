@@ -40,10 +40,12 @@ export function KsAcceptanceClient({
   projectId,
   userId,
   group = "chu_nha",
+  initialOpen,
 }: {
   projectId: string;
   userId: string;
   group?: "chu_nha" | "thau_phu";
+  initialOpen?: string; // từ nhắc việc "BB sắp tới" → mở sẵn card này
 }) {
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,16 +66,19 @@ export function KsAcceptanceClient({
       // Lần đầu mở sẵn đợt đang chờ đầu tiên.
       if (!opened.current) {
         opened.current = true;
-        const first = list.find((m) => m.status !== "signed");
+        const first = list.find((m) => m.id === initialOpen) ?? list.find((m) => m.status !== "signed");
         setOpen(first?.id ?? null);
         setOpenDot(first ? dotOf(first) : null);
+        if (first && first.id === initialOpen) {
+          setTimeout(() => document.getElementById(`ms-${first.id}`)?.scrollIntoView({ block: "start" }), 50);
+        }
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
-  }, [projectId, group]);
+  }, [projectId, group, initialOpen]);
 
   useEffect(() => {
     void load();
@@ -229,6 +234,7 @@ export function KsAcceptanceClient({
           <Fragment key={m.id}>
           {header}
           <div
+            id={`ms-${m.id}`}
             className={`rounded-2xl border-2 ${done ? "border-[#34d399]/50 bg-[#152418]" : "border-[#ff8a3d]/40 bg-[#1a1d2e]"}`}
           >
             <button

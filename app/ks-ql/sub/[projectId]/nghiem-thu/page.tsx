@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 
 // Nghiệm thu cho KS màn gọn: admin tạo sẵn các đợt (mốc) ở /projects/[id]/acceptance,
 // KS chỉ tải BB giấy đã ký + ảnh công trình cho từng đợt (dùng chung API photos).
-export default async function KsAcceptancePage({ params }: { params: { projectId: string } }) {
+export default async function KsAcceptancePage({
+  params,
+  searchParams,
+}: {
+  params: { projectId: string };
+  searchParams: { open?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
 
@@ -17,7 +23,7 @@ export default async function KsAcceptancePage({ params }: { params: { projectId
 
   return (
     <SubLayout title="Nghiệm thu chủ nhà" subtitle={project.name} backHref={`/ks-ql/sub/${project.id}/menu`}>
-      <KsAcceptanceClient projectId={project.id} userId={user.id} />
+      <KsAcceptanceClient projectId={project.id} userId={user.id} initialOpen={searchParams.open} />
     </SubLayout>
   );
 }

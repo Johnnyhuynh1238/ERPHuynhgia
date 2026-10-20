@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
+import { UpcomingAcceptance } from "@/app/ks-ql/sub/_components/upcoming-acceptance";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default async function SubLandingPage() {
           href={`/ks-ql/sub/${p.id}/menu`}
         />
       ))}
+      <UpcomingAcceptance projects={projects} />
     </SubLayout>
   );
 }

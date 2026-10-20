@@ -3,6 +3,7 @@ import { FolderOpen, BookOpen, FileSignature, ClipboardCheck } from "lucide-reac
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
+import { UpcomingAcceptance } from "@/app/ks-ql/sub/_components/upcoming-acceptance";
 
 export const dynamic = "force-dynamic";
 
@@ -51,9 +52,10 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
       <BigCard
         icon={<ClipboardCheck className="h-8 w-8" />}
         title="NGHIỆM THU THẦU PHỤ"
-        subtitle="Các đợt thanh toán đội khoán · Up biên bản đã ký + ảnh"
+        subtitle="Biên bản công tác đội khoán · Up biên bản đã ký + ảnh"
         href={`/ks-ql/sub/${project.id}/nghiem-thu-thau-phu`}
       />
+      <UpcomingAcceptance projects={[project]} />
     </SubLayout>
   );
 }

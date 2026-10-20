@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 
 // Nghiệm thu thầu phụ (đội khoán): các đợt thanh toán theo Phụ lục 03 HĐ khoán, mỗi đợt kèm
 // BB công tác NT-xx phải ký đạt. KS + tổ trưởng ký giấy, KS up BB + ảnh. Không hiện cổng CN.
-export default async function KsSubAcceptancePage({ params }: { params: { projectId: string } }) {
+export default async function KsSubAcceptancePage({
+  params,
+  searchParams,
+}: {
+  params: { projectId: string };
+  searchParams: { open?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
 
@@ -17,7 +23,7 @@ export default async function KsSubAcceptancePage({ params }: { params: { projec
 
   return (
     <SubLayout title="Nghiệm thu thầu phụ" subtitle={project.name} backHref={`/ks-ql/sub/${project.id}/menu`}>
-      <KsAcceptanceClient projectId={project.id} userId={user.id} group="thau_phu" />
+      <KsAcceptanceClient projectId={project.id} userId={user.id} initialOpen={searchParams.open} group="thau_phu" />
     </SubLayout>
   );
 }
