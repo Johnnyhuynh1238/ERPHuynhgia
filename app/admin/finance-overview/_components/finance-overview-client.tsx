@@ -85,6 +85,7 @@ export function FinanceOverviewClient() {
           </button>
         </div>
 
+        <BriefModule />
         <SpendModule theme={theme} />
         <FinanceModules theme={theme} />
       </div>
@@ -674,6 +675,53 @@ function OverheadEditor({ items, monthly, onChanged }: { items: OverheadItem[]; 
 }
 
 const LEVEL_ICON: Record<CompanyFinance["insights"][number]["level"], string> = { bad: "!", warn: "▲", info: "i", good: "✓" };
+
+type Brief = { id: string; asOf: string; headline: string; items: CompanyFinance["insights"]; createdAt: string };
+
+/* ── Nhận định: bản AI soạn khi anh hỏi cập nhật tình hình, chọn xem bản cũ ── */
+function BriefModule() {
+  const [list, setList] = useState<Brief[] | null>(null);
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    fetch("/api/admin/finance-overview/briefs", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<Brief[]>) : []))
+      .then(setList)
+      .catch(() => setList([]));
+  }, []);
+  if (!list?.length) return null;
+  const b = list[Math.min(idx, list.length - 1)];
+  return (
+    <section className="fo-mod">
+      <div className="fo-mod-head">
+        <h2 className="fo-h2">Nhận định</h2>
+        {list.length > 1 ? (
+          <select className="fo-brief-sel" value={idx} onChange={(e) => setIdx(Number(e.target.value))} aria-label="Chọn bản nhận định">
+            {list.map((x, i) => (
+              <option key={x.id} value={i}>
+                {i === 0 ? "Mới nhất · " : ""}
+                {fmtDay(x.asOf)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="fo-sub">cập nhật {fmtDay(b.asOf)}</div>
+        )}
+      </div>
+      <div className="fo-brief-hl">{b.headline}</div>
+      <div className="fo-ins">
+        {b.items.map((x, i) => (
+          <div key={i} className={`fo-in ${x.level}`}>
+            <span className="ic">{LEVEL_ICON[x.level] ?? "i"}</span>
+            <div>
+              <div className="t">{x.title}</div>
+              <div className="d">{x.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function InsightModule({ data }: { data: CompanyFinance }) {
   return (

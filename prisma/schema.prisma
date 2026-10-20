@@ -3893,6 +3893,18 @@ model CompanyOverheadItem {
   @@map("company_overhead_items")
 }
 
+// Nhận định tài chính AI soạn (items = [{level,title,detail}]), màn Tài chính tổng quan hiện bản mới nhất.
+model FinanceBrief {
+  id        String   @id @default(uuid()) @db.Uuid
+  asOf      DateTime @map("as_of") @db.Date
+  headline  String   @db.Text
+  items     Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("finance_briefs")
+}
+
 /// Danh mục chi (admin quản lý). Vật tư / Máy móc / Văn phòng …
 model ExpenseCategory {
   id        String   @id @default(uuid()) @db.Uuid

@@ -144,3 +144,8 @@
 .fo-oh-add input,.fo-oh-add select{border-color:var(--line2);background:var(--card)}
 @media(max-width:520px){.fo-oh-add{grid-template-columns:minmax(0,1fr) 78px}.fo-oh-add select{grid-column:1}.fo-oh-add button{grid-column:2}}
 .fo-oh-total{display:flex;justify-content:space-between;font-weight:600;font-size:14px;padding:4px 2px}
+
+/* Nhận định (AI soạn) */
+.fo-brief-hl{margin-top:10px;font-size:14px;font-weight:500;line-height:1.5;white-space:pre-line}
+.fo-brief-sel{background:var(--card);border:1px solid var(--line2);border-radius:9px;color:var(--text);font:inherit;font-size:12px;padding:5px 8px}
+.fo-in .d{white-space:pre-line}
