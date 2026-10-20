@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
+import { notAdminOnlyGroupWhere } from "@/lib/project-doc-groups";
 import { getObjectFromMinio } from "@/lib/minio";
 import { companyDocFileName, fileExtension, isCompanyDocKey } from "@/lib/company-docs";
 
@@ -127,6 +128,7 @@ export async function loadBidAssets(projectId: string | null, docKeys: string[])
             projectId,
             isCurrent: true,
             OR: [{ accessMode: "group", group: { permSubcontractor: true } }, { designStep: { not: null } }],
+            ...notAdminOnlyGroupWhere,
           },
           orderBy: [{ uploadedAt: "asc" }],
           select: { id: true, title: true, fileUrl: true },

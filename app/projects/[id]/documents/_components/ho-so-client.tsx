@@ -10,6 +10,7 @@ import { plexMono, plexSans } from "@/lib/fonts";
 import {
   DOC_STATUSES,
   DOC_STATUS_LABEL,
+  isAdminOnlyGroup,
   type DocGroupDto,
   type DocStatus,
   type ProjectDocDto,
@@ -451,6 +452,7 @@ export function HoSoClient({
                   <div className="perm">
                     <span className="hint" style={{ marginRight: 2 }}>Ai xem được:</span>
                     <span className="chip">Admin</span>
+                    {isAdminOnlyGroup(active.systemKey) ? <span className="hint">chỉ admin — kỹ sư, kế toán, thầu phụ không xem được</span> : null}
                     <span className={`chip ${active.permEngineer ? "" : "off"}`}>Kỹ sư</span>
                     <span className={`chip ${active.permAccountant ? "" : "off"}`}>Kế toán</span>
                     <span className={`chip ${active.permSubcontractor ? "" : "off"}`}>Thầu phụ</span>
@@ -769,6 +771,7 @@ function GroupModal({
   });
   const [newSub, setNewSub] = useState("");
   const [saving, setSaving] = useState(false);
+  const adminOnly = isAdminOnlyGroup(editing?.systemKey);
   const set = <K extends keyof GroupForm>(k: K, v: GroupForm[K]) => setF((p) => ({ ...p, [k]: v }));
   function addSub() {
     const s = newSub.trim();
@@ -824,11 +827,12 @@ function GroupModal({
             <label>Ai được xem file trong nhóm</label>
             <div className="ck">
               <label><input type="checkbox" checked disabled /> Admin</label>
-              <label><input type="checkbox" checked={f.permEngineer} onChange={(e) => set("permEngineer", e.target.checked)} /> Kỹ sư giám sát</label>
-              <label><input type="checkbox" checked={f.permAccountant} onChange={(e) => set("permAccountant", e.target.checked)} /> Kế toán</label>
-              <label><input type="checkbox" checked={f.permSubcontractor} onChange={(e) => set("permSubcontractor", e.target.checked)} /> Thầu phụ (link mời thầu)</label>
+              <label><input type="checkbox" checked={f.permEngineer} disabled={adminOnly} onChange={(e) => set("permEngineer", e.target.checked)} /> Kỹ sư giám sát</label>
+              <label><input type="checkbox" checked={f.permAccountant} disabled={adminOnly} onChange={(e) => set("permAccountant", e.target.checked)} /> Kế toán</label>
+              <label><input type="checkbox" checked={f.permSubcontractor} disabled={adminOnly} onChange={(e) => set("permSubcontractor", e.target.checked)} /> Thầu phụ (link mời thầu)</label>
               <label><input type="checkbox" checked={f.permCustomer} onChange={(e) => set("permCustomer", e.target.checked)} /> Chủ nhà (cổng khách)</label>
             </div>
+            {adminOnly ? <p className="hint" style={{ marginTop: 6 }}>Nhóm hợp đồng chủ nhà: chỉ admin xem, không mở cho kỹ sư / kế toán / thầu phụ (kể cả cấp riêng từng file).</p> : null}
             <p className="hint" style={{ marginTop: 6 }}>File mới vào nhóm tự hưởng quyền này. Từng file vẫn đặt quyền riêng được. File CAD không bao giờ hiện cho chủ nhà.</p>
           </div>
           {!editing ? (
@@ -976,6 +980,7 @@ function DocModal({
   const g = groups.find((x) => x.id === groupId);
   const ft = fileType(doc.fileName);
   const cad = CAD_EXT.has(ext(doc.fileName));
+  const docAdminOnly = isAdminOnlyGroup(groups.find((x) => x.id === doc.groupId)?.systemKey);
   const dirty = title.trim() !== doc.title || groupId !== (doc.groupId ?? "") || subfolder !== (doc.subfolder ?? "");
 
   async function save() {
@@ -1027,6 +1032,9 @@ function DocModal({
 
           <div className="f">
             <span className="flbl">Quyền xem</span>
+            {docAdminOnly ? (
+              <p className="hint">Nhóm hợp đồng chủ nhà: chỉ admin xem{doc.visibleToCustomer ? " + chủ nhà" : ""}. Kỹ sư, kế toán, thầu phụ không xem được.</p>
+            ) : (<>
             <div className="seg">
               <button
                 type="button"
@@ -1048,6 +1056,7 @@ function DocModal({
                 : `Chỉ admin + ${doc.grantedUsers?.length ? doc.grantedUsers.map((u) => u.fullName).join(", ") : "người tải lên"}${doc.visibleToCustomer ? " + chủ nhà" : ""}.`}
               {doc.accessMode === "custom" ? <> <button type="button" className="linkbtn" onClick={() => onAccess(doc)} style={{ color: "var(--terra)" }}>chọn người</button></> : null}
             </p>
+            </>)}
             <div className="ck one" style={{ marginTop: 8 }}>
               <label style={{ opacity: cad ? 0.5 : 1 }}>
                 <input

@@ -5,10 +5,10 @@ import { prisma } from "@/lib/prisma";
 // Nhóm hồ sơ dự án theo chức năng. 5 nhóm gốc (system_key) + nhóm admin tự tạo.
 // Nhóm mẫu (project_id NULL) được copy sang dự án qua hàm DB ensure_project_doc_groups().
 export {
-  SYSTEM_GROUP_KEYS, DOC_STATUSES, DOC_STATUS_LABEL, CAD_EXTENSIONS, fileExtension, isCadFile,
+  ADMIN_ONLY_GROUP_KEYS, isAdminOnlyGroup, SYSTEM_GROUP_KEYS, DOC_STATUSES, DOC_STATUS_LABEL, CAD_EXTENSIONS, fileExtension, isCadFile,
 } from "./project-doc-groups-shared";
 export type { SystemGroupKey, DocStatus, DocGroupDto, ProjectDocDto } from "./project-doc-groups-shared";
-import { isCadFile, type DocGroupDto, type ProjectDocDto } from "./project-doc-groups-shared";
+import { ADMIN_ONLY_GROUP_KEYS, isCadFile, type DocGroupDto, type ProjectDocDto } from "./project-doc-groups-shared";
 
 export async function ensureProjectDocGroups(projectId: string) {
   await prisma.$executeRaw`SELECT ensure_project_doc_groups(${projectId}::uuid)`;
@@ -21,6 +21,11 @@ export function groupPermFlagForRole(role: string): "permEngineer" | "permAccoun
   return null;
 }
 
+// Loại file thuộc nhóm chỉ-admin (file không nhóm vẫn giữ).
+export const notAdminOnlyGroupWhere: Prisma.ProjectDocumentWhereInput = {
+  NOT: { group: { is: { systemKey: { in: ADMIN_ONLY_GROUP_KEYS } } } },
+};
+
 // Hồ sơ người không phải admin xem được: tự tải lên, được cấp riêng, hoặc file theo nhóm mà role được xem.
 // Lưu ý: chỉ lọc ở cấp file — caller phải tự giới hạn dự án user là thành viên.
 export function docVisibilityWhere(viewer: { id: string; role: string }): Prisma.ProjectDocumentWhereInput {
@@ -31,7 +36,7 @@ export function docVisibilityWhere(viewer: { id: string; role: string }): Prisma
     { accessList: { some: { userId: viewer.id } } },
   ];
   if (flag) or.push({ accessMode: "group", group: { [flag]: true } });
-  return { OR: or };
+  return { AND: [{ OR: or }, notAdminOnlyGroupWhere] };
 }
 
 // Đổi nhóm → category đi theo (category vẫn được AI dự án / link mời thầu / cổng khách đọc).

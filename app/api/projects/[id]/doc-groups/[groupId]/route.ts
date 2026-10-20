@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { CAD_EXTENSIONS, groupFieldsSchema, toDocGroupDto } from "@/lib/project-doc-groups";
+import { CAD_EXTENSIONS, groupFieldsSchema, isAdminOnlyGroup, toDocGroupDto } from "@/lib/project-doc-groups";
 import { logProjectActivity } from "@/lib/project-activity-log";
 
 export const runtime = "nodejs";
@@ -32,6 +32,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const data = { ...parsed.data };
   if (data.subfolders) data.subfolders = Array.from(new Set(data.subfolders));
+  // Nhóm chỉ-admin: không mở cho kỹ sư / kế toán / thầu phụ.
+  if (isAdminOnlyGroup(group.systemKey)) {
+    if (data.permEngineer) data.permEngineer = false;
+    if (data.permAccountant) data.permAccountant = false;
+    if (data.permSubcontractor) data.permSubcontractor = false;
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const row = await tx.projectDocGroup.update({ where: { id: group.id }, data });

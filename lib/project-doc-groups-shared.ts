@@ -4,6 +4,13 @@ import type { ProjectDocumentCategory } from "@prisma/client";
 export const SYSTEM_GROUP_KEYS = ["ban_ve", "hd_chu_nha", "hd_thau_phu", "hd_giam_sat", "hd_ke_toan"] as const;
 export type SystemGroupKey = (typeof SYSTEM_GROUP_KEYS)[number];
 
+// Nhóm chỉ admin xem (kỹ sư / kế toán / thầu phụ không bao giờ thấy, kể cả cấp quyền riêng từng file).
+// Chủ nhà vẫn bật/tắt được qua cổng khách (HĐ của chính họ).
+export const ADMIN_ONLY_GROUP_KEYS: string[] = ["hd_chu_nha"];
+export function isAdminOnlyGroup(systemKey: string | null | undefined) {
+  return !!systemKey && ADMIN_ONLY_GROUP_KEYS.indexOf(systemKey) >= 0;
+}
+
 export const DOC_STATUSES = ["approved", "pending", "signed", "reference"] as const;
 export type DocStatus = (typeof DOC_STATUSES)[number];
 export const DOC_STATUS_LABEL: Record<DocStatus, string> = {
