@@ -17,15 +17,16 @@ async function findAccessibleProject(userId: string, role: string, projectId: st
   });
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
 
   const project = await findAccessibleProject(user.id, user.role, params.id);
   if (!project) return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
+  const kind = new URL(req.url).searchParams.get("kind") === "thau_phu" ? "thau_phu" : "chu_nha";
   const milestones = await prisma.acceptanceMilestone.findMany({
-    where: { projectId: params.id },
+    where: { projectId: params.id, kind },
     orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -55,6 +56,7 @@ const createSchema = z.object({
   seq: z.number().int().min(1).max(999),
   title: z.string().trim().min(3, "Tên mốc quá ngắn").max(300),
   description: z.string().trim().max(3000).optional(),
+  kind: z.enum(["chu_nha", "thau_phu"]).optional(),
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -76,6 +78,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       seq: parsed.data.seq,
       title: parsed.data.title,
       description: parsed.data.description || null,
+      kind: parsed.data.kind ?? "chu_nha",
       createdBy: user.id,
     },
   });

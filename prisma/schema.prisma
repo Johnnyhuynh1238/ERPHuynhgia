@@ -4255,6 +4255,8 @@ model AcceptanceMilestone {
   id           String                    @id @default(uuid()) @db.Uuid
   projectId    String                    @map("project_id") @db.Uuid
   seq          Int
+  // chu_nha = nghiệm thu với chủ nhà (hiện cổng CN); thau_phu = KS nghiệm thu đội khoán (chỉ nội bộ).
+  kind         String                    @default("chu_nha") @db.VarChar(20)
   title        String
   description  String?                   @db.Text
   status       AcceptanceMilestoneStatus @default(pending)

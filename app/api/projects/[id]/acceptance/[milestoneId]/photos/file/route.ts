@@ -26,11 +26,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string; 
   const photo = findAcceptanceStaffFile(milestone, key);
   if (!photo) return NextResponse.json({ message: "Không tìm thấy file" }, { status: 404 });
 
+  // ?download=1 → tải về máy (giữ tên file gốc), mặc định mở xem inline.
+  const download = req.nextUrl.searchParams.get("download") === "1";
+  const disposition = download
+    ? `attachment; filename="file.${photo.contentType === "application/pdf" ? "pdf" : "jpg"}"; filename*=UTF-8''${encodeURIComponent(photo.name || "file")}`
+    : "inline";
+
   const { buffer, contentType } = await getObjectFromMinio(photo.key);
   return new Response(buffer as BodyInit, {
     headers: {
       "Content-Type": photo.contentType || contentType || "image/jpeg",
-      "Content-Disposition": "inline",
+      "Content-Disposition": disposition,
       "Cache-Control": "private, max-age=300",
     },
   });

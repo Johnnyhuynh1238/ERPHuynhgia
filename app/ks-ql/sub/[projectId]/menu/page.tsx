@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { FolderOpen, BookOpen, FileSignature } from "lucide-react";
+import { FolderOpen, BookOpen, FileSignature, ClipboardCheck } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
@@ -19,10 +19,16 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
   });
   if (!project) notFound();
 
+  // Có từ 2 dự án mới cho quay lại danh sách (1 dự án thì /ks-ql/sub tự chuyển thẳng vào đây).
+  const projectCount = await prisma.projectMemberAssignment.count({
+    where: { userId: user.id, role: "pm_engineer" },
+  });
+
   return (
     <SubLayout
       title={project.name}
       subtitle={`Chủ nhà: ${project.customerName}`}
+      backHref={projectCount > 1 ? "/ks-ql/sub" : undefined}
     >
       <BigCard
         icon={<FolderOpen className="h-8 w-8" />}
@@ -38,9 +44,15 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
       />
       <BigCard
         icon={<FileSignature className="h-8 w-8" />}
-        title="NGHIỆM THU"
-        subtitle="Các đợt nghiệm thu · Up biên bản đã ký + ảnh"
+        title="NGHIỆM THU CHỦ NHÀ"
+        subtitle="Các đợt nghiệm thu với chủ nhà · Up biên bản đã ký + ảnh"
         href={`/ks-ql/sub/${project.id}/nghiem-thu`}
+      />
+      <BigCard
+        icon={<ClipboardCheck className="h-8 w-8" />}
+        title="NGHIỆM THU THẦU PHỤ"
+        subtitle="Các đợt thanh toán đội khoán · Up biên bản đã ký + ảnh"
+        href={`/ks-ql/sub/${project.id}/nghiem-thu-thau-phu`}
       />
     </SubLayout>
   );

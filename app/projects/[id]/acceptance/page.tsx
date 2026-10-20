@@ -16,7 +16,13 @@ const statusLabel: Record<ProjectStatus, string> = {
 };
 
 // Màn tài liệu toàn màn (nền ngà, header riêng) — khung tối của project layout bị ẩn (HideOnEstimate).
-export default async function ProjectAcceptancePage({ params }: { params: { id: string } }) {
+export default async function ProjectAcceptancePage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { kind?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) redirect("/login");
 
@@ -50,6 +56,7 @@ export default async function ProjectAcceptancePage({ params }: { params: { id: 
       canManage={canManage}
       userId={user.id}
       backHref={backHref}
+      group={searchParams.kind === "thau_phu" ? "thau_phu" : "chu_nha"}
     />
   );
 }

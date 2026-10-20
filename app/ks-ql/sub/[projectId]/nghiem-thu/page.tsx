@@ -16,7 +16,7 @@ export default async function KsAcceptancePage({ params }: { params: { projectId
   if (!project) notFound();
 
   return (
-    <SubLayout title="Nghiệm thu" subtitle={project.name} backHref={`/ks-ql/sub/${project.id}/menu`}>
+    <SubLayout title="Nghiệm thu chủ nhà" subtitle={project.name} backHref={`/ks-ql/sub/${project.id}/menu`}>
       <KsAcceptanceClient projectId={project.id} userId={user.id} />
     </SubLayout>
   );

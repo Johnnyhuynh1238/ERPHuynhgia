@@ -194,7 +194,7 @@ async function buildProjectReport(projectId: string): Promise<string> {
       WHERE sc.project_id = ${projectId}::uuid AND sp.status = 'paid'`,
     prisma.$queryRaw<{ total: number; signed: number }[]>`
       SELECT count(*)::int total, count(*) FILTER (WHERE status='signed')::int signed
-      FROM acceptance_milestones WHERE project_id = ${projectId}::uuid`,
+      FROM acceptance_milestones WHERE project_id = ${projectId}::uuid AND kind = 'chu_nha'`,
     prisma.$queryRaw<{ n: number }[]>`
       SELECT count(*)::int n FROM construction_diaries WHERE project_id = ${projectId}::uuid`,
     prisma.$queryRaw<{ name: string; amount: number }[]>`

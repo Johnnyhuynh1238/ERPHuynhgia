@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
   if (!key) return NextResponse.json({ message: "Thiếu key" }, { status: 400 });
 
   const milestone = await prisma.acceptanceMilestone.findFirst({
-    where: { id: params.milestoneId, projectId: access.project.id },
+    where: { id: params.milestoneId, projectId: access.project.id, kind: "chu_nha" },
     select: { bienBanPhotos: true, sitePhotos: true },
   });
   const photo = milestone ? findAcceptancePhoto(milestone, key) : undefined;

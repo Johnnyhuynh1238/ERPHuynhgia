@@ -49,12 +49,14 @@ export function AcceptanceManageClient({
   canManage,
   userId,
   backHref,
+  group = "chu_nha",
 }: {
   projectId: string;
   project: ProjectInfo;
   canManage: boolean;
   userId: string;
   backHref: string;
+  group?: "chu_nha" | "thau_phu";
 }) {
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +90,7 @@ export function AcceptanceManageClient({
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/projects/${projectId}/acceptance`, { cache: "no-store" });
+      const r = await fetch(`/api/projects/${projectId}/acceptance?kind=${group}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.message || "Lỗi tải dữ liệu");
       setRows(j.milestones);
@@ -97,7 +99,7 @@ export function AcceptanceManageClient({
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, group]);
 
   useEffect(() => {
     void load();
@@ -163,6 +165,7 @@ export function AcceptanceManageClient({
         seq: Number(form.seq),
         title: form.title.trim(),
         description: form.description.trim() || undefined,
+        ...(panel === "new" ? { kind: group } : {}),
       };
       const editing = panel && panel !== "new" ? panel : null;
       const url = editing
@@ -348,7 +351,26 @@ export function AcceptanceManageClient({
           </div>
         </div>
 
-        <div className="eyebrow">Nghiệm thu · {project.code}</div>
+        <div style={{ display: "flex", gap: 8, margin: "4px 0 10px" }}>
+          <Link
+            href={`/projects/${projectId}/acceptance`}
+            className={`iconbtn${group === "chu_nha" ? " pri" : ""}`}
+            style={{ width: "auto", padding: "0 12px" }}
+          >
+            Chủ nhà
+          </Link>
+          <Link
+            href={`/projects/${projectId}/acceptance?kind=thau_phu`}
+            className={`iconbtn${group === "thau_phu" ? " pri" : ""}`}
+            style={{ width: "auto", padding: "0 12px" }}
+          >
+            Thầu phụ
+          </Link>
+        </div>
+
+        <div className="eyebrow">
+          Nghiệm thu {group === "thau_phu" ? "thầu phụ" : "chủ nhà"} · {project.code}
+        </div>
         <h1>{project.name}</h1>
         <div className="meta">
           {project.customerName ? (
@@ -371,8 +393,9 @@ export function AcceptanceManageClient({
             <i style={{ width: `${rows.length ? (signedCount / rows.length) * 100 : 0}%` }} />
           </div>
           <div className="tot-m">
-            Ký giấy tại công trình → chụp BB đã ký đưa lên mốc → mốc thành “Đã nghiệm thu”. Chủ nhà chỉ thấy BB đã ký +
-            ảnh công trình.
+            {group === "thau_phu"
+              ? "KS + tổ trưởng đội khoán ký BB công tác → KS chụp BB đã ký đưa lên đợt → đợt đủ điều kiện thanh toán. Chỉ nội bộ, chủ nhà không thấy."
+              : "Ký giấy tại công trình → chụp BB đã ký đưa lên mốc → mốc thành “Đã nghiệm thu”. Chủ nhà chỉ thấy BB đã ký + ảnh công trình."}
           </div>
         </div>
 

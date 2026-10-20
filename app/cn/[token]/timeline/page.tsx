@@ -48,7 +48,7 @@ export default async function CustomerTimelinePage({ params }: { params: { token
   }
 
   const acceptanceMilestones = await prisma.acceptanceMilestone.findMany({
-    where: { projectId: project.id },
+    where: { projectId: project.id, kind: "chu_nha" },
     orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
     select: { id: true, seq: true, title: true, status: true, signedAt: true },
   });

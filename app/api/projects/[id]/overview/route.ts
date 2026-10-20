@@ -110,7 +110,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     FROM mh_orders WHERE project_id = ${id}::uuid`;
   const msRows = await prisma.$queryRaw<{ total: number; signed: number }[]>`
     SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'signed')::int AS signed
-    FROM acceptance_milestones WHERE project_id = ${id}::uuid`;
+    FROM acceptance_milestones WHERE project_id = ${id}::uuid AND kind = 'chu_nha'`;
 
   // Nhật ký
   const diaryRows = await prisma.$queryRaw<

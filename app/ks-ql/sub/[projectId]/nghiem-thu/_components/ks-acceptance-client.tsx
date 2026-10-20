@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, CheckCircle2, ChevronDown, Clock, FileText, Printer, Trash2 } from "lucide-react";
+import { Camera, CheckCircle2, ChevronDown, Clock, Download, FileText, Printer, Trash2 } from "lucide-react";
 
 type Kind = "bien_ban" | "site";
 
@@ -31,9 +31,17 @@ const fmtDay = (iso: string | null) =>
 
 const isPdf = (f: FileItem) => f.contentType === "application/pdf";
 
-// Danh sách đợt nghiệm thu với chủ nhà. Mỗi đợt: in BB mẫu → ký giấy tại công trình →
-// KS chụp BB đã ký + ảnh công trình. Có ảnh BB → đợt chuyển "Đã nghiệm thu".
-export function KsAcceptanceClient({ projectId, userId }: { projectId: string; userId: string }) {
+// Danh sách đợt nghiệm thu (chủ nhà hoặc thầu phụ/đội khoán). Mỗi đợt: in BB mẫu → ký giấy tại
+// công trình → KS chụp BB đã ký + ảnh công trình. Có ảnh BB → đợt chuyển "Đã nghiệm thu".
+export function KsAcceptanceClient({
+  projectId,
+  userId,
+  group = "chu_nha",
+}: {
+  projectId: string;
+  userId: string;
+  group?: "chu_nha" | "thau_phu";
+}) {
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
@@ -44,7 +52,7 @@ export function KsAcceptanceClient({ projectId, userId }: { projectId: string; u
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/projects/${projectId}/acceptance`, { cache: "no-store" });
+      const r = await fetch(`/api/projects/${projectId}/acceptance?kind=${group}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.message || "Lỗi tải dữ liệu");
       const list: Milestone[] = j.milestones;
@@ -59,7 +67,7 @@ export function KsAcceptanceClient({ projectId, userId }: { projectId: string; u
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, group]);
 
   useEffect(() => {
     void load();
@@ -112,7 +120,9 @@ export function KsAcceptanceClient({ projectId, userId }: { projectId: string; u
   if (rows.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-[#252840] bg-[#13151f] px-5 py-6 text-center text-base text-[#8892b0]">
-        Admin chưa tạo đợt nghiệm thu cho dự án này.
+        {group === "thau_phu"
+          ? "Chưa có đợt nghiệm thu thầu phụ cho dự án này."
+          : "Admin chưa tạo đợt nghiệm thu cho dự án này."}
       </div>
     );
   }
@@ -134,6 +144,13 @@ export function KsAcceptanceClient({ projectId, userId }: { projectId: string; u
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={fileUrl(m.id, f)} alt={f.name} loading="lazy" className="aspect-square w-full object-cover" />
               )}
+            </a>
+            <a
+              href={`${fileUrl(m.id, f)}&download=1`}
+              aria-label={`Tải ${f.name}`}
+              className="absolute bottom-1 left-1 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-orange-300"
+            >
+              <Download className="h-4 w-4" />
             </a>
             {f.uploadedBy === userId ? (
               <button
@@ -219,16 +236,25 @@ export function KsAcceptanceClient({ projectId, userId }: { projectId: string; u
                 {m.templateFiles.length ? (
                   <div className="mb-4 flex flex-col gap-2">
                     {m.templateFiles.map((f) => (
-                      <a
-                        key={f.key}
-                        href={fileUrl(m.id, f)}
-                        target="_blank"
-                        rel="noopener"
-                        className="ksql-tap flex items-center gap-2 rounded-xl bg-[#252840] px-4 py-3 text-base text-[#f0f2ff]"
-                      >
-                        <Printer className="h-5 w-5 shrink-0 text-orange-300" />
-                        <span className="min-w-0 flex-1 truncate">In BB mẫu · {f.name}</span>
-                      </a>
+                      <div key={f.key} className="flex items-center gap-2">
+                        <a
+                          href={fileUrl(m.id, f)}
+                          target="_blank"
+                          rel="noopener"
+                          className="ksql-tap flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-[#252840] px-4 py-3 text-base text-[#f0f2ff]"
+                        >
+                          <Printer className="h-5 w-5 shrink-0 text-orange-300" />
+                          <span className="min-w-0 flex-1 truncate">Xem / in BB mẫu · {f.name}</span>
+                        </a>
+                        <a
+                          href={`${fileUrl(m.id, f)}&download=1`}
+                          aria-label={`Tải ${f.name}`}
+                          className="ksql-tap flex h-12 shrink-0 items-center gap-1 rounded-xl bg-[#ff8a3d] px-3 text-sm font-bold text-[#0f1015]"
+                        >
+                          <Download className="h-5 w-5" />
+                          Tải về
+                        </a>
+                      </div>
                     ))}
                   </div>
                 ) : null}

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Bell, CalendarCheck2, ChevronDown, FolderOpen, LogOut, User as UserIcon } from "lucide-react";
 import { KsQlPageMotion } from "./ksql-page-motion";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 type FrameUser = { id: string; name: string; email: string; role: string };
 
@@ -49,7 +50,13 @@ export function KsQlFrame({ user, children }: { user: FrameUser; children: React
 
   // Flow giao khoán (KS Phúc) dùng SubLayout riêng — bỏ frame cũ để không đè lên.
   if (pathname.startsWith("/ks-ql/sub")) {
-    return <KsQlPageMotion>{children}</KsQlPageMotion>;
+    // App cài PWA (standalone) không có kéo-xuống-tải-lại của trình duyệt → tự gắn.
+    return (
+      <>
+        <PullToRefresh />
+        <KsQlPageMotion>{children}</KsQlPageMotion>
+      </>
+    );
   }
 
   return (

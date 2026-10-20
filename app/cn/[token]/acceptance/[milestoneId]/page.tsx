@@ -13,7 +13,7 @@ export default async function CustomerAcceptancePage({ params }: { params: { tok
   if (!project || !session) notFound();
 
   const milestone = await prisma.acceptanceMilestone.findFirst({
-    where: { id: params.milestoneId, projectId: project.id },
+    where: { id: params.milestoneId, projectId: project.id, kind: "chu_nha" },
   });
   if (!milestone) notFound();
 
