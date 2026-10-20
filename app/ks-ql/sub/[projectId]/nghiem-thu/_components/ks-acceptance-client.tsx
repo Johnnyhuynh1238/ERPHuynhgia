@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Camera, CheckCircle2, ChevronDown, Clock, Download, FileText, Printer, Trash2 } from "lucide-react";
 
@@ -31,6 +31,9 @@ const fmtDay = (iso: string | null) =>
 
 const isPdf = (f: FileItem) => f.contentType === "application/pdf";
 
+// Thầu phụ: dòng đầu mô tả = "Đợt N — khối lượng" → gom card theo đợt thanh toán.
+const dotOf = (m: Milestone) => (m.description ?? "").split("\n")[0];
+
 // Danh sách đợt nghiệm thu (chủ nhà hoặc thầu phụ/đội khoán). Mỗi đợt: in BB mẫu → ký giấy tại
 // công trình → KS chụp BB đã ký + ảnh công trình. Có ảnh BB → đợt chuyển "Đã nghiệm thu".
 export function KsAcceptanceClient({
@@ -45,6 +48,7 @@ export function KsAcceptanceClient({
   const [rows, setRows] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [openDot, setOpenDot] = useState<string | null>(null); // thầu phụ: nhóm đợt đang mở
   const [busy, setBusy] = useState<string | null>(null); // `${id}:${kind}` đang tải lên
   const fileRef = useRef<HTMLInputElement>(null);
   const target = useRef<{ id: string; kind: Kind } | null>(null);
@@ -60,7 +64,9 @@ export function KsAcceptanceClient({
       // Lần đầu mở sẵn đợt đang chờ đầu tiên.
       if (!opened.current) {
         opened.current = true;
-        setOpen(list.find((m) => m.status !== "signed")?.id ?? null);
+        const first = list.find((m) => m.status !== "signed");
+        setOpen(first?.id ?? null);
+        setOpenDot(first ? dotOf(first) : null);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
@@ -193,15 +199,36 @@ export function KsAcceptanceClient({
       />
 
       <div className="text-center text-base text-[#8892b0]">
-        Đã nghiệm thu <b className="text-[#34d399]">{signedCount}</b> / {rows.length} đợt
+        Đã nghiệm thu <b className="text-[#34d399]">{signedCount}</b> / {rows.length}{" "}
+        {group === "thau_phu" ? "biên bản" : "đợt"}
       </div>
 
-      {rows.map((m) => {
+      {rows.map((m, i) => {
         const done = m.status === "signed";
         const isOpen = open === m.id;
+        const dot = group === "thau_phu" ? dotOf(m) : null;
+        const dotRows = dot !== null ? rows.filter((r) => dotOf(r) === dot) : [];
+        const header =
+          dot !== null && (i === 0 || dotOf(rows[i - 1]) !== dot) ? (
+            <button
+              type="button"
+              onClick={() => setOpenDot(openDot === dot ? null : dot)}
+              className="ksql-tap mt-2 flex w-full items-center gap-2 rounded-xl bg-[#252840] px-4 py-3 text-left"
+            >
+              <span className="min-w-0 flex-1 text-base font-bold text-orange-300">{dot}</span>
+              <span className="shrink-0 text-sm text-[#8892b0]">
+                {dotRows.filter((r) => r.status === "signed").length}/{dotRows.length}
+              </span>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-[#8892b0] transition ${openDot === dot ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : null;
+        if (dot !== null && openDot !== dot) return <Fragment key={m.id}>{header}</Fragment>;
         return (
+          <Fragment key={m.id}>
+          {header}
           <div
-            key={m.id}
             className={`rounded-2xl border-2 ${done ? "border-[#34d399]/50 bg-[#152418]" : "border-[#ff8a3d]/40 bg-[#1a1d2e]"}`}
           >
             <button
@@ -269,6 +296,7 @@ export function KsAcceptanceClient({
               </div>
             ) : null}
           </div>
+          </Fragment>
         );
       })}
     </>
