@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,6 +24,10 @@ import {
   ArrowUpCircle,
   Clock,
   ChevronRight,
+  Check,
+  CheckCheck,
+  RotateCcw,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,7 +58,20 @@ type SummaryDto = {
     receiptPending: number;
     pendingOrders?: { projectId: string; projectName: string; count: number }[];
     payNowOrders?: { projectId: string; projectName: string; count: number }[];
+    /** Việc admin giao còn mở */
+    tasks?: AccountantTaskDto[];
   };
+};
+
+type AccountantTaskDto = {
+  id: string;
+  title: string;
+  note: string | null;
+  dueDate: string | null;
+  status: string;
+  createdByName: string | null;
+  createdAt: string;
+  doneAt: string | null;
 };
 
 const formatVnd = (n: number) =>
@@ -254,7 +272,7 @@ export function KetoanLauncher() {
           </div>
         </div>
 
-        <WorkQueue data={data} loading={loading} />
+        <WorkQueue data={data} loading={loading} onChanged={load} />
       </div>
 
       {open && open.buildItems && (
@@ -316,11 +334,38 @@ function buildTodoRows(t: SummaryDto["todos"] | undefined): TodoRow[] {
 function WorkQueue({
   data,
   loading,
+  onChanged,
 }: {
   data: SummaryDto | null;
   loading: boolean;
+  onChanged: () => void;
 }) {
   const rows = buildTodoRows(data?.todos);
+  const serverTasks = data?.todos?.tasks ?? [];
+  // Ẩn ngay việc vừa tick (optimistic) — chờ load() lấy lại danh sách thật.
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
+  const tasks = serverTasks.filter((t) => !hiddenIds.has(t.id));
+  const total = rows.length + tasks.length;
+
+  const tickDone = async (task: AccountantTaskDto) => {
+    setBusyId(task.id);
+    try {
+      const res = await fetch(`/api/ketoan/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ done: true }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || "Lỗi cập nhật");
+      setHiddenIds((prev) => new Set(prev).add(task.id));
+      onChanged();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Lỗi cập nhật");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (!data && loading) {
     return (
@@ -340,12 +385,12 @@ function WorkQueue({
       >
         <ClipboardList className="h-3 w-3" style={{ color: BRAND_GOLD_BRIGHT }} />
         <span>Việc cần làm</span>
-        {rows.length > 0 && (
+        {total > 0 && (
           <span
             className="rounded-full px-1.5 py-[1px] text-[10px] font-bold tracking-normal"
             style={{ backgroundColor: BRAND_GOLD, color: "#0b0d16" }}
           >
-            {rows.length}
+            {total}
           </span>
         )}
         <span
@@ -355,9 +400,40 @@ function WorkQueue({
               "linear-gradient(90deg, rgba(249,115,22,0.35) 0%, transparent 100%)",
           }}
         />
+        <button
+          type="button"
+          onClick={() => setShowDone(true)}
+          className="smooth-press inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal"
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            color: BRAND_GOLD_BRIGHT,
+            boxShadow: "inset 0 0 0 0.5px rgba(249,115,22,0.35)",
+          }}
+        >
+          <CheckCheck className="h-3.5 w-3.5" />
+          Xem việc đã xong
+        </button>
       </div>
 
-      {rows.length === 0 ? (
+      {showDone && (
+        <DoneTasksModal
+          onClose={() => setShowDone(false)}
+          onReopened={() => {
+            setHiddenIds(new Set());
+            onChanged();
+          }}
+        />
+      )}
+
+      {tasks.length > 0 && (
+        <div className="mb-2 flex flex-col gap-2">
+          {tasks.map((t) => (
+            <TaskCard key={t.id} task={t} busy={busyId === t.id} onDone={() => tickDone(t)} />
+          ))}
+        </div>
+      )}
+
+      {total === 0 ? (
         <div
           className="rounded-2xl px-4 py-4 text-center text-[13px]"
           style={{
@@ -375,7 +451,7 @@ function WorkQueue({
         >
           Đã xử lý xong — không có việc đang chờ.
         </div>
-      ) : (
+      ) : rows.length === 0 ? null : (
         <div className="flex flex-col gap-2">
           {rows.map((r) => (
             <TodoCard key={r.key} row={r} />
@@ -442,6 +518,222 @@ function TodoCard({ row }: { row: TodoRow }) {
         style={{ color: BRAND_GOLD_BRIGHT }}
       />
     </Link>
+  );
+}
+
+const CARD_BG = `
+  radial-gradient(circle at 12% 15%, rgba(251,146,60,0.10) 0%, transparent 55%),
+  radial-gradient(circle at 90% 95%, rgba(0,0,0,0.3) 0%, transparent 55%),
+  #13151f
+`;
+
+function vnTodayIso(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+}
+
+function fmtDdMm(iso: string): string {
+  const [, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}`;
+}
+
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+/** Việc admin giao — tick ô tròn = xong. */
+function TaskCard({
+  task,
+  busy,
+  onDone,
+}: {
+  task: AccountantTaskDto;
+  busy: boolean;
+  onDone: () => void;
+}) {
+  const overdue = !!task.dueDate && task.dueDate < vnTodayIso();
+  return (
+    <div
+      className="flex items-start gap-3 overflow-hidden rounded-2xl px-3.5 py-3"
+      style={{
+        background: CARD_BG,
+        boxShadow: [
+          "inset 0 0 0 0.5px rgba(249,115,22,0.42)",
+          "inset 0 1px 0 rgba(251,146,60,0.42)",
+          "0 8px 22px -10px rgba(0,0,0,0.55)",
+        ].join(", "),
+      }}
+    >
+      <button
+        type="button"
+        onClick={onDone}
+        disabled={busy}
+        aria-label="Đánh dấu đã xong"
+        className="smooth-press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+        style={{
+          border: `1.5px solid ${BRAND_GOLD_BRIGHT}`,
+          color: BRAND_GOLD_BRIGHT,
+        }}
+      >
+        {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-4 w-4 opacity-30" />}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13.5px] font-medium leading-snug" style={{ color: BRAND_TEXT }}>
+          {task.title}
+        </div>
+        {task.note && (
+          <div className="mt-0.5 whitespace-pre-line text-[12px] leading-snug" style={{ color: BRAND_TEXT_MUTED }}>
+            {task.note}
+          </div>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px]" style={{ color: BRAND_TEXT_MUTED }}>
+          <span>Anh giao {fmtDdMm(task.createdAt)}</span>
+          {task.dueDate && (
+            <span style={{ color: overdue ? "#f87171" : BRAND_GOLD_BRIGHT, fontWeight: 600 }}>
+              {overdue ? "Quá hạn " : "Hạn "}
+              {fmtDdMm(task.dueDate)}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Danh sách việc đã xong (100 gần nhất) — có nút "Mở lại" nếu tick nhầm. Portal ra body. */
+function DoneTasksModal({ onClose, onReopened }: { onClose: () => void; onReopened: () => void }) {
+  const [tasks, setTasks] = useState<AccountantTaskDto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    fetch("/api/ketoan/tasks?status=done", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => null))?.message || "Lỗi tải");
+        return r.json() as Promise<{ tasks: AccountantTaskDto[] }>;
+      })
+      .then((j) => setTasks(j.tasks))
+      .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải"));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const reopen = async (t: AccountantTaskDto) => {
+    if (!window.confirm(`Mở lại việc "${t.title}"? Việc sẽ quay về danh sách cần làm.`)) return;
+    setBusyId(t.id);
+    try {
+      const res = await fetch(`/api/ketoan/tasks/${t.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ done: false }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || "Lỗi cập nhật");
+      setTasks((prev) => (prev ? prev.filter((x) => x.id !== t.id) : prev));
+      onReopened();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Lỗi cập nhật");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!mounted) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center sm:px-4" onClick={onClose}>
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(11,13,22,0.62)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex max-h-[85vh] w-full flex-col rounded-t-[22px] sm:max-w-[480px] sm:rounded-[22px]"
+        style={{
+          background: CARD_BG,
+          boxShadow: [
+            "inset 0 0 0 0.5px rgba(249,115,22,0.35)",
+            "inset 0 1px 0 rgba(251,146,60,0.35)",
+            "0 30px 60px -20px rgba(0,0,0,0.75)",
+          ].join(", "),
+        }}
+      >
+        <div className="flex items-center gap-2 px-4 pb-2 pt-4">
+          <CheckCheck className="h-4 w-4" style={{ color: BRAND_GOLD_BRIGHT }} />
+          <span className="flex-1 text-[15px] font-semibold" style={{ color: BRAND_TEXT }}>
+            Việc đã xong
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="smooth-press flex h-7 w-7 items-center justify-center rounded-full"
+            style={{ background: "rgba(255,255,255,0.05)", color: BRAND_TEXT_MUTED }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 pb-4">
+          {error ? (
+            <div className="px-2 py-6 text-center text-[13px] text-red-400">{error}</div>
+          ) : !tasks ? (
+            <div className="px-2 py-6 text-center text-[13px]" style={{ color: BRAND_TEXT_MUTED }}>
+              Đang tải…
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="px-2 py-6 text-center text-[13px]" style={{ color: BRAND_TEXT_MUTED }}>
+              Chưa có việc nào đã xong.
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-white/5">
+              {tasks.map((t) => (
+                <div key={t.id} className="flex items-start gap-3 px-1.5 py-2.5">
+                  <span
+                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                    style={{ backgroundColor: "#22c55e", color: BRAND_BG }}
+                  >
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13.5px] leading-snug line-through decoration-white/30" style={{ color: BRAND_TEXT }}>
+                      {t.title}
+                    </div>
+                    {t.note && (
+                      <div className="mt-0.5 whitespace-pre-line text-[12px]" style={{ color: BRAND_TEXT_MUTED }}>
+                        {t.note}
+                      </div>
+                    )}
+                    <div className="mt-0.5 text-[11px]" style={{ color: BRAND_TEXT_MUTED }}>
+                      Giao {fmtDdMm(t.createdAt)} · Xong {t.doneAt ? fmtDateTime(t.doneAt) : "—"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => reopen(t)}
+                    disabled={busyId === t.id}
+                    className="smooth-press inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                    style={{ background: "rgba(255,255,255,0.05)", color: BRAND_TEXT_MUTED }}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Mở lại
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

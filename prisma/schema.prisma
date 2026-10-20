@@ -4825,3 +4825,22 @@ model KsDailyReport {
   @@index([ksId, reportDate, kind])
   @@map("ks_daily_reports")
 }
+
+/// Việc admin giao cho kế toán (AI tạo theo tin nhắn anh). KT tick xong trên launcher /ketoan.
+/// Cron Zalo 8h→20h mỗi 2 tiếng nhắc việc còn mở cùng việc tự sinh (lệnh chờ, đơn chưa nhận…).
+model AccountantTask {
+  id            String    @id @default(uuid()) @db.Uuid
+  title         String
+  note          String?
+  dueDate       DateTime? @map("due_date") @db.Date
+  /// open | done
+  status        String    @default("open") @db.VarChar(20)
+  createdByName String?   @map("created_by_name") @db.VarChar(120)
+  doneAt        DateTime? @map("done_at")
+  doneById      String?   @map("done_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, dueDate])
+  @@map("accountant_tasks")
+}
