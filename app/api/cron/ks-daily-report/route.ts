@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 /**
  * Cron nhiệm vụ KS qua link Zalo. Host crontab gọi theo giờ:
  *   ?kind=headcount: 07:00 step=ask · 07:10→07:50 step=remind · 08:00 step=close
- *   ?kind=eod:       16:00 step=ask · 16:10→16:50 step=remind · 17:00 step=close
+ *   ?kind=eod:       16:00 step=ask · 16:30→21:30 step=remind (mỗi giờ) · 22:00 step=close
  */
 export async function POST(request: Request) {
   const key = request.headers.get("x-cron-key");

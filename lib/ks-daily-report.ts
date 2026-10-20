@@ -3,10 +3,11 @@
  *
  * Mỗi loại (kind) 1 khung giờ — cron host gọi /api/cron/ks-daily-report?kind=...&step=...:
  *  - headcount (số thợ):          ask 07:00 · remind 07:10→07:50 · close 08:00
- *  - eod (khối lượng + ảnh):      ask 16:00 · remind 16:10→16:50 · close 17:00
+ *  - eod (khối lượng + ảnh):      ask 16:00 · remind 16:30→21:30 (1 giờ/lần) · close 22:00
  * ask   : mỗi dự án in_progress có KS (pm_engineer) → 1 dòng pending/dự án/ngày/kind,
  *         nick Zalo cty gửi mỗi KS 1 link /nv/<token> (token HMAC = kind + KS + ngày).
- * remind: gửi lại link cho KS chưa lưu (10 phút/lần).
+ * remind: gửi lại link cho KS chưa lưu (headcount 10 phút/lần, eod 1 giờ/lần). eod: KS đã tự
+ *         viết nhật ký trên app (có nội dung + ảnh) thì tính là đã báo, không nhắc nữa.
  * close : pending → expired, gửi tổng hợp cho admin (anh Huỳnh Luận).
  * KS mở link → điền mọi công trình → Lưu 1 lần → khoá (không sửa). Nội dung ghi vào
  * Nhật ký thi công (construction_diaries) của ngày đó.
@@ -25,7 +26,7 @@ export type KsTaskKind = "headcount" | "eod";
 
 export const KS_TASKS: Record<KsTaskKind, { title: string; closeHour: number; hint: string }> = {
   headcount: { title: "Báo số thợ", closeHour: 8, hint: "điền số thợ từng công trình" },
-  eod: { title: "Báo cáo cuối ngày", closeHour: 17, hint: "ghi khối lượng làm được + chụp ảnh từng công trình" },
+  eod: { title: "Báo cáo cuối ngày", closeHour: 22, hint: "ghi khối lượng làm được + chụp ảnh từng công trình" },
 };
 
 export function isKsTaskKind(v: unknown): v is KsTaskKind {
@@ -436,7 +437,37 @@ export async function stepAsk(kind: KsTaskKind, now = new Date()) {
 
 export async function stepRemind(kind: KsTaskKind, now = new Date()) {
   if (vnHour(now) >= KS_TASKS[kind].closeHour) return { sent: 0 };
-  return { sent: await sendPendingLinks(kind, vnToday(now), true) };
+  const date = vnToday(now);
+  const synced = kind === "eod" ? await syncEodFromDiary(date) : 0;
+  return { synced, sent: await sendPendingLinks(kind, date, true) };
+}
+
+/**
+ * eod pending nhưng KS đã viết nhật ký ngày đó trên app (có nội dung + ≥1 ảnh, hoặc đã duyệt)
+ * → đánh dấu done để không nhắc nữa.
+ */
+async function syncEodFromDiary(date: Date) {
+  const pending = await prisma.ksDailyReport.findMany({
+    where: { reportDate: date, kind: "eod", status: "pending" },
+    select: { id: true, projectId: true, ksId: true },
+  });
+  if (!pending.length) return 0;
+  const diaries = await prisma.constructionDiary.findMany({
+    where: { entryDate: date, projectId: { in: pending.map((r) => r.projectId) } },
+    select: { projectId: true, ksId: true, tasksDone: true, taskPhotos: true, approvedAt: true },
+  });
+  const ids = pending
+    .filter((r) => {
+      const d = diaries.find((x) => x.projectId === r.projectId && x.ksId === r.ksId);
+      return d && (d.approvedAt || (d.tasksDone?.trim() && photoCountOf(d.taskPhotos) > 0));
+    })
+    .map((r) => r.id);
+  if (!ids.length) return 0;
+  const u = await prisma.ksDailyReport.updateMany({
+    where: { id: { in: ids }, status: "pending" },
+    data: { status: "done", answeredAt: new Date() },
+  });
+  return u.count;
 }
 
 export async function stepClose(kind: KsTaskKind, now = new Date()) {
