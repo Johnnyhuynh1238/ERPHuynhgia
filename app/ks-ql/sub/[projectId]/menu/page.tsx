@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { FolderOpen, BookOpen } from "lucide-react";
+import { FolderOpen, BookOpen, FileSignature } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
@@ -35,6 +35,12 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
         title="NHẬT KÝ THI CÔNG"
         subtitle="Trả lời 5 câu hỏi mỗi ngày"
         href={`/ks-ql/sub/${project.id}/diary`}
+      />
+      <BigCard
+        icon={<FileSignature className="h-8 w-8" />}
+        title="NGHIỆM THU"
+        subtitle="Các đợt nghiệm thu · Up biên bản đã ký + ảnh"
+        href={`/ks-ql/sub/${project.id}/nghiem-thu`}
       />
     </SubLayout>
   );
