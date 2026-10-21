@@ -84,7 +84,8 @@ export function ksTaskLink(kind: KsTaskKind, ksId: string, date: Date): string {
 }
 
 export function parseKsTaskToken(token: string): { kind: KsTaskKind; ksId: string; date: Date } | null {
-  const m = /^(headcount|eod)\.([0-9a-f-]{36})\.(\d{4})(\d{2})(\d{2})\.([0-9a-f]{32})$/.exec(token || "");
+  // Không neo `$`: Zalo hay dính chữ dòng sau vào link (vd "...<hmac>Anh") → bỏ đuôi rác, HMAC vẫn kiểm.
+  const m = /^(headcount|eod)\.([0-9a-f-]{36})\.(\d{4})(\d{2})(\d{2})\.([0-9a-f]{32})/.exec(token || "");
   if (!m) return null;
   const expected = Buffer.from(sign(`${m[1]}.${m[2]}.${m[3]}${m[4]}${m[5]}`));
   const got = Buffer.from(m[6]);
@@ -348,8 +349,9 @@ function linkText(kind: KsTaskKind, ksId: string, date: Date, remind: boolean): 
   const t = KS_TASKS[kind];
   return (
     `${remind ? "⏰ Nhắc: " : ""}${kind === "headcount" ? "👷" : "📋"} ${t.title} ${ddmm(date)} – hạn ${t.closeHour}:00\n` +
-    `${ksTaskLink(kind, ksId, date)}\n` +
-    `Anh bấm link, ${t.hint} rồi bấm Lưu (lưu 1 lần, không sửa được).`
+    `Anh bấm link, ${t.hint} rồi bấm Lưu (lưu 1 lần, không sửa được):\n` +
+    // Link để CUỐI tin: Zalo gộp chữ dòng sau vào link → token hỏng.
+    ksTaskLink(kind, ksId, date)
   );
 }
 
