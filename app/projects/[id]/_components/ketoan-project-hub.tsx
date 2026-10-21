@@ -1,5 +1,6 @@
 import Link from "next/link";
 import "./ketoan-project-hub.css";
+import { ProjectTopics } from "@/components/project-topics";
 
 const statusLabel: Record<string, string> = {
   planning: "Planning",
@@ -27,6 +28,7 @@ type Props = {
   scheduleCollected: number;
   scheduleCount: number;
   scheduleCollectedCount: number;
+  initialTopicId?: string;
 };
 
 // Màn kế toán vào dự án: brand ngà, Ngân sách (kiểm soát chi thay admin) + Thanh toán HĐ (thu theo đợt) + Mua hàng + Công nợ NCC (không tile thi công/tài chính khác).
@@ -47,6 +49,7 @@ export function KetoanProjectHub({
   scheduleCollected,
   scheduleCount,
   scheduleCollectedCount,
+  initialTopicId,
 }: Props) {
   const base = `/projects/${projectId}`;
   const scheduleRemaining = scheduleTotal - scheduleCollected;
@@ -179,6 +182,9 @@ export function KetoanProjectHub({
             <span className="kph-chev">›</span>
           </Link>
         </div>
+
+        {/* Trao đổi nội bộ: dưới cùng, sau Quản lý NCC. */}
+        <ProjectTopics projectId={projectId} initialTopicId={initialTopicId} limit={5} theme="kph" />
 
         <div className="kph-foot">Kế toán · ngân sách · thu theo đợt HĐ · mua hàng &amp; công nợ NCC</div>
       </div>

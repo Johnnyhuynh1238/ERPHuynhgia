@@ -753,6 +753,7 @@ model Project {
   materialProposals         MaterialProposal[]
   constructionDiaries       ConstructionDiary[]
   ksDailyReports            KsDailyReport[]
+  topics                    ProjectTopic[]
   designContract            DesignContract?
   purchaseGuideAdjusts      PurchaseGuideAdjust[]
   projectBudget             ProjectBudget?
@@ -2646,6 +2647,8 @@ enum StaffNotificationKind {
   receipt_kt_request
   receipt_kt_approved
   receipt_kt_rejected
+  project_topic_new
+  project_topic_comment
 }
 
 enum MaterialProposalStatus {
@@ -4855,4 +4858,38 @@ model AccountantTask {
 
   @@index([status, dueDate])
   @@map("accountant_tasks")
+}
+
+/// Ô trao đổi công việc nội bộ dự án: thành viên (assignment) + admin tạo chủ đề, bình luận.
+/// Tạo chủ đề → thông báo app + Zalo mọi thành viên; bình luận → thông báo app.
+model ProjectTopic {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  title          String   @db.VarChar(200)
+  body           String?
+  authorId       String   @map("author_id") @db.Uuid
+  authorName     String   @map("author_name") @db.VarChar(120)
+  commentCount   Int      @default(0) @map("comment_count")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project  Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments ProjectTopicComment[]
+
+  @@index([projectId, lastActivityAt])
+  @@map("project_topics")
+}
+
+model ProjectTopicComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  topicId    String   @map("topic_id") @db.Uuid
+  body       String
+  authorId   String   @map("author_id") @db.Uuid
+  authorName String   @map("author_name") @db.VarChar(120)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  topic ProjectTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, createdAt])
+  @@map("project_topic_comments")
 }

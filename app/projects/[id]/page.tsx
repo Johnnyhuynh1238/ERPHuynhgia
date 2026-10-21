@@ -16,7 +16,13 @@ function startOfTodayUtc() {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
 }
 
-export default async function ProjectInfoPage({ params }: { params: { id: string } }) {
+export default async function ProjectInfoPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { t?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id || !user.role) {
     redirect("/login");
@@ -79,6 +85,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
         projectId={project.id}
         laborMode={project.laborMode}
         pendingDiaries={pendingDiariesAdmin}
+        initialTopicId={searchParams.t}
       />
     );
   }
@@ -135,6 +142,7 @@ export default async function ProjectInfoPage({ params }: { params: { id: string
         scheduleCollected={scheduleCollected}
         scheduleCount={scheduleCount}
         scheduleCollectedCount={scheduleCollectedCount}
+        initialTopicId={searchParams.t}
       />
     );
   }

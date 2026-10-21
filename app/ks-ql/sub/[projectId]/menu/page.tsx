@@ -4,10 +4,17 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
 import { UpcomingAcceptance } from "@/app/ks-ql/sub/_components/upcoming-acceptance";
+import { ProjectTopics } from "@/components/project-topics";
 
 export const dynamic = "force-dynamic";
 
-export default async function SubMenuPage({ params }: { params: { projectId: string } }) {
+export default async function SubMenuPage({
+  params,
+  searchParams,
+}: {
+  params: { projectId: string };
+  searchParams: { t?: string };
+}) {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
 
@@ -55,6 +62,8 @@ export default async function SubMenuPage({ params }: { params: { projectId: str
         subtitle="Biên bản công tác đội khoán · Up biên bản đã ký + ảnh"
         href={`/ks-ql/sub/${project.id}/nghiem-thu-thau-phu`}
       />
+      {/* Trao đổi nội bộ: dưới các card nghiệm thu, trên ô biên bản. */}
+      <ProjectTopics projectId={project.id} initialTopicId={searchParams.t} limit={5} />
       <UpcomingAcceptance projects={[project]} />
     </SubLayout>
   );

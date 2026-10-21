@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import "./overview.css";
+import { ProjectTopics } from "@/components/project-topics";
 
 
 type Cost = { name: string; amount: number };
@@ -49,10 +50,12 @@ export function OverviewClient({
   projectId,
   laborMode = "self",
   pendingDiaries = 0,
+  initialTopicId,
 }: {
   projectId: string;
   laborMode?: "self" | "subcontract";
   pendingDiaries?: number;
+  initialTopicId?: string;
 }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [data, setData] = useState<Overview | null>(null);
@@ -317,6 +320,9 @@ export function OverviewClient({
             ),
           )}
         </div>
+
+        {/* ── TRAO ĐỔI NỘI BỘ (trên nhật ký) ── */}
+        <ProjectTopics projectId={projectId} initialTopicId={initialTopicId} limit={5} theme="ov" />
 
         {/* ── NHẬT KÝ ── */}
         <div className="phead"><span className="pn">Nhật ký thi công</span></div>
