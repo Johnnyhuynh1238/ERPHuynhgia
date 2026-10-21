@@ -88,6 +88,29 @@ function isBackfilled(entryDate: string, savedAt: string | null) {
   return savedYmdVn > entryDate;
 }
 
+/** Nén ảnh điện thoại: cạnh dài ≤1600px, JPEG 0.8 (ảnh 4–8MB → ~300–500KB). */
+async function compress(file: File): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.8));
+    return blob || file;
+  } catch {
+    return file;
+  }
+}
+
+// Ảnh chọn trên máy, chưa gửi — chỉ gửi khi bấm Chốt.
+type PendingPhoto = { id: string; blob: Blob; url: string };
+type GridItem = { id: string; src: string; isNew?: boolean };
+
+const MAX_PHOTOS_PER_KIND = 20;
+
 function photoSrc(projectId: string, key: string) {
   return `/api/ks-ql/projects/${projectId}/diary/photos/file?key=${encodeURIComponent(key)}`;
 }
@@ -111,8 +134,9 @@ export function DiaryClient({
 
   const taskFileRef = useRef<HTMLInputElement>(null);
   const siteFileRef = useRef<HTMLInputElement>(null);
-  const [uploadingTask, setUploadingTask] = useState(false);
-  const [uploadingSite, setUploadingSite] = useState(false);
+  const [pending, setPending] = useState<{ task: PendingPhoto[]; site: PendingPhoto[] }>({ task: [], site: [] });
+  const [removed, setRemoved] = useState<{ task: string[]; site: string[] }>({ task: [], site: [] });
+  const [compressing, setCompressing] = useState<"task" | "site" | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [detailDate, setDetailDate] = useState<string | null>(null);
   const [activeYmd, setActiveYmd] = useState(todayYmd);
@@ -127,6 +151,11 @@ export function DiaryClient({
       if (r1.ok) {
         const d: DiaryResponse = await r1.json();
         setData(d);
+        setPending((prev) => {
+          [...prev.task, ...prev.site].forEach((p) => URL.revokeObjectURL(p.url));
+          return { task: [], site: [] };
+        });
+        setRemoved({ task: [], site: [] });
         if (d.diary) {
           setWorkerCount(d.diary.workerCount);
           setTasksDone(d.diary.tasksDone);
@@ -158,15 +187,18 @@ export function DiaryClient({
   const saveDiary = async () => {
     setSaving(true);
     try {
+      const fd = new FormData();
+      fd.append("date", activeYmd);
+      fd.append("workerCount", String(workerCount));
+      fd.append("tasksDone", tasksDone);
+      fd.append("issues", issues);
+      fd.append("removeTask", JSON.stringify(removed.task));
+      fd.append("removeSite", JSON.stringify(removed.site));
+      pending.task.forEach((p, i) => fd.append("taskFiles", p.blob, `hangmuc-${i + 1}.jpg`));
+      pending.site.forEach((p, i) => fd.append("siteFiles", p.blob, `toancanh-${i + 1}.jpg`));
       const res = await fetch(`/api/ks-ql/projects/${projectId}/diary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: activeYmd,
-          workerCount,
-          tasksDone,
-          issues,
-        }),
+        body: fd,
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -189,60 +221,65 @@ export function DiaryClient({
     }
   };
 
-  const applyPhotos = (kind: "task" | "site", photos: Photo[]) => {
-    setData((prev) => {
-      if (!prev || !prev.diary) return prev;
-      const field = kind === "task" ? "taskPhotos" : "sitePhotos";
-      return { ...prev, diary: { ...prev.diary, [field]: photos } };
-    });
-  };
-
-  const uploadPhotos = async (kind: "task" | "site", files: FileList | null) => {
+  const addPhotos = async (kind: "task" | "site", files: FileList | null) => {
     if (!files || !files.length) return;
-    const setUploading = kind === "task" ? setUploadingTask : setUploadingSite;
-    setUploading(true);
+    const room = MAX_PHOTOS_PER_KIND - photoCount(kind);
+    const list = Array.from(files).slice(0, Math.max(0, room));
+    if (list.length < files.length) flash("err", `Tối đa ${MAX_PHOTOS_PER_KIND} ảnh mỗi mục`);
+    if (!list.length) return;
+    setCompressing(kind);
     try {
-      const fd = new FormData();
-      for (const f of Array.from(files)) fd.append("files", f);
-      const res = await fetch(
-        `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${activeYmd}`,
-        { method: "POST", body: fd },
-      );
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        flash("err", j.message || "Upload thất bại");
-        return;
+      const items: PendingPhoto[] = [];
+      for (const f of list) {
+        const blob = await compress(f);
+        items.push({ id: `${Date.now()}-${Math.random()}`, blob, url: URL.createObjectURL(blob) });
       }
-      if (Array.isArray(j.photos)) applyPhotos(kind, j.photos as Photo[]);
-      flash("ok", "Đã tải ảnh lên");
+      setPending((prev) => ({ ...prev, [kind]: [...prev[kind], ...items] }));
     } finally {
-      setUploading(false);
+      setCompressing(null);
     }
   };
 
-  const deletePhoto = async (kind: "task" | "site", key: string) => {
-    if (!await confirmDialog("Xoá ảnh này?")) return;
-    const res = await fetch(
-      `/api/ks-ql/projects/${projectId}/diary/photos?kind=${kind}&date=${activeYmd}&key=${encodeURIComponent(key)}`,
-      { method: "DELETE" },
-    );
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      flash("err", j.message || "Xoá thất bại");
+  const removePhoto = async (kind: "task" | "site", item: GridItem) => {
+    if (item.isNew) {
+      setPending((prev) => {
+        const hit = prev[kind].find((p) => p.id === item.id);
+        if (hit) URL.revokeObjectURL(hit.url);
+        return { ...prev, [kind]: prev[kind].filter((p) => p.id !== item.id) };
+      });
       return;
     }
-    if (Array.isArray(j.photos)) applyPhotos(kind, j.photos as Photo[]);
+    if (!await confirmDialog("Xoá ảnh này? (áp dụng khi bấm Cập nhật)")) return;
+    setRemoved((prev) => ({ ...prev, [kind]: [...prev[kind], item.id] }));
   };
 
-  const taskPhotos = data?.diary?.taskPhotos ?? [];
-  const sitePhotos = data?.diary?.sitePhotos ?? [];
+  const gridItems = (kind: "task" | "site"): GridItem[] => {
+    const saved = (kind === "task" ? data?.diary?.taskPhotos : data?.diary?.sitePhotos) ?? [];
+    return [
+      ...saved
+        .filter((p) => !removed[kind].includes(p.key))
+        .map((p) => ({ id: p.key, src: photoSrc(projectId, p.key) })),
+      ...pending[kind].map((p) => ({ id: p.id, src: p.url, isNew: true })),
+    ];
+  };
+  function photoCount(kind: "task" | "site") {
+    return gridItems(kind).length;
+  }
+
+  const taskPhotos = gridItems("task");
+  const sitePhotos = gridItems("site");
   const finalized = !!data?.diary?.savedAt;
   const approved = !!data?.diary?.approvedAt;
   const locked = approved;
 
-  const canFinalize = useMemo(() => {
-    return workerCount > 0 && tasksDone.trim().length > 0;
-  }, [workerCount, tasksDone]);
+  // Bắt điền đủ 5 mục mới cho chốt (server kiểm lại y hệt).
+  const missing: string[] = [];
+  if (workerCount <= 0) missing.push("số thợ");
+  if (!tasksDone.trim()) missing.push("công việc");
+  if (taskPhotos.length < 1) missing.push("ảnh hạng mục");
+  if (sitePhotos.length < 1) missing.push("ảnh toàn cảnh");
+  if (!issues.trim()) missing.push("vấn đề phát sinh");
+  const canFinalize = missing.length === 0;
 
   // 3 ngày gần nhất chưa chốt (server cũng chặn quá 3 ngày)
   const missingBackfillDays = useMemo(() => {
@@ -386,10 +423,9 @@ export function DiaryClient({
         right={`${taskPhotos.length}/20`}
       >
         <PhotoGrid
-          projectId={projectId}
-          photos={taskPhotos}
+          items={taskPhotos}
           readOnly={locked}
-          onDelete={(k) => deletePhoto("task", k)}
+          onDelete={(it) => removePhoto("task", it)}
         />
         {!locked ? (
           <>
@@ -400,24 +436,19 @@ export function DiaryClient({
               multiple
               hidden
               onChange={(e) => {
-                uploadPhotos("task", e.target.files);
+                addPhotos("task", e.target.files);
                 e.target.value = "";
               }}
             />
             <button
               type="button"
-              disabled={uploadingTask || taskPhotos.length >= 20 || !finalized}
+              disabled={compressing === "task" || taskPhotos.length >= MAX_PHOTOS_PER_KIND}
               onClick={() => taskFileRef.current?.click()}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
             >
-              {uploadingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Tải ảnh hạng mục
+              {compressing === "task" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Chọn ảnh hạng mục
             </button>
-            {!finalized && (
-              <p className="mt-1 text-center text-xs text-[#fbbf24]">
-                Chốt nhật ký trước khi tải ảnh
-              </p>
-            )}
           </>
         ) : null}
       </Section>
@@ -429,10 +460,9 @@ export function DiaryClient({
         right={`${sitePhotos.length}/20`}
       >
         <PhotoGrid
-          projectId={projectId}
-          photos={sitePhotos}
+          items={sitePhotos}
           readOnly={locked}
-          onDelete={(k) => deletePhoto("site", k)}
+          onDelete={(it) => removePhoto("site", it)}
         />
         {!locked ? (
           <>
@@ -443,24 +473,19 @@ export function DiaryClient({
               multiple
               hidden
               onChange={(e) => {
-                uploadPhotos("site", e.target.files);
+                addPhotos("site", e.target.files);
                 e.target.value = "";
               }}
             />
             <button
               type="button"
-              disabled={uploadingSite || sitePhotos.length >= 20 || !finalized}
+              disabled={compressing === "site" || sitePhotos.length >= MAX_PHOTOS_PER_KIND}
               onClick={() => siteFileRef.current?.click()}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#ff8a3d]/40 bg-[#1a1d2e] px-4 py-3 text-sm font-medium text-orange-300 active:scale-[0.99] disabled:opacity-50"
             >
-              {uploadingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Tải ảnh toàn cảnh
+              {compressing === "site" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Chọn ảnh toàn cảnh
             </button>
-            {!finalized && (
-              <p className="mt-1 text-center text-xs text-[#fbbf24]">
-                Chốt nhật ký trước khi tải ảnh
-              </p>
-            )}
           </>
         ) : null}
       </Section>
@@ -475,7 +500,7 @@ export function DiaryClient({
           disabled={locked}
           onChange={(e) => setIssues(e.target.value.slice(0, 4000))}
           rows={3}
-          placeholder="Để trống nếu không có…"
+          placeholder="Không có thì ghi &quot;Không có&quot;"
           className="w-full rounded-xl border-2 border-[#252840] bg-[#0f1015] px-3 py-3 text-base text-[#f0f2ff] outline-none focus:border-[#ff8a3d] disabled:opacity-60"
         />
         <p className="mt-1 text-right text-xs text-[#8892b0]">{issues.length}/4000</p>
@@ -494,7 +519,7 @@ export function DiaryClient({
           </button>
           {!canFinalize && (
             <p className="text-center text-xs text-[#fbbf24]">
-              Cần điền số thợ &gt; 0 và mục công việc trước khi chốt.
+              Còn thiếu: {missing.join(", ")}. Điền đủ mới chốt được.
             </p>
           )}
         </div>
@@ -918,17 +943,15 @@ function Section({
 }
 
 function PhotoGrid({
-  projectId,
-  photos,
+  items,
   onDelete,
   readOnly,
 }: {
-  projectId: string;
-  photos: Photo[];
-  onDelete: (key: string) => void;
+  items: GridItem[];
+  onDelete: (item: GridItem) => void;
   readOnly?: boolean;
 }) {
-  if (!photos.length) {
+  if (!items.length) {
     return (
       <div className="flex items-center justify-center rounded-xl border border-dashed border-[#252840] bg-[#0f1015] px-4 py-6 text-xs text-[#8892b0]">
         Chưa có ảnh
@@ -937,23 +960,28 @@ function PhotoGrid({
   }
   return (
     <div className="grid grid-cols-3 gap-2">
-      {photos.map((p) => (
+      {items.map((p) => (
         <div
-          key={p.key}
+          key={p.id}
           className="relative aspect-square overflow-hidden rounded-xl border border-[#252840] bg-[#0f1015]"
         >
           <Image
-            src={photoSrc(projectId, p.key)}
+            src={p.src}
             alt=""
             fill
             sizes="33vw"
             className="object-cover"
             unoptimized
           />
+          {p.isNew ? (
+            <span className="absolute bottom-1 left-1 rounded bg-[#ff8a3d] px-1.5 py-0.5 text-[10px] font-bold text-black">
+              Mới
+            </span>
+          ) : null}
           {!readOnly ? (
             <button
               type="button"
-              onClick={() => onDelete(p.key)}
+              onClick={() => onDelete(p)}
               className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white active:scale-95"
               aria-label="Xoá"
             >

@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getWorkDateVn } from "@/lib/attendance";
 import { diaryDateError } from "@/lib/diary-date";
+import { putObjectToMinio, deleteObjectFromMinio } from "@/lib/minio";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -83,6 +86,33 @@ export async function GET(
   });
 }
 
+type StoredPhoto = { key: string; contentType: string; width: number | null; height: number | null };
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_PHOTOS_PER_KIND = 20;
+
+function safeBaseName(name: string) {
+  return (
+    (name || "img")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/\.(jpe?g|png|webp)$/i, "")
+      .slice(0, 60) || "img"
+  );
+}
+
+function parseKeys(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+// Chốt 1 lần: form + ảnh mới + ảnh xoá gửi chung 1 request (multipart).
+// Bắt điền đủ 5 mục: số thợ, công việc, ≥1 ảnh hạng mục, ≥1 ảnh toàn cảnh, vấn đề phát sinh.
 export async function POST(
   req: NextRequest,
   { params }: { params: { projectId: string } },
@@ -93,20 +123,20 @@ export async function POST(
   const project = await ensureKsProject(params.projectId, user.id);
   if (!project) return NextResponse.json({ message: "forbidden" }, { status: 403 });
 
-  let body: Record<string, unknown>;
+  let form: FormData;
   try {
-    body = await req.json();
+    form = await req.formData();
   } catch {
-    return NextResponse.json({ message: "Body JSON không hợp lệ" }, { status: 400 });
+    return NextResponse.json({ message: "Form không hợp lệ" }, { status: 400 });
   }
 
-  const entryDate = parseDateParam(typeof body.date === "string" ? body.date : null);
+  const dateRaw = form.get("date");
+  const entryDate = parseDateParam(typeof dateRaw === "string" ? dateRaw : null);
   const dateErr = diaryDateError(entryDate);
   if (dateErr) return NextResponse.json({ message: dateErr }, { status: 400 });
-  const workerCount = Math.max(0, Math.min(500, Math.floor(Number(body.workerCount) || 0)));
-  const tasksDone = String(body.tasksDone ?? "").slice(0, 4000).trim();
-  const issuesRaw = body.issues == null ? null : String(body.issues).slice(0, 4000);
-  const issues = issuesRaw && issuesRaw.trim() ? issuesRaw : null;
+  const workerCount = Math.max(0, Math.min(500, Math.floor(Number(form.get("workerCount")) || 0)));
+  const tasksDone = String(form.get("tasksDone") ?? "").slice(0, 4000).trim();
+  const issues = String(form.get("issues") ?? "").slice(0, 4000).trim();
 
   if (workerCount <= 0) {
     return NextResponse.json({ message: "Số thợ phải > 0" }, { status: 400 });
@@ -114,16 +144,34 @@ export async function POST(
   if (!tasksDone) {
     return NextResponse.json({ message: "Cần điền mục công việc hôm nay" }, { status: 400 });
   }
+  if (!issues) {
+    return NextResponse.json(
+      { message: "Cần điền mục vấn đề phát sinh (không có thì ghi \"Không có\")" },
+      { status: 400 },
+    );
+  }
 
+  const newFiles = {
+    task: form.getAll("taskFiles").filter((x): x is File => x instanceof File),
+    site: form.getAll("siteFiles").filter((x): x is File => x instanceof File),
+  };
+  for (const f of [...newFiles.task, ...newFiles.site]) {
+    if (!ALLOWED_TYPES.includes(f.type)) {
+      return NextResponse.json({ message: `${f.name}: không phải JPG/PNG/WEBP` }, { status: 400 });
+    }
+    if (f.size > MAX_BYTES) {
+      return NextResponse.json({ message: `${f.name}: vượt 25MB` }, { status: 400 });
+    }
+  }
+  const removeKeys = {
+    task: new Set(parseKeys(form.get("removeTask"))),
+    site: new Set(parseKeys(form.get("removeSite"))),
+  };
+
+  const key = { projectId: project.id, ksId: user.id, entryDate };
   const existing = await prisma.constructionDiary.findUnique({
-    where: {
-      projectId_ksId_entryDate: {
-        projectId: project.id,
-        ksId: user.id,
-        entryDate,
-      },
-    },
-    select: { approvedAt: true },
+    where: { projectId_ksId_entryDate: key },
+    select: { id: true, approvedAt: true, taskPhotos: true, sitePhotos: true },
   });
   if (existing?.approvedAt) {
     return NextResponse.json(
@@ -132,33 +180,71 @@ export async function POST(
     );
   }
 
-  const now = new Date();
-  const saved = await prisma.constructionDiary.upsert({
-    where: {
-      projectId_ksId_entryDate: {
-        projectId: project.id,
-        ksId: user.id,
-        entryDate,
-      },
-    },
-    create: {
-      projectId: project.id,
-      ksId: user.id,
-      entryDate,
+  const kept = {
+    task: ((existing?.taskPhotos as unknown as StoredPhoto[]) || []).filter((p) => !removeKeys.task.has(p.key)),
+    site: ((existing?.sitePhotos as unknown as StoredPhoto[]) || []).filter((p) => !removeKeys.site.has(p.key)),
+  };
+  const removed = [
+    ...((existing?.taskPhotos as unknown as StoredPhoto[]) || []).filter((p) => removeKeys.task.has(p.key)),
+    ...((existing?.sitePhotos as unknown as StoredPhoto[]) || []).filter((p) => removeKeys.site.has(p.key)),
+  ].map((p) => p.key);
+
+  for (const kind of ["task", "site"] as const) {
+    const label = kind === "task" ? "ảnh hạng mục" : "ảnh toàn cảnh";
+    const total = kept[kind].length + newFiles[kind].length;
+    if (total < 1) {
+      return NextResponse.json({ message: `Cần ít nhất 1 ${label}` }, { status: 400 });
+    }
+    if (total > MAX_PHOTOS_PER_KIND) {
+      return NextResponse.json({ message: `Tối đa ${MAX_PHOTOS_PER_KIND} ${label}` }, { status: 400 });
+    }
+  }
+
+  const ymd = entryDate.toISOString().slice(0, 10);
+  const uploaded: string[] = [];
+  let saved;
+  try {
+    for (const kind of ["task", "site"] as const) {
+      for (const file of newFiles[kind]) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        let width: number | null = null;
+        let height: number | null = null;
+        try {
+          const meta = await sharp(buffer).metadata();
+          width = meta.width ?? null;
+          height = meta.height ?? null;
+        } catch {
+          // ignore
+        }
+        const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+        const objKey = `construction-diary/${project.id}/${user.id}/${ymd}/${kind}/${randomUUID()}-${safeBaseName(file.name)}.${ext}`;
+        await putObjectToMinio({ key: objKey, body: buffer, contentType: file.type });
+        uploaded.push(objKey);
+        kept[kind].push({ key: objKey, contentType: file.type, width, height });
+      }
+    }
+
+    const now = new Date();
+    const data = {
       workerCount,
       tasksDone,
       issues,
-      taskPhotos: [] as unknown as Prisma.InputJsonValue,
-      sitePhotos: [] as unknown as Prisma.InputJsonValue,
+      taskPhotos: kept.task as unknown as Prisma.InputJsonValue,
+      sitePhotos: kept.site as unknown as Prisma.InputJsonValue,
       savedAt: now,
-    },
-    update: {
-      workerCount,
-      tasksDone,
-      issues,
-      savedAt: now,
-    },
-  });
+    };
+    saved = await prisma.constructionDiary.upsert({
+      where: { projectId_ksId_entryDate: key },
+      create: { ...key, ...data },
+      update: data,
+    });
+  } catch (err) {
+    await Promise.all(uploaded.map((k) => deleteObjectFromMinio(k).catch(() => undefined)));
+    throw err;
+  }
+
+  // Ảnh bị xoá: chỉ gỡ khỏi MinIO sau khi DB đã lưu.
+  await Promise.all(removed.map((k) => deleteObjectFromMinio(k).catch(() => undefined)));
 
   return NextResponse.json({
     ok: true,
