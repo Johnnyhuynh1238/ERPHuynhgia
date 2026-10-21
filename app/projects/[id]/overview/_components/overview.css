@@ -146,6 +146,7 @@
 .ovdoc .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .ovdoc .tile { display: block; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 13px 14px; transition: border-color 0.15s, transform 0.12s; }
 .ovdoc .tile:active { transform: scale(0.98); }
+.ovdoc button.tile { font: inherit; text-align: left; width: 100%; cursor: pointer; }
 .ovdoc .tile .tt { display: flex; align-items: center; justify-content: space-between; }
 .ovdoc .tile .ic { font-size: 18px; line-height: 1; }
 .ovdoc .tile .nm { font-size: 13px; font-weight: 600; margin-top: 9px; letter-spacing: -0.01em; }

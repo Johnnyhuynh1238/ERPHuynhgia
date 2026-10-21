@@ -63,6 +63,7 @@ export function OverviewClient({
   const [aiOn, setAiOn] = useState(false);
   const [aiSrc, setAiSrc] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => setMounted(true), []);
 
@@ -124,6 +125,25 @@ export function OverviewClient({
     setAiOn(true);
   }, [data, projectId]);
 
+  // Tile "Cổng chủ nhà": sao chép link tuyệt đối để gửi khách, không mở tab.
+  const copyLink = useCallback(async (path: string) => {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(path);
+    setTimeout(() => setCopied((c) => (c === path ? null : c)), 2000);
+  }, []);
+
   const base = `/projects/${projectId}`;
 
   const bars = useMemo(() => {
@@ -157,7 +177,7 @@ export function OverviewClient({
   const spentTotal = f.spent || 1;
   const isSelf = laborMode === "self";
 
-  type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean; external?: boolean };
+  type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean; external?: boolean; copy?: boolean };
   const tiles: Tile[] = [
     { href: `${base}/du-toan`, emoji: "📐", name: "Dự toán", sub: `Giá vốn ${fmt(f.budgetCost)}`, badge: { cls: "ok", text: "Đã duyệt" } },
     { href: `${base}/budget-plan`, emoji: "🐖", name: "Ngân sách", sub: "Hạng mục · đã chi · còn phải chi" },
@@ -181,7 +201,7 @@ export function OverviewClient({
       name: "Cổng chủ nhà",
       sub: data.project.customerPortalEnabled ? "Link theo dõi cho khách" : "Đang tắt",
       badge: data.project.customerPortalEnabled ? { cls: "ok", text: "Bật" } : { cls: "warn", text: "Tắt" },
-      external: true,
+      copy: true,
       show: !!data.project.customerPortalToken,
     },
     { href: `${base}/edit`, emoji: "✏️", name: "Sửa dự án", sub: "Thông tin chung" },
@@ -307,7 +327,12 @@ export function OverviewClient({
         <div className="phead"><span className="pn">Phân hệ dự án</span></div>
         <div className="tiles">
           {tiles.map((t) =>
-            t.external ? (
+            t.copy ? (
+              <button className="tile" type="button" key={t.href} onClick={() => copyLink(t.href)}>
+                <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
+                <div className="nm">{t.name}</div><div className="st">{copied === t.href ? "✓ Đã sao chép link" : `${t.sub ?? ""} · Bấm để sao chép`}</div>
+              </button>
+            ) : t.external ? (
               <a className="tile" href={t.href} key={t.href} target="_blank" rel="noreferrer">
                 <div className="tt"><span className="ic">{t.emoji}</span>{t.badge ? <span className={`badge ${t.badge.cls}`}>{t.badge.text}</span> : null}</div>
                 <div className="nm">{t.name}</div>{t.sub ? <div className="st">{t.sub}</div> : null}
