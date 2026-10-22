@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { plexSans, plexMono } from "@/lib/fonts";
+import { SwipeLightbox } from "@/components/swipe-lightbox";
 import "./nghiem-thu.css";
 
 export type AcceptancePhotoItem = {
@@ -66,6 +67,7 @@ export function AcceptanceManageClient({
   const [busyKey, setBusyKey] = useState<string | null>(null); // `${milestoneId}:${kind}` đang tải lên
   const [expanded, setExpanded] = useState<Set<string>>(new Set()); // dải ảnh đang mở hết
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [lightbox, setLightbox] = useState<{ imgs: string[]; idx: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const target = useRef<{ id: string; kind: Kind } | null>(null);
 
@@ -212,14 +214,24 @@ export function AcceptanceManageClient({
         {photos.length === 0 && <span className="empty">Chưa có</span>}
         {shown.map((p) => (
           <div key={p.key} className="th">
-            <a href={fileUrl(m.id, p)} target="_blank" rel="noreferrer" title={p.name}>
-              {p.contentType === "application/pdf" ? (
+            {p.contentType === "application/pdf" ? (
+              <a href={fileUrl(m.id, p)} target="_blank" rel="noreferrer" title={p.name}>
                 <span className="pdf">PDF</span>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
+              </a>
+            ) : (
+              <a
+                href={fileUrl(m.id, p)}
+                title={p.name}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const imgs = photos.filter((x) => x.contentType !== "application/pdf");
+                  setLightbox({ imgs: imgs.map((x) => fileUrl(m.id, x)), idx: imgs.indexOf(p) });
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={fileUrl(m.id, p)} alt={p.name} loading="lazy" />
-              )}
-            </a>
+              </a>
+            )}
             {(canManage || p.uploadedBy === userId) && (
               <button type="button" className="x" onClick={() => void removeFile(m.id, kind, p)} title="Xoá">
                 ×
@@ -503,6 +515,7 @@ export function AcceptanceManageClient({
           </>
         )}
       </div>
+      {lightbox && <SwipeLightbox imgs={lightbox.imgs} startIdx={lightbox.idx} onClose={() => setLightbox(null)} />}
     </div>
   );
 }

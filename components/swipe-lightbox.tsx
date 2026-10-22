@@ -57,11 +57,35 @@ const counter: CSSProperties = {
   padding: "4px 12px",
   borderRadius: 999,
 };
+const navBtn: CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 2,
+  width: 44,
+  height: 44,
+  borderRadius: 999,
+  border: "none",
+  background: "rgba(255,255,255,0.14)",
+  color: "#fff",
+  fontSize: 26,
+  lineHeight: "44px",
+  cursor: "pointer",
+};
 export function SwipeLightbox({ imgs, startIdx, onClose }: { imgs: string[]; startIdx: number; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   const [idx, setIdx] = useState(startIdx);
   const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => setMounted(true), []);
+  const [canHover, setCanHover] = useState(false); // PC chuột: hiện nút ‹ › (mobile vuốt)
+  useEffect(() => {
+    setMounted(true);
+    setCanHover(window.matchMedia("(hover: hover) and (pointer: fine)").matches);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const scrollTo = useCallback(
     (i: number, smooth = true) => {
@@ -109,6 +133,16 @@ export function SwipeLightbox({ imgs, startIdx, onClose }: { imgs: string[]; sta
       <button type="button" style={closeBtn} onClick={onClose} aria-label="Đóng">
         ✕
       </button>
+      {canHover && imgs.length > 1 && idx > 0 ? (
+        <button type="button" style={{ ...navBtn, left: 12 }} onClick={() => scrollTo(idx - 1)} aria-label="Ảnh trước">
+          ‹
+        </button>
+      ) : null}
+      {canHover && imgs.length > 1 && idx < imgs.length - 1 ? (
+        <button type="button" style={{ ...navBtn, right: 12 }} onClick={() => scrollTo(idx + 1)} aria-label="Ảnh sau">
+          ›
+        </button>
+      ) : null}
       {imgs.length > 1 ? (
         <div style={counter}>
           {idx + 1} / {imgs.length}

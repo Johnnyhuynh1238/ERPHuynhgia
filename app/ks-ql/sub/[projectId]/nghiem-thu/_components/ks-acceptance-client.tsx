@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { SwipeLightbox } from "@/components/swipe-lightbox";
 import { Camera, CheckCircle2, ChevronDown, Clock, Download, FileText, Printer, Trash2 } from "lucide-react";
 
 type Kind = "bien_ban" | "site";
@@ -52,6 +53,7 @@ export function KsAcceptanceClient({
   const [open, setOpen] = useState<string | null>(null);
   const [openDot, setOpenDot] = useState<string | null>(null); // thầu phụ: nhóm đợt đang mở
   const [busy, setBusy] = useState<string | null>(null); // `${id}:${kind}` đang tải lên
+  const [lightbox, setLightbox] = useState<{ imgs: string[]; idx: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const target = useRef<{ id: string; kind: Kind } | null>(null);
   const opened = useRef(false);
@@ -145,17 +147,27 @@ export function KsAcceptanceClient({
       <div className="mt-3 grid grid-cols-3 gap-2">
         {files.map((f) => (
           <div key={f.key} className="relative overflow-hidden rounded-xl border-2 border-[#252840] bg-[#13151f]">
-            <a href={fileUrl(m.id, f)} target="_blank" rel="noopener" className="block">
-              {isPdf(f) ? (
+            {isPdf(f) ? (
+              <a href={fileUrl(m.id, f)} target="_blank" rel="noopener" className="block">
                 <div className="flex aspect-square flex-col items-center justify-center gap-1 px-1 text-center">
                   <FileText className="h-8 w-8 text-orange-300" />
                   <span className="line-clamp-2 break-all text-[11px] text-[#8892b0]">{f.name}</span>
                 </div>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
+              </a>
+            ) : (
+              <a
+                href={fileUrl(m.id, f)}
+                className="block"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const imgs = files.filter((x) => !isPdf(x));
+                  setLightbox({ imgs: imgs.map((x) => fileUrl(m.id, x)), idx: imgs.indexOf(f) });
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={fileUrl(m.id, f)} alt={f.name} loading="lazy" className="aspect-square w-full object-cover" />
-              )}
-            </a>
+              </a>
+            )}
             <a
               href={`${fileUrl(m.id, f)}&download=1`}
               aria-label={`Tải ${f.name}`}
@@ -305,6 +317,7 @@ export function KsAcceptanceClient({
           </Fragment>
         );
       })}
+      {lightbox && <SwipeLightbox imgs={lightbox.imgs} startIdx={lightbox.idx} onClose={() => setLightbox(null)} />}
     </>
   );
 }
