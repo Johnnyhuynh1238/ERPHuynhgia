@@ -5,23 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { buildVtGroups, buildSuperGroups, type VtGroup, type VtItem, type SuperGroup } from "@/lib/estimate-vt-groups";
-import { guessBudgetLineId } from "@/lib/budget-line-match";
+import type { MhList, MhListItem } from "@/lib/mua-hang-list";
 import "./mua-hang.css";
 
 
 // ── kiểu dữ liệu ──────────────────────────────────────────────
-type Material = {
-  id: string;
-  name: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  categoryName: string | null; // chủng loại (Thép, Xi măng…)
-  taskCode: string | null; // "07-030"
-  taskName: string | null;
-};
-
 type OrderItem = { key: string; name: string; unit: string; qty: number; price: number };
 type BudgetLine = { id: string; name: string; groupKind: string };
 // Phân bổ nhiều hạng mục theo số tiền cho 1 đơn: Σ amount = tổng đơn.
@@ -99,8 +87,10 @@ const allocValid = (a: BudgetAlloc[], total: number) =>
   a.every((x) => x.lineId && (total < 0 ? x.amount < 0 : x.amount > 0)) &&
   new Set(a.map((x) => x.lineId)).size === a.length &&
   Math.round(allocSum(a)) === Math.round(total);
-// Đơn giá vật tư: giá thống nhất nếu mọi lần cùng giá, ngược lại bình quân theo SL.
-const upriceOf = (it: VtItem) => it.uniformPrice ?? (it.qty > 0 ? it.amount / it.qty : 0);
+// Khoá 1 dòng danh sách = PHẦN + vật tư (cùng VT có thể nằm ở nhiều PHẦN, SL riêng).
+const rowKey = (group: string, key: string) => `${group}||${key}`;
+// Chuẩn hoá tên để so tên PHẦN ↔ tên hạng mục ngân sách.
+const normName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 // Khoá đã đặt theo vật tư (baseName + đvt, thường hoá chữ thường).
 const itemKeyOf = (name: string, unit: string) =>
   `${baseName(name).toLowerCase()}|${unit.trim().toLowerCase()}`;
@@ -247,6 +237,8 @@ export function MuaHangClient({
   ksName,
   ksPhone,
   isKeToan = false,
+  list,
+  listUpdatedAt,
 }: {
   projectId: string;
   projectCode: string;
@@ -254,8 +246,9 @@ export function MuaHangClient({
   ksName: string;
   ksPhone: string;
   isKeToan?: boolean;
+  list: MhList;
+  listUpdatedAt: string | null;
 }) {
-  const [materials, setMaterials] = useState<Material[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -269,14 +262,16 @@ export function MuaHangClient({
   const [blocks, setBlocks] = useState<Block[]>([]);
   // Giỏ hàng: mỗi VT (theo key) = { SL mua, đơn giá KT tự ghi, tên/đvt gốc từ server }.
   // name/unit giữ để render được cả VT phụ (không có trong danh mục dự toán allItems).
-  const [cartMap, setCartMap] = useState<Record<string, { qty: number; price: number; name?: string; unit?: string }>>({});
+  const [cartMap, setCartMap] = useState<
+    Record<string, { qty: number; price: number; name?: string; unit?: string; hm?: string | null }>
+  >({});
   // Hạng mục ngân sách dự án (rỗng = dự án chưa lập ngân sách → không bắt gắn).
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([]);
   // Phân bổ hạng mục ngân sách (nhiều hạng mục theo số tiền) cho CẢ ĐƠN khi lên đơn.
   const [orderAlloc, setOrderAlloc] = useState<BudgetAlloc[]>([]);
   // VT đang mở popup để nhập SL + giá.
-  const [picked, setPicked] = useState<VtItem<Material> | null>(null);
-  // Trạng thái xổ 3 siêu nhóm (mặc định thu gọn hết).
+  const [picked, setPicked] = useState<MhListItem | null>(null);
+  // Trạng thái xổ từng PHẦN (mặc định thu gọn hết).
   const [openSup, setOpenSup] = useState<Record<string, boolean>>({});
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [editing, setEditing] = useState<Order | null>(null);
@@ -371,9 +366,9 @@ export function MuaHangClient({
       const r = await fetch(`/api/projects/${projectId}/mua-hang/cart`, { cache: "no-store" });
       if (!r.ok) return;
       const j = await r.json();
-      const m: Record<string, { qty: number; price: number; name?: string; unit?: string }> = {};
+      const m: Record<string, { qty: number; price: number; name?: string; unit?: string; hm?: string | null }> = {};
       for (const it of Array.isArray(j.items) ? j.items : [])
-        m[it.key] = { qty: Number(it.qty), price: Number(it.price), name: it.name, unit: it.unit };
+        m[it.key] = { qty: Number(it.qty), price: Number(it.price), name: it.name, unit: it.unit, hm: it.hm ?? null };
       setCartMap(m);
     } catch {
       /* giỏ lỗi → giữ giỏ hiện tại */
@@ -435,10 +430,6 @@ export function MuaHangClient({
   useEffect(() => {
     (async () => {
       try {
-        const mRes = await fetch(`/api/projects/${projectId}/estimate-db/materials`, { cache: "no-store" });
-        if (!mRes.ok) throw new Error("Không đọc được vật tư dự toán");
-        const mj = await mRes.json();
-        setMaterials(mj.items || []);
         await loadOrders();
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Lỗi tải dữ liệu");
@@ -448,31 +439,42 @@ export function MuaHangClient({
     })();
   }, [projectId, loadOrders]);
 
-  // ── gộp VT: chủng loại → vật tư (baseName, tổng SL) ─────────
-  // Nguồn CHUNG với tab "Vật tư" của dự toán (lib/estimate-vt-groups). collapseBase=true
-  // gộp bỏ phần " (vị trí công tác…)" → mỗi vật tư 1 dòng tổng SL để mua.
-  const cats = useMemo<VtGroup<Material>[]>(
-    () => buildVtGroups(materials, { collapseBase: true }),
-    [materials],
-  );
-  const allItems = useMemo(() => cats.flatMap((c) => c.items), [cats]);
+  // ── Danh sách mua hàng GHI TAY (projects.mua_hang_list) — chỉ hiển thị, không tự gộp ──
+  const allItems = useMemo(() => list.groups.flatMap((g) => g.items), [list]);
 
-  const placedByItem = useMemo<Record<string, number>>(() => {
-    const m: Record<string, number> = {};
-    orders.forEach((o) =>
+  // Tên PHẦN (chuẩn hoá) ↔ id hạng mục ngân sách cùng tên.
+  const lineIdByGroup = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const l of budgetLines) m[normName(l.name)] = l.id;
+    return m;
+  }, [budgetLines]);
+  const lineNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const l of budgetLines) m[l.id] = l.name;
+    return m;
+  }, [budgetLines]);
+
+  // Đã đặt theo (PHẦN, vật tư): đơn tính vào PHẦN của hạng mục ngân sách KT chọn cho đơn.
+  // Đơn nhiều hạng mục → PHẦN đầu tiên có vật tư đó; không khớp → PHẦN đầu tiên có VT đó.
+  const placed = useMemo<Record<string, number>>(() => {
+    const groupsOf: Record<string, string[]> = {};
+    for (const it of allItems) (groupsOf[it.key] = groupsOf[it.key] || []).push(it.group);
+    const res: Record<string, number> = {};
+    orders.forEach((o) => {
+      const ids = (o.budgetAlloc && o.budgetAlloc.length ? o.budgetAlloc.map((x) => x.lineId) : [o.budgetLineId])
+        .filter(Boolean) as string[];
+      const names = ids.map((id) => normName(lineNameById[id] || ""));
       o.items.forEach((it) => {
         const k = orderItemKey(it);
-        m[k] = (m[k] || 0) + it.qty;
-      }),
-    );
-    return m;
-  }, [orders]);
-
-  const placed = useMemo<Record<string, number>>(() => {
-    const res: Record<string, number> = {};
-    for (const it of allItems) res[it.key] = Math.min(placedByItem[it.key] || 0, it.qty);
+        const gs = groupsOf[k];
+        if (!gs) return;
+        const g = gs.find((x) => names.indexOf(normName(x)) >= 0) || gs[0];
+        const rk = rowKey(g, k);
+        res[rk] = (res[rk] || 0) + it.qty;
+      });
+    });
     return res;
-  }, [allItems, placedByItem]);
+  }, [orders, allItems, lineNameById]);
 
   // "Đã nhận" = đã nhận hàng (received) hoặc đã thanh toán (paid). Còn lại = chưa nhận.
   const isReceived = (s: Order["status"]) => s === "received" || s === "paid";
@@ -492,36 +494,23 @@ export function MuaHangClient({
   const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
   const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
 
-  // 3 siêu nhóm Thô/ME/Hoàn thiện (nguồn chung dự toán) cho tab Mua hàng.
-  const supers = useMemo<SuperGroup<Material>[]>(() => buildSuperGroups(cats), [cats]);
-
-  // Tra nhanh VT dự toán theo key để dựng giỏ.
+  // Tra nhanh dòng danh sách theo key vật tư (dòng đầu tiên) để dựng giỏ.
   const itemByKey = useMemo(() => {
-    const m: Record<string, VtItem<Material>> = {};
-    for (const it of allItems) m[it.key] = it;
+    const m: Record<string, MhListItem> = {};
+    for (const it of allItems) if (!m[it.key]) m[it.key] = it;
     return m;
   }, [allItems]);
 
-  // Giỏ hàng đã chọn: VT + SL + đơn giá (KT tự ghi). Duyệt theo CHÍNH giỏ (server) chứ
-  // không giao với danh mục dự toán — nếu chỉ lấy allItems thì VT phụ (ngoài dự toán)
-  // sẽ rớt khỏi giỏ dù server đã có. Key không khớp dự toán → dựng VtItem tối thiểu từ
-  // tên/đvt server (trần dự toán = 0, VT phụ vốn không có trần).
+  // Giỏ hàng đã chọn: VT + SL + đơn giá (KT tự ghi). Duyệt theo CHÍNH giỏ (server) —
+  // VT phụ (ngoài danh sách) vẫn giữ. Key không có trong danh sách → dựng dòng tối thiểu.
   const cartEntries = useMemo(
     () =>
       Object.entries(cartMap)
         .filter(([, v]) => (v.qty || 0) > 0)
         .map(([key, v]) => {
-          const it: VtItem<Material> =
-            itemByKey[key] ?? {
-              key,
-              name: v.name ?? key,
-              unit: v.unit ?? "",
-              qty: 0,
-              amount: 0,
-              members: [],
-              uniformPrice: v.price,
-            };
-          return { it, qty: v.qty, price: v.price };
+          const it: MhListItem =
+            itemByKey[key] ?? { key, name: v.name ?? key, unit: v.unit ?? "", qty: 0, price: v.price, note: "", group: "" };
+          return { it, qty: v.qty, price: v.price, hm: v.hm ?? null };
         }),
     [cartMap, itemByKey],
   );
@@ -530,14 +519,16 @@ export function MuaHangClient({
     [cartEntries],
   );
 
-  const addToCart = (it: VtItem<Material>, qty: number, price: number) => {
+  const addToCart = (it: MhListItem, qty: number, price: number) => {
     if (!(qty > 0)) return;
     const p = Math.max(0, Math.round(price));
-    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p, name: it.name, unit: it.unit } }));
+    // Hạng mục ngân sách = PHẦN của dòng đang chọn (gợi ý phân bổ khi lên đơn).
+    const hm = (it.group && lineIdByGroup[normName(it.group)]) || cartMap[it.key]?.hm || null;
+    setCartMap((c) => ({ ...c, [it.key]: { qty, price: p, name: it.name, unit: it.unit, hm } }));
     fetch(`/api/projects/${projectId}/mua-hang/cart`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p }),
+      body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p, hm }),
     }).catch(() => {});
   };
   const removeFromCart = (key: string) => {
@@ -559,8 +550,8 @@ export function MuaHangClient({
     let tot = 0;
     let pl = 0;
     allItems.forEach((it) => {
-      tot += it.amount;
-      pl += (placed[it.key] || 0) * upriceOf(it);
+      tot += it.qty * it.price;
+      pl += Math.min(placed[rowKey(it.group, it.key)] || 0, it.qty) * it.price;
     });
     return { tot, pl, remain: tot - pl, pct: tot > 0 ? Math.round((pl / tot) * 100) : 0 };
   }, [allItems, placed]);
@@ -843,29 +834,27 @@ ${(() => {
         <div className="eyebrow">Đặt mua vật tư · {projectCode}</div>
         <h1>{projectName}</h1>
         <div className="meta">
-          <span>
-            {loading ? "…" : cats.length} chủng loại
-          </span>
+          <span>{list.groups.length} hạng mục</span>
           <span className="d">·</span>
-          <span>Bám dự toán</span>
+          <span>Danh sách ghi tay{listUpdatedAt ? ` · cập nhật ${fmtDate(listUpdatedAt)}` : ""}</span>
         </div>
 
         {/* summary */}
         <div className="sum">
           <div className="c">
-            <div className="k">Dự toán VT</div>
+            <div className="k">Cần mua</div>
             <div className="v t num">{loading ? "—" : fmt(summary.tot)}</div>
-            <div className="sp">{loading ? "—" : `${cats.length} chủng loại`}</div>
+            <div className="sp">{loading ? "—" : `${list.groups.length} hạng mục`}</div>
           </div>
           <div className="c">
             <div className="k">Đã đặt</div>
             <div className="v o num">{loading ? "—" : fmt(summary.pl)}</div>
-            <div className="sp">{loading ? "—" : `${summary.pct}% dự toán`}</div>
+            <div className="sp">{loading ? "—" : `${summary.pct}% danh sách`}</div>
           </div>
           <div className="c">
             <div className="k">Còn lại</div>
             <div className="v g num">{loading ? "—" : fmt(summary.remain)}</div>
-            <div className="sp">so dự toán</div>
+            <div className="sp">so danh sách</div>
           </div>
         </div>
 
@@ -904,7 +893,7 @@ ${(() => {
 
         <div className="panel">
           {loading ? (
-            <div className="load">Đang tải dự toán…</div>
+            <div className="load">Đang tải…</div>
           ) : err ? (
             <div className="empty">{err}</div>
           ) : tab === "blocks" ? (
@@ -912,13 +901,14 @@ ${(() => {
           ) : tab === "buy" ? (
             <>
               <BuyList
-                supers={supers}
+                list={list}
                 placed={placed}
                 cartMap={cartMap}
                 onPick={setPicked}
                 openSup={openSup}
                 toggleSup={(k) => setOpenSup((o) => ({ ...o, [k]: !(o[k] ?? false) }))}
               />
+              {list.basis && <div className="foot">Căn cứ: {list.basis}</div>}
               <div className="foot">Bấm vật tư để xem chi tiết + thêm vào giỏ · KT tự ghi giá</div>
             </>
           ) : tab === "cart" ? (
@@ -929,6 +919,7 @@ ${(() => {
               alloc={orderAlloc}
               onAlloc={setOrderAlloc}
               onEdit={setPicked}
+              lineIdByGroup={lineIdByGroup}
               onRemove={removeFromCart}
               onClear={clearCart}
               onOrder={() => createOrder(orderAlloc)}
@@ -986,7 +977,7 @@ ${(() => {
         createPortal(
           <VtPopup
             item={picked}
-            placed={placed[picked.key] || 0}
+            placed={placed[rowKey(picked.group, picked.key)] || 0}
             existing={cartMap[picked.key]}
             theme={theme}
             onClose={() => setPicked(null)}
@@ -1100,74 +1091,70 @@ ${(() => {
   );
 }
 
-// Tab Mua hàng: 3 siêu nhóm (thu gọn), xổ ra → chọn VT → popup. Ngoài chỉ SL dự toán + đã mua.
+// Tab Mua hàng: danh sách GHI TAY theo PHẦN (thu gọn), xổ ra → chọn VT → popup.
 function BuyList({
-  supers,
+  list,
   placed,
   cartMap,
   onPick,
   openSup,
   toggleSup,
 }: {
-  supers: SuperGroup<Material>[];
+  list: MhList;
   placed: Record<string, number>;
   cartMap: Record<string, { qty: number; price: number }>;
-  onPick: (it: VtItem<Material>) => void;
+  onPick: (it: MhListItem) => void;
   openSup: Record<string, boolean>;
   toggleSup: (key: string) => void;
 }) {
-  if (!supers.length)
+  if (!list.groups.length)
     return (
       <div className="empty">
         <div className="ic">📦</div>
-        Dự toán chưa có vật tư nào.
+        Chưa có danh sách mua hàng.
       </div>
     );
   return (
     <div className="buys">
-      {supers.map((sg) => {
-        const isOpen = openSup[sg.key] ?? false; // mặc định thu gọn
-        const vtCount = sg.groups.reduce((s, g) => s + g.items.length, 0);
+      {list.groups.map((g) => {
+        const isOpen = openSup[g.name] ?? false; // mặc định thu gọn
         return (
-          <div className="sup" key={sg.key}>
-            <button type="button" className="suphd" onClick={() => toggleSup(sg.key)} aria-expanded={isOpen}>
+          <div className="sup" key={g.name}>
+            <button type="button" className="suphd" onClick={() => toggleSup(g.name)} aria-expanded={isOpen}>
               <span className={"sc" + (isOpen ? " open" : "")}>▸</span>
-              <span className="sl">{sg.label}</span>
-              <span className="sm">{vtCount} vật tư</span>
-              <span className="sv num">{fmt(sg.amount)} đ</span>
+              <span className="sl">{g.name}</span>
+              <span className="sm">{g.items.length} vật tư</span>
+              <span className="sv num">{fmt(g.amount)} đ</span>
             </button>
-            {isOpen &&
-              sg.groups.map((g) => (
-                <div key={g.key} className="catgrp">
-                  <div className="cathd">
-                    <span className="cn">{g.categoryName ?? "Chưa phân loại"}</span>
-                  </div>
-                  {g.items.map((it) => {
-                    const pl = placed[it.key] || 0;
-                    const inCart = cartMap[it.key]?.qty || 0;
-                    return (
-                      <button
-                        type="button"
-                        key={it.key}
-                        className={"vtrow" + (inCart > 0 ? " incart" : "")}
-                        onClick={() => onPick(it)}
-                      >
-                        <span className="rn">{it.name}</span>
-                        <span className="nums">
-                          <span>
-                            DT <b>{fmtQ(it.qty)}</b> {it.unit}
-                          </span>
-                          <span className="done">
-                            Đã mua <b>{fmtQ(pl)}</b>
-                          </span>
+            {isOpen && (
+              <div className="catgrp">
+                {g.items.map((it) => {
+                  const pl = placed[rowKey(g.name, it.key)] || 0;
+                  const inCart = cartMap[it.key]?.qty || 0;
+                  return (
+                    <button
+                      type="button"
+                      key={it.key}
+                      className={"vtrow" + (inCart > 0 ? " incart" : "")}
+                      onClick={() => onPick(it)}
+                      title={it.note || undefined}
+                    >
+                      <span className="rn">{it.name}</span>
+                      <span className="nums">
+                        <span>
+                          Cần <b>{fmtQ(it.qty)}</b> {it.unit}
                         </span>
-                        {inCart > 0 && <span className="cbadge">Giỏ {fmtQ(inCart)}</span>}
-                        <span className="chev">›</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+                        <span className="done">
+                          Đã mua <b>{fmtQ(pl)}</b>
+                        </span>
+                      </span>
+                      {inCart > 0 && <span className="cbadge">Giỏ {fmtQ(inCart)}</span>}
+                      <span className="chev">›</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
@@ -1185,7 +1172,7 @@ function VtPopup({
   onAdd,
   onRemove,
 }: {
-  item: VtItem<Material>;
+  item: MhListItem;
   placed: number;
   existing?: { qty: number; price: number };
   theme: "light" | "dark";
@@ -1193,13 +1180,12 @@ function VtPopup({
   onAdd: (qty: number, price: number) => void;
   onRemove?: () => void;
 }) {
-  const suggest = Math.round(upriceOf(item));
+  const suggest = Math.round(item.price);
   const [qty, setQtyS] = useState<string>(existing ? String(existing.qty) : "");
   const [price, setPriceS] = useState<string>(String(existing ? existing.price : suggest));
   const rem = item.qty - placed;
   const q = parseFloat(qty) || 0;
   const p = parseFloat(price) || 0;
-  const tasks = Array.from(new Set(item.members.map((m) => m.taskName).filter(Boolean)));
   return (
     <div className="vt-scrim" data-theme={theme} onClick={onClose}>
       <div className="vt-box" onClick={(e) => e.stopPropagation()}>
@@ -1211,12 +1197,13 @@ function VtPopup({
         </div>
         <div className="vt-info">
           <div className="kv"><span>Đơn vị</span><b>{item.unit}</b></div>
-          <div className="kv"><span>SL dự toán</span><b>{fmtQ(item.qty)} {item.unit}</b></div>
+          {item.group && <div className="kv"><span>Hạng mục</span><b className="tsk">{item.group}</b></div>}
+          <div className="kv"><span>SL cần mua</span><b>{fmtQ(item.qty)} {item.unit}</b></div>
           <div className="kv"><span>Đã mua</span><b>{fmtQ(placed)} {item.unit}</b></div>
-          <div className="kv"><span>Còn lại dự toán</span><b>{fmtQ(rem > 0 ? rem : 0)} {item.unit}</b></div>
-          <div className="kv"><span>Đơn giá dự toán</span><b>{fmt(suggest)} đ</b></div>
-          {tasks.length > 0 && (
-            <div className="kv"><span>Công tác</span><b className="tsk">{tasks.join(", ")}</b></div>
+          <div className="kv"><span>Còn lại</span><b>{fmtQ(rem > 0 ? rem : 0)} {item.unit}</b></div>
+          <div className="kv"><span>Đơn giá dự kiến</span><b>{suggest > 0 ? `${fmt(suggest)} đ` : "Chưa có giá"}</b></div>
+          {item.note && (
+            <div className="kv"><span>Ghi chú</span><b className="tsk">{item.note}</b></div>
           )}
         </div>
         <div className="vt-form">
@@ -1390,23 +1377,26 @@ function CartPanel({
   onRemove,
   onClear,
   onOrder,
+  lineIdByGroup,
 }: {
-  entries: { it: VtItem<Material>; qty: number; price: number }[];
+  entries: { it: MhListItem; qty: number; price: number; hm: string | null }[];
   total: number;
   budgetLines: BudgetLine[];
   alloc: BudgetAlloc[];
   onAlloc: (a: BudgetAlloc[]) => void;
-  onEdit: (it: VtItem<Material>) => void;
+  onEdit: (it: MhListItem) => void;
+  lineIdByGroup: Record<string, string>;
   onRemove: (key: string) => void;
   onClear: () => void;
   onOrder: () => void;
 }) {
   const needHm = budgetLines.length > 0;
-  // Gợi ý hạng mục dòng đầu theo tên vật tư đầu giỏ (khi chưa phân bổ).
+  // Gợi ý hạng mục = PHẦN của vật tư đầu giỏ (khi chưa phân bổ).
   useEffect(() => {
     if (needHm && alloc.length === 0 && entries.length) {
-      const g = guessBudgetLineId(entries[0].it.name, budgetLines);
-      onAlloc([{ lineId: g || "", amount: Math.round(total) }]);
+      const e = entries[0];
+      const g = e.hm || (e.it.group && lineIdByGroup[normName(e.it.group)]) || "";
+      onAlloc([{ lineId: g, amount: Math.round(total) }]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needHm, entries.length]);

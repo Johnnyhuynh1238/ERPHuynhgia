@@ -1,12 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { parseMhList } from "@/lib/mua-hang-list";
 import { MuaHangClient } from "./_components/mua-hang-client";
 
 export const metadata = { title: "Mua hàng" };
 
 // Module Mua hàng — đặt vật tư bám dự toán.
-// Admin: tự do. Kế toán: giá lấy từ dự toán + SL không vượt dự toán (chặn + log).
+// Danh sách VT = projects.mua_hang_list GHI TAY theo PHẦN (AI soạn từ bóc tách + hao hụt), chỉ hiển thị.
+// Admin: tự do. Kế toán: SL vượt danh sách → vẫn cho đặt + log.
 // Đơn lưu bảng mh_orders (độc lập material_proposals). AI 🤖 ghi thẳng DB.
 export default async function MuaHangPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -22,6 +24,8 @@ export default async function MuaHangPage({ params }: { params: { id: string } }
       code: true,
       name: true,
       mainEngineer: { select: { fullName: true, phone: true } },
+      muaHangList: true,
+      muaHangListUpdatedAt: true,
     },
   });
   if (!project) notFound();
@@ -34,6 +38,8 @@ export default async function MuaHangPage({ params }: { params: { id: string } }
       ksName={project.mainEngineer?.fullName || ""}
       ksPhone={project.mainEngineer?.phone || ""}
       isKeToan={isKeToan}
+      list={parseMhList(project.muaHangList)}
+      listUpdatedAt={project.muaHangListUpdatedAt?.toISOString() ?? null}
     />
   );
 }

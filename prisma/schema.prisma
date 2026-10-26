@@ -705,6 +705,9 @@ model Project {
   guideData              Json?            @map("guide_data")
   guideBasis             String?          @map("guide_basis") // VD "HĐ thi công ký 10/10/2026 + PL01"
   guideUpdatedAt         DateTime?        @map("guide_updated_at")
+  // Danh sách mua hàng GHI TAY theo PHẦN (AI soạn từ bóc tách + hao hụt) — màn Mua hàng chỉ đọc.
+  muaHangList            Json?            @map("mua_hang_list")
+  muaHangListUpdatedAt   DateTime?        @map("mua_hang_list_updated_at")
   customerPortalEnabled  Boolean          @default(true) @map("customer_portal_enabled")
   customerPortalPassword String?          @map("customer_portal_password")
   projectManagerId       String           @map("project_manager_id") @db.Uuid

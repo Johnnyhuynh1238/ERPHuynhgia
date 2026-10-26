@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMuaHang } from "@/lib/estimate";
 import { cleanAlloc, validateAlloc, type BudgetAlloc } from "@/lib/mh-budget-alloc";
+import { mhItemKey, mhListQtyByKey, parseMhList } from "@/lib/mua-hang-list";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ const baseName = (n: string) => {
   const i = n.indexOf(" (");
   return (i >= 0 ? n.slice(0, i) : n).trim();
 };
-const matKey = (name: string, unit: string) => `${baseName(name)}|${unit.trim()}`;
+const matKey = (name: string, unit: string) => mhItemKey(baseName(name), unit);
 
 function cleanItems(raw: unknown): OrderItem[] {
   if (!Array.isArray(raw)) return [];
@@ -170,18 +171,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   const budgetLineId = alloc[0]?.lineId ?? null;
 
-  // ── Kế toán: 1 tường SL theo dự toán (giá KT tự ghi). Admin bỏ qua (tự do). ──
+  // ── Kế toán: trần SL theo danh sách mua hàng ghi tay (giá KT tự ghi). Admin bỏ qua (tự do). ──
   if (isKeToan) {
-    // Trần SL gộp theo vật tư (mọi giai đoạn) từ dự toán.
-    const mats = await prisma.estimateDbMaterial.findMany({
-      where: { projectId: params.id },
-      select: { name: true, unit: true, quantity: true },
-    });
-    const budgetQty: Record<string, number> = {}; // Σ SL dự toán / VT
-    for (const m of mats) {
-      const k = matKey(m.name, m.unit);
-      budgetQty[k] = (budgetQty[k] || 0) + Number(m.quantity);
-    }
+    // Trần SL gộp theo vật tư (mọi PHẦN) từ danh sách mua hàng ghi tay.
+    const pj = await prisma.project.findUnique({ where: { id: params.id }, select: { muaHangList: true } });
+    const budgetQty = mhListQtyByKey(parseMhList(pj?.muaHangList)); // Σ SL cần mua / VT
 
     // Đã đặt cộng dồn (mọi đơn hiện có) theo VT.
     const existing = await prisma.mhOrder.findMany({
@@ -206,8 +200,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Soi từng VT → gom vi phạm SL vượt dự toán (giá không còn chặn — KT tự ghi).
     type Block = { materialName: string; unit: string; need: number; have: number; budget: number };
     const blocks: Block[] = [];
+    const label: Record<string, { name: string; unit: string }> = {};
+    for (const it of items) {
+      const k = matKey(it.name, it.unit);
+      if (!label[k]) label[k] = { name: baseName(it.name), unit: it.unit };
+    }
     for (const k of Object.keys(newQty)) {
-      const [name, unit] = k.split("|");
+      const { name, unit } = label[k];
       const budget = budgetQty[k];
       const need = newQty[k];
       if (budget == null) {
@@ -221,7 +220,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     // Cho phép KT đặt VƯỢT dự toán (không chặn nữa) — chỉ GHI LOG để admin thấy đơn nào vượt.
-    if (blocks.length) {
+    // Dự án chưa có danh sách ghi tay → không có trần → không log.
+    if (blocks.length && Object.keys(budgetQty).length) {
       await prisma.mhOrderBlock.createMany({
         data: blocks.map((b) => ({
           projectId: params.id,
