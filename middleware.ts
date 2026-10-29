@@ -77,6 +77,11 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), false);
   }
 
+  // AI Mua hàng gắn ảnh nhận hàng (công cụ mh-anh, SOP-06 GĐ-10) — tự auth bằng Bearer MH_AI_UPLOAD_SECRET.
+  if (pathname === "/api/mua-hang-ai/receipt-photo") {
+    return applySecurityHeaders(NextResponse.next(), false);
+  }
+
   // Public lead capture + pricing API từ huynhgia6.com (form báo giá). Route tự
   // xử lý CORS + validation. Nếu để NextAuth chặn, preflight OPTIONS sẽ bị
   // redirect 307 → trình duyệt từ chối → form gửi lead chết toàn bộ.
