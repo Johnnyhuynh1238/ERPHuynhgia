@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
 import { z } from "zod";
-import { DESIGN_EXPENSE_SOURCES, DESIGN_STEPS } from "@/lib/design-steps";
+import {
+  DESIGN_EXPENSE_SOURCES,
+  DESIGN_STEPS,
+  DESIGN_STEP_SUBFOLDERS,
+  designStepOfDoc,
+} from "@/lib/design-steps";
 
 // Màn GĐ 4 Thiết kế: dùng lại hồ sơ có sẵn của dự án.
 // - Mặt bằng + bộ bản vẽ thi công = project_documents.design_step (bật khách xem → mục HỒ SƠ cổng chủ nhà).
+//   Liên thông Hồ sơ: file bản current trong nhóm "Bản vẽ" thư mục con Mặt bằng/Kiến trúc/… cũng hiện ở bước tương ứng.
 // - 3D phối cảnh = nhóm ảnh thiết kế design_step 'phoi_canh' (băng ảnh trang chủ cổng).
 // - Lệnh chi thiết kế thuê ngoài: expenses.source_type = thiet_ke_<bước>.
 // - Chốt từng bước: project_pipelines.design_done {bước: ISO}.
@@ -18,13 +24,25 @@ export async function GET(
 
   const [docs, group, expenses, pipe] = await Promise.all([
     prisma.projectDocument.findMany({
-      where: { projectId: params.id, designStep: { not: null } },
+      where: {
+        projectId: params.id,
+        isCurrent: true,
+        OR: [
+          { designStep: { not: null } },
+          {
+            group: { systemKey: "ban_ve" },
+            subfolder: { in: DESIGN_STEP_SUBFOLDERS },
+          },
+        ],
+      },
       orderBy: { uploadedAt: "asc" },
       select: {
         id: true,
         title: true,
         fileName: true,
         designStep: true,
+        subfolder: true,
+        group: { select: { systemKey: true } },
         mimeType: true,
         fileSize: true,
       },
@@ -65,17 +83,26 @@ export async function GET(
   const docBase = `/api/projects/${params.id}/documents`;
   const photoBase = `/api/projects/${params.id}/design-photos`;
   const files = [
-    ...docs.map((d) => ({
-      id: d.id,
-      name: d.title,
-      designStep: d.designStep as string,
-      isImage: d.mimeType.startsWith("image/"),
-      ext: (d.fileName.split(".").pop() || "").toUpperCase().slice(0, 4),
-      sizeBytes: d.fileSize,
-      viewUrl: `${docBase}/${d.id}/file`,
-      thumbUrl: `${docBase}/${d.id}/file`,
-      deleteUrl: `${docBase}/${d.id}`,
-    })),
+    ...docs
+      .flatMap((d) => {
+        const step = designStepOfDoc({
+          designStep: d.designStep,
+          subfolder: d.subfolder,
+          groupKey: d.group?.systemKey,
+        });
+        return step ? [{ ...d, step }] : [];
+      })
+      .map((d) => ({
+        id: d.id,
+        name: d.title,
+        designStep: d.step as string,
+        isImage: d.mimeType.startsWith("image/"),
+        ext: (d.fileName.split(".").pop() || "").toUpperCase().slice(0, 4),
+        sizeBytes: d.fileSize,
+        viewUrl: `${docBase}/${d.id}/file`,
+        thumbUrl: `${docBase}/${d.id}/file`,
+        deleteUrl: `${docBase}/${d.id}`,
+      })),
     ...(group?.photos || []).map((p, i) => ({
       id: p.id,
       name: p.caption || `Ảnh 3D ${i + 1}`,
@@ -122,7 +149,10 @@ export async function POST(
     select: { id: true },
   });
   if (!project)
-    return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
+    return NextResponse.json(
+      { message: "Không tìm thấy dự án" },
+      { status: 404 },
+    );
 
   const created = await prisma.designPhotoGroup.create({
     data: {
@@ -153,14 +183,20 @@ export async function PATCH(
 
   const parsed = DoneSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
-    return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
+    return NextResponse.json(
+      { message: "Dữ liệu không hợp lệ" },
+      { status: 400 },
+    );
 
   const pipe = await prisma.projectPipeline.findUnique({
     where: { projectId: params.id },
     select: { id: true, designDone: true },
   });
   if (!pipe)
-    return NextResponse.json({ message: "Dự án chưa gắn tiến độ" }, { status: 404 });
+    return NextResponse.json(
+      { message: "Dự án chưa gắn tiến độ" },
+      { status: 404 },
+    );
 
   const next = { ...((pipe.designDone || {}) as Record<string, string>) };
   if (parsed.data.done) next[parsed.data.step] = new Date().toISOString();

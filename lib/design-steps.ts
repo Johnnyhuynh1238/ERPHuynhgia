@@ -1,11 +1,17 @@
 // GĐ 4 Thiết kế: 3 bước — ① mặt bằng, ② 3D phối cảnh, ③ bộ bản vẽ thi công 3 bộ môn.
 // File: project_documents.design_step (3D: design_photo_groups.design_step = phoi_canh); lệnh chi thuê ngoài gắn sourceType = "thiet_ke_<step>".
+// Liên thông Hồ sơ: subfolder = thư mục con nhóm "Bản vẽ" (ban_ve) — file up ở Hồ sơ vào thư mục này cũng hiện ở bước tương ứng.
 export const DESIGN_STEPS = [
-  { key: "mat_bang", label: "Mặt bằng", group: 1 },
-  { key: "phoi_canh", label: "3D phối cảnh", group: 2 },
-  { key: "kien_truc", label: "Kiến trúc", group: 3 },
-  { key: "ket_cau", label: "Kết cấu", group: 3 },
-  { key: "dien_nuoc", label: "Điện nước", group: 3 },
+  { key: "mat_bang", label: "Mặt bằng", group: 1, subfolder: "Mặt bằng" },
+  {
+    key: "phoi_canh",
+    label: "3D phối cảnh",
+    group: 2,
+    subfolder: "Phối cảnh 3D",
+  },
+  { key: "kien_truc", label: "Kiến trúc", group: 3, subfolder: "Kiến trúc" },
+  { key: "ket_cau", label: "Kết cấu", group: 3, subfolder: "Kết cấu" },
+  { key: "dien_nuoc", label: "Điện nước", group: 3, subfolder: "Điện nước" },
 ] as const;
 
 export type DesignStepKey = (typeof DESIGN_STEPS)[number]["key"];
@@ -27,3 +33,20 @@ export function designStepLabel(key: string | null | undefined) {
 export const DESIGN_EXPENSE_SOURCES = DESIGN_STEPS.map(
   (s) => `thiet_ke_${s.key}` as const,
 );
+
+export const DESIGN_STEP_SUBFOLDERS: string[] = DESIGN_STEPS.map(
+  (s) => s.subfolder,
+);
+
+// Bước thiết kế của 1 file hồ sơ: thư mục con "Bản vẽ" quyết định (sếp dời file ở Hồ sơ → GĐ 4 theo), không có thì design_step.
+export function designStepOfDoc(doc: {
+  designStep: string | null;
+  subfolder: string | null;
+  groupKey: string | null | undefined;
+}): DesignStepKey | null {
+  if (doc.groupKey === "ban_ve" && doc.subfolder) {
+    const s = DESIGN_STEPS.find((x) => x.subfolder === doc.subfolder);
+    if (s) return s.key;
+  }
+  return isDesignStep(doc.designStep) ? doc.designStep : null;
+}
