@@ -13,7 +13,7 @@ const STAGES: StageMeta[] = [
   { num: "I", label: "Trước giờ làm" },
   { num: "II", label: "Sáng — Mở việc" },
   { num: "III", label: "Trong ngày — Triển khai" },
-  { num: "IV", label: "Cuối ngày — EOD" },
+  { num: "IV", label: "Cuối ngày" },
   { num: "V", label: "Định kỳ" },
   { num: "VI", label: "Khi cần tra cứu" },
 ];
@@ -60,25 +60,7 @@ const modules: Module[] = [
     ],
     notes: [
       "Check-in muộn vẫn được trong ngày, nhưng KPI có thể bị trừ điểm đúng giờ.",
-      "Sau check-in mới sang được màn Nhiệm Vụ và mở phiếu giao việc.",
-    ],
-  },
-  {
-    id: "work-orders",
-    stage: "II",
-    title: "Phiếu giao việc hàng ngày",
-    route: "/projects/[id]/work-orders",
-    summary: "Tạo phiếu giao đầu việc cho từng nhóm thợ. KS được tạo, sửa, xoá phiếu.",
-    steps: [
-      "Vào dự án → tab Giao việc hàng ngày. Mặc định mở ngày hôm nay.",
-      "Cách nhanh: bấm Nhân bản hôm qua — app sao chép toàn bộ phiếu của ngày trước sang hôm nay (ngày đích phải chưa có phiếu).",
-      "Cách thủ công: bấm Tạo phiếu mới → chọn Nhóm số → chọn Đầu việc từ dự toán NC (có sẵn phase Móng/Thân/Mái + đơn giá) → nhập Sản lượng giao → chọn các Thợ trong nhóm → ghi chú kỹ thuật (VD: đầm chặt K95, mạch vữa 8mm) → bấm Tạo phiếu.",
-      "Theo dõi trạng thái: Đang làm (open), Đã xong (done), Dở dang (carried).",
-      "Phiếu dở dang cuối ngày sẽ được gợi ý nhân bản sang hôm sau.",
-    ],
-    notes: [
-      "Đầu việc không có trong danh sách — chưa có trong dự toán NC. Báo TPTC bổ sung trước, không tự ý ghi sản lượng ngoài dự toán.",
-      "Mỗi phiếu gắn một nhóm thợ và một đầu việc — không gộp hai đầu việc vào một phiếu.",
+      "Sau check-in mới sang được màn Nhiệm Vụ.",
     ],
   },
   {
@@ -114,64 +96,11 @@ const modules: Module[] = [
     ],
   },
   {
-    id: "eod-cham-cong",
-    stage: "IV",
-    title: "EOD — Chấm công",
-    route: "/projects/[id]/eod → khối Chấm công",
-    summary: "Chấm công cho từng thợ theo quy ước 1 / ½ / 0 và bốn lý do nghỉ.",
-    steps: [
-      "Vào dự án → tab Cuối ngày. Mặc định mở ngày hôm nay.",
-      "Khối Chấm công liệt kê thợ thuộc các nhóm có phiếu giao việc trong ngày.",
-      "Bấm số công cho từng thợ: 1 là công đủ, ½ là nửa công, 0 là vắng.",
-      "Nếu chọn 0 hoặc ½ phải chọn một trong bốn lý do: P (có phép), KP (không phép), MUA (mưa — lỗi công ty), CHO (chờ việc — lỗi công ty).",
-      "App tự gom tổng công theo tuần, hiển thị Tuần ở đầu trang.",
-    ],
-    notes: [
-      "MUA và CHO là lỗi công ty — thợ vẫn được tính tiền chờ theo chính sách. KP là không phép, không có lương ngày đó.",
-      "Sửa chấm công ngày trước: vẫn được nếu tuần chưa khoá. Đã khoá phải nhờ TPTC mở lại.",
-    ],
-  },
-  {
-    id: "eod-san-luong",
-    stage: "IV",
-    title: "EOD — Sản lượng theo phiếu",
-    route: "/projects/[id]/eod → khối Sản lượng",
-    summary: "Nhập khối lượng thực tế của từng phiếu giao việc và ảnh QC để chờ TPTC duyệt.",
-    steps: [
-      "Khối Sản lượng liệt kê các phiếu đã tạo trong ngày.",
-      "Mỗi phiếu: nhập số lượng thực tế đã làm (không quá sản lượng giao), upload 1 đến 3 ảnh QC hiện trường.",
-      "Sau khi điền, trạng thái phiếu chuyển sang Chờ duyệt (pending).",
-      "TPTC duyệt — trạng thái chuyển Đạt, Không đạt hoặc Sửa lại (rework).",
-      "Nếu bị rework: đọc ghi chú TPTC → khắc phục thực tế → quay lại EOD ngày đó cập nhật sản lượng và ảnh.",
-    ],
-    notes: [
-      "Ảnh QC bắt buộc trước khi gửi duyệt — không gửi suông được.",
-      "KS không tự duyệt sản lượng của mình. Quyền duyệt thuộc TPTC và Admin.",
-    ],
-  },
-  {
-    id: "eod-qc",
-    stage: "IV",
-    title: "EOD — QC checklist & Ghi lỗi thợ",
-    route: "/projects/[id]/eod → QC checklist + Ghi nhận lỗi QC",
-    summary: "Tick checklist QC cho từng đầu việc và ghi lỗi cá nhân của thợ (ảnh hưởng rating).",
-    steps: [
-      "Trong từng phiếu sản lượng, mở khối QC checklist — TPTC đã cấu hình sẵn các mục cần kiểm cho đầu việc đó.",
-      "Tick từng mục: mục nào yêu cầu ảnh phải đính kèm ảnh.",
-      "Phát hiện lỗi do thợ cụ thể: vào khối Ghi nhận lỗi QC → chọn thợ liên quan → chọn mức Nhẹ, Vừa hoặc Nặng → ghi mô tả → bấm lưu.",
-      "Lỗi QC ghi nhận sẽ vào hồ sơ thợ (WorkerQcIssue) và ảnh hưởng rating thợ.",
-    ],
-    notes: [
-      "Cấu hình mapping checklist cho đầu việc chỉ TPTC làm (/qc-mapping) — KS không vào được màn đó.",
-      "Ghi lỗi cụ thể tên thợ và mô tả; tránh ghi chung chung khó truy.",
-    ],
-  },
-  {
     id: "nop-bao-cao",
     stage: "IV",
     title: "Nộp báo cáo cuối ngày",
     route: "/reports",
-    summary: "Rà soát toàn bộ task, chấm công, sản lượng, QC, sau đó bấm gửi báo cáo để khoá dữ liệu.",
+    summary: "Rà soát toàn bộ task, sau đó bấm gửi báo cáo để khoá dữ liệu.",
     steps: [
       "Quay lại /reports, kiểm tra: còn task pending nào không, ảnh minh chứng đủ chưa, ghi chú đầy đủ chưa.",
       "Hoàn tất hoặc chuyển N/A cho các task bắt buộc trước hạn nộp.",
@@ -214,22 +143,6 @@ const faqs = [
     a: "Vào /reports check-in muộn — vẫn được tính trong ngày nhưng KPI đúng giờ có thể bị trừ. Sau đó tiếp tục flow bình thường.",
   },
   {
-    q: "Sản lượng bị TPTC trả về Sửa lại (rework) — quy trình?",
-    a: "Đọc ghi chú TPTC, ra hiện trường khắc phục, quay lại EOD ngày đó cập nhật sản lượng và ảnh QC mới. Trạng thái về Chờ duyệt, TPTC xét lại.",
-  },
-  {
-    q: "Nhập nhầm chấm công ngày trước — còn sửa được không?",
-    a: "Còn sửa nếu tuần đó chưa khoá. Tuần đã khoá phải nhờ TPTC mở lại, sửa xong khoá lại.",
-  },
-  {
-    q: "Đầu việc thực tế không có trong dự toán NC?",
-    a: "Báo TPTC bổ sung dự toán (TPTC đề xuất phát sinh, Admin duyệt). KS không tạo phiếu giao việc ngoài dự toán.",
-  },
-  {
-    q: "Ngoài công trường mất mạng — chụp ảnh QC offline được không?",
-    a: "App chưa hỗ trợ upload offline. Cách tạm: chụp ảnh bằng máy ảnh điện thoại, có sóng quay lại EOD upload sau, miễn còn trong ngày và tuần chưa khoá.",
-  },
-  {
     q: "Đổi điện thoại / quên mật khẩu?",
     a: "Quên mật khẩu: báo Admin reset. Đổi điện thoại: chỉ cần đăng nhập lại, không cần đăng xuất máy cũ.",
   },
@@ -238,9 +151,7 @@ const faqs = [
 const principles = [
   "Chỉ thấy dự án được Admin gán. Không thấy dự án — báo Admin gán quyền.",
   "Bắt buộc check-in sáng trước khi xử lý nhiệm vụ trong ngày.",
-  "Mọi sản lượng phải gắn một phiếu giao việc và một đầu việc trong dự toán NC.",
-  "Ảnh QC bắt buộc trước khi gửi sản lượng để TPTC duyệt.",
-  "Sửa dự toán và duyệt sản lượng không thuộc quyền KS.",
+  "Sửa dự toán không thuộc quyền KS.",
 ];
 
 function pad2(n: number) {

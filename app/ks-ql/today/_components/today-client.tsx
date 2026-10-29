@@ -14,7 +14,6 @@ import {
   ListTodo,
   Package,
   Receipt,
-  Sparkles,
   UserCircle,
   Wrench,
 } from "lucide-react";
@@ -311,34 +310,6 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
                 needsAction: !data.morning.attendanceDone,
               },
               {
-                Icon: Sparkles,
-                title: "Rải công + % tiến độ",
-                status:
-                  data.evening.workOrdersToday === 0
-                    ? "Chưa có phiếu giao việc"
-                    : data.evening.assignDone
-                      ? `Đã rải ${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu`
-                      : `${data.evening.workOrderOutputsToday}/${data.evening.workOrdersToday} phiếu đã rải`,
-                statusTone:
-                  data.evening.workOrdersToday === 0
-                    ? "muted"
-                    : data.evening.assignDone
-                      ? "done"
-                      : "todo",
-                cta: data.evening.assignDone ? "Sửa" : "Rải",
-                sop: "6.2",
-                muted: data.evening.workOrdersToday === 0,
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/eod?back=/ks-ql/today?p=${selectedProjectId}`
-                  : undefined,
-                count:
-                  data.evening.workOrdersToday > 0 && !data.evening.assignDone
-                    ? data.evening.workOrdersToday - data.evening.workOrderOutputsToday
-                    : undefined,
-                needsAction:
-                  data.evening.workOrdersToday > 0 && !data.evening.assignDone,
-              },
-              {
                 Icon: Camera,
                 title: "Ảnh tổ hôm nay",
                 status: data.morning.teamPhotoDone ? "Đã chụp" : "Chưa chụp",
@@ -355,33 +326,12 @@ export function KsQlTodayClient({ user, projects, selectedProjectId }: Props) {
           <ResponsibilitySection
             id="quality"
             title="Kiểm soát chất lượng"
-            sub="QC hold-point, sự cố"
+            sub="Sự cố"
             Icon={ClipboardCheck}
             accent="terra"
-            summary={
-              data.midday.qcHoldPoints > 0
-                ? `${data.midday.qcHoldPoints} điểm QC cần tick`
-                : "Không có điểm QC chờ"
-            }
-            badgeTone={data.midday.qcHoldPoints > 0 ? "warn" : "ok"}
+            summary="Gắn cờ khi có sự cố"
+            badgeTone="ok"
             cards={[
-              {
-                Icon: ClipboardCheck,
-                title: "QC hold-point",
-                status:
-                  data.midday.qcHoldPoints === 0
-                    ? "Không có điểm chờ"
-                    : `${data.midday.qcHoldPoints} điểm cần tick`,
-                statusTone: data.midday.qcHoldPoints === 0 ? "muted" : "warn",
-                cta: "Mở",
-                sop: "6.3",
-                muted: data.midday.qcHoldPoints === 0,
-                href: selectedProjectId
-                  ? `/projects/${selectedProjectId}/qc-mapping`
-                  : undefined,
-                count: data.midday.qcHoldPoints > 0 ? data.midday.qcHoldPoints : undefined,
-                needsAction: data.midday.qcHoldPoints > 0,
-              },
               {
                 Icon: Flag,
                 title: "Gắn cờ sự cố",

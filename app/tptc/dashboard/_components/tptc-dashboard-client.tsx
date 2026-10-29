@@ -95,18 +95,6 @@ function KpiBar({ data }: { data: DashboardData }) {
       href: null,
     },
     {
-      label: "Sản lượng chờ nghiệm thu",
-      value: data.totals.qcPending,
-      tone: data.totals.qcPending > 0 ? "text-amber-300" : "text-emerald-300",
-      href: null,
-    },
-    {
-      label: "Lương tuần đang nháp",
-      value: data.totals.payrollDraft,
-      tone: data.totals.payrollDraft > 0 ? "text-amber-300" : "text-emerald-300",
-      href: null,
-    },
-    {
       label: "Yêu cầu chi mua lẻ chờ duyệt",
       value: data.totals.pettyCashPending,
       tone: data.totals.pettyCashPending > 0 ? "text-amber-300" : "text-emerald-300",

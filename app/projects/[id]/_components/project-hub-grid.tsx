@@ -1,11 +1,9 @@
 import Link from "next/link";
 import {
-  Banknote,
   BookCheck,
   BookOpenCheck,
   BookText,
   Calculator,
-  ClipboardList,
   CreditCard,
   FileSignature,
   FolderOpen,
@@ -18,8 +16,6 @@ import {
   Pencil,
   PiggyBank,
   ShoppingCart,
-  ShieldCheck,
-  Sunset,
   Wallet,
   Users,
   type LucideIcon,
@@ -40,10 +36,6 @@ type HubGroup = {
 
 type Caps = {
   canViewBudget: boolean;
-  canViewWorkOrders: boolean;
-  canViewEod: boolean;
-  canViewQcMapping: boolean;
-  canViewPayroll: boolean;
   canProposeMaterials: boolean;
   canViewSubContracts: boolean;
   canViewConstructionLog: boolean;
@@ -55,8 +47,7 @@ type Caps = {
   isAdmin: boolean;
 };
 
-// Menu theo loại dự án: trực thầu (self) mới hiện Giao việc / Cuối ngày /
-// QC Mapping / Lương tuần; giao khoán (subcontract) mới hiện Thầu phụ.
+// Menu theo loại dự án: giao khoán (subcontract) mới hiện Thầu phụ.
 // Route cũ vẫn sống — chỉ ẩn khỏi menu.
 export function ProjectHubGrid({
   projectId,
@@ -80,15 +71,6 @@ export function ProjectHubGrid({
     ...(caps.isAdmin
       ? [{ href: `${base}/du-toan`, label: "Dự toán", icon: Package, desc: "Kho VT + khoán" } as HubItem]
       : []),
-    ...(isSelf && caps.canViewWorkOrders
-      ? [{ href: `${base}/work-orders`, label: "Giao việc", icon: ClipboardList, desc: "Phiếu hàng ngày" } as HubItem]
-      : []),
-    ...(isSelf && caps.canViewEod
-      ? [{ href: `${base}/eod`, label: "Cuối ngày", icon: Sunset, desc: "Chấm công + sản lượng" } as HubItem]
-      : []),
-    ...(isSelf && caps.canViewQcMapping
-      ? [{ href: `${base}/qc-mapping`, label: "QC Mapping", icon: ShieldCheck, desc: "Checklist NC" } as HubItem]
-      : []),
   ];
 
   const finance: HubItem[] = [
@@ -106,9 +88,6 @@ export function ProjectHubGrid({
       : []),
     { href: `${base}/huong-dan-mua-hang`, label: "HD mua hàng", icon: BookCheck, desc: "Hãng · quy cách theo HĐ" },
     { href: `${base}/hd-thi-cong`, label: "HD thi công", icon: ClipboardCheck, desc: "Vật tư · nghiệm thu · bản in" },
-    ...(isSelf && caps.canViewPayroll
-      ? [{ href: `${base}/payroll`, label: "Lương tuần", icon: Banknote, desc: "Bonus + payslip" } as HubItem]
-      : []),
   ];
 
   const customer: HubItem[] = [

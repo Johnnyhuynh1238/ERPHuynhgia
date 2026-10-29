@@ -79,13 +79,6 @@ function statusLabel(s: ProjectMetrics["status"]): string {
   return "Hoàn thành";
 }
 
-function payrollLabel(s: ProjectMetrics["payroll"]["status"]): string {
-  if (s === "missing") return "Chưa lập";
-  if (s === "draft") return "Đang nháp";
-  if (s === "ready_to_pay") return "Chờ kế toán chi";
-  return "Đã chi";
-}
-
 function daysUntil(targetIso: string): number {
   const target = new Date(targetIso + "T00:00:00Z").getTime();
   const now = Date.now();
@@ -167,7 +160,7 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
               tone={ks.morningCheckin ? "good" : "danger"}
             />
             <MetricLine
-              href={`/projects/${p.id}/eod`}
+              href={`/cham-cong-tho/${p.id}`}
               label="Chấm công thợ"
               value={ks.workersActive > 0 ? `${ks.workersMarked}/${ks.workersActive} thợ` : ks.workersMarked > 0 ? `${ks.workersMarked} thợ` : "Chưa chấm"}
               tone={ks.workersActive === 0 ? "muted" : ks.workersMarked >= ks.workersActive ? "good" : ks.workersMarked > 0 ? "warn" : "danger"}
@@ -189,21 +182,7 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
 
         <Section title="Hôm nay">
           <MetricLine
-            href={`/projects/${p.id}/work-orders`}
-            label="Phiếu giao việc"
-            value={p.workOrders.todayTotal === 0 ? "Chưa giao" : `${p.workOrders.todayDone}/${p.workOrders.todayTotal} xong`}
-            sub={p.workOrders.todayOpen > 0 ? `${p.workOrders.todayOpen} chưa xong` : ""}
-            tone={p.workOrders.todayOpen > 0 ? "warn" : p.workOrders.todayTotal === 0 ? "muted" : "good"}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/work-orders?status=carried`}
-            label="Phiếu chuyển ngày"
-            value={p.workOrders.carried}
-            sub={p.workOrders.stuckDays >= 2 ? `tắc ${p.workOrders.stuckDays} ngày liên tiếp` : ""}
-            tone={p.workOrders.carried > 0 ? "warn" : "muted"}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/eod`}
+            href={`/cham-cong-tho/${p.id}`}
             label="Thợ có mặt"
             value={`${p.attendance.present}/${p.attendance.total}`}
             sub={
@@ -221,19 +200,6 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
                   : "đầy đủ"
             }
             tone={p.attendance.absentKP > 0 ? "danger" : absentTotal > 0 ? "warn" : p.attendance.total === 0 ? "muted" : "good"}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/eod`}
-            label="Báo cáo cuối ngày"
-            value={p.eod.submittedToday ? "Đã nộp" : "Chưa nộp"}
-            tone={p.eod.submittedToday ? "good" : "danger"}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/eod`}
-            label="Sản lượng chờ nghiệm thu"
-            value={p.qc.pendingReview}
-            sub={p.qc.failedThisWeek > 0 ? `${p.qc.failedThisWeek} fail tuần này` : ""}
-            tone={p.qc.pendingReview > 0 ? "warn" : "muted"}
           />
         </Section>
 
@@ -258,13 +224,6 @@ export function ProjectCard({ project }: { project: ProjectMetrics }) {
             value={`${eqPct}%`}
             sub={p.budget.equipment.planned > 0 ? `${fmtMoney(p.budget.equipment.used)} / ${fmtMoney(p.budget.equipment.planned)}` : "chưa lập dự toán"}
             valueClass={pctTone(eqPct)}
-          />
-          <MetricLine
-            href={`/projects/${p.id}/payroll?week=${p.payroll.weekKey}`}
-            label={`Lương tuần ${p.payroll.weekKey}`}
-            value={fmtMoney(p.payroll.totalPayable)}
-            sub={`${payrollLabel(p.payroll.status)}${p.payroll.negStreak > 0 ? ` · âm ${p.payroll.negStreak} tuần` : ""}`}
-            tone={p.payroll.negStreak >= 2 ? "danger" : p.payroll.status === "draft" ? "warn" : "good"}
           />
         </Section>
 

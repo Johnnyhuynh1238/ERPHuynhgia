@@ -841,7 +841,6 @@ function AccountantActions({ data }: { data: NonNullable<DashboardData["accounta
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <ExpenseSubLink href="/projects" label="Lương tuần chờ chi" value={expense.payroll} />
           <ExpenseSubLink href="/sub-payments" label="Nhà thầu phụ chờ payout" value={expense.subPayment} />
         </CardContent>
       </Card>

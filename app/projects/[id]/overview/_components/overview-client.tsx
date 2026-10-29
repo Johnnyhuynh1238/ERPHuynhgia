@@ -175,7 +175,6 @@ export function OverviewClient({
   const f = data.finance;
   const p = data.project;
   const spentTotal = f.spent || 1;
-  const isSelf = laborMode === "self";
 
   type Tile = { href: string; emoji: string; name: string; sub?: string; badge?: { cls: string; text: string }; show?: boolean; external?: boolean; copy?: boolean };
   const tiles: Tile[] = [
@@ -186,10 +185,6 @@ export function OverviewClient({
     { href: `${base}/hd-thi-cong`, emoji: "📘", name: "HD thi công", sub: "Vật tư · tiêu chí nghiệm thu · bản in" },
     { href: `${base}/payments`, emoji: "💵", name: "Thanh toán HĐ", sub: `Đã thu ${fmt(f.collected)}`, badge: { cls: "info", text: `${data.payments.doneInstallments}/${data.payments.totalInstallments} đợt` } },
     { href: `${base}/cong-no`, emoji: "💰", name: "Quản lý NCC", sub: `Công nợ · thầu phụ · Còn nợ ${fmt(f.supplierDebt)}`, badge: f.supplierCount ? { cls: "warn", text: `${f.supplierCount} NCC` } : undefined },
-    { href: `${base}/work-orders`, emoji: "👷", name: "Giao việc", sub: "Phiếu hàng ngày", show: isSelf },
-    { href: `${base}/eod`, emoji: "🌇", name: "Cuối ngày", sub: "Chấm công · sản lượng", show: isSelf },
-    { href: `${base}/qc-mapping`, emoji: "✅", name: "QC Mapping", sub: "Checklist NC", show: isSelf },
-    { href: `${base}/payroll`, emoji: "🏦", name: "Lương tuần", sub: "Bonus · payslip", show: isSelf },
     { href: `${base}/acceptance`, emoji: "📋", name: "Nghiệm thu", sub: `${Math.max(0, data.tiles.acceptance.total - data.tiles.acceptance.signed)} mốc chưa nghiệm thu`, badge: { cls: "ok", text: `${data.tiles.acceptance.signed}/${data.tiles.acceptance.total} mốc` } },
     { href: `${base}/construction-log`, emoji: "📖", name: "Nhật ký", sub: `${data.tiles.diary.count} bản ghi`, badge: data.diary[0] ? { cls: "info", text: ddmm(data.diary[0].date) } : undefined },
     { href: `${base}/diary-approval`, emoji: "📝", name: "Duyệt nhật ký", sub: "Nhật ký KS QL", badge: pendingDiaries ? { cls: "warn", text: `${pendingDiaries} chờ` } : undefined },

@@ -401,11 +401,6 @@ export async function GET() {
     if (laborPct >= 90) alerts.push(`Nhân công đã dùng ${laborPct}% dự toán`);
     if (materialPct >= 90) alerts.push(`Vật tư đã dùng ${materialPct}% dự toán`);
     if (equipPct >= 90) alerts.push(`Máy móc đã dùng ${equipPct}% dự toán`);
-    if (stuckDays >= 2) alerts.push(`Phiếu giao việc tắc ${stuckDays} ngày liên tiếp`);
-    if (!submittedToday) alerts.push("Kỹ sư chưa nộp báo cáo cuối ngày");
-    if ((qcPendingMap.get(p.id) ?? 0) >= 5) alerts.push(`${qcPendingMap.get(p.id)} sản lượng chờ TPTC nghiệm thu`);
-    if ((qcFailedWeekMap.get(p.id) ?? 0) >= 3) alerts.push(`${qcFailedWeekMap.get(p.id)} sản lượng QC fail tuần này`);
-    if (payroll && payroll.negStreak >= 2) alerts.push(`Lương tuần âm ${payroll.negStreak} tuần liên tiếp`);
 
     return {
       id: p.id,

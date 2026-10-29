@@ -179,10 +179,6 @@ export default async function ProjectInfoPage({
   const caps = {
     isAdmin,
     canViewBudget: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
-    canViewWorkOrders: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
-    canViewEod: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
-    canViewQcMapping: inAllowedSet([UserRole.admin, UserRole.construction_manager]),
-    canViewPayroll: inAllowedSet([UserRole.admin, UserRole.construction_manager, UserRole.engineer, UserRole.accountant]),
     canProposeMaterials: inAllowedSet([UserRole.admin, UserRole.engineer]),
     canMuaHang: inAllowedSet([UserRole.admin, UserRole.accountant]),
     canViewSubContracts,
