@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildCashPlan } from "@/lib/cash-plan";
 import { buildBudgetPlan } from "@/lib/budget-plan";
+import { syncPaymentLateStatus } from "@/lib/payment-schedule-status";
 
 function canAccess(role: string | undefined) {
   return role === UserRole.admin || role === UserRole.accountant;
@@ -182,7 +183,8 @@ export async function PATCH(req: Request) {
     if (!value) return NextResponse.json({ error: "Đợt thầu phụ bắt buộc có ngày" }, { status: 400 });
     await prisma.subPayment.update({ where: { id: sourceId }, data: { expectedDate: value } });
   } else if (sourceType === "payment_schedule") {
-    await prisma.paymentSchedule.update({ where: { id: sourceId }, data: { expectedDate: value } });
+    const row = await prisma.paymentSchedule.update({ where: { id: sourceId }, data: { expectedDate: value, dueDate: value } });
+    await syncPaymentLateStatus(row.projectId);
   } else {
     await prisma.mhOrder.update({ where: { id: sourceId }, data: { deliveryDate: value } });
   }

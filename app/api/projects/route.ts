@@ -679,6 +679,9 @@ export async function POST(request: Request) {
               actualPaidDate: null,
               actualPaidAmount: null,
               notes: null,
+              installmentNo: item.phaseNumber,
+              description: item.milestoneDescription,
+              dueDate: addDays(startDate, item.dayOffset),
             }));
           })();
 

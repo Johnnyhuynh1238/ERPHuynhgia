@@ -71,6 +71,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     status: PaymentStatus;
     actualPaidDate: Date | null;
     actualPaidAmount: number | null;
+    paidAt: Date | null;
+    paidAmount: number | null;
     notes: string | null;
     expectedDate?: Date | null;
     dueDate?: Date | null;
@@ -79,6 +81,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     status,
     actualPaidDate: status === PaymentStatus.collected ? normalizeDate(actualPaidDate) : null,
     actualPaidAmount: status === PaymentStatus.collected ? actualPaidAmount ?? null : null,
+    paidAt: status === PaymentStatus.collected ? normalizeDate(actualPaidDate) : null,
+    paidAmount: status === PaymentStatus.collected ? actualPaidAmount ?? null : null,
     notes: notes || null,
   };
 

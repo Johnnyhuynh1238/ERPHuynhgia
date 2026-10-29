@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { PaymentStatus, ReceiptStatus, UserRole } from "@prisma/client";
+import { ReceiptStatus, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { normalizePaymentSchedule } from "@/lib/customer-portal-v2";
+import { syncPaymentLateStatus } from "@/lib/payment-schedule-status";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
-
-function startOfTodayUtc() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-}
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -44,26 +40,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
   }
 
-  const today = startOfTodayUtc();
-
-  await prisma.$transaction([
-    prisma.paymentSchedule.updateMany({
-      where: {
-        projectId: params.id,
-        status: PaymentStatus.not_collected,
-        expectedDate: { lt: today },
-      },
-      data: { status: PaymentStatus.customer_late },
-    }),
-    prisma.paymentSchedule.updateMany({
-      where: {
-        projectId: params.id,
-        status: PaymentStatus.pending,
-        OR: [{ dueDate: { lt: today } }, { expectedDate: { lt: today } }],
-      },
-      data: { status: PaymentStatus.overdue },
-    }),
-  ]);
+  await syncPaymentLateStatus(params.id);
 
   const rows = await prisma.paymentSchedule.findMany({
     where: { projectId: params.id },

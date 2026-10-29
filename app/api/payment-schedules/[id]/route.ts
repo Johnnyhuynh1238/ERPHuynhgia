@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PaymentStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { syncPaymentLateStatus } from "@/lib/payment-schedule-status";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { buildDiff, fmtDate, fmtMoney, joinSummary, logProjectActivity } from "@/lib/project-activity-log";
@@ -95,6 +96,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       diff,
     });
   }
+  if (dueDate) await syncPaymentLateStatus(payment.projectId);
 
   return NextResponse.json({ payment, message: "Đã cập nhật đợt thanh toán" });
 }
