@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { PushEnableButton } from "@/components/push-enable-button";
 import { SubPushPrompt } from "./sub-push-prompt";
+import { SubLogoutButton } from "./sub-logout-button";
 
 export function SubLayout({
   title,
@@ -35,6 +36,7 @@ export function SubLayout({
           <div className="flex items-center gap-2">
             <PushEnableButton />
             <NotificationsBell apiBase="/api/notifications" listHref="/notifications" />
+            <SubLogoutButton />
           </div>
         </div>
 
