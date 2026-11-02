@@ -38,6 +38,7 @@ export type ProgressWork = {
   quantity: number;
   weight: number; // tỉ trọng trong hạng mục (Σ = 1) — client tính lại % khi tick
   done: boolean;
+  doneAt: string | null; // ISO lúc tick xong (khoá)
 };
 
 export type ProgressTask = {
@@ -73,7 +74,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
     }),
     prisma.estimateTaskProgress.findMany({
       where: { projectId, refType: { in: ["line", "section", "budget", "work"] } },
-      select: { refType: true, refId: true, percent: true, done: true },
+      select: { refType: true, refId: true, percent: true, done: true, updatedAt: true },
     }),
     prisma.estimateDbMaterial.count({ where: { projectId, sectionId: null } }),
     prisma.estimateWork.findMany({
@@ -83,8 +84,9 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
     }),
   ]);
 
-  const progMap = new Map<string, { percent: number; done: boolean }>();
-  for (const p of progRows) progMap.set(`${p.refType}|${p.refId}`, { percent: p.percent, done: p.done });
+  const progMap = new Map<string, { percent: number; done: boolean; at: Date }>();
+  for (const p of progRows)
+    progMap.set(`${p.refType}|${p.refId}`, { percent: p.percent, done: p.done, at: p.updatedAt });
 
   // Khối lượng theo PHẦN + trọng số (giá trị khoán NC).
   const worksBySec = new Map<string, { w: ProgressWork; value: number }[]>();
@@ -99,6 +101,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
         quantity: qty,
         weight: 0,
         done: progMap.get(`work|${r.id}`)?.done ?? false,
+        doneAt: progMap.get(`work|${r.id}`)?.done ? progMap.get(`work|${r.id}`)!.at.toISOString() : null,
       },
       value: qty * Number(r.laborPrice),
     };
