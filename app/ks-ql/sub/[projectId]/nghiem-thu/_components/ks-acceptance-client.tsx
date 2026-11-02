@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SwipeLightbox } from "@/components/swipe-lightbox";
-import { Camera, CheckCircle2, ChevronDown, Clock, Download, FileText, Printer, Trash2 } from "lucide-react";
+import { Camera, CheckCircle2, ChevronDown, Clock, Download, FileText, PenLine, Printer, Trash2 } from "lucide-react";
 
 type Kind = "bien_ban" | "site";
 
@@ -25,6 +25,16 @@ type Milestone = {
   bienBanPhotos: FileItem[];
   sitePhotos: FileItem[];
   templateFiles: FileItem[];
+  esign: Esign | null;
+};
+
+// Phiên ký online mới nhất của mốc (API /acceptance trả kèm).
+type Esign = {
+  status: "ks_draft" | "cho_khach" | "chot" | "xong" | "huy";
+  ksLink: string;
+  partyLink: string;
+  partyName: string | null;
+  partyNote: string | null;
 };
 
 const fmtDay = (iso: string | null) =>
@@ -124,6 +134,89 @@ export function KsAcceptanceClient({
     if (!r.ok) return void toast.error(j.message || "Không xoá được");
     toast.success(j.message || "Đã xoá");
     void load();
+  }
+
+  async function startEsign(m: Milestone) {
+    setBusy(`${m.id}:esign`);
+    try {
+      const r = await fetch(`/api/projects/${projectId}/acceptance/${m.id}/esign`, { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Không tạo được biên bản");
+      toast.success(j.message || "Đã tạo biên bản ký online");
+      void load();
+      if (j.esign?.status === "ks_draft") window.location.href = j.esign.ksLink;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không tạo được biên bản");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Đã chép link, anh dán vào Zalo khách");
+    } catch {
+      window.prompt("Chép link này gửi khách:", link);
+    }
+  }
+
+  // Ký online (02/11/2026): KS điền + ký trên điện thoại → khách ký qua link Zalo → PDF tự đính vào mục 1.
+  function esignBlock(m: Milestone) {
+    const e = m.esign;
+    if (m.status === "signed" || e?.status === "xong") return null;
+    // Chủ nhà tạm chưa ký online (Zalo cty chưa kết bạn khách) — chỉ đội khoán.
+    if (group !== "thau_phu" && !e) return null;
+    const isBusy = busy === `${m.id}:esign`;
+    return (
+      <div className="mb-4 rounded-xl border-2 border-[#ff8a3d]/50 bg-[#211a14] p-3">
+        <div className="flex items-center gap-2 text-base font-bold text-orange-300">
+          <PenLine className="h-5 w-5" /> Ký online
+        </div>
+        {e?.status === "cho_khach" || e?.status === "chot" ? (
+          <>
+            <p className="mt-1 text-sm text-[#c9cde4]">
+              Anh đã ký. Đang chờ {e.partyName ?? (group === "thau_phu" ? "đội khoán" : "khách")} ký.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <a href={e.ksLink} className="ksql-tap rounded-xl bg-[#252840] px-3 py-3 text-center text-sm font-bold text-[#f0f2ff]">
+                Xem biên bản
+              </a>
+              <button
+                type="button"
+                onClick={() => void copyLink(e.partyLink)}
+                className="ksql-tap rounded-xl bg-[#252840] px-3 py-3 text-sm font-bold text-orange-300"
+              >
+                Chép link khách
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {e?.partyNote ? (
+              <p className="mt-1 rounded-lg bg-[#3a1f1a] px-3 py-2 text-sm text-[#fca5a5]">
+                ↩ Khách chưa đồng ý: {e.partyNote}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-[#c9cde4]">
+                {group === "thau_phu"
+                  ? "Anh điền kết quả + chụp ảnh + ký trên máy. Ký xong PDF tự đính vào đây và gửi Zalo cho đội khoán."
+                  : "Anh điền kết quả + chụp ảnh + ký trên máy. Ký xong máy gửi Zalo cho khách ký, khách ký xong PDF tự đính vào đây."}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={!!busy}
+              onClick={() => (e ? (window.location.href = e.ksLink) : void startEsign(m))}
+              className="ksql-tap mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff8a3d] px-4 py-3 text-base font-bold text-[#0f1015] disabled:opacity-60"
+            >
+              <PenLine className="h-5 w-5" />
+              {isBusy ? "Đang mở…" : e ? "Mở biên bản để điền + ký" : "Điền + ký biên bản online"}
+            </button>
+          </>
+        )}
+      </div>
+    );
   }
 
   if (loading) {
@@ -277,6 +370,8 @@ export function KsAcceptanceClient({
                 {m.description ? (
                   <p className="mb-3 whitespace-pre-line text-sm text-[#8892b0]">{m.description}</p>
                 ) : null}
+
+                {esignBlock(m)}
 
                 {m.templateFiles.length ? (
                   <div className="mb-4 flex flex-col gap-2">

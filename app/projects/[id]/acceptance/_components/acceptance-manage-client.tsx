@@ -292,7 +292,7 @@ export function AcceptanceManageClient({
           rows={2}
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="VD: CT6 – CT9 theo bộ tài liệu giám sát"
+          placeholder="VD: CT2 – CT8 theo bộ tài liệu giám sát"
         />
       </label>
       {m && (

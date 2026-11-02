@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 import { sendZaloBridge } from "@/lib/zalo-notify";
+import { ensureEsign, esignLink } from "@/lib/acceptance-esign";
 
 export type AcceptanceKind = "chu_nha" | "thau_phu";
 type Row = { id: string; projectId: string; seq: number; kind: string; title: string; status: string };
@@ -80,20 +81,37 @@ export async function sendAcceptanceReminders() {
     byKs.set(a.user.id, entry);
   }
 
+  // Mỗi BB cần ký → link ký online (tạo phiên nếu chưa có; KS chỉ bấm link là điền + ký).
+  const links = new Map<string, string>();
+  const allItems = Array.from(upcoming.values()).flat();
+  for (const i of allItems) {
+    try {
+      const { esign } = await ensureEsign(i.id);
+      links.set(i.id, esign.ksToken);
+    } catch (err) {
+      console.error("[acceptance-reminder esign]", i.id, err);
+    }
+  }
+
   let zalo = 0;
   let push = 0;
   for (const [ksId, { zaloThreadId, projects }] of Array.from(byKs.entries())) {
     const missed = projects.reduce((n, p) => n + p.items.filter((i) => i.missed).length, 0);
     const blocks = projects.map((p) => {
-      const lines = p.items.map(
-        (i) =>
-          `${i.missed ? "⚠️ Còn sót" : "• Sắp tới"} [${i.kind === "thau_phu" ? "Thầu phụ" : "Chủ nhà"}] ${upcomingItemLabel(i)}`,
-      );
+      // Link để CUỐI dòng riêng: Zalo hay dính chữ dòng sau vào link → trang /ky chỉ lấy 32 hex đầu.
+      const lines = p.items.map((i) => {
+        const tk = links.get(i.id);
+        return (
+          `${i.missed ? "⚠️ Còn sót" : "• Sắp tới"} [${i.kind === "thau_phu" ? "Thầu phụ" : "Chủ nhà"}] ${upcomingItemLabel(i)}` +
+          (tk ? `\n${esignLink(tk)}` : "")
+        );
+      });
       return `🏠 ${p.name}\n${lines.join("\n")}`;
     });
     const text =
       `📝 Nhắc ký biên bản nghiệm thu ${ddmmToday()}\n` +
-      `Hôm nay làm xong công tác nào thì ký BB công tác đó, chụp BB + ảnh up lên ERP.\n\n` +
+      `Hôm nay làm xong công tác nào thì bấm link BB công tác đó: điền kết quả, chụp ảnh, ký trên máy. ` +
+      `Chủ nhà: ký xong máy tự gửi khách ký. Đội khoán: ký xong máy tự gửi PDF cho đội.\n\n` +
       blocks.join("\n\n");
     if (zaloThreadId && (await sendZaloBridge({ threadId: zaloThreadId, text }))) zalo++;
     try {

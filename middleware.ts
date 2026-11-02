@@ -111,6 +111,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // BB nghiệm thu ký online (/ky/<token> + /submit, /pdf, /file): KS điền + ký, khách đọc + ký.
+  // Token 32 hex ngẫu nhiên lưu DB, mỗi link chỉ mở đúng 1 biên bản — không gắn session.
+  if (pathname.startsWith("/ky/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // File HĐ thầu phụ công khai cho bên B đọc (/hd/<fileId>.<hmac>), CHỈ ĐỌC, không gắn user.
   if (pathname.startsWith("/hd/")) {
     return applySecurityHeaders(NextResponse.next(), true);

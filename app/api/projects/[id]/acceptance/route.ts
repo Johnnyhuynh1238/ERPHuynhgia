@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { esignSummary } from "@/lib/acceptance-esign";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +44,17 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       templateFiles: true,
       createdAt: true,
       creator: { select: { fullName: true } },
+      esigns: { where: { status: { not: "huy" } }, orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
 
-  // Không gửi data-URL chữ ký (nặng) — chỉ cờ có chữ ký cổng CN cũ.
+  // Không gửi data-URL chữ ký (nặng) — chỉ cờ có chữ ký cổng CN cũ. Phiên ký online mới nhất → tóm tắt.
   return NextResponse.json({
-    milestones: milestones.map(({ signatureUrl, ...m }) => ({ ...m, hasSignature: !!signatureUrl })),
+    milestones: milestones.map(({ signatureUrl, esigns, ...m }) => ({
+      ...m,
+      hasSignature: !!signatureUrl,
+      esign: esigns[0] ? esignSummary(esigns[0]) : null,
+    })),
   });
 }
 

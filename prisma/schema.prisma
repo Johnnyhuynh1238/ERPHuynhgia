@@ -4296,10 +4296,57 @@ model AcceptanceMilestone {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   creator User    @relation("AcceptanceMilestoneCreator", fields: [createdBy], references: [id])
+  esigns  AcceptanceEsign[]
 
   @@index([projectId, seq])
   @@index([projectId, status])
   @@map("acceptance_milestones")
+}
+
+/// BB nghiệm thu ký online (02/11/2026): link Zalo → KS điền + ký trước → khách đọc + ký trên màn hình
+/// → tự ghép PDF đính vào mốc. Đội khoán (thau_phu): chỉ KS ký, PDF tự gửi Zalo đội khoán.
+/// status: ks_draft (chờ KS) | cho_khach (KS đã ký, chờ khách) | xong | huy.
+model AcceptanceEsign {
+  id             String    @id @default(uuid()) @db.Uuid
+  milestoneId    String    @map("milestone_id") @db.Uuid
+  projectId      String    @map("project_id") @db.Uuid
+  kind           String    @db.VarChar(20)
+  status         String    @default("ks_draft") @db.VarChar(20)
+  // Link không đăng nhập: /ky/<token>. ksToken cho KS, partyToken cho khách / đội khoán.
+  ksToken        String    @unique @map("ks_token") @db.VarChar(64)
+  partyToken     String    @unique @map("party_token") @db.VarChar(64)
+  // Nội dung BB chụp lúc tạo (công tác + tiêu chuẩn) — sửa Bộ tài liệu sau không đổi BB đã ký.
+  content        Json
+  // KS điền: { items: { [ctNo]: { kq: "dat"|"khong_ad", ngay, note } }, note, photos: [{key,contentType}] }
+  ksData         Json      @default("{}") @map("ks_data")
+  ksUserId       String?   @map("ks_user_id") @db.Uuid
+  ksName         String?   @map("ks_name")
+  ksZaloId       String?   @map("ks_zalo_id")
+  ksSignature    String?   @map("ks_signature") @db.Text
+  ksSignedAt     DateTime? @map("ks_signed_at")
+  ksIp           String?   @map("ks_ip")
+  ksUa           String?   @map("ks_ua") @db.Text
+  partyName      String?   @map("party_name")
+  partyPhone     String?   @map("party_phone")
+  partyZaloId    String?   @map("party_zalo_id")
+  partySignature String?   @map("party_signature") @db.Text
+  partySignedAt  DateTime? @map("party_signed_at")
+  partyIp        String?   @map("party_ip")
+  partyUa        String?   @map("party_ua") @db.Text
+  // Ý kiến khách khi ký, hoặc lý do "Chưa đồng ý" (trả về KS).
+  partyNote      String?   @map("party_note") @db.Text
+  pdfKey         String?   @map("pdf_key")
+  // Nhật ký gửi Zalo / trả về: [{at, ev, ok, note}]
+  log            Json      @default("[]")
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  milestone AcceptanceMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([milestoneId, status])
+  @@index([projectId, status])
+  @@map("acceptance_esigns")
 }
 
 // ──────────────────────────── Dự toán admin (Estimate): mô tả hạng mục → AI bóc KL ────────────────────────────

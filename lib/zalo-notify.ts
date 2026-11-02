@@ -63,6 +63,9 @@ export async function sendZaloBridge(input: {
   imageUrl?: string | null;
   imageBase64?: string | null;
   imageExt?: string | null;
+  /** File đính kèm (vd PDF biên bản) — bridge gửi bằng `openzca msg upload`. */
+  fileBase64?: string | null;
+  fileName?: string | null;
 }): Promise<boolean> {
   if (!BRIDGE_URL || !BRIDGE_TOKEN) return false;
   try {
@@ -79,6 +82,8 @@ export async function sendZaloBridge(input: {
         imageUrl: input.imageUrl || null,
         imageBase64: input.imageBase64 || null,
         imageExt: input.imageExt || null,
+        fileBase64: input.fileBase64 || null,
+        fileName: input.fileName || null,
       }),
       // base64 bill có thể vài MB → nới timeout so với tin text.
       signal: AbortSignal.timeout(20000),
