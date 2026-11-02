@@ -12,19 +12,13 @@ type OrderItem = { key: string; name: string; unit: string; qty: number; price: 
 //  cashMode 'refund'  → status 'paid' (ngoài view công nợ). KHÔNG tự tạo lệnh thu —
 //                       admin bấm nút "Lập lệnh thu" trên đơn trả để NCC hoàn tiền vào quỹ.
 // Body { items:[{key, qty}], cashMode, note? }. qty = SL trả (dương), lưu xuống âm.
-// CHỈ admin (không cho kế toán).
+// Admin + kế toán (02/11/2026 sếp cấp quyền KT).
 export async function POST(
   req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { user, isKeToan, error } = await requireMuaHang();
+  const { user, error } = await requireMuaHang();
   if (error) return error;
-  if (isKeToan) {
-    return NextResponse.json(
-      { message: "Trả hàng do admin thực hiện (ảnh hưởng công nợ / lệnh thu). Liên hệ admin." },
-      { status: 403 },
-    );
-  }
 
   const src = await prisma.mhOrder.findFirst({
     where: { id: params.orderId, projectId: params.id },
