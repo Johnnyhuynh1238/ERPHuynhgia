@@ -169,8 +169,6 @@ export function KsAcceptanceClient({
   function esignBlock(m: Milestone) {
     const e = m.esign;
     if (m.status === "signed" || e?.status === "xong") return null;
-    // Chủ nhà tạm chưa ký online (Zalo cty chưa kết bạn khách) — chỉ đội khoán.
-    if (group !== "thau_phu" && !e) return null;
     const isBusy = busy === `${m.id}:esign`;
     return (
       <div className="mb-4 rounded-xl border-2 border-[#ff8a3d]/50 bg-[#211a14] p-3">
@@ -204,7 +202,7 @@ export function KsAcceptanceClient({
             ) : (
               <p className="mt-1 text-sm text-[#c9cde4]">
                 {group === "thau_phu"
-                  ? "Anh điền kết quả + chụp ảnh + ký trên máy. Ký xong PDF tự đính vào đây và gửi Zalo cho đội khoán."
+                  ? "Anh điền kết quả + chụp ảnh + ký trên máy. Ký xong PDF tự đính vào đây."
                   : "Anh điền kết quả + chụp ảnh + ký trên máy. Ký xong máy gửi Zalo cho khách ký, khách ký xong PDF tự đính vào đây."}
               </p>
             )}

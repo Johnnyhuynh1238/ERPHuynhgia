@@ -42,10 +42,10 @@ type LogEv = { at: string; ev: string; ok?: boolean; note?: string };
 
 export const ESIGN_MAX_PHOTOS = 12;
 /**
- * Ký online với chủ nhà: TẠM KHOÁ (sếp 02/11/2026) — Zalo cty chưa kết bạn khách nên chưa gửi được link.
- * Chạy thử với đội khoán trước; mở lại = đổi true.
+ * Ký online với chủ nhà: MỞ (sếp 02/11/2026) — trước GĐ 6 tin chào Zalo phải tới được khách (SOP-22 bước 9b).
+ * Cần khoá lại (vd Zalo cty lỗi) = đổi false → KS bấm sẽ được báo dùng BB giấy.
  */
-export const ESIGN_CHU_NHA_ON = false;
+export const ESIGN_CHU_NHA_ON = true;
 export const ESIGN_MAX_SIG_CHARS = 400_000; // data URL PNG chữ ký
 
 type Ct = EsignCt;
@@ -381,13 +381,13 @@ export async function ksSubmit(
 
   if (e.kind === "thau_phu") {
     await finalizeOrRevert(fresh, "ks_draft");
-    return { ok: true, message: "Đã ký. PDF đã đính lên ERP và gửi Zalo cho đội khoán." };
+    return { ok: true, message: "Đã ký. PDF đã đính lên ERP." };
   }
   const sent = await zaloSend(
     fresh,
     "party",
     "party_link",
-    `📝 Huỳnh Gia gửi ${fresh.partyName ? `anh/chị ${fresh.partyName}` : "anh/chị"} biên bản nghiệm thu ${c.title} · ${c.projectName}.\n` +
+    `📝 Huỳnh Gia gửi ${xungHo(fresh.partyName)} biên bản nghiệm thu ${c.title} · ${c.projectName}.\n` +
       `Kỹ sư giám sát ${fresh.ksName ?? ""} đã kiểm tra và ký. Anh/chị bấm link để đọc biên bản, đọc xong bấm Ký để ký trực tiếp trên màn hình:\n` +
       esignLink(fresh.partyToken),
   );
@@ -543,6 +543,14 @@ async function finalizeEsign(e: EsignRow) {
   await notifyDone(done, c, pdf, name).catch((err) => console.error("[esign notify]", err));
 }
 
+/** "Anh Hiếu" → "anh Hiếu"; tên trần → "anh/chị Tên"; trống → "anh/chị". */
+function xungHo(name: string | null): string {
+  const n = (name ?? "").trim();
+  if (!n) return "anh/chị";
+  const m = /^(anh|chị|chú|cô|bác)\s+(.+)$/i.exec(n);
+  return m ? `${m[1].toLowerCase()} ${m[2]}` : `anh/chị ${n}`;
+}
+
 async function notifyDone(done: EsignRow, c: EsignContent, pdf: Buffer, name: string) {
   if (done.kind === "thau_phu") {
     await zaloSend(
@@ -554,7 +562,7 @@ async function notifyDone(done: EsignRow, c: EsignContent, pdf: Buffer, name: st
         esignLink(done.partyToken),
       { base64: pdf.toString("base64"), name },
     );
-    await zaloSend(done, "ks", "ks_xong", `✅ Đã đính BB ${c.title} · ${c.projectName} lên ERP và gửi PDF cho đội khoán.`);
+    await zaloSend(done, "ks", "ks_xong", `✅ Đã đính BB ${c.title} · ${c.projectName} lên ERP.`);
     return;
   }
   await zaloSend(
