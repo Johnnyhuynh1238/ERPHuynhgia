@@ -53,6 +53,7 @@ export default async function SubMenuPage({
       <BigCard
         icon={<ListChecks className="h-8 w-8" />}
         title="BÁO CÁO TIẾN ĐỘ"
+        badge="Mới"
         subtitle="Đánh dấu xong từng khối lượng theo hạng mục"
         href={`/ks-ql/sub/${project.id}/tien-do`}
       />

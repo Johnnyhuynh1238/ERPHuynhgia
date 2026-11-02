@@ -59,9 +59,11 @@ export function BigCard({
   onClick,
   tone = "primary",
   disabled,
+  badge,
 }: {
   icon?: ReactNode;
   title: string;
+  badge?: string; // nhãn nhỏ cạnh tiêu đề (vd "Mới")
   subtitle?: string;
   href?: string;
   onClick?: () => void;
@@ -82,7 +84,14 @@ export function BigCard({
     >
       {icon ? <div className="shrink-0 text-orange-300">{icon}</div> : null}
       <div className="min-w-0 flex-1">
-        <div className="text-xl font-bold text-[#f0f2ff]">{title}</div>
+        <div className="flex flex-wrap items-center gap-2 text-xl font-bold text-[#f0f2ff]">
+          {title}
+          {badge ? (
+            <span className="rounded-full bg-[#ff8a3d] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#1a1d2e]">
+              {badge}
+            </span>
+          ) : null}
+        </div>
         {subtitle ? <div className="mt-1 text-sm text-[#8892b0]">{subtitle}</div> : null}
       </div>
     </div>

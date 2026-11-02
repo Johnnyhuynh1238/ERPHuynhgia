@@ -737,7 +737,7 @@ function Ring({ pct, size, sw, color, children }: { pct: number; size: number; s
   const c = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(100, pct));
   return (
-    <span className="ring" style={{ width: size, height: size }}>
+    <span className="pring" style={{ width: size, height: size }}>
       <svg width={size} height={size} aria-hidden>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={sw} />
         {p > 0 && (
