@@ -244,3 +244,27 @@
 .tddoc .undated { font-size: 12px; line-height: 1.5; color: var(--text); background: color-mix(in srgb, #d97706 12%, transparent); border: 1px solid color-mix(in srgb, #d97706 45%, transparent); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
 .tddoc .undated button { font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: 1px 8px; cursor: pointer; }
 .tddoc .undated .hint { color: var(--mut2); }
+
+/* Báo cáo tiến độ = mark done từng khối lượng (bỏ thanh kéo %). */
+.tddoc .g-bar.ro { cursor: default; touch-action: auto; }
+.tddoc .g-bar.ro .g-handle { display: none; }
+.tddoc .rbar { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.tddoc .rbar > i { display: block; height: 100%; border-radius: 3px; background: var(--orange); transition: width 0.2s ease; }
+.tddoc .row:not(.done) .rbar > i { background: var(--terra); }
+.tddoc .dn.kl { font-variant-numeric: tabular-nums; }
+.tddoc .dn.kl.open { border-color: var(--orange); color: var(--orange); }
+.tddoc .wlist { list-style: none; margin-top: 8px; border-top: 1px dashed var(--line2); }
+.tddoc .witem { width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.tddoc .witem:active { opacity: 0.7; }
+.tddoc .wck { flex: none; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid var(--line2); display: grid; place-items: center; font-size: 13px; font-weight: 700; line-height: 1; margin-top: 1px; }
+.tddoc .witem.on .wck { background: var(--orange); border-color: var(--orange); color: #fff; }
+.tddoc[data-theme="dark"] .witem.on .wck { color: #3a1608; }
+.tddoc .wtx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tddoc .wnm { font-size: 13px; font-weight: 500; }
+.tddoc .witem.on .wnm { color: var(--mut); text-decoration: line-through; text-decoration-color: var(--mut2); }
+.tddoc .wloc { font-size: 11px; color: var(--mut); overflow-wrap: anywhere; }
+.tddoc .wq { flex: none; font-size: 12px; color: var(--mut); white-space: nowrap; margin-top: 2px; }
+.tddoc .rplan .rplan-d { font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Đã xong = khoá, không bấm mở lại. */
+.tddoc .dn:disabled, .tddoc .witem:disabled { cursor: default; }
+.tddoc .dn:disabled:active, .tddoc .witem:disabled:active { transform: none; opacity: 1; }

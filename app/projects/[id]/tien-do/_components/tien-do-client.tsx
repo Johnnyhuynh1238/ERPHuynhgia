@@ -6,6 +6,16 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import "./tien-do.css";
 
 
+type Work = {
+  id: string; // id estimate_works
+  name: string;
+  location: string | null;
+  unit: string;
+  quantity: number;
+  weight: number; // tỉ trọng trong hạng mục (Σ = 1)
+  done: boolean;
+};
+
 type Task = {
   refType: "line" | "section";
   refId: string; // id dòng ngân sách (line) / id phần chưa có dòng NS (section)
@@ -19,6 +29,7 @@ type Task = {
   done: boolean;
   planStart: string | null; // dự kiến
   planEnd: string | null;
+  works: Work[]; // khối lượng con — mark done từng dòng; rỗng → Xong cả hạng mục
 };
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
@@ -50,26 +61,51 @@ const plannedPct = (t: { planStart: string | null; planEnd: string | null }): nu
   return Math.max(0, Math.min(100, Math.round(((n - s) / (e - s)) * 100)));
 };
 const keyOf = (t: { refType: string; refId: string }) => `${t.refType}|${t.refId}`;
+const fmtDMY = (iso: string) => {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y.slice(2)}`;
+};
+// Badge sớm/trễ của 1 hạng mục so với % dự kiến hôm nay.
+function SchedBadge({ t }: { t: { planStart: string | null; planEnd: string | null; percent: number } }) {
+  if (!t.planStart || !t.planEnd) return null;
+  const pv = plannedPct(t);
+  const d = t.percent - pv;
+  const cls = d > 0 ? "ahead" : d < 0 ? "behind" : "ontime";
+  const txt = d > 0 ? `sớm ${d}%` : d < 0 ? `trễ ${-d}%` : "đúng";
+  return (
+    <span className={`rsched ${cls}`}>
+      DK {pv}% · {txt}
+    </span>
+  );
+}
+const fmtQty = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString("vi-VN");
+// % hạng mục từ KL đã xong (theo tỉ trọng server tính).
+const pctOfWorks = (ws: Work[]) => Math.round(ws.reduce((s, w) => s + (w.done ? w.weight : 0), 0) * 100);
 
 export function TienDoClient({
   projectId,
   projectCode,
   projectName,
   projectAddress,
+  backHref,
+  ks = false,
 }: {
   projectId: string;
   projectCode: string;
   projectName: string;
   projectAddress?: string | null;
+  backHref?: string;
+  ks?: boolean; // màn KS (/ks-ql/sub): ko khung app, ko sửa ngày
 }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [uncataloged, setUncataloged] = useState(0);
+  const [hideMoney, setHideMoney] = useState(ks); // KS ko thấy tiền (server cũng che)
+  const [open, setOpen] = useState<Record<string, boolean>>({}); // hạng mục đang mở KL
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("dark"); // mặc định tối
   const [view, setView] = useState<"list" | "gantt">("list"); // PC auto → gantt
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // PC (rộng ≥1024) auto hiện Gantt; mobile giữ danh sách. Người dùng đổi được bằng nút.
   useEffect(() => {
@@ -114,6 +150,7 @@ export function TienDoClient({
         const j = await r.json();
         setTasks(Array.isArray(j.tasks) ? j.tasks : []);
         setUncataloged(j.uncataloged || 0);
+        setHideMoney(!!j.hideMoney);
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Lỗi tải");
       } finally {
@@ -150,7 +187,7 @@ export function TienDoClient({
     };
   }, [tasks]);
 
-  // Tween số tiền hoàn thành: bám theo target khi kéo thanh → chạy mượt.
+  // Tween số tiền hoàn thành: bám theo target khi tick → chạy mượt.
   const [dispEarned, setDispEarned] = useState(0);
   const targetRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -188,30 +225,22 @@ export function TienDoClient({
     return Array.from(map.values());
   }, [tasks]);
 
+  // Lưu mark done (KL hoặc cả hạng mục). Lỗi → trả local về trạng thái cũ.
   const save = useCallback(
-    async (t: Task, patch: { percent?: number; done?: boolean }) => {
+    async (ref: { refType: "work" | "line" | "section"; refId: string }, done: boolean, rollback: () => void) => {
       const r = await fetch(`/api/projects/${projectId}/tien-do`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ refType: t.refType, refId: t.refId, ...patch }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
+        body: JSON.stringify({ ...ref, done }),
+      }).catch(() => null);
+      if (!r || !r.ok) {
+        const j = r ? await r.json().catch(() => ({})) : {};
+        rollback();
         toast(j.message || "Lưu lỗi");
       }
     },
     [projectId],
   );
-
-  // Kéo % → cập nhật local ngay (tiền tween theo), debounce PATCH.
-  const setPercent = (t: Task, percent: number) => {
-    setTasks((prev) =>
-      prev.map((x) => (keyOf(x) === keyOf(t) ? { ...x, percent, done: percent >= 100 ? x.done : false } : x)),
-    );
-    const k = keyOf(t);
-    if (timers.current[k]) clearTimeout(timers.current[k]);
-    timers.current[k] = setTimeout(() => save({ ...t, percent }, { percent }), 350);
-  };
 
   // Lưu ngày DỰ KIẾN của 1 PHẦN (chỉ refType 'section'), qua API sections.
   const savePlan = async (t: Task, patch: { planStart?: string | null; planEnd?: string | null }) => {
@@ -231,26 +260,46 @@ export function TienDoClient({
     }
   };
 
-  const toggleDone = (t: Task) => {
-    const nextDone = !t.done;
-    setTasks((prev) =>
-      prev.map((x) =>
-        keyOf(x) === keyOf(t) ? { ...x, done: nextDone, percent: nextDone ? 100 : x.percent } : x,
-      ),
-    );
-    save(t, { done: nextDone });
-    toast(nextDone ? "Đã đánh dấu Xong" : "Mở lại công tác");
+  // Hạng mục KHÔNG có KL con → Xong cả hạng mục. Đã xong là khoá, không mở lại.
+  const markDone = (t: Task) => {
+    if (t.done) return;
+    if (!window.confirm(`Đánh dấu XONG cả hạng mục “${t.name}”?\nĐã xong thì không mở lại được.`)) return;
+    const prev = { done: t.done, percent: t.percent };
+    const apply = (v: { done: boolean; percent: number }) =>
+      setTasks((ts) => ts.map((x) => (keyOf(x) === keyOf(t) ? { ...x, ...v } : x)));
+    apply({ done: true, percent: 100 });
+    save({ refType: t.refType, refId: t.refId }, true, () => apply(prev));
+    toast("Đã đánh dấu Xong");
+  };
+
+  // Tick 1 khối lượng → % hạng mục tự tính lại. Đã tick là khoá.
+  const markWork = (t: Task, w: Work) => {
+    if (w.done) return;
+    if (!window.confirm(`Xong khối lượng “${w.name}”?\nĐã xong thì không mở lại được.`)) return;
+    const set = (done: boolean) =>
+      setTasks((ts) =>
+        ts.map((x) => {
+          if (keyOf(x) !== keyOf(t)) return x;
+          const works = x.works.map((y) => (y.id === w.id ? { ...y, done } : y));
+          return { ...x, works, percent: pctOfWorks(works), done: works.every((y) => y.done) };
+        }),
+      );
+    set(true);
+    save({ refType: "work", refId: w.id }, true, () => set(false));
   };
 
   return (
-    <div className={`tddoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
+    <div
+      className={`tddoc${ks ? "" : " -mx-4 -mt-4 md:-mx-6 md:-mt-6"} ${plexSans.variable} ${plexMono.variable}`}
+      data-theme={theme}
+    >
       <div className="wrap">
         <div className="topbar">
           <div className="brand">
             <div className="mark">HG</div>
             <div>
               <b>HUỲNH GIA</b>
-              <span>Tiến độ thi công</span>
+              <span>Báo cáo tiến độ</span>
             </div>
           </div>
           <div className="tbtns">
@@ -266,7 +315,7 @@ export function TienDoClient({
             <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
               ◑
             </button>
-            <Link href={`/projects/${projectId}`} className="iconbtn" aria-label="Về dự án">
+            <Link href={backHref ?? `/projects/${projectId}`} className="iconbtn" aria-label="Quay lại">
               ‹
             </Link>
           </div>
@@ -284,7 +333,7 @@ export function TienDoClient({
           ) : null}
           <span className="d">·</span>
           <span>
-            <span className="num">{tasks.length}</span> phần
+            <span className="num">{tasks.length}</span> hạng mục
           </span>
         </div>
 
@@ -313,6 +362,13 @@ export function TienDoClient({
               })()}
             </div>
           )}
+          {hideMoney ? (
+            <div className="tot-m">
+              <span>
+                Xong <span className="num">{total.doneCnt}/{tasks.length}</span> hạng mục
+              </span>
+            </div>
+          ) : (
           <div className="tot-m">
             <span>
               Giá trị hoàn thành <span className="num">{loading ? "…" : fmt(dispEarned)}</span> đ
@@ -324,6 +380,7 @@ export function TienDoClient({
               Ngân sách <span className="num">{loading ? "…" : fmt(total.amt)}</span> đ
             </span>
           </div>
+          )}
         </div>
 
         {loading ? (
@@ -337,7 +394,7 @@ export function TienDoClient({
           </div>
         ) : view === "gantt" ? (
           <>
-            {undated.length > 0 && (
+            {undated.length > 0 && !ks && (
               // Hạng mục thiếu ngày KHÔNG vẽ được trên timeline → báo rõ, không ẩn im lặng.
               <div className="undated">
                 <b>⚠ {undated.length} hạng mục chưa hiện trên timeline (chưa có ngày):</b>{" "}
@@ -352,6 +409,8 @@ export function TienDoClient({
             )}
             <GanttView
               tasks={tasks}
+              readOnly={ks}
+              hideMoney={hideMoney}
               onPlan={(t, patch) => savePlan(t, patch)}
             />
           </>
@@ -361,36 +420,48 @@ export function TienDoClient({
               const dn = g.items.filter((x) => x.done).length;
               const gAmt = g.items.reduce((s, x) => s + x.amount, 0);
               const gEarned = g.items.reduce((s, x) => s + (x.percent / 100) * x.amount, 0);
+              const gPct = gAmt > 0 ? Math.round((gEarned / gAmt) * 100) : 0;
               return (
                 <div key={g.groupKey} className="sec">
                   <div className="phead">
                     <span className="pc">{g.groupLabel}</span>
                     <span className="pnm" />
                     <span className="pr">
-                      <span className="pr-m num">
-                        {fmt(gEarned)}<span className="pr-den"> / {fmt(gAmt)} đ</span>
-                      </span>
-                      <span className="pr-d">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} phần`}</span>
+                      {hideMoney ? (
+                        <span className="pr-m num">{gPct}%</span>
+                      ) : (
+                        <span className="pr-m num">
+                          {fmt(gEarned)}<span className="pr-den"> / {fmt(gAmt)} đ</span>
+                        </span>
+                      )}
+                      <span className="pr-d">{dn > 0 ? `${dn}/${g.items.length} xong` : `${g.items.length} hạng mục`}</span>
                     </span>
                   </div>
-                  {g.items.map((t) => (
-                    <div key={keyOf(t)} className={`row${t.done ? " done" : ""}`}>
+                  {g.items.map((t) => {
+                    const k = keyOf(t);
+                    const hasWorks = t.works.length > 0;
+                    const isOpen = !!open[k];
+                    const wDone = t.works.filter((w) => w.done).length;
+                    return (
+                    <div key={k} className={`row${t.done ? " done" : ""}`}>
                       <div className="rtop">
                         <div className="rl">
                           <span className="rnm">{t.name}</span>
                         </div>
-                        <div className="rright">
-                          <span className="ramt num">
-                            <b>{fmt((t.percent / 100) * t.amount)}</b>
-                            <span className="ramt-den"> / {fmt(t.amount)} NS</span>
-                          </span>
-                          <span className="rbuy2">
-                            đã mua <b className={`num${t.bought > t.amount ? " over" : ""}`}>{fmt(t.bought)}</b> đ
-                            {t.bought > t.amount ? " · vượt" : ""}
-                          </span>
-                        </div>
+                        {!hideMoney && (
+                          <div className="rright">
+                            <span className="ramt num">
+                              <b>{fmt((t.percent / 100) * t.amount)}</b>
+                              <span className="ramt-den"> / {fmt(t.amount)} NS</span>
+                            </span>
+                            <span className="rbuy2">
+                              đã mua <b className={`num${t.bought > t.amount ? " over" : ""}`}>{fmt(t.bought)}</b> đ
+                              {t.bought > t.amount ? " · vượt" : ""}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      {t.sectionId && (
+                      {t.sectionId && !ks && (
                         <div className="rplan">
                           <span className="rplan-l">Bắt đầu</span>
                           <input
@@ -425,38 +496,69 @@ export function TienDoClient({
                             aria-label={`Số ngày thi công ${t.name}`}
                           />
                           <span className="rdays-u">ngày</span>
-                          {t.planStart && t.planEnd
-                            ? (() => {
-                                const pv = plannedPct(t);
-                                const d = t.percent - pv;
-                                const cls = d > 0 ? "ahead" : d < 0 ? "behind" : "ontime";
-                                const txt = d > 0 ? `sớm ${d}%` : d < 0 ? `trễ ${-d}%` : "đúng";
-                                return <span className={`rsched ${cls}`}>DK {pv}% · {txt}</span>;
-                              })()
-                            : null}
+                          <SchedBadge t={t} />
+                        </div>
+                      )}
+                      {ks && t.planStart && t.planEnd && (
+                        <div className="rplan">
+                          <span className="rplan-d">
+                            {fmtDMY(t.planStart)} → {fmtDMY(t.planEnd)} · {durationDays(t.planStart, t.planEnd)} ngày
+                          </span>
+                          <SchedBadge t={t} />
                         </div>
                       )}
                       <div className="rctl">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={1}
-                          value={t.percent}
-                          onChange={(e) => setPercent(t, Number(e.target.value))}
-                          aria-label={`Tiến độ ${t.name}`}
-                        />
+                        <span className="rbar" aria-hidden>
+                          <i style={{ width: `${Math.max(0, Math.min(100, t.percent))}%` }} />
+                        </span>
                         <span className="rpct">{t.percent}%</span>
-                        <button
-                          type="button"
-                          className={`dn${t.done ? " on" : ""}`}
-                          onClick={() => toggleDone(t)}
-                        >
-                          {t.done ? "✓ Xong" : "Xong"}
-                        </button>
+                        {hasWorks ? (
+                          <button
+                            type="button"
+                            className={`dn kl${isOpen ? " open" : ""}`}
+                            onClick={() => setOpen((o) => ({ ...o, [k]: !o[k] }))}
+                            aria-expanded={isOpen}
+                          >
+                            {wDone}/{t.works.length} KL {isOpen ? "▴" : "▾"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`dn${t.done ? " on" : ""}`}
+                            onClick={() => markDone(t)}
+                            disabled={t.done}
+                          >
+                            {t.done ? "✓ Xong" : "Xong"}
+                          </button>
+                        )}
                       </div>
+                      {hasWorks && isOpen && (
+                        <ul className="wlist">
+                          {t.works.map((w) => (
+                            <li key={w.id}>
+                              <button
+                                type="button"
+                                className={`witem${w.done ? " on" : ""}`}
+                                onClick={() => markWork(t, w)}
+                                disabled={w.done}
+                                aria-pressed={w.done}
+                              >
+                                <span className="wck">{w.done ? "✓" : ""}</span>
+                                <span className="wtx">
+                                  <span className="wnm">{w.name}</span>
+                                  {w.location ? <span className="wloc">{w.location}</span> : null}
+                                </span>
+                                <span className="wq num">
+                                  {fmtQty(w.quantity)} {w.unit}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })}
@@ -489,9 +591,13 @@ type DragState = {
 };
 function GanttView({
   tasks,
+  readOnly = false,
+  hideMoney = false,
   onPlan,
 }: {
   tasks: Task[];
+  readOnly?: boolean; // KS: xem, ko kéo ngày
+  hideMoney?: boolean;
   onPlan: (t: Task, patch: { planStart: string; planEnd: string }) => void;
 }) {
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -597,10 +703,11 @@ function GanttView({
                 <div className="g-lane" style={{ width: chartW }}>
                   {has && (
                     <div
-                      className={`g-bar${t.done ? " done" : ""}${late ? " late" : ""}${dCur ? " dragging" : ""}`}
+                      className={`g-bar${readOnly ? " ro" : ""}${t.done ? " done" : ""}${late ? " late" : ""}${dCur ? " dragging" : ""}`}
                       style={{ left: l, width: w }}
-                      title={`${isoOfMs(sMs)} → ${isoOfMs(eMs)} · ${durationDays(isoOfMs(sMs), isoOfMs(eMs))} ngày · thực tế ${t.percent}% · dự kiến ${pv}% · đã mua ${fmt(t.bought)}/${fmt(t.amount)}đ`}
+                      title={`${isoOfMs(sMs)} → ${isoOfMs(eMs)} · ${durationDays(isoOfMs(sMs), isoOfMs(eMs))} ngày · thực tế ${t.percent}% · dự kiến ${pv}%${hideMoney ? "" : ` · đã mua ${fmt(t.bought)}/${fmt(t.amount)}đ`}`}
                       onPointerDown={(ev) => {
+                        if (readOnly) return;
                         const tgt = ev.target as HTMLElement;
                         const mode =
                           tgt.dataset.h === "l" ? "start" : tgt.dataset.h === "r" ? "end" : "move";

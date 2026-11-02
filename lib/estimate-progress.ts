@@ -12,6 +12,10 @@ import { buildBudgetPlan } from "@/lib/budget-plan";
 //    ghi chú "(Vĩnh Tường)", "(khách cấp …)" → lệch tên phần → mất khỏi timeline.
 //  - PHẦN chưa có dòng ngân sách nào vẫn hiện (refType="section", ngân sách 0): khách cấp vật
 //    tư thì vẫn phải thi công, tiến độ không được mất.
+//  - % hạng mục KHÔNG kéo tay nữa: hạng mục có khối lượng (estimate_works cùng PHẦN) → % = số
+//    KL đã xong theo trọng số giá trị khoán NC (qty×labor_price; thiếu giá thì đếm số dòng).
+//    Mark done từng KL lưu refType="work", refId = id estimate_works. Hạng mục không có KL nào
+//    → giữ nút Xong cả hạng mục (refType line/section như cũ).
 
 const KIND_LABEL: Record<BudgetPlanGroup, string> = {
   tho: "Thô",
@@ -24,6 +28,16 @@ const KIND_RANK: Record<BudgetPlanGroup, number> = {
   hoan_thien: 1,
   nhan_cong: 2,
   chung: 3,
+};
+
+export type ProgressWork = {
+  id: string; // id estimate_works
+  name: string;
+  location: string | null;
+  unit: string;
+  quantity: number;
+  weight: number; // tỉ trọng trong hạng mục (Σ = 1) — client tính lại % khi tick
+  done: boolean;
 };
 
 export type ProgressTask = {
@@ -39,6 +53,7 @@ export type ProgressTask = {
   done: boolean;
   planStart: string | null;
   planEnd: string | null;
+  works: ProgressWork[]; // khối lượng con (rỗng → mark done cả hạng mục)
 };
 
 export type EstimateProgress = {
@@ -49,7 +64,7 @@ export type EstimateProgress = {
 };
 
 export async function computeEstimateProgress(projectId: string): Promise<EstimateProgress> {
-  const [budget, sections, progRows, uncataloged] = await Promise.all([
+  const [budget, sections, progRows, uncataloged, workRows] = await Promise.all([
     buildBudgetPlan(projectId),
     prisma.projectSection.findMany({
       where: { projectId },
@@ -57,14 +72,55 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
       select: { id: true, name: true, kind: true, planStart: true, planEnd: true },
     }),
     prisma.estimateTaskProgress.findMany({
-      where: { projectId, refType: { in: ["line", "section", "budget"] } },
+      where: { projectId, refType: { in: ["line", "section", "budget", "work"] } },
       select: { refType: true, refId: true, percent: true, done: true },
     }),
     prisma.estimateDbMaterial.count({ where: { projectId, sectionId: null } }),
+    prisma.estimateWork.findMany({
+      where: { projectId, sectionId: { not: null } },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, sectionId: true, name: true, location: true, unit: true, quantity: true, laborPrice: true },
+    }),
   ]);
 
   const progMap = new Map<string, { percent: number; done: boolean }>();
   for (const p of progRows) progMap.set(`${p.refType}|${p.refId}`, { percent: p.percent, done: p.done });
+
+  // Khối lượng theo PHẦN + trọng số (giá trị khoán NC).
+  const worksBySec = new Map<string, { w: ProgressWork; value: number }[]>();
+  for (const r of workRows) {
+    const qty = Number(r.quantity);
+    const item = {
+      w: {
+        id: r.id,
+        name: r.name,
+        location: r.location,
+        unit: r.unit,
+        quantity: qty,
+        weight: 0,
+        done: progMap.get(`work|${r.id}`)?.done ?? false,
+      },
+      value: qty * Number(r.laborPrice),
+    };
+    const arr = worksBySec.get(r.sectionId!);
+    if (arr) arr.push(item);
+    else worksBySec.set(r.sectionId!, [item]);
+  }
+  // 1 PHẦN có thể gắn nhiều dòng NS → KL chỉ gắn vào dòng ĐẦU TIÊN của phần (khỏi đếm 2 lần).
+  const worksTaken = new Set<string>();
+  const takeWorks = (sectionId: string | null) => {
+    if (!sectionId || worksTaken.has(sectionId)) return [];
+    worksTaken.add(sectionId);
+    return worksBySec.get(sectionId) ?? [];
+  };
+  // Tỉ trọng KL: theo giá trị khoán nếu dòng nào cũng có giá, không thì chia đều.
+  for (const items of Array.from(worksBySec.values())) {
+    const byValue = items.every((x) => x.value > 0);
+    const tot = items.reduce((s, x) => s + (byValue ? x.value : 1), 0);
+    for (const x of items) x.w.weight = tot > 0 ? (byValue ? x.value : 1) / tot : 0;
+  }
+  const pctFromWorks = (items: { w: ProgressWork }[]) =>
+    Math.round(items.reduce((s, x) => s + (x.w.done ? x.w.weight : 0), 0) * 100);
 
   const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   const secById = new Map(sections.map((x) => [x.id, x]));
@@ -74,6 +130,8 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
   const tasks: ProgressTask[] = lines.map((l) => {
     const pr = progMap.get(`line|${l.id}`) ?? progMap.get(`budget|${l.name}`);
     const sec = l.sectionId ? secById.get(l.sectionId) : undefined;
+    const ws = takeWorks(sec?.id ?? null);
+    const pct = ws.length ? pctFromWorks(ws) : pr?.done ? 100 : (pr?.percent ?? 0);
     return {
       refType: "line" as const,
       refId: l.id,
@@ -83,10 +141,11 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
       name: l.name,
       amount: l.budget,
       bought: l.spent + l.debt,
-      percent: pr?.percent ?? 0,
-      done: pr?.done ?? false,
+      percent: pct,
+      done: ws.length ? ws.every((x) => x.w.done) : (pr?.done ?? false),
       planStart: iso(sec?.planStart ?? null),
       planEnd: iso(sec?.planEnd ?? null),
+      works: ws.map((x) => x.w),
     };
   });
 
@@ -95,6 +154,7 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
   for (const sec of sections) {
     if (linked.has(sec.id) || sec.kind === "nhan_cong") continue;
     const pr = progMap.get(`section|${sec.id}`);
+    const ws = takeWorks(sec.id);
     tasks.push({
       refType: "section",
       refId: sec.id,
@@ -104,10 +164,11 @@ export async function computeEstimateProgress(projectId: string): Promise<Estima
       name: sec.name,
       amount: 0,
       bought: 0,
-      percent: pr?.percent ?? 0,
-      done: pr?.done ?? false,
+      percent: ws.length ? pctFromWorks(ws) : pr?.done ? 100 : (pr?.percent ?? 0),
+      done: ws.length ? ws.every((x) => x.w.done) : (pr?.done ?? false),
       planStart: iso(sec.planStart),
       planEnd: iso(sec.planEnd),
+      works: ws.map((x) => x.w),
     });
   }
 
