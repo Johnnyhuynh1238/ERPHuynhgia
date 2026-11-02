@@ -248,9 +248,21 @@ async function zaloIdOf(e: EsignRow, who: "ks" | "party"): Promise<string | null
     return id;
   }
   if (e.partyZaloId) return e.partyZaloId;
-  if (!e.partyPhone) return null;
-  const id = await lookupZaloUserByPhone(e.partyPhone);
-  if (id) await prisma.acceptanceEsign.update({ where: { id: e.id }, data: { partyZaloId: id } });
+  let id = e.partyPhone ? await lookupZaloUserByPhone(e.partyPhone) : null;
+  let phone = e.partyPhone;
+  if (!id) {
+    // SĐT chụp lúc tạo phiếu có thể trống/sai (điền vào dự án sau) → lấy SĐT hiện tại của chủ nhà/đội khoán.
+    const [project, m] = await Promise.all([
+      prisma.project.findUnique({ where: { id: e.projectId }, select: { id: true, customerName: true, customerPhone: true } }),
+      prisma.acceptanceMilestone.findUnique({ where: { id: e.milestoneId }, select: { kind: true, description: true } }),
+    ]);
+    const cur = project && m ? (await resolveParty(project, m)).partyPhone : null;
+    if (cur && cur !== e.partyPhone) {
+      phone = cur;
+      id = await lookupZaloUserByPhone(cur);
+    }
+  }
+  if (id) await prisma.acceptanceEsign.update({ where: { id: e.id }, data: { partyZaloId: id, partyPhone: phone } });
   return id;
 }
 
@@ -540,7 +552,8 @@ async function finalizeEsign(e: EsignRow) {
   ]);
   const done = (await prisma.acceptanceEsign.findUnique({ where: { id: e.id } }))!;
   // BB đã chốt trong DB — Zalo lỗi không được làm hỏng (đã log + báo sếp trong zaloSend).
-  await notifyDone(done, c, pdf, name).catch((err) => console.error("[esign notify]", err));
+  // Chạy nền: upload PDF qua bridge có thể mất ~90s, không bắt người ký chờ.
+  void notifyDone(done, c, pdf, name).catch((err) => console.error("[esign notify]", err));
 }
 
 /** "Anh Hiếu" → "anh Hiếu"; tên trần → "anh/chị Tên"; trống → "anh/chị". */

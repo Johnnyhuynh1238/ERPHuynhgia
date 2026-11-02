@@ -86,7 +86,8 @@ export async function sendZaloBridge(input: {
         fileName: input.fileName || null,
       }),
       // base64 bill có thể vài MB → nới timeout so với tin text.
-      signal: AbortSignal.timeout(20000),
+      // Có file (PDF BB) → bridge upload tới 90s + gửi text → chờ 120s, kẻo báo "bridge lỗi" dù đã gửi.
+      signal: AbortSignal.timeout(input.fileBase64 ? 120000 : 20000),
     });
     if (!res.ok) {
       console.error("[zalo-notify] bridge trả lỗi:", res.status, await res.text().catch(() => ""));
