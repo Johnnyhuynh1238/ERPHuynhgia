@@ -120,6 +120,8 @@
 .ptdoc .phint { margin-top: 10px; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; font-weight: 500; }
 .ptdoc .phint.warn { background: var(--gold-bg); color: var(--gold); }
 .ptdoc .phint.bad { background: var(--bad-bg); color: var(--bad); }
+.ptdoc .pready { margin-top: 10px; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; font-weight: 500; border: 1px dashed var(--line2, rgba(46,20,10,.16)); color: var(--mut, inherit); }
+.ptdoc .pready.ok { border-style: solid; border-color: var(--ok); color: var(--ok); font-weight: 600; }
 .ptdoc .preceipt { margin-top: 10px; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; font-weight: 500; background: var(--gold-bg); color: var(--terra); }
 
 .ptdoc .pacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

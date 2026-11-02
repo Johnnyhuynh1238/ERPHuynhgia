@@ -26,6 +26,15 @@ type PaymentRow = {
   status: PaymentStatus;
   notes: string | null;
   activeReceipt: { id: string; code: string; status: ReceiptRefStatus } | null;
+  // Gán mốc (GĐ5): điều kiện thu theo tiến độ thật.
+  readiness: {
+    state: "da_thu" | "chua_gan" | "du_dieu_kien" | "chua_du";
+    pct: number;
+    pctRequired: number;
+    worksLeft: string[];
+    milestonesLeft: string[];
+    readySince: string | null;
+  } | null;
 };
 
 type ProjectInfo = {
@@ -365,6 +374,17 @@ export function ProjectPaymentsClient({ projectId }: { projectId: string }) {
               {row.notes ? <div className="pnote">Ghi chú: {row.notes}</div> : null}
               {row.activeReceipt ? (
                 <div className="preceipt">{row.activeReceipt.status === "received" ? "Đã thu" : "Đang chờ KT thu"} — {row.activeReceipt.code}</div>
+              ) : null}
+              {row.readiness && row.readiness.state === "du_dieu_kien" && row.remaining > 0 ? (
+                <div className="pready ok">
+                  ✅ Đủ điều kiện thu — công tác theo HĐ đã xong{row.readiness.readySince ? ` từ ${fmtDate(row.readiness.readySince)}` : ""}
+                </div>
+              ) : row.readiness && row.readiness.state === "chua_du" ? (
+                <div className="pready">
+                  ⏳ Chưa đủ điều kiện: công tác xong {row.readiness.pct}%/{row.readiness.pctRequired}%
+                  {row.readiness.worksLeft.length ? ` · còn: ${row.readiness.worksLeft.slice(0, 4).join(", ")}${row.readiness.worksLeft.length > 4 ? "…" : ""}` : ""}
+                  {row.readiness.milestonesLeft.length ? ` · chưa ký NT: ${row.readiness.milestonesLeft.join(", ")}` : ""}
+                </div>
               ) : null}
               {hint ? <div className={`phint ${hint.className === "bad" ? "bad" : "warn"}`}>{hint.text}</div> : null}
 

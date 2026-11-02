@@ -5,6 +5,7 @@ import { normalizePaymentSchedule } from "@/lib/customer-portal-v2";
 import { syncPaymentLateStatus } from "@/lib/payment-schedule-status";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
+import { loadPaymentReadiness } from "@/lib/gan-moc";
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -72,6 +73,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
   });
 
+  // Gán mốc (GĐ5): công tác tiến độ gắn đợt đã xong đủ + NT chủ nhà gắn đã ký → "Đủ điều kiện thu".
+  const readiness = await loadPaymentReadiness(params.id);
+
   const canEdit = user.role === "admin" || user.role === "accountant";
   const isAdmin = user.role === UserRole.admin;
 
@@ -110,6 +114,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         remaining,
         normalized,
         activeReceipt,
+        readiness: readiness.get(row.id) ?? null,
       };
     }),
     canEdit,

@@ -3,31 +3,60 @@
  *  - Còn sót : mốc chờ nhưng nằm trước mốc đã ký xa nhất (đã làm qua mà quên ký/up BB).
  *  - Sắp tới : các mốc chờ kế tiếp theo thứ tự thi công (seq).
  * Dùng cho khối "Biên bản nghiệm thu sắp tới" ở màn KS + cron nhắc 16:30 (Zalo + push).
+ * Từ 02/11/2026: loại mốc nào của dự án ĐÃ GÁN công tác tiến độ (Gán mốc GĐ5) → dùng tiến độ thật:
+ *  - Đến hạn : công tác gắn xong hết mà chưa ký (lib/gan-moc).
+ *  - Sắp tới : đang làm (xong 1 phần công tác gắn).
+ * Chưa gán → giữ cách đoán theo thứ tự seq như cũ.
  */
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 import { sendZaloBridge } from "@/lib/zalo-notify";
 import { ensureEsign, esignLink } from "@/lib/acceptance-esign";
+import { loadMilestoneReadiness, type MilestoneReadiness } from "@/lib/gan-moc";
 
 export type AcceptanceKind = "chu_nha" | "thau_phu";
 type Row = { id: string; projectId: string; seq: number; kind: string; title: string; status: string };
-export type UpcomingItem = Row & { missed: boolean };
+export type UpcomingItem = Row & { missed: boolean; due: boolean };
 
 const UPCOMING_LIMIT: Record<AcceptanceKind, number> = { thau_phu: 3, chu_nha: 1 };
 const MISSED_LIMIT = 5;
 
-function pickItems(rows: Row[]): UpcomingItem[] {
+const DUE_LIMIT = 8;
+
+function pickItems(rows: Row[], ready: Map<string, MilestoneReadiness>): UpcomingItem[] {
   const out: UpcomingItem[] = [];
   for (const kind of ["thau_phu", "chu_nha"] as const) {
     const list = rows.filter((r) => r.kind === kind).sort((a, b) => a.seq - b.seq);
     const maxSigned = list.reduce((m, r) => (r.status === "signed" ? Math.max(m, r.seq) : m), 0);
     const pending = list.filter((r) => r.status !== "signed");
-    out.push(...pending.filter((r) => r.seq < maxSigned).slice(0, MISSED_LIMIT).map((r) => ({ ...r, missed: true })));
+    const st = (r: Row) => ready.get(r.id)?.state;
+    const assigned = list.some((r) => (ready.get(r.id)?.total ?? 0) > 0);
+    if (assigned) {
+      // Đã gán mốc: đến hạn (công tác xong hết) trước, rồi mốc đang làm. Mốc chưa gán công tác mà nằm
+      // trước mốc đã ký xa nhất → vẫn tính "còn sót" như cũ.
+      out.push(...pending.filter((r) => st(r) === "den_han").slice(0, DUE_LIMIT).map((r) => ({ ...r, missed: false, due: true })));
+      out.push(
+        ...pending
+          .filter((r) => st(r) === "chua_gan" && r.seq < maxSigned)
+          .slice(0, MISSED_LIMIT)
+          .map((r) => ({ ...r, missed: true, due: false })),
+      );
+      out.push(
+        ...pending
+          .filter((r) => st(r) === "dang_lam")
+          .slice(0, UPCOMING_LIMIT[kind])
+          .map((r) => ({ ...r, missed: false, due: false })),
+      );
+      continue;
+    }
+    out.push(
+      ...pending.filter((r) => r.seq < maxSigned).slice(0, MISSED_LIMIT).map((r) => ({ ...r, missed: true, due: false })),
+    );
     out.push(
       ...pending
         .filter((r) => r.seq > maxSigned)
         .slice(0, UPCOMING_LIMIT[kind])
-        .map((r) => ({ ...r, missed: false })),
+        .map((r) => ({ ...r, missed: false, due: false })),
     );
   }
   return out;
@@ -41,8 +70,9 @@ export async function loadUpcomingAcceptance(projectIds: string[]): Promise<Map<
     where: { projectId: { in: projectIds } },
     select: { id: true, projectId: true, seq: true, kind: true, title: true, status: true },
   });
+  const ready = await loadMilestoneReadiness(projectIds);
   for (const pid of projectIds) {
-    const items = pickItems(rows.filter((r) => r.projectId === pid));
+    const items = pickItems(rows.filter((r) => r.projectId === pid), ready);
     if (items.length) result.set(pid, items);
   }
   return result;
@@ -102,7 +132,7 @@ export async function sendAcceptanceReminders() {
       const lines = p.items.map((i) => {
         const tk = links.get(i.id);
         return (
-          `${i.missed ? "⚠️ Còn sót" : "• Sắp tới"} [${i.kind === "thau_phu" ? "Thầu phụ" : "Chủ nhà"}] ${upcomingItemLabel(i)}` +
+          `${i.missed ? "⚠️ Còn sót" : i.due ? "🔔 Đến hạn" : "• Sắp tới"} [${i.kind === "thau_phu" ? "Thầu phụ" : "Chủ nhà"}] ${upcomingItemLabel(i)}` +
           (tk ? `\n${esignLink(tk)}` : "")
         );
       });

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { buildProjectAccessWhere } from "@/lib/project-permissions";
 import { esignSummary } from "@/lib/acceptance-esign";
+import { loadMilestoneReadiness } from "@/lib/gan-moc";
 
 export const dynamic = "force-dynamic";
 
@@ -48,12 +49,16 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
   });
 
+  // Gán mốc (GĐ5): công tác tiến độ gắn đã xong hết → "Đến hạn nghiệm thu".
+  const readiness = await loadMilestoneReadiness([params.id]);
+
   // Không gửi data-URL chữ ký (nặng) — chỉ cờ có chữ ký cổng CN cũ. Phiên ký online mới nhất → tóm tắt.
   return NextResponse.json({
     milestones: milestones.map(({ signatureUrl, esigns, ...m }) => ({
       ...m,
       hasSignature: !!signatureUrl,
       esign: esigns[0] ? esignSummary(esigns[0]) : null,
+      readiness: readiness.get(m.id) ?? null,
     })),
   });
 }

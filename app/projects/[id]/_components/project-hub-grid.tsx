@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Wallet,
   Users,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -66,6 +67,9 @@ export function ProjectHubGrid({
   const construction: HubItem[] = [
     ...(caps.isAdmin
       ? [{ href: `${base}/tien-do`, label: "Báo cáo tiến độ", icon: ListChecks, desc: "Xong từng khối lượng" } as HubItem]
+      : []),
+    ...(caps.isAdmin
+      ? [{ href: `${base}/gan-moc`, label: "Gán mốc", icon: Link2, desc: "Công tác → nghiệm thu · đợt thu" } as HubItem]
       : []),
     ...(caps.canViewBudget
       ? [{ href: `${base}/budget`, label: "Dự toán", icon: Calculator, desc: "NC · VT · MM" } as HubItem]

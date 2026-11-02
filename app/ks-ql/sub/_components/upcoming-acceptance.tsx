@@ -41,6 +41,8 @@ export async function UpcomingAcceptance({ projects }: { projects: { id: string;
                         <AlertTriangle className="h-3.5 w-3.5" />
                         Còn sót
                       </span>
+                    ) : m.due ? (
+                      <span className="text-[#ff8a3d]">Đến hạn nghiệm thu</span>
                     ) : (
                       <span className="text-[#fbbf24]">Sắp tới</span>
                     )}

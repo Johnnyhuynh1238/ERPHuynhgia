@@ -1,0 +1,95 @@
+/* Gán mốc (GĐ5) — brand Huỳnh Gia ngà/mahogany, IBM Plex. Scope .gmdoc (không đụng .tddoc). */
+.gmdoc {
+  --bg: #f5efe1;
+  --card: #fbf7ec;
+  --text: #2e140a;
+  --mut: rgba(46, 20, 10, 0.55);
+  --line: rgba(46, 20, 10, 0.1);
+  --line2: rgba(46, 20, 10, 0.16);
+  --orange: #e36122;
+  --ok: #5b7a52;
+  --bad: #b3261e;
+  --gold: #b8934a;
+  font-family: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.4;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  color-scheme: light;
+}
+.gmdoc[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #3a1608;
+  --card: #4a1d0c;
+  --text: #f7f2e4;
+  --mut: rgba(247, 242, 228, 0.6);
+  --line: rgba(247, 242, 228, 0.12);
+  --line2: rgba(247, 242, 228, 0.2);
+  --orange: #f0752f;
+  --ok: #89ab78;
+  --bad: #f2867d;
+  --gold: #d8b25e;
+}
+.gmdoc * { box-sizing: border-box; margin: 0; padding: 0; }
+.gmdoc .num { font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.gmdoc .mut { color: var(--mut); }
+.gmdoc .wrap { max-width: 980px; margin: 0 auto; padding: 0 clamp(12px, 4vw, 20px); }
+.gmdoc .topbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 12px; }
+.gmdoc .brand { display: flex; align-items: center; gap: 9px; }
+.gmdoc .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.gmdoc .brand b { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; display: block; line-height: 1.1; }
+.gmdoc .brand span { font-size: 10px; color: var(--mut); letter-spacing: 0.14em; text-transform: uppercase; }
+.gmdoc .tbtns { display: flex; gap: 8px; }
+.gmdoc .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line2); background: none; color: var(--text); cursor: pointer; font-size: 15px; display: grid; place-items: center; text-decoration: none; }
+.gmdoc .ttl { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-top: 6px; }
+.gmdoc .meta { font-size: 13px; color: var(--mut); margin-top: 4px; }
+.gmdoc .lead { font-size: 13.5px; margin: 10px 0 14px; color: var(--mut); }
+.gmdoc .lead b { color: var(--text); font-weight: 600; }
+.gmdoc .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line2); overflow-x: auto; }
+.gmdoc .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--mut); padding: 9px 10px; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.gmdoc .tabs button.on { color: var(--text); border-bottom-color: var(--orange); font-weight: 600; }
+.gmdoc .tabs .num { font-size: 12px; color: var(--ok); }
+.gmdoc .tabs .num.warn { color: var(--orange); }
+.gmdoc .acts { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.gmdoc .btn { border: 1px solid var(--line2); background: var(--card); color: var(--text); border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.gmdoc .btn.primary { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 600; }
+.gmdoc .btn:disabled { opacity: 0.5; cursor: default; }
+.gmdoc .empty { padding: 24px 0; color: var(--mut); text-align: center; font-size: 14px; }
+.gmdoc .tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.gmdoc .tbl th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); padding: 8px 6px; border-bottom: 1px solid var(--line2); }
+.gmdoc .tbl td { padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.gmdoc .tbl tr.row { cursor: pointer; }
+@media (hover: hover) { .gmdoc .tbl tr.row:hover td { background: var(--card); } }
+.gmdoc .tbl tr.grp td { font-size: 12px; font-weight: 600; color: var(--gold); padding-top: 14px; }
+.gmdoc .tbl .mc { width: 34%; }
+.gmdoc .tbl .mc b { font-weight: 600; display: block; }
+.gmdoc .tbl .wc { color: var(--text); font-size: 12.5px; }
+.gmdoc .tbl small { display: block; font-size: 11.5px; color: var(--mut); margin-top: 3px; }
+.gmdoc .st { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px; white-space: nowrap; border: 1px solid currentColor; }
+.gmdoc .st.ok { color: var(--ok); }
+.gmdoc .st.hot { color: #fff; background: var(--orange); border-color: var(--orange); }
+.gmdoc .st.mid { color: var(--gold); }
+.gmdoc .st.mut { color: var(--mut); }
+.gmdoc .st.bad { color: var(--bad); }
+
+.gmdoc .sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+.gmdoc .sheet { background: var(--bg); width: 100%; max-width: 640px; max-height: 88dvh; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; }
+@media (min-width: 720px) { .gmdoc .sheet-bg { align-items: center; } .gmdoc .sheet { border-radius: 16px; } }
+.gmdoc .sh-top { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 14px 16px 8px; }
+.gmdoc .sh-top b { font-size: 15px; font-weight: 600; }
+.gmdoc .sh-acts { display: flex; gap: 8px; align-items: center; padding: 0 16px 8px; font-size: 13px; }
+.gmdoc .paycfg { padding: 0 16px 8px; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+.gmdoc .paycfg input[type="number"] { width: 64px; padding: 4px 6px; border: 1px solid var(--line2); border-radius: 6px; background: var(--card); color: var(--text); }
+.gmdoc .mslist { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gmdoc .chip { border: 1px solid var(--line2); border-radius: 99px; padding: 3px 9px; cursor: pointer; font-size: 12.5px; }
+.gmdoc .chip input { display: none; }
+.gmdoc .chip.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+.gmdoc .wlist { overflow-y: auto; padding: 0 16px; flex: 1; border-top: 1px solid var(--line); }
+.gmdoc .wsh { font-size: 11.5px; font-weight: 600; color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 0 4px; }
+.gmdoc .wrow { display: flex; gap: 9px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; cursor: pointer; }
+.gmdoc .wrow input { width: 18px; height: 18px; accent-color: var(--orange); flex-shrink: 0; }
+.gmdoc .wrow .wn { flex: 1; min-width: 0; }
+.gmdoc .wrow.on .wn { font-weight: 600; }
+.gmdoc .sh-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.gmdoc.gmportal { min-height: 0; padding: 0; background: none; }

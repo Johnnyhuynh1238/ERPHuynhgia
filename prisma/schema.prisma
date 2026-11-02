@@ -1506,6 +1506,11 @@ model PaymentSchedule {
   paidAmount           Decimal?            @map("paid_amount") @db.Decimal(15, 2)
   receiptUrl           String?             @map("receipt_url") @db.Text
   paymentNote          String?             @map("payment_note") @db.Text
+  // Gán mốc (GĐ5, 02/11/2026): đợt ĐỦ ĐIỀU KIỆN THU khi công tác gắn xong ≥ workPctRequired% (theo giá trị
+  // khoán NC) + các mốc nghiệm thu chủ nhà gắn đã ký.
+  workIds              String[]            @default([]) @map("work_ids") @db.Uuid
+  milestoneIds         String[]            @default([]) @map("milestone_ids") @db.Uuid
+  workPctRequired      Int                 @default(100) @map("work_pct_required") @db.SmallInt
   createdBy            String?             @map("created_by") @db.Uuid
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
@@ -4290,6 +4295,8 @@ model AcceptanceMilestone {
   sitePhotos    Json                     @default("[]") @map("site_photos")
   // BB mẫu (trắng) để in — admin tải lên, chỉ staff thấy, KHÔNG lộ ra cổng CN.
   templateFiles Json                     @default("[]") @map("template_files")
+  // Gán mốc (GĐ5, 02/11/2026): mốc ĐẾN HẠN nghiệm thu khi mọi công tác tiến độ (estimate_works) này đã xong.
+  workIds      String[]                  @default([]) @map("work_ids") @db.Uuid
   createdBy    String                    @map("created_by") @db.Uuid
   createdAt    DateTime                  @default(now()) @map("created_at")
   updatedAt    DateTime                  @updatedAt @map("updated_at")

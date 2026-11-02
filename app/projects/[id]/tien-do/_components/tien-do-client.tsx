@@ -372,6 +372,11 @@ export function TienDoClient({
           <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền sáng/tối">
             ◑
           </button>
+          {!ks ? (
+            <Link href={`/projects/${projectId}/gan-moc`} className="iconbtn" aria-label="Gán mốc" title="Gán mốc nghiệm thu & đợt thu">
+              🔗
+            </Link>
+          ) : null}
         </div>
 
         {/* Tổng: vòng % + sớm/trễ + thanh (dự kiến nhạt, thực tế đậm) + 3 số */}

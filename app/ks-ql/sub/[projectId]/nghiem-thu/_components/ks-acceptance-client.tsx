@@ -26,6 +26,8 @@ type Milestone = {
   sitePhotos: FileItem[];
   templateFiles: FileItem[];
   esign: Esign | null;
+  // Gán mốc: công tác tiến độ gắn với mốc (null = API cũ).
+  readiness: { state: "da_ky" | "chua_gan" | "den_han" | "dang_lam" | "chua_toi"; done: number; total: number } | null;
 };
 
 // Phiên ký online mới nhất của mốc (API /acceptance trả kèm).
@@ -78,7 +80,9 @@ export function KsAcceptanceClient({
       // Lần đầu mở sẵn đợt đang chờ đầu tiên.
       if (!opened.current) {
         opened.current = true;
-        const first = list.find((m) => m.id === initialOpen) ?? list.find((m) => m.status !== "signed");
+        const first = list.find((m) => m.id === initialOpen) ??
+          list.find((m) => m.status !== "signed" && m.readiness?.state === "den_han") ??
+          list.find((m) => m.status !== "signed");
         setOpen(first?.id ?? null);
         setOpenDot(first ? dotOf(first) : null);
         if (first && first.id === initialOpen) {
@@ -327,6 +331,11 @@ export function KsAcceptanceClient({
             >
               <span className="min-w-0 flex-1 text-base font-bold text-orange-300">{dot}</span>
               <span className="shrink-0 text-sm text-[#8892b0]">
+                {dotRows.some((r) => r.status !== "signed" && r.readiness?.state === "den_han") ? (
+                  <b className="mr-2 text-[#ff8a3d]">
+                    {dotRows.filter((r) => r.status !== "signed" && r.readiness?.state === "den_han").length} đến hạn
+                  </b>
+                ) : null}
                 {dotRows.filter((r) => r.status === "signed").length}/{dotRows.length}
               </span>
               <ChevronDown
@@ -354,9 +363,17 @@ export function KsAcceptanceClient({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="break-words text-lg font-bold text-[#f0f2ff]">{m.title}</div>
-                <div className={`mt-1 flex items-center gap-1 text-sm ${done ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+                <div
+                  className={`mt-1 flex items-center gap-1 text-sm ${done ? "text-[#34d399]" : m.readiness?.state === "den_han" ? "font-bold text-[#ff8a3d]" : m.readiness?.total ? "text-[#8892b0]" : "text-[#fbbf24]"}`}
+                >
                   {done ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                  {done ? `Đã nghiệm thu ${fmtDay(m.signedAt)}` : "Chờ nghiệm thu"}
+                  {done
+                    ? `Đã nghiệm thu ${fmtDay(m.signedAt)}`
+                    : m.readiness?.state === "den_han"
+                      ? "Đến hạn nghiệm thu"
+                      : m.readiness?.total
+                        ? `Chưa tới · xong ${m.readiness.done}/${m.readiness.total} công tác`
+                        : "Chờ nghiệm thu"}
                   <span className="text-[#8892b0]">
                     · BB {m.bienBanPhotos.length} · Ảnh {m.sitePhotos.length}
                   </span>
