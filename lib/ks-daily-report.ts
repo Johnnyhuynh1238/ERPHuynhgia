@@ -21,6 +21,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deleteObjectFromMinio, putObjectToMinio } from "@/lib/minio";
 import { autoApproveData, isDiaryLocked } from "@/lib/diary-approval";
+import { queueCustomerDiaryLink } from "@/lib/customer-diary-link";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
 
 export type KsTaskKind = "headcount" | "eod";
@@ -342,6 +343,13 @@ export async function submitEod(
     if (err instanceof Error && err.message === STALE) return { ok: false, message: ALREADY };
     if (err instanceof Error && err.message === "bad-image") return { ok: false, message: "Có ảnh bị lỗi, anh chọn lại ảnh khác." };
     throw err;
+  }
+  // Lần lưu đầu của ngày → tạo link xem nhật ký + tin chờ gửi chủ nhà. Lỗi không chặn việc lưu.
+  for (const p of plan) {
+    if (isDiaryLocked(p.diary)) continue;
+    await queueCustomerDiaryLink(p.row.projectId, parsed.date).catch((err) =>
+      console.error("[ks-eod] queue customer link", err),
+    );
   }
   return { ok: true };
 }

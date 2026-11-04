@@ -4267,6 +4267,42 @@ model ConstructionDiary {
   @@map("construction_diaries")
 }
 
+/// Link xem nhật ký thi công gửi chủ nhà (lệnh sếp 04/11/2026, V261104-121521): 1 dự án + 1 ngày, chỉ đọc,
+/// không mật khẩu, hết hạn 7 ngày. Mã 43 ký tự ngẫu nhiên (32 byte). 1 link / dự án / ngày → KS sửa lại không gửi lại tin.
+/// projectId để scalar (FK thật ở migration SQL) cho khỏi thêm back-relation vào Project.
+model CustomerDiaryLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(64)
+  projectId String   @map("project_id") @db.Uuid
+  entryDate DateTime @map("entry_date") @db.Date
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, entryDate])
+  @@map("customer_diary_links")
+}
+
+/// Hàng chờ tin Zalo gửi RIÊNG từng chủ nhà (không nhóm). Chỉ cổng Zalo khách hàng (chưa có) được lấy ra gửi.
+/// status: waiting_gateway (chờ cổng gửi) | missing_phone (dự án thiếu SĐT chủ nhà) | sent | failed | cancelled.
+model CustomerZaloOutbox {
+  id             String    @id @default(uuid()) @db.Uuid
+  dedupeKey      String    @unique @map("dedupe_key") @db.VarChar(120)
+  kind           String    @db.VarChar(32)
+  templateKey    String    @map("template_key") @db.VarChar(64)
+  projectId      String    @map("project_id") @db.Uuid
+  recipientName  String?   @map("recipient_name")
+  recipientPhone String?   @map("recipient_phone") @db.VarChar(32)
+  message        String    @db.Text
+  status         String    @default("waiting_gateway") @db.VarChar(24)
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  sentAt         DateTime? @map("sent_at")
+
+  @@index([status, createdAt])
+  @@index([projectId])
+  @@map("customer_zalo_outbox")
+}
+
 enum AcceptanceMilestoneStatus {
   pending
   signed

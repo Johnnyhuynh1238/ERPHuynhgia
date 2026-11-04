@@ -122,6 +122,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Link nhật ký thi công 1 ngày gửi chủ nhà qua Zalo (/nk/<mã> + /anh/<i>): mã 43 ký tự ngẫu nhiên lưu DB,
+  // mỗi link chỉ mở đúng 1 dự án + 1 ngày, CHỈ ĐỌC, hết hạn 7 ngày — không gắn session.
+  if (pathname.startsWith("/nk/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // Bảng đối chiếu công nợ công khai cho đối tác (NCC / thầu phụ) — để 2 bên chốt sổ.
   // Tự auth bằng publicToken random trên URL, CHỈ ĐỌC, không gắn user.
   if (pathname.startsWith("/doi-tac/")) {

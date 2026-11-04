@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { getWorkDateVn } from "@/lib/attendance";
 import { diaryDateError } from "@/lib/diary-date";
 import { AUTO_APPROVER_NAME, autoApproveData, isDiaryAutoApproved, isDiaryLocked } from "@/lib/diary-approval";
+import { queueCustomerDiaryLink } from "@/lib/customer-diary-link";
 import { putObjectToMinio, deleteObjectFromMinio } from "@/lib/minio";
 
 export const dynamic = "force-dynamic";
@@ -248,6 +249,9 @@ export async function POST(
 
   // Ảnh bị xoá: chỉ gỡ khỏi MinIO sau khi DB đã lưu.
   await Promise.all(removed.map((k) => deleteObjectFromMinio(k).catch(() => undefined)));
+
+  // Lần lưu đầu của ngày → tạo link xem nhật ký + tin chờ gửi chủ nhà. Lỗi không chặn việc lưu.
+  await queueCustomerDiaryLink(project.id, entryDate).catch((err) => console.error("[diary] queue customer link", err));
 
   return NextResponse.json({
     ok: true,
