@@ -278,9 +278,7 @@ export function StageClient({
     const nextNo = latestNo + 1;
     const note = window.prompt(
       `Tạo phiên bản V${nextNo} (mô tả V${nextNo} + báo giá V${nextNo}).` +
-        (stage > 1
-          ? `\nDự án sẽ quay về giai đoạn 1 · Mô tả. Các bản cũ vẫn giữ nguyên.`
-          : "") +
+        `\nDự án giữ nguyên giai đoạn. Các bản cũ vẫn giữ nguyên.` +
         `\n\nGhi chú thay đổi (có thể để trống):`,
       "",
     );
@@ -459,7 +457,8 @@ export function StageClient({
     .filter(Boolean)
     .join(" · ");
 
-  const canAddVersion = stage <= 3 && status !== "done";
+  // Từ giai đoạn 3 (Hợp đồng) đổi yêu cầu đi phụ lục HĐ (SOP-11), không tạo phiên bản.
+  const canAddVersion = stage <= 2 && status !== "done";
   const canRemoveVersion =
     isLatest &&
     versions.length > 1 &&

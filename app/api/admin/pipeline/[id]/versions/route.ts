@@ -8,8 +8,9 @@ const CreateSchema = z.object({
   note: z.string().trim().max(200).nullable().optional(),
 });
 
-// Tạo phiên bản mới (mô tả mới + báo giá mới, cùng số). Khách đổi ý sau báo giá → dự án quay về
-// giai đoạn 1 · Mô tả; bỏ lựa chọn báo giá chốt hợp đồng (vào lại giai đoạn Hợp đồng sẽ lấy bản mới nhất).
+// Tạo phiên bản mới (mô tả mới + báo giá mới, cùng số). Khách đổi ý sau công bố (SOP-10 bước 16)
+// → chỉ thêm phiên bản, giữ nguyên giai đoạn, ngày giai đoạn và phiên bản chốt HĐ.
+// Từ giai đoạn 3 (Hợp đồng) trở đi không tạo phiên bản: đổi sau ký đi phụ lục HĐ (SOP-11).
 export async function POST(
   request: Request,
   { params }: { params: { id: string } },
@@ -39,11 +40,11 @@ export async function POST(
       { message: "Không tìm thấy dự án" },
       { status: 404 },
     );
-  if (current.stage > 3) {
+  if (current.stage >= 3) {
     return NextResponse.json(
       {
         message:
-          "Dự án đã qua giai đoạn Hợp đồng. Mở lại giai đoạn Hợp đồng trước khi tạo phiên bản mới.",
+          "Dự án đã sang giai đoạn Hợp đồng. Khách đổi yêu cầu sau ký thì làm phụ lục hợp đồng, không tạo phiên bản mới.",
       },
       { status: 409 },
     );
@@ -52,24 +53,13 @@ export async function POST(
   const nos = current.versions.map((v) => v.versionNo);
   const nextNo = nos.length ? Math.max.apply(null, nos) + 1 : 1;
 
-  await prisma.$transaction([
-    prisma.projectPipelineVersion.create({
-      data: {
-        pipelineId: params.id,
-        versionNo: nextNo,
-        note: parsed.data.note || null,
-      },
-    }),
-    prisma.projectPipeline.update({
-      where: { id: params.id },
-      data: {
-        stage: 1,
-        stageDates: {},
-        status: "active",
-        contractVersionNo: null,
-      },
-    }),
-  ]);
+  await prisma.projectPipelineVersion.create({
+    data: {
+      pipelineId: params.id,
+      versionNo: nextNo,
+      note: parsed.data.note || null,
+    },
+  });
 
   return NextResponse.json(await loadPipelineState(params.id), { status: 201 });
 }
