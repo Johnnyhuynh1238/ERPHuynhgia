@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { AUTO_APPROVER_NAME, isDiaryAutoApproved } from "@/lib/diary-approval";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,6 +38,7 @@ export async function GET(
       sitePhotos: true,
       savedAt: true,
       approvedAt: true,
+      approvedById: true,
       approvedBy: { select: { fullName: true } },
     },
   });
@@ -52,7 +54,8 @@ export async function GET(
       siteCount: ((d.sitePhotos as unknown as unknown[]) || []).length,
       savedAt: d.savedAt?.toISOString() ?? null,
       approvedAt: d.approvedAt?.toISOString() ?? null,
-      approvedByName: d.approvedBy?.fullName ?? null,
+      approvedByName: isDiaryAutoApproved(d) ? AUTO_APPROVER_NAME : d.approvedBy?.fullName ?? null,
+      autoApproved: isDiaryAutoApproved(d),
     })),
   });
 }

@@ -20,6 +20,7 @@ import sharp from "sharp";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deleteObjectFromMinio, putObjectToMinio } from "@/lib/minio";
+import { autoApproveData, isDiaryLocked } from "@/lib/diary-approval";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
 
 export type KsTaskKind = "headcount" | "eod";
@@ -108,7 +109,7 @@ export type KsTaskFormRow = {
   tasksDone: string;
   issues: string;
   photoCount: number;
-  locked: boolean; // nhật ký đã duyệt → không ghi đè
+  locked: boolean; // nhật ký admin đã duyệt tay → không ghi đè
 };
 
 export type KsTaskForm = {
@@ -142,7 +143,7 @@ export async function getKsTaskForm(token: string, now = new Date()): Promise<Ks
   if (rows.length === 0) return null;
   const diaries = await prisma.constructionDiary.findMany({
     where: { ksId, entryDate: date, projectId: { in: rows.map((r) => r.projectId) } },
-    select: { projectId: true, tasksDone: true, issues: true, taskPhotos: true, approvedAt: true },
+    select: { projectId: true, tasksDone: true, issues: true, taskPhotos: true, approvedAt: true, approvedById: true },
   });
   const byProject = new Map(diaries.map((d) => [d.projectId, d]));
 
@@ -165,7 +166,7 @@ export async function getKsTaskForm(token: string, now = new Date()): Promise<Ks
         tasksDone: d?.tasksDone ?? "",
         issues: d?.issues ?? "",
         photoCount: photoCountOf(d?.taskPhotos),
-        locked: Boolean(d?.approvedAt),
+        locked: isDiaryLocked(d),
       };
     }),
   };
@@ -202,7 +203,7 @@ async function markDone(tx: Prisma.TransactionClient, id: string, data: { worker
 
 /**
  * Sáng — KS bấm Lưu số thợ: phải điền đủ mọi công trình. Cập nhật số thợ vào nhật ký ngày đó
- * (giữ nguyên nội dung KS đã viết, bỏ qua nhật ký đã duyệt).
+ * (giữ nguyên nội dung KS đã viết, bỏ qua nhật ký admin đã duyệt tay).
  */
 export async function submitHeadcount(token: string, counts: Record<string, unknown>, now = new Date()): Promise<SubmitResult> {
   const loaded = await loadPending(token, "headcount", now);
@@ -225,11 +226,11 @@ export async function submitHeadcount(token: string, counts: Record<string, unkn
         const key = { projectId: rows[i].projectId, ksId: parsed.ksId, entryDate: parsed.date };
         const diary = await tx.constructionDiary.findUnique({
           where: { projectId_ksId_entryDate: key },
-          select: { id: true, approvedAt: true },
+          select: { id: true, approvedAt: true, approvedById: true },
         });
         if (!diary) {
           await tx.constructionDiary.create({ data: { ...key, workerCount: values[i] } });
-        } else if (!diary.approvedAt) {
+        } else if (!isDiaryLocked(diary)) {
           await tx.constructionDiary.update({ where: { id: diary.id }, data: { workerCount: values[i] } });
         }
       }
@@ -247,7 +248,8 @@ type StoredPhoto = { key: string; contentType: string; width: number | null; hei
 /**
  * Chiều — KS bấm Lưu báo cáo cuối ngày: mỗi công trình cần nội dung (công việc + khối lượng)
  * và ít nhất 1 ảnh (ảnh mới hoặc ảnh đã có trong nhật ký). Ghi vào nhật ký ngày đó:
- * tasks_done / issues / task_photos (+ảnh mới), saved_at = now. Nhật ký đã duyệt → không đụng.
+ * tasks_done / issues / task_photos (+ảnh mới), saved_at = now, tự duyệt (lib/diary-approval).
+ * Nhật ký admin đã duyệt tay → không đụng.
  */
 export async function submitEod(
   token: string,
@@ -261,7 +263,7 @@ export async function submitEod(
 
   const diaries = await prisma.constructionDiary.findMany({
     where: { ksId: parsed.ksId, entryDate: parsed.date, projectId: { in: rows.map((r) => r.projectId) } },
-    select: { id: true, projectId: true, approvedAt: true, taskPhotos: true },
+    select: { id: true, projectId: true, approvedAt: true, approvedById: true, taskPhotos: true },
   });
   const byProject = new Map(diaries.map((d) => [d.projectId, d]));
 
@@ -278,7 +280,7 @@ export async function submitEod(
     };
   });
   for (const p of plan) {
-    if (p.diary?.approvedAt) continue; // nhật ký đã duyệt → chỉ đánh dấu đã báo
+    if (isDiaryLocked(p.diary)) continue; // nhật ký admin đã duyệt tay → chỉ đánh dấu đã báo
     if (!p.tasksDone) return { ok: false, message: "Anh ghi công việc + khối lượng hôm nay cho tất cả công trình." };
     if (p.files.length > EOD_MAX_PHOTOS_PER_PROJECT) {
       return { ok: false, message: `Tối đa ${EOD_MAX_PHOTOS_PER_PROJECT} ảnh mỗi công trình.` };
@@ -295,7 +297,7 @@ export async function submitEod(
   const day = parsed.date.toISOString().slice(0, 10);
   try {
     for (const p of plan) {
-      if (p.diary?.approvedAt) continue;
+      if (isDiaryLocked(p.diary)) continue;
       for (const f of p.files) {
         let width: number | null = null;
         let height: number | null = null;
@@ -318,12 +320,13 @@ export async function submitEod(
     await prisma.$transaction(async (tx) => {
       for (const p of plan) {
         await markDone(tx, p.row.id, {});
-        if (p.diary?.approvedAt) continue;
+        if (isDiaryLocked(p.diary)) continue;
         const data = {
           tasksDone: p.tasksDone,
           issues: p.issues || null,
           taskPhotos: p.stored as unknown as Prisma.InputJsonValue,
           savedAt,
+          ...autoApproveData(savedAt),
         };
         if (p.diary) {
           await tx.constructionDiary.update({ where: { id: p.diary.id }, data });

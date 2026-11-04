@@ -30,6 +30,7 @@ type DiaryItem = {
   savedAt: string | null;
   approvedAt: string | null;
   approvedByName: string | null;
+  autoApproved: boolean;
   updatedAt: string;
   ksName: string;
   ksId: string;
@@ -93,7 +94,7 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
         flash("err", j.message || "Duyệt thất bại");
         return;
       }
-      flash("ok", "Đã duyệt nhật ký");
+      flash("ok", "Đã duyệt nhật ký · KS không sửa được nữa");
       await load();
     } finally {
       setBusyId(null);
@@ -101,7 +102,7 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
   };
 
   const unapprove = async (id: string) => {
-    if (!await confirmDialog("Bỏ duyệt để KS sửa lại nhật ký này?")) return;
+    if (!await confirmDialog("Bỏ duyệt để KS sửa lại nhật ký này? Khách sẽ không thấy nhật ký này tới khi KS lưu lại.")) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/admin/construction-diaries/${id}/unapprove`, {
@@ -186,7 +187,7 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
                       <span className="text-sm font-bold text-[#f0f2ff]">{fmtDate(it.entryDate)}</span>
                       {it.approvedAt ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
-                          <ShieldCheck className="h-3 w-3" /> Đã duyệt
+                          <ShieldCheck className="h-3 w-3" /> {it.autoApproved ? "Tự duyệt" : "Đã duyệt"}
                         </span>
                       ) : it.savedAt ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
@@ -206,7 +207,18 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
                       {it.tasksDone || "—"}
                     </span>
                   </span>
-                  <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <span className="flex shrink-0 flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    {it.autoApproved ? (
+                      <button
+                        type="button"
+                        onClick={() => approve(it.id)}
+                        disabled={busyId === it.id}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#2d3249] px-2.5 py-1.5 text-xs text-[#8892b0] hover:text-[#f0f2ff] disabled:opacity-60"
+                      >
+                        {busyId === it.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                        Duyệt tay
+                      </button>
+                    ) : null}
                     {it.approvedAt ? (
                       <button
                         type="button"
@@ -249,7 +261,8 @@ export function DiaryApprovalPanel({ projectId }: { projectId: string }) {
                           {it.savedAt ? <div>Chốt lúc: {fmtTime(it.savedAt)} ({fmtDate(it.entryDate)})</div> : null}
                           {it.approvedAt ? (
                             <div className="text-blue-300">
-                              Duyệt bởi {it.approvedByName || "?"} lúc {fmtTime(it.approvedAt)}
+                              {it.autoApproved ? "Tự duyệt bởi hệ thống khi KS lưu" : `Duyệt bởi ${it.approvedByName || "?"}`} lúc{" "}
+                              {fmtTime(it.approvedAt)}
                             </div>
                           ) : null}
                         </div>

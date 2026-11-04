@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { putObjectToMinio, deleteObjectFromMinio } from "@/lib/minio";
 import { getWorkDateVn } from "@/lib/attendance";
 import { diaryDateError } from "@/lib/diary-date";
+import { isDiaryLocked } from "@/lib/diary-approval";
 
 export const runtime = "nodejs";
 
@@ -101,7 +102,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (diary.approvedAt) {
+  if (isDiaryLocked(diary)) {
     return NextResponse.json(
       { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
       { status: 403 },
@@ -164,7 +165,7 @@ export async function DELETE(
     where: { projectId_ksId_entryDate: { projectId: project.id, ksId: user.id, entryDate } },
   });
   if (!diary) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });
-  if (diary.approvedAt) {
+  if (isDiaryLocked(diary)) {
     return NextResponse.json(
       { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
       { status: 403 },

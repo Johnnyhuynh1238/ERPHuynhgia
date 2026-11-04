@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-helpers";
+import { isDiaryLocked } from "@/lib/diary-approval";
 
 export const runtime = "nodejs";
 
@@ -18,13 +19,14 @@ export async function POST(
 
   const diary = await prisma.constructionDiary.findUnique({
     where: { id: params.id },
-    select: { id: true, savedAt: true, approvedAt: true },
+    select: { id: true, savedAt: true, approvedAt: true, approvedById: true },
   });
   if (!diary) return NextResponse.json({ message: "Không tìm thấy nhật ký" }, { status: 404 });
   if (!diary.savedAt) {
     return NextResponse.json({ message: "Nhật ký chưa chốt, không duyệt được" }, { status: 400 });
   }
-  if (diary.approvedAt) {
+  // Tự duyệt (hệ thống) → admin vẫn duyệt tay được, ghi đè người duyệt + khoá nhật ký.
+  if (isDiaryLocked(diary)) {
     return NextResponse.json({ message: "Đã duyệt trước đó" }, { status: 400 });
   }
 

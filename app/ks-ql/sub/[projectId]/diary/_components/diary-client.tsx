@@ -42,6 +42,7 @@ type DiaryDay = {
   savedAt: string | null;
   approvedAt: string | null;
   approvedByName: string | null;
+  autoApproved: boolean; // hệ thống tự duyệt khi lưu → KS vẫn sửa được; chỉ admin duyệt tay mới khoá
   updatedAt: string;
 };
 
@@ -63,6 +64,7 @@ type HistoryItem = {
   savedAt: string | null;
   approvedAt: string | null;
   approvedByName: string | null;
+  autoApproved: boolean;
 };
 
 function fmtDateVn(ymd: string) {
@@ -269,7 +271,7 @@ export function DiaryClient({
   const taskPhotos = gridItems("task");
   const sitePhotos = gridItems("site");
   const finalized = !!data?.diary?.savedAt;
-  const approved = !!data?.diary?.approvedAt;
+  const approved = !!data?.diary?.approvedAt && !data.diary.autoApproved;
   const locked = approved;
 
   // Bắt điền đủ 5 mục mới cho chốt (server kiểm lại y hệt).
@@ -560,7 +562,7 @@ export function DiaryClient({
                       {h.approvedAt ? (
                         <span className="flex items-center gap-1 rounded-full bg-[#4a8cf7]/20 px-2 py-0.5 text-[#a3c7f7]">
                           <ShieldCheck className="h-3 w-3" />
-                          Đã duyệt
+                          {h.autoApproved ? "Tự duyệt" : "Đã duyệt"}
                         </span>
                       ) : h.savedAt ? (
                         <span className="rounded-full bg-[#34d399]/20 px-2 py-0.5 text-[#a3d3a8]">
@@ -620,7 +622,7 @@ function TodayCard({
   onOpen: () => void;
 }) {
   const finalized = !!diary?.savedAt;
-  const approved = !!diary?.approvedAt;
+  const approved = !!diary?.approvedAt && !diary.autoApproved;
   return (
     <div
       className={`rounded-2xl border-2 p-4 ${
@@ -651,7 +653,7 @@ function TodayCard({
             {approved
               ? `ADMIN đã duyệt${diary?.approvedByName ? ` · ${diary.approvedByName}` : ""}`
               : finalized
-                ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}`
+                ? `Đã chốt lúc ${diary?.savedAt ? fmtTimeVn(diary.savedAt) : "—"}${diary?.autoApproved ? " · đã tự duyệt" : ""}`
                 : "Hôm nay chưa chốt nhật ký"}
           </div>
         </div>
@@ -738,7 +740,9 @@ function HistoryDetailModal({
               <AlertTriangle className="h-5 w-5 shrink-0" />
             )}
             <span>
-              {diary.approvedAt
+              {diary.approvedAt && diary.autoApproved
+                ? `Đã chốt lúc ${diary.savedAt ? fmtTimeVn(diary.savedAt) : "—"} · hệ thống tự duyệt`
+                : diary.approvedAt
                 ? `ADMIN đã duyệt${diary.approvedByName ? ` · ${diary.approvedByName}` : ""} — khoá không sửa`
                 : diary.savedAt
                   ? `Đã chốt lúc ${fmtTimeVn(diary.savedAt)}`

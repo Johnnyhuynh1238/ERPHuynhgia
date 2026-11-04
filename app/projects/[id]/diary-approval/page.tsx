@@ -23,7 +23,8 @@ export default async function DiaryApprovalPage({ params }: { params: { id: stri
       <div>
         <h2 className="text-lg font-semibold text-orange-300">Duyệt nhật ký thi công</h2>
         <p className="mt-0.5 text-xs text-[#8892b0]">
-          Nhật ký KS đã chốt chờ admin duyệt; duyệt xong KS không sửa được nữa.
+          Nhật ký KS lưu là hệ thống tự duyệt (khách xem được), KS vẫn sửa được. Admin bấm Duyệt tay thì KS không sửa
+          được nữa; Bỏ duyệt để ẩn khỏi khách và cho KS sửa lại.
         </p>
       </div>
       <DiaryApprovalPanel projectId={project.id} />

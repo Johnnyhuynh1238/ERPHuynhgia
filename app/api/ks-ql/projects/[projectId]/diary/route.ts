@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getWorkDateVn } from "@/lib/attendance";
 import { diaryDateError } from "@/lib/diary-date";
+import { AUTO_APPROVER_NAME, autoApproveData, isDiaryAutoApproved, isDiaryLocked } from "@/lib/diary-approval";
 import { putObjectToMinio, deleteObjectFromMinio } from "@/lib/minio";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +79,8 @@ export async function GET(
           sitePhotos: (diary.sitePhotos as unknown as Array<{ key: string; contentType: string }>) || [],
           savedAt: diary.savedAt?.toISOString() ?? null,
           approvedAt: diary.approvedAt?.toISOString() ?? null,
-          approvedByName: diary.approvedBy?.fullName ?? null,
+          approvedByName: isDiaryAutoApproved(diary) ? AUTO_APPROVER_NAME : diary.approvedBy?.fullName ?? null,
+          autoApproved: isDiaryAutoApproved(diary),
           updatedAt: diary.updatedAt.toISOString(),
         }
       : null,
@@ -171,9 +173,9 @@ export async function POST(
   const key = { projectId: project.id, ksId: user.id, entryDate };
   const existing = await prisma.constructionDiary.findUnique({
     where: { projectId_ksId_entryDate: key },
-    select: { id: true, approvedAt: true, taskPhotos: true, sitePhotos: true },
+    select: { id: true, approvedAt: true, approvedById: true, taskPhotos: true, sitePhotos: true },
   });
-  if (existing?.approvedAt) {
+  if (isDiaryLocked(existing)) {
     return NextResponse.json(
       { message: "Nhật ký đã được ADMIN duyệt, không sửa được" },
       { status: 403 },
@@ -232,6 +234,7 @@ export async function POST(
       taskPhotos: kept.task as unknown as Prisma.InputJsonValue,
       sitePhotos: kept.site as unknown as Prisma.InputJsonValue,
       savedAt: now,
+      ...autoApproveData(now),
     };
     saved = await prisma.constructionDiary.upsert({
       where: { projectId_ksId_entryDate: key },
