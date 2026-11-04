@@ -50,7 +50,14 @@ export async function PATCH(
       contractVersionNo: true,
       contractUpdatedAt: true,
       prepDone: true,
-      versions: { select: { versionNo: true } },
+      versions: {
+        select: {
+          versionNo: true,
+          quoteUpdatedAt: true,
+          quoteTotal: true,
+          quotePublishedAt: true,
+        },
+      },
     },
   });
   if (!current)
@@ -60,6 +67,14 @@ export async function PATCH(
     );
 
   const versionNos = current.versions.map((v) => v.versionNo);
+  // SOP-10: HĐ chỉ chốt theo báo giá đã có tổng + đã chốt cho khách. Hồ sơ chưa có báo giá nào
+  // (nhập thẳng giai đoạn Hợp đồng) thì giữ như cũ, chọn bản nào cũng được.
+  const hasAnyQuote = current.versions.some(
+    (v) => v.quoteUpdatedAt !== null || v.quoteTotal !== null,
+  );
+  const quotedNos = current.versions
+    .filter((v) => v.quoteTotal !== null && v.quotePublishedAt !== null)
+    .map((v) => v.versionNo);
 
   const data: Prisma.ProjectPipelineUpdateInput = {};
   if (d.name !== undefined) data.name = d.name;
@@ -91,6 +106,14 @@ export async function PATCH(
         { status: 400 },
       );
     }
+    if (hasAnyQuote && quotedNos.indexOf(d.contractVersionNo) < 0) {
+      return NextResponse.json(
+        {
+          message: `Báo giá V${d.contractVersionNo} chưa có tổng hoặc chưa chốt cho khách, chưa chọn chốt hợp đồng được`,
+        },
+        { status: 400 },
+      );
+    }
     contractNo = d.contractVersionNo;
     data.contractVersionNo = contractNo;
   }
@@ -116,9 +139,12 @@ export async function PATCH(
       next[String(k)] = old[String(k)] || nowIso;
     data.stage = d.stage;
     data.stageDates = next;
-    // Vào giai đoạn Hợp đồng mà chưa chọn báo giá → mặc định bản mới nhất (admin đổi được ở màn Hợp đồng).
-    if (d.stage >= 3 && contractNo === null && versionNos.length > 0) {
-      data.contractVersionNo = Math.max.apply(null, versionNos);
+    // Vào giai đoạn Hợp đồng mà chưa chọn báo giá → mặc định bản mới nhất đã chốt báo giá cho khách
+    // (chưa có báo giá nào thì bản mới nhất; admin đổi được ở màn Hợp đồng).
+    if (d.stage >= 3 && contractNo === null) {
+      const pool = hasAnyQuote ? quotedNos : versionNos;
+      if (pool.length > 0)
+        data.contractVersionNo = Math.max.apply(null, pool);
     }
   }
 

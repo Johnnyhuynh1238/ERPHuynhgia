@@ -69,23 +69,29 @@ export async function PATCH(
       { status: 404 },
     );
 
+  // Báo giá đã chốt cho khách → khoá cả phiên bản (mô tả, báo giá, giá vốn + tổng) theo SOP-10 luật 4.3.
+  // Muốn sửa: tạo phiên bản mới (hoặc "Ẩn lại" nếu chốt nhầm).
+  if (
+    existed.quotePublishedAt &&
+    (d.descriptionHtml !== undefined ||
+      d.quoteHtml !== undefined ||
+      d.quoteTotal !== undefined ||
+      d.costHtml !== undefined ||
+      d.costTotal !== undefined)
+  )
+    return NextResponse.json(
+      {
+        message: `Báo giá V${versionNo} đã chốt cho khách, không sửa mô tả / báo giá / giá vốn được. Tạo phiên bản mới để báo giá lại.`,
+      },
+      { status: 409 },
+    );
+
   const data: Prisma.ProjectPipelineVersionUpdateInput = {};
   if (d.note !== undefined) data.note = d.note || null;
   if (d.descriptionHtml !== undefined) {
     data.descriptionHtml = d.descriptionHtml;
     data.descriptionUpdatedAt = d.descriptionHtml ? new Date() : null;
   }
-  // Báo giá đã chốt cho khách → khoá file + tổng. Muốn sửa: tạo phiên bản mới (hoặc "Ẩn lại" nếu chốt nhầm).
-  if (
-    existed.quotePublishedAt &&
-    (d.quoteHtml !== undefined || d.quoteTotal !== undefined)
-  )
-    return NextResponse.json(
-      {
-        message: `Báo giá V${versionNo} đã chốt cho khách, không sửa được. Tạo phiên bản mới để báo giá lại.`,
-      },
-      { status: 409 },
-    );
   if (d.quoteHtml !== undefined) {
     data.quoteHtml = d.quoteHtml;
     data.quoteUpdatedAt = d.quoteHtml ? new Date() : null;

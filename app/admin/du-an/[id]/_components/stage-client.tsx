@@ -469,9 +469,12 @@ export function StageClient({
     totalDraft !== null
       ? totalDraft
       : fmtMoney(cur ? (isCost ? cur.costTotal : cur.quoteTotal) : null);
-  // Báo giá đã chốt cho khách thì khoá file + tổng (giá vốn nội bộ vẫn sửa được).
-  const quoteLocked =
-    view === 2 && !isCost && Boolean(cur && cur.quotePublishedAt);
+  // Báo giá đã chốt cho khách thì khoá cả phiên bản: mô tả, báo giá, giá vốn + tổng (SOP-10 luật 4.3).
+  const quoteLocked = view <= 2 && Boolean(cur && cur.quotePublishedAt);
+  // Có báo giá thì HĐ chỉ chốt theo bản đã có tổng + đã chốt cho khách (khớp API).
+  const hasAnyQuote = versions.some(
+    (v) => Boolean(v.quoteUpdatedAt) || v.quoteTotal !== null,
+  );
   const profit =
     cur &&
     cur.quoteTotal !== null &&
@@ -731,7 +734,7 @@ export function StageClient({
               disabled={busy || quoteLocked}
               title={
                 quoteLocked
-                  ? "Báo giá đã chốt cho khách. Tạo phiên bản mới để báo giá lại."
+                  ? `Báo giá V${curNo} đã chốt cho khách, phiên bản đã khoá. Tạo phiên bản mới để sửa.`
                   : undefined
               }
             >
@@ -857,7 +860,7 @@ export function StageClient({
                   type="button"
                   className="pl-btn"
                   onClick={() => fileRef.current?.click()}
-                  disabled={busy}
+                  disabled={busy || quoteLocked}
                 >
                   ⬆ Tải file {kindLabel} V{curNo}
                 </button>
@@ -920,7 +923,10 @@ export function StageClient({
                       <td className="r act">
                         {sel ? (
                           <span className="pl-tag ct">✓ Đang chốt</span>
-                        ) : past ? null : (
+                        ) : past ? null : hasAnyQuote &&
+                          (v.quoteTotal === null || !v.quotePublishedAt) ? (
+                          <span className="pl-sub">Chưa chốt báo giá</span>
+                        ) : (
                           <button
                             type="button"
                             className="pl-btn ghost"
