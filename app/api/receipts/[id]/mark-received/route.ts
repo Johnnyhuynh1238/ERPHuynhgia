@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { recordCashTxn } from "@/lib/treasury";
 import { fireAndForget, notifyReceiptReceived } from "@/lib/notifications";
+import { zaloNotifyReceiptToCustomer } from "@/lib/zalo-notify";
 
 const RECEIVE_ROLES = new Set<string>([UserRole.admin, UserRole.accountant]);
 
@@ -118,6 +119,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         actorName: user.name || user.email || "Kế toán",
       }),
     );
+    // Nhắn Zalo xác nhận cho khách (bật qua env ZALO_NOTIFY_CUSTOMER_RECEIPT).
+    fireAndForget(zaloNotifyReceiptToCustomer(updated.id));
 
     return NextResponse.json({
       receipt: { ...updated, amount: Number(updated.amount), receivedAmount: Number(updated.receivedAmount) },

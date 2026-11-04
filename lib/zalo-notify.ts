@@ -258,3 +258,65 @@ export async function zaloNotifyReceipt(receiptId: string): Promise<void> {
 
   await sendZaloAccountant({ text: lines.join("\n"), imageUrl: null });
 }
+
+/**
+ * Kế toán "Xác nhận đã thu" lệnh thu của KHÁCH → nhắn Zalo xác nhận cho khách (SĐT trong dự án).
+ * Bật/tắt bằng env ZALO_NOTIFY_CUSTOMER_RECEIPT:
+ *  - "1"     → gửi khách thật.
+ *  - "admin" → chạy thử: gửi bản tin cho anh Huỳnh Luận xem mẫu, KHÔNG gửi khách.
+ *  - khác/trống → tắt.
+ * Chỉ nguồn `customer` gắn dự án (lệnh thu HĐ thiết kế không gửi); không SĐT / không tra được Zalo
+ * → bỏ qua (log), không ảnh hưởng luồng thu.
+ */
+export async function zaloNotifyReceiptToCustomer(receiptId: string): Promise<void> {
+  const mode = (process.env.ZALO_NOTIFY_CUSTOMER_RECEIPT || "").trim();
+  if (mode !== "1" && mode !== "admin") return;
+  if (!BRIDGE_URL || !BRIDGE_TOKEN) return;
+
+  const r = await prisma.receipt.findUnique({
+    where: { id: receiptId },
+    select: {
+      code: true,
+      source: true,
+      status: true,
+      receivedAmount: true,
+      receivedAt: true,
+      project: { select: { customerName: true, customerPhone: true } },
+      paymentSchedule: { select: { phaseNumber: true, milestoneDescription: true } },
+    },
+  });
+  if (!r || !r.project || r.source !== "customer" || r.status !== "received" || !r.receivedAmount) return;
+
+  const customerName = r.project.customerName || "";
+  const phone = (r.project.customerPhone || "").replace(/\D/g, "");
+
+  const lines = [
+    "✅ XÂY DỰNG HUỲNH GIA XÁC NHẬN ĐÃ NHẬN THANH TOÁN",
+    customerName ? `Khách hàng: ${customerName}` : null,
+    r.paymentSchedule
+      ? `Đợt ${r.paymentSchedule.phaseNumber}: ${r.paymentSchedule.milestoneDescription}`
+      : null,
+    `Số tiền: ${fmtVnd(Number(r.receivedAmount))}`,
+    r.receivedAt ? `Ngày nhận: ${r.receivedAt.toISOString().slice(0, 10).split("-").reverse().join("/")}` : null,
+    "",
+    "Cảm ơn anh/chị đã tin tưởng Xây Dựng Huỳnh Gia.",
+  ].filter((l): l is string => l !== null);
+  const text = lines.join("\n");
+
+  if (mode === "admin") {
+    const note = phone ? `SĐT khách: ${phone}` : "⚠️ Khách chưa có SĐT — bật thật sẽ KHÔNG gửi được";
+    await sendZaloBridge({ to: "admin", text: `🧪 [THỬ — chưa gửi khách] ${note}\n\n${text}` });
+    return;
+  }
+
+  if (phone.length < 9) {
+    console.warn(`[zalo-notify] ${r.code}: khách không có SĐT hợp lệ → bỏ qua tin xác nhận thu`);
+    return;
+  }
+  const threadId = await lookupZaloUserByPhone(phone);
+  if (!threadId) {
+    console.warn(`[zalo-notify] ${r.code}: không tìm thấy Zalo theo SĐT ${phone} → bỏ qua`);
+    return;
+  }
+  await sendZaloBridge({ threadId, text });
+}
