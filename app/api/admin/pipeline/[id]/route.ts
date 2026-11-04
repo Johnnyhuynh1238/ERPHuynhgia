@@ -45,6 +45,7 @@ export async function PATCH(
   const current = await prisma.projectPipeline.findUnique({
     where: { id: params.id },
     select: {
+      projectId: true,
       stage: true,
       stageDates: true,
       contractVersionNo: true,
@@ -127,6 +128,19 @@ export async function PATCH(
           {
             message: `Chưa chốt đủ Chuẩn bị: ${missing.map((m) => m.label).join(", ")}`,
           },
+          { status: 400 },
+        );
+      // Chưa thu đợt 1 vẫn làm GĐ 5 nhưng KHÔNG sang GĐ 6 (sếp duyệt 01/11/2026, V261101-231540bb).
+      const first = current.projectId
+        ? await prisma.paymentSchedule.findFirst({
+            where: { projectId: current.projectId, type: "contract" },
+            orderBy: { phaseNumber: "asc" },
+            select: { status: true },
+          })
+        : null;
+      if (first?.status !== "collected")
+        return NextResponse.json(
+          { message: "Chưa thu đợt 1 — chưa được sang Thi công (ghi nhận đã thu ở Lịch thu trước)" },
           { status: 400 },
         );
     }
