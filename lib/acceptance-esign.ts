@@ -12,6 +12,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getObjectFromMinio, putObjectToMinio } from "@/lib/minio";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
+import { enqueueZaloRetry, markZaloRetrySent, type RetryOutcome } from "@/lib/zalo-retry";
 import { readAcceptancePhotos, type AcceptancePhoto } from "@/lib/acceptance-photos";
 import { buildEsignPdf } from "@/lib/acceptance-esign-pdf";
 import BO_GIAM_SAT from "@/lib/data/bo-giam-sat.json";
@@ -266,6 +267,27 @@ async function zaloIdOf(e: EsignRow, who: "ks" | "party"): Promise<string | null
   return id;
 }
 
+/** Gửi 1 tin + ghi nhật ký BB. Trả lý do lỗi (null = đã gửi). */
+async function zaloDeliver(
+  e: EsignRow,
+  who: "ks" | "party",
+  ev: string,
+  text: string,
+  file?: { base64: string; name: string },
+): Promise<string | null> {
+  const threadId = await zaloIdOf(e, who);
+  const ok = threadId
+    ? await sendZaloBridge({ threadId, text, fileBase64: file?.base64 ?? null, fileName: file?.name ?? null })
+    : false;
+  const note = ok ? null : threadId ? "bridge lỗi" : "không tìm thấy Zalo theo SĐT";
+  const cur = await prisma.acceptanceEsign.findUnique({ where: { id: e.id }, select: { log: true } });
+  await prisma.acceptanceEsign.update({
+    where: { id: e.id },
+    data: { log: pushLog(cur?.log, { at: new Date().toISOString(), ev, ok, note: note ?? undefined }) },
+  });
+  return note;
+}
+
 async function zaloSend(
   e: EsignRow,
   who: "ks" | "party",
@@ -273,34 +295,72 @@ async function zaloSend(
   text: string,
   file?: { base64: string; name: string },
 ): Promise<boolean> {
-  const threadId = await zaloIdOf(e, who);
-  const ok = threadId
-    ? await sendZaloBridge({ threadId, text, fileBase64: file?.base64 ?? null, fileName: file?.name ?? null })
-    : false;
-  const cur = await prisma.acceptanceEsign.findUnique({ where: { id: e.id }, select: { log: true } });
-  await prisma.acceptanceEsign.update({
-    where: { id: e.id },
-    data: {
-      log: pushLog(cur?.log, {
-        at: new Date().toISOString(),
-        ev,
-        ok,
-        note: ok ? undefined : threadId ? "bridge lỗi" : "không tìm thấy Zalo theo SĐT",
-      }),
-    },
-  });
-  if (!ok) {
-    // Không gửi được (khách chưa có Zalo / chặn người lạ) → báo sếp để gửi tay, kèm link.
+  const note = await zaloDeliver(e, who, ev, text, file);
+  const ok = note === null;
+  if (!ok && who === "party") {
+    // Tin cho chủ nhà / đội khoán lỗi → hàng chờ, chỉ máy gửi lại (3 lần × 5 phút → báo TP DA–TC → mỗi giờ).
     const c = esignContent(e);
-    const link = who === "ks" ? esignLink(e.ksToken) : esignLink(e.partyToken);
+    await enqueueZaloRetry({
+      kind: "bb_party",
+      refId: e.id,
+      ev,
+      projectId: e.projectId,
+      recipient: `${c.partyLabel.toLowerCase()} ${e.partyName ?? ""}`.trim() + ` (BB ${c.title})`,
+      message: text,
+      withFile: !!file,
+      link: esignLink(e.partyToken),
+      error: note,
+    });
+  } else if (ok && who === "party") {
+    await markZaloRetrySent("bb_party", e.id, ev);
+  } else if (!ok) {
+    // Tin cho KS không gửi được → báo văn phòng gửi tay, kèm link (như cũ).
+    const c = esignContent(e);
     await sendZaloBridge({
       to: "admin",
-      text:
-        `⚠️ Chưa gửi được Zalo ${who === "ks" ? `KS ${e.ksName ?? ""}` : `${c.partyLabel.toLowerCase()} ${e.partyName ?? ""}`}` +
-        ` (BB ${c.title} · ${c.projectName}). Sếp gửi tay link này:\n${link}`,
+      text: `⚠️ Chưa gửi được Zalo KS ${e.ksName ?? ""} (BB ${c.title} · ${c.projectName}). Sếp gửi tay link này:\n${esignLink(e.ksToken)}`,
     });
   }
   return ok;
+}
+
+/** Hàng chờ gửi lại (lib/zalo-retry.ts) gọi: gửi lại 1 tin BB cho chủ nhà / đội khoán, nội dung giữ nguyên. */
+export async function retryEsignPartySend(
+  esignId: string,
+  ev: string,
+  text: string,
+  withFile: boolean,
+  since: Date,
+): Promise<RetryOutcome> {
+  const e = await prisma.acceptanceEsign.findUnique({ where: { id: esignId } });
+  if (!e || e.status === "huy") return { r: "cancel" };
+  // Tin này đã tới khách sau lần lỗi (vd KS ký lại, máy gửi lại tin mời ký) → thôi, không gửi trùng.
+  const logs = Array.isArray(e.log) ? (e.log as unknown as LogEv[]) : [];
+  const t0 = since.getTime();
+  if (logs.some((x) => x.ok === true && (x.ev === ev || x.ev === `${ev}_gui_lai`) && new Date(x.at).getTime() >= t0)) {
+    return { r: "sent" };
+  }
+  // Link mời ký chỉ còn nghĩa khi BB đang chờ khách ký.
+  if (ev === "party_link" && e.status !== "cho_khach") return { r: "cancel" };
+  let file: { base64: string; name: string } | undefined;
+  if (withFile) {
+    if (!e.pdfKey) return { r: "cancel" };
+    const o = await getObjectFromMinio(e.pdfKey);
+    file = { base64: o.buffer.toString("base64"), name: pdfFileName(esignContent(e), e.partySignedAt ?? e.ksSignedAt ?? e.updatedAt) };
+  }
+  // Tin mời ký: soạn lại đúng mẫu (KS ký lại thì tên/nội dung mới nhất).
+  const msg = ev === "party_link" ? partyLinkText(e) : text;
+  const note = await zaloDeliver(e, "party", `${ev}_gui_lai`, msg, file);
+  return note === null ? { r: "sent" } : { r: "failed", note };
+}
+
+function partyLinkText(e: EsignRow) {
+  const c = esignContent(e);
+  return (
+    `📝 Huỳnh Gia gửi ${xungHo(e.partyName)} biên bản nghiệm thu ${c.title} · ${c.projectName}.\n` +
+    `Kỹ sư giám sát ${e.ksName ?? ""} đã kiểm tra và ký. Anh/chị bấm link để đọc biên bản, đọc xong bấm Ký để ký trực tiếp trên màn hình:\n` +
+    esignLink(e.partyToken)
+  );
 }
 
 /** Gửi link cho KS điền + ký. */
@@ -395,19 +455,12 @@ export async function ksSubmit(
     await finalizeOrRevert(fresh, "ks_draft");
     return { ok: true, message: "Đã ký. PDF đã đính lên ERP." };
   }
-  const sent = await zaloSend(
-    fresh,
-    "party",
-    "party_link",
-    `📝 Huỳnh Gia gửi ${xungHo(fresh.partyName)} biên bản nghiệm thu ${c.title} · ${c.projectName}.\n` +
-      `Kỹ sư giám sát ${fresh.ksName ?? ""} đã kiểm tra và ký. Anh/chị bấm link để đọc biên bản, đọc xong bấm Ký để ký trực tiếp trên màn hình:\n` +
-      esignLink(fresh.partyToken),
-  );
+  const sent = await zaloSend(fresh, "party", "party_link", partyLinkText(fresh));
   return {
     ok: true,
     message: sent
       ? "Đã ký. Máy đã gửi Zalo cho khách ký."
-      : "Đã ký. Chưa gửi được Zalo cho khách — đã báo văn phòng gửi tay.",
+      : "Đã ký. Chưa gửi được Zalo cho khách — máy tự gửi lại sau 5 phút.",
   };
 }
 
@@ -551,7 +604,7 @@ async function finalizeEsign(e: EsignRow) {
     prisma.acceptanceEsign.update({ where: { id: e.id }, data: { status: "xong", pdfKey: key } }),
   ]);
   const done = (await prisma.acceptanceEsign.findUnique({ where: { id: e.id } }))!;
-  // BB đã chốt trong DB — Zalo lỗi không được làm hỏng (đã log + báo sếp trong zaloSend).
+  // BB đã chốt trong DB — Zalo lỗi không được làm hỏng (đã log + đưa hàng chờ gửi lại trong zaloSend).
   // Chạy nền: upload PDF qua bridge có thể mất ~90s, không bắt người ký chờ.
   void notifyDone(done, c, pdf, name).catch((err) => console.error("[esign notify]", err));
 }

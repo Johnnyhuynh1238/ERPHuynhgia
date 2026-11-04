@@ -309,14 +309,37 @@ export async function zaloNotifyReceiptToCustomer(receiptId: string): Promise<vo
     return;
   }
 
-  if (phone.length < 9) {
-    console.warn(`[zalo-notify] ${r.code}: khách không có SĐT hợp lệ → bỏ qua tin xác nhận thu`);
-    return;
-  }
+  const res = await retryReceiptCustomerSend(receiptId, text);
+  if (res.r !== "failed") return;
+  // Lỗi → hàng chờ gửi lại (3 lần × 5 phút → báo TP DA–TC → mỗi giờ), lần sau đọc lại SĐT trong dự án.
+  console.warn(`[zalo-notify] ${r.code}: ${res.note} → đưa vào hàng chờ gửi lại`);
+  const p = await prisma.receipt.findUnique({ where: { id: receiptId }, select: { projectId: true } });
+  const { enqueueZaloRetry } = await import("@/lib/zalo-retry");
+  await enqueueZaloRetry({
+    kind: "receipt_customer",
+    refId: receiptId,
+    ev: "receipt_received",
+    projectId: p?.projectId ?? null,
+    recipient: `chủ nhà ${customerName}`.trim() + ` (xác nhận đã nhận ${r.code})`,
+    message: text,
+    error: res.note,
+  });
+}
+
+/** Gửi tin xác nhận đã thu cho khách theo SĐT hiện tại của dự án (lần đầu + hàng chờ gửi lại dùng chung). */
+export async function retryReceiptCustomerSend(
+  receiptId: string,
+  text: string,
+): Promise<{ r: "sent" } | { r: "failed"; note: string } | { r: "cancel" }> {
+  if ((process.env.ZALO_NOTIFY_CUSTOMER_RECEIPT || "").trim() !== "1") return { r: "cancel" };
+  const r = await prisma.receipt.findUnique({
+    where: { id: receiptId },
+    select: { status: true, project: { select: { customerPhone: true } } },
+  });
+  if (!r || !r.project || r.status !== "received") return { r: "cancel" };
+  const phone = (r.project.customerPhone || "").replace(/\D/g, "");
+  if (phone.length < 9) return { r: "failed", note: "dự án chưa có SĐT chủ nhà hợp lệ" };
   const threadId = await lookupZaloUserByPhone(phone);
-  if (!threadId) {
-    console.warn(`[zalo-notify] ${r.code}: không tìm thấy Zalo theo SĐT ${phone} → bỏ qua`);
-    return;
-  }
-  await sendZaloBridge({ threadId, text });
+  if (!threadId) return { r: "failed", note: `không tìm thấy Zalo theo SĐT ${phone}` };
+  return (await sendZaloBridge({ threadId, text })) ? { r: "sent" } : { r: "failed", note: "bridge lỗi" };
 }

@@ -4303,6 +4303,35 @@ model CustomerZaloOutbox {
   @@map("customer_zalo_outbox")
 }
 
+/// Hàng chờ GỬI LẠI tin Zalo cho chủ nhà / đội khoán khi gửi lỗi (luật sếp 04/11/2026, lib/zalo-retry.ts):
+/// 3 lần cách 5 phút → báo TP Dự án – Thi công để theo dõi (không nhắn KS, không gửi tay) → mỗi giờ 1 lần tới khi gửi được.
+/// Quá 24 giờ còn pending → bản tin CEO đọc bảng này.
+/// kind: bb_party (BB nghiệm thu, refId = acceptance_esigns.id) | receipt_customer (refId = receipts.id).
+/// status: pending | sent | cancelled (BB đã ký/huỷ, không cần gửi nữa). tries = số lần đã gửi (cả lần đầu).
+model ZaloRetry {
+  id          String    @id @default(uuid()) @db.Uuid
+  kind        String    @db.VarChar(24)
+  refId       String    @map("ref_id") @db.Uuid
+  ev          String    @db.VarChar(40)
+  projectId   String?   @map("project_id") @db.Uuid
+  recipient   String?
+  message     String    @db.Text
+  withFile    Boolean   @default(false) @map("with_file")
+  link        String?   @db.Text
+  status      String    @default("pending") @db.VarChar(16)
+  tries       Int       @default(1)
+  nextAt      DateTime  @map("next_at")
+  lastError   String?   @map("last_error") @db.Text
+  escalatedAt DateTime? @map("escalated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  sentAt      DateTime? @map("sent_at")
+
+  @@index([status, nextAt])
+  @@index([kind, refId])
+  @@map("zalo_retries")
+}
+
 enum AcceptanceMilestoneStatus {
   pending
   signed
