@@ -508,17 +508,22 @@ async function orderedDebtItems(projectIds: string[] | null, ctx: Ctx, projLabel
     });
 }
 
-function lineItems(lines: CashLineView[], projLabel: Map<string, string>, projectIdOf: Map<string, string>): CashItem[] {
+function lineItems(lines: CashLineView[], projLabel: Map<string, string>, projectIdOf: Map<string, string>, today: string): CashItem[] {
   return lines
     .filter((l) => l.remaining > EPS)
-    .map((l) => ({
-      k: `line:${l.id}`, loai: "line" as const, huong: "out" as const,
-      ten: `${KIND_LABEL[l.kind]} · ${l.title}`,
-      phu: [TERM_LABEL[l.term], l.consumed > EPS ? `đã có đơn ${Math.round(l.consumed).toLocaleString("vi-VN")} đ` : null, l.note]
-        .filter(Boolean).join(" · ") || null,
-      du_an: projLabel.get(projectIdOf.get(l.id) ?? "") ?? null, projectId: projectIdOf.get(l.id) ?? null,
-      ngay: l.dueDate, uoc: !l.dateManual, tien: l.remaining, src: { op: "line", id: l.id },
-    }));
+    .map((l) => {
+      // Dòng máy ước tính mà ngày đã qua = phần chưa mua/chưa trả → dồn về hôm nay, không tính là quá hạn.
+      const don = !l.dateManual && l.dueDate < today;
+      return {
+        k: `line:${l.id}`, loai: "line" as const, huong: "out" as const,
+        ten: `${KIND_LABEL[l.kind]} · ${l.title}`,
+        phu: [TERM_LABEL[l.term], l.consumed > EPS ? `đã có đơn ${Math.round(l.consumed).toLocaleString("vi-VN")} đ` : null, l.note,
+          don ? `kế hoạch ${l.dueDate.slice(8, 10)}/${l.dueDate.slice(5, 7)} chưa mua → dồn về hôm nay` : null]
+          .filter(Boolean).join(" · ") || null,
+        du_an: projLabel.get(projectIdOf.get(l.id) ?? "") ?? null, projectId: projectIdOf.get(l.id) ?? null,
+        ngay: don ? today : l.dueDate, uoc: !l.dateManual, tien: l.remaining, src: { op: "line", id: l.id },
+      };
+    });
 }
 
 // ── Lịch tháng / tuần ──────────────────────────────────────────────────────
@@ -606,13 +611,13 @@ export async function buildProjectCashFlow(projectId: string): Promise<ProjectCa
   const label = `${project.code} · ${project.name}`;
   const projLabel = new Map([[projectId, label]]);
   const projectIdOf = new Map(lines.map((l) => [l.id, projectId]));
+  const today = todayVn();
   const items = [
     ...rowsToItems(cash.out, "out", ctx),
     ...rowsToItems(cash.in, "in", ctx),
     ...(await orderedDebtItems([projectId], ctx, projLabel)),
-    ...lineItems(lines, projLabel, projectIdOf),
+    ...lineItems(lines, projLabel, projectIdOf, today),
   ];
-  const today = todayVn();
   const calendar = lamLich(items, { today, horizonEnd: iso(project.expectedEndDate)!, balance: 0 });
   const thuItems = items.filter((i) => i.huong === "in");
   const supAgg = new Map<string, { id: string; name: string; lines: number; amount: number }>();
@@ -693,7 +698,7 @@ export async function buildCashCalendar(): Promise<CompanyCashCalendar> {
     ...rowsToItems(cash.out, "out", ctx),
     ...rowsToItems(cash.in, "in", ctx),
     ...(await orderedDebtItems(null, ctx, projLabel)),
-    ...lineItems(lines, projLabel, projectIdOf),
+    ...lineItems(lines, projLabel, projectIdOf, today),
   ];
 
   // Dự án chưa lập kế hoạch dòng tiền (dự toán cũ / chưa GĐ 5) → vẫn 1 cục "còn phải chi theo ngân sách" ở ngày bàn giao.
@@ -715,7 +720,9 @@ export async function buildCashCalendar(): Promise<CompanyCashCalendar> {
   // Chi phí chung hằng tháng (company_overhead_items) — ngày 5 mỗi tháng đến hết kỳ.
   const monthly = n(overhead._sum.monthlyAmount);
   if (monthly > EPS) {
-    const endForOh = maxIso(horizon, addDays(today, 60))!;
+    // Kéo chi phí chung tới hết kỳ lịch (kể cả đợt thu xa hơn ngày bàn giao), tối thiểu 60 ngày.
+    let endForOh = maxIso(horizon, addDays(today, 60))!;
+    for (const it of items) if (it.ngay) endForOh = maxIso(endForOh, it.ngay)!;
     let y = Number(today.slice(0, 4));
     let m = Number(today.slice(5, 7));
     for (;;) {
