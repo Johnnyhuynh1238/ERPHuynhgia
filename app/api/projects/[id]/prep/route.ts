@@ -27,7 +27,7 @@ export async function GET(
   if (!project)
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
-  const [pipe, gvRows, plan, subs, adjusts, docs] = await Promise.all([
+  const [pipe, gvRows, plan, subs, adjusts, docs, cashPlan] = await Promise.all([
     prisma.projectPipeline.findUnique({
       where: { projectId: params.id },
       select: { prepDone: true },
@@ -62,6 +62,10 @@ export async function GET(
     }),
     prisma.purchaseGuideAdjust.count({ where: { projectId: params.id } }),
     listPrepDocs(params.id).catch(() => ({}) as Record<string, string>),
+    prisma.projectCashPlan.findUnique({
+      where: { projectId: params.id },
+      select: { status: true, generatedAt: true, lines: { select: { amount: true } } },
+    }),
   ]);
 
   const money = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
@@ -81,6 +85,12 @@ export async function GET(
           text: `${plan.lines.length} hạng mục · ${money(plan.totals.budget)}${plan.status === "locked" ? " · đã khoá" : ""}`,
         }
       : { text: "Chưa lập ngân sách", warn: true },
+    dong_tien: cashPlan?.lines.length
+      ? {
+          text: `${cashPlan.lines.length} dòng · chi dự kiến ${money(cashPlan.lines.reduce((s, l) => s + Number(l.amount), 0))}${cashPlan.status === "locked" ? " · đã khoá" : " · nháp"}`,
+          warn: cashPlan.status !== "locked",
+        }
+      : { text: "Chưa lập kế hoạch dòng tiền (tạo từ dự toán + tiến độ)", warn: true },
     hd_mua_hang: {
       text: adjusts ? `Theo HĐ · ${adjusts} điều chỉnh` : "Theo hợp đồng (chưa điều chỉnh)",
     },
@@ -153,6 +163,24 @@ export async function PATCH(
     if (plan?.status !== "locked")
       return NextResponse.json(
         { message: "Khoá ngân sách trước khi chốt (màn Ngân sách → Khoá)" },
+        { status: 400 },
+      );
+  }
+
+  // Kế hoạch dòng tiền phải có dòng + KHOÁ (đã rà ngày trả NCC / đợt thu) mới chốt.
+  if (parsed.data.step === "dong_tien" && parsed.data.done) {
+    const cp = await prisma.projectCashPlan.findUnique({
+      where: { projectId: params.id },
+      select: { status: true, _count: { select: { lines: true } } },
+    });
+    if (!cp || cp._count.lines === 0)
+      return NextResponse.json(
+        { message: "Chưa có kế hoạch dòng tiền (màn Kế hoạch dòng tiền → Tạo từ dự toán)" },
+        { status: 400 },
+      );
+    if (cp.status !== "locked")
+      return NextResponse.json(
+        { message: "Khoá kế hoạch dòng tiền trước khi chốt (màn Kế hoạch dòng tiền → Khoá)" },
         { status: 400 },
       );
   }

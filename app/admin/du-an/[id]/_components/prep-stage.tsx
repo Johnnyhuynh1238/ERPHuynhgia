@@ -131,7 +131,7 @@ export function PrepStage({ projectId }: { projectId: string }) {
             <b>{label}</b>
             {ok ? <small>Đã chốt {dateVn(done[key])}</small> : null}
           </div>
-          {key === "nhan_su" ? (
+          {key === "nhan_su" || key === "dong_tien" ? (
             <div className={`pl-pr-info${info[key]?.warn ? " warn" : ""}`}>
               {info[key]?.text || "…"}{" "}
               <Link href={`/projects/${projectId}/${path}`}>Mở ›</Link>

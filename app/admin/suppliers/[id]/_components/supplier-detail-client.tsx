@@ -32,12 +32,21 @@ type Supplier = {
   bankAccountName: string | null;
   notes: string | null;
   isActive: boolean;
+  paymentTerm: "no_ngay" | "tra_ngay" | "sau_nghiem_thu";
+  creditDays: number;
   createdAt: string;
   groups: Group[];
   prices: Price[];
 };
 
 const fmtVnd = (n: number) => n.toLocaleString("vi-VN");
+const TERM_LABEL = {
+  no_ngay: "Công nợ",
+  tra_ngay: "Trả ngay",
+  sau_nghiem_thu: "Trả sau khi xong",
+} as const;
+const termText = (s: Pick<Supplier, "paymentTerm" | "creditDays">) =>
+  s.paymentTerm === "no_ngay" ? `Công nợ ${s.creditDays} ngày` : TERM_LABEL[s.paymentTerm] ?? "Công nợ";
 const fmtDate = (iso: string | null) => {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -214,6 +223,10 @@ export function SupplierDetailClient({
           <div className="v">{fmtDate(lastUpdate)}</div>
         </div>
         <div className="sn-st">
+          <div className="k">Thanh toán</div>
+          <div className="v">{termText(supplier)}</div>
+        </div>
+        <div className="sn-st">
           <div className="k">Trạng thái</div>
           <div className="v" style={{ color: supplier.isActive ? "var(--sn-ok)" : "var(--sn-red)" }}>
             {supplier.isActive ? "Đang dùng" : "Ngưng"}
@@ -357,6 +370,8 @@ function EditSupplierModal({
   const [bankAccountName, setBankAccountName] = useState(supplier.bankAccountName || "");
   const [notes, setNotes] = useState(supplier.notes || "");
   const [isActive, setIsActive] = useState(supplier.isActive);
+  const [paymentTerm, setPaymentTerm] = useState<Supplier["paymentTerm"]>(supplier.paymentTerm ?? "no_ngay");
+  const [creditDays, setCreditDays] = useState(String(supplier.creditDays ?? 14));
   const [busy, setBusy] = useState(false);
 
   async function save() {
@@ -377,6 +392,8 @@ function EditSupplierModal({
         bankAccountName: bankAccountName.trim() || null,
         notes: notes.trim() || null,
         isActive,
+        paymentTerm,
+        creditDays: Math.max(0, Number(creditDays) || 0),
       }),
     });
     setBusy(false);
@@ -397,6 +414,21 @@ function EditSupplierModal({
       <MiniField label="Ngân hàng" value={bankName} onChange={setBankName} />
       <MiniField label="Số TK" value={bankAccount} onChange={setBankAccount} />
       <MiniField label="Tên chủ TK" value={bankAccountName} onChange={setBankAccountName} />
+      <label className="sn-flabel">
+        <div className="sn-fl">Điều khoản thanh toán (kế hoạch dòng tiền)</div>
+        <select
+          className="sn-fin"
+          value={paymentTerm}
+          onChange={(e) => setPaymentTerm(e.target.value as Supplier["paymentTerm"])}
+        >
+          <option value="no_ngay">Công nợ — trả sau khi giao N ngày (vật tư thường)</option>
+          <option value="tra_ngay">Trả ngay khi giao — không nợ (tôn, sắt kèo…)</option>
+          <option value="sau_nghiem_thu">Trả sau khi làm xong (thạch cao, cửa nhôm, lan can…)</option>
+        </select>
+      </label>
+      {paymentTerm === "no_ngay" ? (
+        <MiniField label="Số ngày công nợ" value={creditDays} onChange={setCreditDays} />
+      ) : null}
       <label className="sn-flabel">
         <div className="sn-fl">Ghi chú</div>
         <textarea className="sn-fin" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />

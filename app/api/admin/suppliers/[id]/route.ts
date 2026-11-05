@@ -21,6 +21,9 @@ const patchSchema = z.object({
   bankAccountName: z.string().trim().max(100).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   isActive: z.boolean().optional(),
+  // Điều khoản thanh toán → kế hoạch dòng tiền dự án (lib/cash-forecast)
+  paymentTerm: z.enum(["no_ngay", "tra_ngay", "sau_nghiem_thu"]).optional(),
+  creditDays: z.coerce.number().int().min(0).max(180).optional(),
 });
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -44,6 +47,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       bankAccountName: true,
       notes: true,
       isActive: true,
+      paymentTerm: true,
+      creditDays: true,
       createdAt: true,
       groups: {
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],

@@ -4,9 +4,7 @@ import { CashPlanDirection, CashPlanSourceType, Prisma, UserRole } from "@prisma
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { buildCashPlan } from "@/lib/cash-plan";
-import { buildBudgetPlan } from "@/lib/budget-plan";
-import { syncPaymentLateStatus } from "@/lib/payment-schedule-status";
+import { cashPlanPayload, setNativeDate } from "@/lib/cash-plan-ops";
 
 function canAccess(role: string | undefined) {
   return role === UserRole.admin || role === UserRole.accountant;
@@ -17,51 +15,8 @@ export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!canAccess(user?.role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const projectId = new URL(req.url).searchParams.get("projectId");
-  const data = await buildCashPlan({ projectId: projectId || null });
-
-  // "Còn phải chi" theo ngân sách — TỔNG mọi dự án (màn tổng quan cả cty), hoặc
-  // riêng 1 dự án nếu đang lọc. Chỉ gồm dự án đã lập ngân sách.
-  const plans = await prisma.projectBudgetPlan.findMany({ select: { projectId: true } });
-  const targetIds = (projectId ? plans.filter((p) => p.projectId === projectId) : plans).map(
-    (p) => p.projectId,
-  );
-  // Nhãn + ngày bàn giao dự kiến (expectedEndDate) làm ngày kế hoạch mặc định cho khoản ngân sách.
-  const projInfo = targetIds.length
-    ? new Map(
-        (
-          await prisma.project.findMany({
-            where: { id: { in: targetIds } },
-            select: { id: true, code: true, name: true, expectedEndDate: true },
-          })
-        ).map((p) => [
-          p.id,
-          { label: `${p.code} · ${p.name}`, plannedDate: p.expectedEndDate.toISOString().slice(0, 10) },
-        ]),
-      )
-    : new Map<string, { label: string; plannedDate: string }>();
-  const byProject: {
-    projectId: string;
-    label: string;
-    remaining: number;
-    plannedDate: string | null;
-  }[] = [];
-  for (const id of targetIds) {
-    const bp = await buildBudgetPlan(id);
-    if (!bp.exists) continue;
-    const info = projInfo.get(id);
-    byProject.push({
-      projectId: id,
-      label: info?.label ?? id,
-      remaining: bp.totals.remaining,
-      plannedDate: info?.plannedDate ?? null,
-    });
-  }
-  byProject.sort((a, b) => b.remaining - a.remaining);
-  const budget = byProject.length
-    ? { total: byProject.reduce((s, r) => s + r.remaining, 0), byProject }
-    : null;
-
-  return NextResponse.json({ ...data, budget });
+  // Logic gom dữ liệu + ngân sách nằm ở lib/cash-plan-ops.ts (dùng chung với /api/cron/cash-plan).
+  return NextResponse.json(await cashPlanPayload(projectId || null));
 }
 
 // ── POST: tạo đợt kế hoạch / khoản nhập tay / chuỗi lương định kỳ ─────────────
@@ -177,16 +132,7 @@ export async function PATCH(req: Request) {
   if (!parsed.success)
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "invalid" }, { status: 400 });
   const { sourceType, sourceId, date } = parsed.data;
-  const value = date ? new Date(`${date}T00:00:00Z`) : null;
-
-  if (sourceType === "sub_payment") {
-    if (!value) return NextResponse.json({ error: "Đợt thầu phụ bắt buộc có ngày" }, { status: 400 });
-    await prisma.subPayment.update({ where: { id: sourceId }, data: { expectedDate: value } });
-  } else if (sourceType === "payment_schedule") {
-    const row = await prisma.paymentSchedule.update({ where: { id: sourceId }, data: { expectedDate: value, dueDate: value } });
-    await syncPaymentLateStatus(row.projectId);
-  } else {
-    await prisma.mhOrder.update({ where: { id: sourceId }, data: { deliveryDate: value } });
-  }
+  const loi = await setNativeDate(sourceType, sourceId, date);
+  if (loi) return NextResponse.json({ error: loi }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

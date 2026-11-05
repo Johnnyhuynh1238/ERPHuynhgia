@@ -3,6 +3,7 @@
 export const PREP_STEPS = [
   { key: "du_toan", label: "Dự toán", group: 1, path: "du-toan" },
   { key: "ngan_sach", label: "Ngân sách", group: 1, path: "budget-plan" },
+  { key: "dong_tien", label: "Kế hoạch dòng tiền", group: 1, path: "dong-tien" },
   { key: "hd_mua_hang", label: "HD mua hàng", group: 2, path: "huong-dan-mua-hang" },
   { key: "hd_giam_sat", label: "HD giám sát", group: 2, path: "hd-thi-cong" },
   { key: "thau_phu", label: "Hợp đồng thầu phụ", group: 3, path: "sub-contracts" },

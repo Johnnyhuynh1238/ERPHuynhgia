@@ -762,6 +762,8 @@ model Project {
   purchaseGuideAdjusts      PurchaseGuideAdjust[]
   projectBudget             ProjectBudget?
   projectBudgetPlan         ProjectBudgetPlan?
+  projectCashPlan           ProjectCashPlan?
+  projectCashLines          ProjectCashLine[]
   projectComponents         ProjectComponent[]
   workOrders                WorkOrder[]
   workerTimesheets          WorkerTimesheet[]
@@ -3002,6 +3004,9 @@ model Supplier {
   isActive        Boolean  @default(true) @map("is_active")
   // Token link công khai chốt công nợ (/doi-tac/[token]) — random, không gắn user.
   publicToken     String?  @unique @map("public_token")
+  // Điều khoản thanh toán (sếp chốt 05/11/2026): nợ N ngày sau giao / trả ngay khi giao / trả sau khi làm xong.
+  paymentTerm     CashTerm @default(no_ngay) @map("payment_term")
+  creditDays      Int      @default(14) @map("credit_days")
   createdAt       DateTime @default(now()) @map("created_at")
   createdBy       String   @map("created_by") @db.Uuid
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -3011,6 +3016,7 @@ model Supplier {
   prices        SupplierMaterialPrice[]
   debts         MaterialProposalItemDebt[]
   paymentOrders SupplierPaymentOrder[]
+  cashLines     ProjectCashLine[]
 
   @@index([isActive, name])
   @@map("suppliers")
@@ -4154,6 +4160,73 @@ enum AdvanceStatus {
 /// Bảng này chỉ giữ: đợt admin TỰ CHIA (công nợ NCC, gốc/lãi vay, lương) + khoản NHẬP TAY ngoài hệ thống.
 /// plannedDate NULL = "chưa lên kế hoạch" (nằm cột trái); có ngày = nằm timeline.
 /// projectId/createdBy/sourceId để scalar (FK gắn ở migration) để khỏi thêm back-relation vào User/Project.
+// ── Kế hoạch dòng tiền DỰ ÁN (GĐ 5 Chuẩn bị, sếp chốt 05/11/2026) ───────────────────────────
+// Dự báo chi/thu TRƯỚC khi phát sinh đơn hàng: sinh từ dự toán (vật tư theo PHẦN × NCC, khoán NC theo PHẦN)
+// + tiến độ dự kiến (project_sections.plan_start/plan_end) + điều khoản thanh toán NCC.
+// Khi có đơn mua thật → phần dự báo cùng NCC bị trừ dần (xem lib/cash-forecast.ts); đơn thật đi theo /cash-plan.
+enum CashTerm {
+  no_ngay        // công nợ: trả sau khi giao N ngày (suppliers.credit_days, mặc định 14)
+  tra_ngay       // trả ngay khi giao (tôn, sắt kèo, VT mua 1 lần)
+  sau_nghiem_thu // trả sau khi làm xong / nghiệm thu (thạch cao, cửa nhôm, lan can…)
+}
+
+enum CashLineKind {
+  vat_tu    // vật tư theo PHẦN × NCC
+  nhan_cong // khoán nhân công theo PHẦN (khi chưa có HĐ khoán chia đợt)
+  du_phong  // dự phòng phát sinh (% vật tư, rải đều theo tuần)
+  khac      // nhập tay
+}
+
+model ProjectCashPlan {
+  id               String           @id @default(uuid()) @db.Uuid
+  projectId        String           @unique @map("project_id") @db.Uuid
+  status           BudgetPlanStatus @default(draft)
+  contingencyPct   Decimal          @default(5) @map("contingency_pct") @db.Decimal(5, 2) // % dự phòng trên vật tư
+  receiptDelayDays Int              @default(4) @map("receipt_delay_days") // khách thường trả trễ N ngày so với mốc
+  leadDays         Int              @default(3) @map("lead_days") // đặt hàng trước ngày bắt đầu phần N ngày
+  generatedAt      DateTime?        @map("generated_at")
+  lockedAt         DateTime?        @map("locked_at")
+  note             String?          @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lines   ProjectCashLine[]
+
+  @@map("project_cash_plans")
+}
+
+model ProjectCashLine {
+  id         String       @id @default(uuid()) @db.Uuid
+  planId     String       @map("plan_id") @db.Uuid
+  projectId  String       @map("project_id") @db.Uuid
+  kind       CashLineKind
+  sectionId  String?      @map("section_id") @db.Uuid
+  supplierId String?      @map("supplier_id") @db.Uuid
+  groupKey   String       @map("group_key") @db.VarChar(80) // khoá đối chiếu với đơn thật: "sup:<supplier_id>" | "sup:none" | "nc" | "dp"
+  seq        Int          @default(1) // thứ tự đợt trong cùng nhóm (tuần 1, 2…)
+  title      String
+  term       CashTerm     @default(no_ngay)
+  baseDate   DateTime     @map("base_date") @db.Date // ngày giao / ngày xong dự kiến (gốc tính)
+  dueDate    DateTime     @map("due_date") @db.Date // ngày CHI dự kiến = base + điều khoản; sếp sửa tay → date_manual
+  dateManual Boolean      @default(false) @map("date_manual")
+  amount     Decimal      @db.Decimal(18, 2)
+  note       String?      @db.Text
+  sortOrder  Int          @default(0) @map("sort_order")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  plan     ProjectCashPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section  ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  supplier Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([planId])
+  @@index([projectId, dueDate])
+  @@index([projectId, groupKey])
+  @@map("project_cash_lines")
+}
+
 model CashPlanItem {
   id          String             @id @default(uuid()) @db.Uuid
   direction   CashPlanDirection
@@ -4725,6 +4798,7 @@ model ProjectSection {
   materials   EstimateDbMaterial[]
   works       EstimateWork[]
   budgetLines ProjectBudgetPlanLine[]
+  cashLines   ProjectCashLine[]
 
   @@index([projectId, sortOrder])
   @@map("project_sections")
