@@ -3,7 +3,7 @@ import { CashPlanDirection, CashPlanSourceType, Prisma, UserRole } from "@prisma
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { setItemDate, setLineDate, setNativeDate } from "@/lib/cash-plan-ops";
-import { buildCashCalendar } from "@/lib/cash-forecast";
+import { buildCashCalendar, generateProjectCashLines } from "@/lib/cash-forecast";
 
 export const runtime = "nodejs";
 
@@ -19,6 +19,7 @@ export const runtime = "nodejs";
  *   POST {op:"item", id, date}                            đổi ngày 1 đợt kế hoạch (cash_plan_items)
  *   POST {op:"chunk", direction, sourceType, sourceId, projectId?, amount, date, title?}
  *                                                          lên kế hoạch phần "chưa có ngày" của 1 khoản
+ *   POST {op:"regen", projectId}                          tạo lại dòng dự báo kế hoạch dòng tiền dự án (bỏ qua khi đã khoá)
  */
 function ok(req: Request) {
   const key = req.headers.get("x-cron-key");
@@ -47,6 +48,7 @@ const bodySchema = z.discriminatedUnion("op", [
   }),
   z.object({ op: z.literal("item"), id: z.string().uuid(), date: dateStr.nullable() }),
   z.object({ op: z.literal("line"), id: z.string().uuid(), date: dateStr }),
+  z.object({ op: z.literal("regen"), projectId: z.string().uuid() }),
   z.object({
     op: z.literal("chunk"),
     direction: z.enum(["out", "in"]),
@@ -79,6 +81,12 @@ export async function POST(req: Request) {
     if (b.op === "line") {
       await setLineDate(b.id, b.date);
       return NextResponse.json({ ok: true });
+    }
+    if (b.op === "regen") {
+      const plan = await prisma.projectCashPlan.findUnique({ where: { projectId: b.projectId }, select: { status: true } });
+      if (plan?.status === "locked") return NextResponse.json({ error: "Kế hoạch đã khoá, mở khoá trên ERP trước" }, { status: 400 });
+      const r = await generateProjectCashLines(b.projectId);
+      return NextResponse.json({ ok: true, lines: r.lines, warnings: r.warnings });
     }
     // chunk: cần người tạo → lấy admin đầu tiên (bản ghi ghi chú rõ nguồn là bản tin dòng tiền).
     const admin = await prisma.user.findFirst({
