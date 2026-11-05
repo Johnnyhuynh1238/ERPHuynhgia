@@ -4356,8 +4356,10 @@ model CustomerDiaryLink {
   @@map("customer_diary_links")
 }
 
-/// Hàng chờ tin Zalo gửi RIÊNG từng chủ nhà (không nhóm). Chỉ cổng Zalo khách hàng (chưa có) được lấy ra gửi.
-/// status: waiting_gateway (chờ cổng gửi) | missing_phone (dự án thiếu SĐT chủ nhà) | sent | failed | cancelled.
+/// Tin Zalo ERP gửi RIÊNG từng chủ nhà (không nhóm) — gửi thật qua bridge ngay khi tạo (lib/customer-diary-link.ts),
+/// lỗi → hàng chờ gửi lại zalo_retries (kind diary_link, refId = id dòng này).
+/// status: sending | sent | missing_phone (dự án thiếu SĐT chủ nhà) | failed (xem error) | cancelled
+/// | waiting_gateway (chỉ còn ở dòng bản cũ: ≤ 24 giờ cron gửi thật, cũ hơn → cancelled).
 model CustomerZaloOutbox {
   id             String    @id @default(uuid()) @db.Uuid
   dedupeKey      String    @unique @map("dedupe_key") @db.VarChar(120)
@@ -4380,7 +4382,8 @@ model CustomerZaloOutbox {
 /// Hàng chờ GỬI LẠI tin Zalo cho chủ nhà / đội khoán khi gửi lỗi (luật sếp 04/11/2026, lib/zalo-retry.ts):
 /// 3 lần cách 5 phút → báo TP Dự án – Thi công để theo dõi (không nhắn KS, không gửi tay) → mỗi giờ 1 lần tới khi gửi được.
 /// Quá 24 giờ còn pending → bản tin CEO đọc bảng này.
-/// kind: bb_party (BB nghiệm thu, refId = acceptance_esigns.id) | receipt_customer (refId = receipts.id).
+/// kind: bb_party (BB nghiệm thu, refId = acceptance_esigns.id) | receipt_customer (refId = receipts.id)
+/// | diary_link (link nhật ký chủ nhà, refId = customer_zalo_outbox.id).
 /// status: pending | sent | cancelled (BB đã ký/huỷ, không cần gửi nữa). tries = số lần đã gửi (cả lần đầu).
 model ZaloRetry {
   id          String    @id @default(uuid()) @db.Uuid

@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { computeEstimateProgress } from "@/lib/estimate-progress";
+import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
 
-// Link xem nhật ký thi công cho chủ nhà (lệnh sếp 04/11/2026, việc V261104-121521):
+// Link xem nhật ký thi công cho chủ nhà (lệnh sếp 04/11/2026, việc V261104-121521, V261105-194810):
 // - KS lưu nhật ký (tự duyệt) → tạo 1 link /nk/<mã> cho đúng 1 dự án + 1 ngày, không mật khẩu, hết hạn 7 ngày,
-//   + 1 tin vào hàng chờ Zalo khách hàng (gửi riêng chủ nhà, không nhóm). Cổng Zalo khách chưa có → chỉ nằm chờ.
+//   + gửi THẬT 1 tin Zalo riêng chủ nhà (không nhóm) qua bridge ERP; lỗi → hàng chờ gửi lại zalo_retries.
 // - Đã có link cho dự án + ngày đó → KHÔNG tạo tin mới; link luôn hiện bản nhật ký mới nhất.
 // - Trang link chỉ hiện ảnh + % từng hạng mục lớn — không nội dung chi tiết/khối lượng, không giá/tiền, không dự án khác.
 
@@ -55,7 +56,7 @@ export function renderDiaryLinkMessage(v: { customerName: string | null; project
 }
 
 /**
- * Gọi sau khi KS lưu nhật ký (đã tự duyệt). Lần đầu của dự án + ngày → tạo link + 1 tin chờ gửi; các lần sau bỏ qua.
+ * Gọi sau khi KS lưu nhật ký (đã tự duyệt). Lần đầu của dự án + ngày → tạo link + gửi 1 tin Zalo chủ nhà; các lần sau bỏ qua.
  * Lỗi không được chặn việc lưu nhật ký → nơi gọi tự catch.
  */
 export async function queueCustomerDiaryLink(projectId: string, entryDate: Date): Promise<void> {
@@ -74,10 +75,11 @@ export async function queueCustomerDiaryLink(projectId: string, entryDate: Date)
   const code = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + DIARY_LINK_TTL_DAYS * 24 * 60 * 60 * 1000);
   const phone = (project.customerPhone || "").trim();
+  let outboxId: string;
   try {
-    await prisma.$transaction(async (tx) => {
+    outboxId = await prisma.$transaction(async (tx) => {
       const link = await tx.customerDiaryLink.create({ data: { code, projectId, entryDate, expiresAt } });
-      await tx.customerZaloOutbox.create({
+      const row = await tx.customerZaloOutbox.create({
         data: {
           dedupeKey: `diary_link:${link.id}`,
           kind: "diary_link",
@@ -92,14 +94,110 @@ export async function queueCustomerDiaryLink(projectId: string, entryDate: Date)
             url: diaryLinkUrl(code),
             expiresAt,
           }),
-          status: phone ? "waiting_gateway" : "missing_phone",
+          status: "sending",
         },
+        select: { id: true },
       });
+      return row.id;
     });
   } catch (err) {
     // 2 lần lưu cùng lúc → lần sau đụng unique (dự án + ngày) → đã có link, bỏ qua.
     if ((err as { code?: string })?.code === "P2002") return;
     throw err;
+  }
+  // Gửi ngầm — KS bấm lưu không phải chờ Zalo.
+  void sendCustomerDiaryLink(outboxId).catch((err) => console.error("[customer-diary-link] gửi Zalo lỗi:", err));
+}
+
+/**
+ * Lần gửi đầu 1 tin nhật ký cho chủ nhà. Lỗi (thiếu SĐT / không tra được Zalo / bridge lỗi) → hàng chờ gửi lại
+ * zalo_retries (3 lần × 5 phút → báo TP Dự án – Thi công → mỗi giờ; SOP-23 luật 26).
+ */
+export async function sendCustomerDiaryLink(outboxId: string): Promise<void> {
+  const res = await retryCustomerDiaryLinkSend(outboxId);
+  if (res.r !== "failed") return;
+  const row = await prisma.customerZaloOutbox.findUnique({
+    where: { id: outboxId },
+    select: { projectId: true, recipientName: true, message: true },
+  });
+  if (!row) return;
+  console.warn(`[customer-diary-link] ${outboxId}: ${res.note} → đưa vào hàng chờ gửi lại`);
+  const { enqueueZaloRetry } = await import("@/lib/zalo-retry");
+  await enqueueZaloRetry({
+    kind: "diary_link",
+    refId: outboxId,
+    ev: "diary_link",
+    projectId: row.projectId,
+    recipient: `chủ nhà ${row.recipientName ?? ""}`.trim() + " (link nhật ký)",
+    message: row.message,
+    error: res.note,
+  });
+}
+
+/**
+ * Gửi THẬT 1 tin nhật ký cho chủ nhà qua bridge Zalo ERP (cùng đường tin xác nhận đã thu), nhắn riêng — không nhóm.
+ * SĐT đọc lại từ dự án mỗi lần (bổ sung SĐT xong thì lần gửi lại tự dùng). Kết quả ghi vào dòng customer_zalo_outbox.
+ * Lần đầu + hàng chờ gửi lại dùng chung.
+ */
+export async function retryCustomerDiaryLinkSend(
+  outboxId: string,
+): Promise<{ r: "sent" } | { r: "failed"; note: string } | { r: "cancel" }> {
+  const row = await prisma.customerZaloOutbox.findUnique({
+    where: { id: outboxId },
+    select: { id: true, status: true, projectId: true, message: true, createdAt: true },
+  });
+  if (!row || row.status === "cancelled") return { r: "cancel" };
+  if (row.status === "sent") return { r: "sent" };
+  // Link hết hạn 7 ngày → gửi nữa vô ích.
+  if (row.createdAt.getTime() + DIARY_LINK_TTL_DAYS * 24 * 60 * 60 * 1000 <= Date.now()) {
+    await prisma.customerZaloOutbox.update({ where: { id: row.id }, data: { status: "cancelled", error: "link đã hết hạn" } });
+    return { r: "cancel" };
+  }
+  const project = await prisma.project.findUnique({ where: { id: row.projectId }, select: { customerPhone: true } });
+  const phone = (project?.customerPhone || "").replace(/\D/g, "");
+  let error: string | null = null;
+  if (phone.length < 9) {
+    error = "dự án chưa có SĐT chủ nhà hợp lệ";
+  } else {
+    const threadId = await lookupZaloUserByPhone(phone);
+    if (!threadId) error = `không tìm thấy Zalo theo SĐT ${phone}`;
+    else if (!(await sendZaloBridge({ threadId, text: row.message }))) error = "bridge lỗi";
+  }
+  await prisma.customerZaloOutbox.update({
+    where: { id: row.id },
+    data: error
+      ? { status: phone.length < 9 ? "missing_phone" : "failed", error, recipientPhone: phone || null }
+      : { status: "sent", error: null, sentAt: new Date(), recipientPhone: phone },
+  });
+  return error ? { r: "failed", note: error } : { r: "sent" };
+}
+
+const BACKLOG_HOURS = 24;
+
+/**
+ * Tin nhật ký tạo thời bản "chờ cổng" (status waiting_gateway): tạo trong 24 giờ gần nhất → gửi thật ngay;
+ * cũ hơn → bỏ (lệnh sếp 19:47 05/11/2026, việc V261105-194810). Cron mỗi phút gọi; bản mới không tạo waiting_gateway nữa.
+ */
+export async function flushWaitingDiaryLinks(): Promise<void> {
+  const cutoff = new Date(Date.now() - BACKLOG_HOURS * 60 * 60 * 1000);
+  await prisma.customerZaloOutbox.updateMany({
+    where: { kind: "diary_link", status: "waiting_gateway", createdAt: { lt: cutoff } },
+    data: { status: "cancelled", error: "tin chờ cổng quá 24 giờ — bỏ, không gửi" },
+  });
+  const rows = await prisma.customerZaloOutbox.findMany({
+    where: { kind: "diary_link", status: "waiting_gateway", createdAt: { gte: cutoff } },
+    orderBy: { createdAt: "asc" },
+    take: 10,
+    select: { id: true },
+  });
+  for (const r of rows) {
+    // Giành dòng: lượt cron khác đã lấy thì bỏ qua, không gửi trùng.
+    const claim = await prisma.customerZaloOutbox.updateMany({
+      where: { id: r.id, status: "waiting_gateway" },
+      data: { status: "sending" },
+    });
+    if (!claim.count) continue;
+    await sendCustomerDiaryLink(r.id);
   }
 }
 

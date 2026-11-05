@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
 import { sendPushToUser } from "@/lib/push-server";
 
-export type ZaloRetryKind = "bb_party" | "receipt_customer";
+export type ZaloRetryKind = "bb_party" | "receipt_customer" | "diary_link";
 /** sent = đã tới khách · failed = vẫn lỗi (note lý do) · cancel = không cần gửi nữa (BB đã ký/huỷ…). */
 export type RetryOutcome = { r: "sent" } | { r: "failed"; note: string } | { r: "cancel" };
 
@@ -92,6 +92,10 @@ async function attempt(row: { kind: string; refId: string; ev: string; message: 
   if (row.kind === "receipt_customer") {
     const { retryReceiptCustomerSend } = await import("@/lib/zalo-notify");
     return retryReceiptCustomerSend(row.refId, row.message);
+  }
+  if (row.kind === "diary_link") {
+    const { retryCustomerDiaryLinkSend } = await import("@/lib/customer-diary-link");
+    return retryCustomerDiaryLinkSend(row.refId);
   }
   return { r: "cancel" };
 }

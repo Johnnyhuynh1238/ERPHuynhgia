@@ -5,6 +5,7 @@ import { sendPushToUser } from "@/lib/push-server";
 import { getTodayDateVn } from "@/lib/task-centric";
 import { isDefaultRestDay } from "@/lib/reporting";
 import { runZaloRetries } from "@/lib/zalo-retry";
+import { flushWaitingDiaryLinks } from "@/lib/customer-diary-link";
 
 type Stage = "r30" | "r15" | "overdue";
 
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
 
   // Cron này chạy mỗi phút → quét luôn hàng chờ gửi lại tin Zalo khách / đội khoán (chạy nền, lỗi không ảnh hưởng push).
   void runZaloRetries().catch((err) => console.error("[cron zalo-retry]", err));
+  // Tin nhật ký chủ nhà còn nằm "chờ cổng" từ bản cũ: ≤ 24 giờ → gửi thật, cũ hơn → bỏ.
+  void flushWaitingDiaryLinks().catch((err) => console.error("[cron diary-link backlog]", err));
 
   const now = new Date();
   const today = getTodayDateVn();
