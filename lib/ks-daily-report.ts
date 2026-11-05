@@ -3,7 +3,9 @@
  *
  * Mỗi loại (kind) 1 khung giờ — cron host gọi /api/cron/ks-daily-report?kind=...&step=...:
  *  - headcount (số thợ):          ask 07:00 · remind 07:10→07:50 · close 08:00
- *  - eod (khối lượng + ảnh):      ask 16:00 · remind 16:30→21:30 (1 giờ/lần) · close 22:00
+ *    → TẮT HẲN (sếp Zalo 14:28 05/11/2026, việc V261105-142857): không tạo dòng, không gửi Zalo,
+ *      không ghi hàng chờ thư ký. Cron vẫn gọi được, chỉ trả về 0.
+ *  - eod (khối lượng + ảnh):    ask 16:00 · remind 16:30→21:30 (1 giờ/lần) · close 22:00
  * ask   : mỗi dự án in_progress có KS (pm_engineer) → 1 dòng pending/dự án/ngày/kind,
  *         nick Zalo cty gửi mỗi KS 1 link /nv/<token> (token HMAC = kind + KS + ngày).
  * remind: gửi lại link cho KS chưa lưu (headcount 10 phút/lần, eod 1 giờ/lần). eod: KS đã tự
@@ -405,7 +407,11 @@ async function sendPendingLinks(kind: KsTaskKind, date: Date, remind: boolean) {
   return sent;
 }
 
+/** Tin báo số thợ sáng đã bỏ hẳn (sếp Zalo 14:28 05/11/2026): ERP không gửi, thư ký cũng không nhắn. */
+const HEADCOUNT_TAT = true;
+
 export async function stepAsk(kind: KsTaskKind, now = new Date()) {
+  if (kind === "headcount" && HEADCOUNT_TAT) return { created: 0, sent: 0, unlinked: 0, tat: true };
   const date = vnToday(now);
   const assignments = await prisma.projectMemberAssignment.findMany({
     where: { role: "pm_engineer", project: { status: "in_progress" }, user: { isActive: true } },
@@ -453,9 +459,9 @@ export async function stepAsk(kind: KsTaskKind, now = new Date()) {
   // @@unique(projectId, reportDate, kind) chặn trùng khi cron chạy lại.
   const created = data.length ? (await prisma.ksDailyReport.createMany({ data, skipDuplicates: true })).count : 0;
 
-  // Cảnh báo KS chưa có Zalo chỉ 1 lần/ngày (buổi sáng).
+  // Cảnh báo KS chưa có Zalo chỉ 1 lần/ngày (lượt hỏi cuối ngày — tin số thợ sáng đã bỏ).
   const missing = picked.filter((a) => !linked.get(a.user.id));
-  if (missing.length && kind === "headcount") {
+  if (missing.length && kind === "eod") {
     const lines = missing.map(
       (a) => `• ${a.project.name}: KS ${a.user.fullName}${a.user.phone ? ` (${a.user.phone})` : " (chưa có SĐT)"}`,
     );
@@ -470,6 +476,7 @@ export async function stepAsk(kind: KsTaskKind, now = new Date()) {
 }
 
 export async function stepRemind(kind: KsTaskKind, now = new Date()) {
+  if (kind === "headcount" && HEADCOUNT_TAT) return { sent: 0, tat: true };
   if (vnHour(now) >= KS_TASKS[kind].closeHour) return { sent: 0 };
   const date = vnToday(now);
   const synced = kind === "eod" ? await syncEodFromDiary(date) : 0;
