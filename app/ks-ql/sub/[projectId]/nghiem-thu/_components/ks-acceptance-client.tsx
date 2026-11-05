@@ -156,15 +156,6 @@ export function KsAcceptanceClient({
     }
   }
 
-  async function copyLink(link: string) {
-    try {
-      await navigator.clipboard.writeText(link);
-      toast.success("Đã chép link, anh dán vào Zalo khách");
-    } catch {
-      window.prompt("Chép link này gửi khách:", link);
-    }
-  }
-
   // Ký online (02/11/2026): KS điền + ký trên điện thoại → khách ký qua link Zalo → PDF tự đính vào mục 1.
   function esignBlock(m: Milestone) {
     const e = m.esign;
@@ -180,18 +171,13 @@ export function KsAcceptanceClient({
             <p className="mt-1 text-sm text-[#c9cde4]">
               Anh đã ký. Đang chờ {e.partyName ?? (group === "thau_phu" ? "đội khoán" : "khách")} ký.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <a href={e.ksLink} className="ksql-tap rounded-xl bg-[#252840] px-3 py-3 text-center text-sm font-bold text-[#f0f2ff]">
-                Xem biên bản
-              </a>
-              <button
-                type="button"
-                onClick={() => void copyLink(e.partyLink)}
-                className="ksql-tap rounded-xl bg-[#252840] px-3 py-3 text-sm font-bold text-orange-300"
-              >
-                Chép link khách
-              </button>
-            </div>
+            {/* Không có nút chép link khách: tin cho khách chỉ máy gửi (SOP-23 luật 26, SOP-20 C12). */}
+            <a
+              href={e.ksLink}
+              className="ksql-tap mt-2 block rounded-xl bg-[#252840] px-3 py-3 text-center text-sm font-bold text-[#f0f2ff]"
+            >
+              Xem biên bản
+            </a>
           </>
         ) : (
           <>
