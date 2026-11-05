@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { getObjectFromMinio, putObjectToMinio } from "@/lib/minio";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
 import { enqueueZaloRetry, markZaloRetrySent, type RetryOutcome } from "@/lib/zalo-retry";
+import { ghiTinCho, ksQuaThuKy, type KsTinLoai } from "@/lib/ks-tin-cho";
 import { readAcceptancePhotos, type AcceptancePhoto } from "@/lib/acceptance-photos";
 import { buildEsignPdf } from "@/lib/acceptance-esign-pdf";
 import BO_GIAM_SAT from "@/lib/data/bo-giam-sat.json";
@@ -295,6 +296,35 @@ async function zaloSend(
   text: string,
   file?: { base64: string; name: string },
 ): Promise<boolean> {
+  if (who === "ks" && e.ksUserId) {
+    // Tin KS qua thư ký (sếp 05/11/2026): luôn ghi hàng chờ; KS đã chuyển sang thư ký → ERP không gửi thẳng.
+    const c = esignContent(e);
+    const quaThuKy = await ksQuaThuKy(e.ksUserId);
+    const loai: KsTinLoai = ev === "ks_link_tra_ve" ? "ks_link_tra_ve" : ev === "ks_xong" ? "ks_xong" : "ks_link";
+    const daGhi = await ghiTinCho(
+      e.ksUserId,
+      [
+        {
+          loai,
+          projectId: e.projectId,
+          duAn: `${c.projectCode} — ${c.projectName}`,
+          moc: `${c.partyLabel} · ${c.title}`,
+          link: loai === "ks_xong" ? null : esignLink(e.ksToken),
+          noiDung: text,
+          refId: e.id,
+        },
+      ],
+      !quaThuKy,
+    );
+    if (quaThuKy && daGhi) {
+      const cur = await prisma.acceptanceEsign.findUnique({ where: { id: e.id }, select: { log: true } });
+      await prisma.acceptanceEsign.update({
+        where: { id: e.id },
+        data: { log: pushLog(cur?.log, { at: new Date().toISOString(), ev, ok: true, note: "chuyển thư ký KS" }) },
+      });
+      return true;
+    }
+  }
   const note = await zaloDeliver(e, who, ev, text, file);
   const ok = note === null;
   if (!ok && who === "party") {

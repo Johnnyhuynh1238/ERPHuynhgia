@@ -9,6 +9,8 @@ const updateSchema = z.object({
   phone: z.string().trim().max(20).optional().or(z.literal("")),
   role: z.nativeEnum(UserRole),
   isActive: z.boolean(),
+  // KS: tin ERP chỉ vào hàng chờ thư ký kỹ sư, ERP không gửi Zalo thẳng (sếp 05/11/2026). Không gửi = giữ nguyên.
+  ksTinQuaThuKy: z.boolean().optional(),
 });
 
 function mapAuthError(error: unknown) {
@@ -87,6 +89,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       phone: parsed.data.phone || null,
       role: parsed.data.role,
       isActive: parsed.data.isActive,
+      ...(parsed.data.ksTinQuaThuKy !== undefined ? { ksTinQuaThuKy: parsed.data.ksTinQuaThuKy } : {}),
     },
     select: {
       id: true,
@@ -96,6 +99,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       role: true,
       isActive: true,
       mustChangePassword: true,
+      ksTinQuaThuKy: true,
       createdAt: true,
     },
   });

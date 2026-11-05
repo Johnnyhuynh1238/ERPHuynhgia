@@ -10,7 +10,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
-import { sendZaloBridge } from "@/lib/zalo-notify";
+import { guiKs, type KsTinDong } from "@/lib/ks-tin-cho";
 import { ensureEsign, esignLink } from "@/lib/acceptance-esign";
 import { loadMilestoneReadiness, type MilestoneReadiness } from "@/lib/gan-moc";
 
@@ -90,34 +90,44 @@ function ddmmToday(): string {
   return new Date().toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" });
 }
 
-/** Cron 16:30: mỗi KS (pm_engineer dự án đang thi công) nhận 1 tin Zalo + 1 push liệt kê BB cần ký. */
+/**
+ * Cron 16:30: mỗi KS (pm_engineer dự án đang thi công) nhận 1 tin Zalo + 1 push liệt kê BB cần ký.
+ * KS đã chuyển sang thư ký (lib/ks-tin-cho) → không Zalo thẳng, mỗi mốc 1 dòng hàng chờ cho thư ký.
+ */
 export async function sendAcceptanceReminders() {
   const assignments = await prisma.projectMemberAssignment.findMany({
     where: { role: "pm_engineer", project: { status: "in_progress" }, user: { isActive: true } },
     select: {
       projectId: true,
-      project: { select: { name: true } },
+      project: { select: { code: true, name: true } },
       user: { select: { id: true, zaloThreadId: true } },
     },
   });
   const upcoming = await loadUpcomingAcceptance(Array.from(new Set(assignments.map((a) => a.projectId))));
 
-  const byKs = new Map<string, { zaloThreadId: string | null; projects: { name: string; items: UpcomingItem[] }[] }>();
+  const byKs = new Map<
+    string,
+    { zaloThreadId: string | null; projects: { id: string; code: string; name: string; items: UpcomingItem[] }[] }
+  >();
   for (const a of assignments) {
     const items = upcoming.get(a.projectId);
     if (!items) continue;
     const entry = byKs.get(a.user.id) ?? { zaloThreadId: a.user.zaloThreadId, projects: [] };
-    if (!entry.projects.some((p) => p.name === a.project.name)) entry.projects.push({ name: a.project.name, items });
+    if (!entry.projects.some((p) => p.name === a.project.name)) {
+      entry.projects.push({ id: a.projectId, code: a.project.code, name: a.project.name, items });
+    }
     byKs.set(a.user.id, entry);
   }
 
   // Mỗi BB cần ký → link ký online (tạo phiên nếu chưa có; KS chỉ bấm link là điền + ký).
   const links = new Map<string, string>();
+  const esignIds = new Map<string, string>();
   const allItems = Array.from(upcoming.values()).flat();
   for (const i of allItems) {
     try {
       const { esign } = await ensureEsign(i.id);
       links.set(i.id, esign.ksToken);
+      esignIds.set(i.id, esign.id);
     } catch (err) {
       console.error("[acceptance-reminder esign]", i.id, err);
     }
@@ -143,7 +153,24 @@ export async function sendAcceptanceReminders() {
       `Hôm nay làm xong công tác nào thì bấm link BB công tác đó: điền kết quả, chụp ảnh, ký trên máy. ` +
       `Chủ nhà: ký xong máy tự gửi khách ký. Đội khoán: ký xong máy tự gửi PDF cho đội.\n\n` +
       blocks.join("\n\n");
-    if (zaloThreadId && (await sendZaloBridge({ threadId: zaloThreadId, text }))) zalo++;
+    // Tin KS qua thư ký (sếp 05/11/2026): 1 dòng hàng chờ / mốc, kèm link ký + phiên ký (thư ký xem BB đã ký chưa).
+    const rows: KsTinDong[] = projects.flatMap((p) =>
+      p.items.map((i) => {
+        const tk = links.get(i.id);
+        return {
+          loai: "nghiem_thu" as const,
+          projectId: p.id,
+          duAn: `${p.code} — ${p.name}`,
+          moc:
+            `${i.missed ? "Còn sót" : i.due ? "Đến hạn" : "Sắp tới"} · ` +
+            `${i.kind === "thau_phu" ? "Thầu phụ" : "Chủ nhà"} · ${upcomingItemLabel(i)}`,
+          link: tk ? esignLink(tk) : null,
+          noiDung: text,
+          refId: esignIds.get(i.id) ?? null,
+        };
+      }),
+    );
+    if (await guiKs({ ksId, threadId: zaloThreadId, text, rows })) zalo++;
     try {
       const r = await sendPushToUser(ksId, {
         title: missed ? `⚠️ Còn ${missed} biên bản nghiệm thu chưa ký` : "📝 Nhắc ký biên bản nghiệm thu",

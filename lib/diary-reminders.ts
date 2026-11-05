@@ -1,13 +1,13 @@
 /**
  * Nhắc KS chốt nhật ký thi công: cron 17:00 + 20:00 (host crontab).
  * Mỗi KS (pm_engineer dự án đang thi công) chỉ nhận tin khi còn dự án hôm nay chưa chốt nhật ký;
- * tin liệt kê đúng các dự án thiếu. Gửi Zalo + push.
+ * tin liệt kê đúng các dự án thiếu. Gửi Zalo (hoặc hàng chờ thư ký — lib/ks-tin-cho) + push.
  */
 import { prisma } from "@/lib/prisma";
 import { getWorkDateVn } from "@/lib/attendance";
 import { KS_QL_ENGINEER_IDS } from "@/lib/ks-ql-engineers";
 import { sendPushToUser } from "@/lib/push-server";
-import { sendZaloBridge } from "@/lib/zalo-notify";
+import { guiKs } from "@/lib/ks-tin-cho";
 
 function ddmmToday(): string {
   return new Date().toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" });
@@ -24,7 +24,7 @@ export async function sendDiaryReminders({ dryRun = false }: { dryRun?: boolean 
     },
     select: {
       projectId: true,
-      project: { select: { name: true } },
+      project: { select: { code: true, name: true } },
       user: { select: { id: true, zaloThreadId: true } },
     },
   });
@@ -34,18 +34,24 @@ export async function sendDiaryReminders({ dryRun = false }: { dryRun?: boolean 
   });
   const doneKeys = new Set(done.map((d) => `${d.projectId}:${d.ksId}`));
 
-  const byKs = new Map<string, { zaloThreadId: string | null; projects: string[] }>();
+  const byKs = new Map<
+    string,
+    { zaloThreadId: string | null; projects: string[]; rows: { projectId: string; duAn: string }[] }
+  >();
   for (const a of assignments) {
     if (doneKeys.has(`${a.projectId}:${a.user.id}`)) continue;
-    const entry = byKs.get(a.user.id) ?? { zaloThreadId: a.user.zaloThreadId, projects: [] };
-    if (!entry.projects.includes(a.project.name)) entry.projects.push(a.project.name);
+    const entry = byKs.get(a.user.id) ?? { zaloThreadId: a.user.zaloThreadId, projects: [], rows: [] };
+    if (!entry.projects.includes(a.project.name)) {
+      entry.projects.push(a.project.name);
+      entry.rows.push({ projectId: a.projectId, duAn: `${a.project.code} — ${a.project.name}` });
+    }
     byKs.set(a.user.id, entry);
   }
 
   let zalo = 0;
   let push = 0;
   const preview: { ksId: string; projects: string[] }[] = [];
-  for (const [ksId, { zaloThreadId, projects }] of Array.from(byKs.entries())) {
+  for (const [ksId, { zaloThreadId, projects, rows }] of Array.from(byKs.entries())) {
     preview.push({ ksId, projects });
     if (dryRun) continue;
     const text =
@@ -53,7 +59,9 @@ export async function sendDiaryReminders({ dryRun = false }: { dryRun?: boolean 
       `Còn ${projects.length} dự án hôm nay chưa chốt nhật ký:\n` +
       projects.map((n) => `🏠 ${n}`).join("\n") +
       `\n\nVào ERP → chọn dự án → NHẬT KÝ THI CÔNG, điền đủ 5 mục rồi bấm Chốt.`;
-    if (zaloThreadId && (await sendZaloBridge({ threadId: zaloThreadId, text }))) zalo++;
+    // Tin KS qua thư ký (sếp 05/11/2026): 1 dòng hàng chờ / dự án chưa chốt nhật ký.
+    const tin = rows.map((r) => ({ loai: "nhat_ky" as const, ...r, moc: "Chốt nhật ký thi công", noiDung: text }));
+    if (await guiKs({ ksId, threadId: zaloThreadId, text, rows: tin })) zalo++;
     try {
       const r = await sendPushToUser(ksId, {
         title: `📒 Còn ${projects.length} nhật ký hôm nay chưa chốt`,

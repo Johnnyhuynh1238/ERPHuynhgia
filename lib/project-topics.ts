@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push-server";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
+import { guiKs, ksQuaThuKy } from "@/lib/ks-tin-cho";
 
 const SITE_URL = (process.env.NEXTAUTH_URL || "https://erp.huynhgia6.com").replace(/\/$/, "");
 
@@ -113,7 +114,7 @@ export async function notifyTopicCreated(topicId: string) {
       body: true,
       authorId: true,
       authorName: true,
-      project: { select: { id: true, name: true } },
+      project: { select: { id: true, code: true, name: true } },
     },
   });
   if (!topic) return;
@@ -142,6 +143,27 @@ export async function notifyTopicCreated(topicId: string) {
   const sentFallback = new Set<string>();
   for (const m of others) {
     try {
+      if (m.role === "engineer") {
+        // Tin KS qua thư ký (sếp 05/11/2026, lib/ks-tin-cho): KS đã chuyển thì chỉ vào hàng chờ, chưa thì gửi như cũ.
+        const thread = (await ksQuaThuKy(m.id)) ? null : await resolveZaloThread(m);
+        await guiKs({
+          ksId: m.id,
+          threadId: thread,
+          text,
+          rows: [
+            {
+              loai: "chu_de",
+              projectId: topic.project.id,
+              duAn: `${topic.project.code} — ${topic.project.name}`,
+              moc: clip(topic.title, 200),
+              link: `${SITE_URL}${topicLink(topic.project.id, topic.id)}`,
+              noiDung: text,
+              refId: topic.id,
+            },
+          ],
+        });
+        continue;
+      }
       const thread = await resolveZaloThread(m);
       if (thread) {
         await sendZaloBridge({ threadId: thread, text });

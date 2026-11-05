@@ -13,6 +13,7 @@ type UserItem = {
   role: "admin" | "engineer" | "foreman" | "accountant" | "construction_manager";
   isActive: boolean;
   mustChangePassword: boolean;
+  ksTinQuaThuKy: boolean;
   createdAt: string;
 };
 
@@ -96,6 +97,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
     phone: "",
     role: "engineer",
     isActive: true,
+    ksTinQuaThuKy: false,
   });
 
   useEffect(() => {
@@ -196,6 +198,14 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   async function handleUpdateUser(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedUser) return;
+    if (
+      editForm.ksTinQuaThuKy &&
+      !selectedUser.ksTinQuaThuKy &&
+      !(await confirmDialog(
+        `Từ giờ ERP KHÔNG tự gửi Zalo cho ${selectedUser.fullName} nữa, mọi tin vào hàng chờ cho thư ký kỹ sư nhắn. Chỉ bật khi thư ký của KS này đã chạy. Bật?`,
+      ))
+    )
+      return;
 
     setUpdating(true);
     const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
@@ -272,6 +282,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
       phone: user.phone || "",
       role: user.role,
       isActive: user.isActive,
+      ksTinQuaThuKy: user.ksTinQuaThuKy,
     });
     setShowEditModal(true);
   }
@@ -552,6 +563,17 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                 <option value="active">Đang hoạt động</option>
                 <option value="inactive">Đã vô hiệu</option>
               </select>
+
+              {editForm.role === "engineer" ? (
+                <select
+                  className="w-full rounded-xl border border-[#2d3249] bg-[#13151f] px-3 py-2 text-sm"
+                  value={editForm.ksTinQuaThuKy ? "thu_ky" : "erp"}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, ksTinQuaThuKy: e.target.value === "thu_ky" }))}
+                >
+                  <option value="erp">Tin Zalo cho KS: ERP tự gửi</option>
+                  <option value="thu_ky">Tin Zalo cho KS: qua thư ký kỹ sư (ERP không gửi)</option>
+                </select>
+              ) : null}
 
               <div className="flex justify-between gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => handleResetPassword(selectedUser)}>

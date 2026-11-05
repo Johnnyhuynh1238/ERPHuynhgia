@@ -23,6 +23,7 @@ import { deleteObjectFromMinio, putObjectToMinio } from "@/lib/minio";
 import { autoApproveData, isDiaryLocked } from "@/lib/diary-approval";
 import { queueCustomerDiaryLink } from "@/lib/customer-diary-link";
 import { lookupZaloUserByPhone, sendZaloBridge } from "@/lib/zalo-notify";
+import { guiKs, type KsTinDong } from "@/lib/ks-tin-cho";
 
 export type KsTaskKind = "headcount" | "eod";
 
@@ -379,7 +380,27 @@ async function sendPendingLinks(kind: KsTaskKind, date: Date, remind: boolean) {
       where: { ksId: ks.id, reportDate: date, kind, status: "pending" },
       data: remind ? { remindedAt: new Date() } : { askedAt: new Date() },
     });
-    if (await sendZaloBridge({ threadId: ks.zaloThreadId, text: linkText(kind, ks.id, date, remind) })) sent++;
+    // Tin KS qua thư ký (sếp 05/11/2026): 1 dòng hàng chờ / dự án còn chờ báo.
+    const pending = await prisma.ksDailyReport.findMany({
+      where: { ksId: ks.id, reportDate: date, kind, status: "pending" },
+      orderBy: { project: { name: "asc" } },
+      select: { projectId: true, project: { select: { code: true, name: true } } },
+    });
+    const text = linkText(kind, ks.id, date, remind);
+    const link = ksTaskLink(kind, ks.id, date);
+    // Hạn = giờ chốt hôm nay theo giờ VN (cột lưu UTC).
+    const hanLuc = new Date(date.getTime() + (KS_TASKS[kind].closeHour - 7) * 3600 * 1000);
+    const loai = kind === "headcount" ? (remind ? "so_tho_nhac" : "so_tho") : remind ? "cuoi_ngay_nhac" : "cuoi_ngay";
+    const rows = pending.map((p) => ({
+      loai,
+      projectId: p.projectId,
+      duAn: `${p.project.code} — ${p.project.name}`,
+      moc: KS_TASKS[kind].title,
+      link,
+      noiDung: text,
+      hanLuc,
+    })) satisfies KsTinDong[];
+    if (await guiKs({ ksId: ks.id, threadId: ks.zaloThreadId, text, rows })) sent++;
   }
   return sent;
 }

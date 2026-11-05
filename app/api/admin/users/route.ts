@@ -81,6 +81,7 @@ export async function GET(request: Request) {
         role: true,
         isActive: true,
         mustChangePassword: true,
+        ksTinQuaThuKy: true,
         createdAt: true,
       },
     }),

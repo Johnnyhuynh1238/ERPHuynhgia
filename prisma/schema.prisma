@@ -444,6 +444,7 @@ model User {
   mustChangePassword Boolean  @default(true) @map("must_change_password")
   avatarUrl          String?  @map("avatar_url")
   zaloThreadId       String?  @unique @map("zalo_thread_id") // Zalo 1-1 với nick cty (KS nhận nhiệm vụ qua Zalo)
+  ksTinQuaThuKy      Boolean  @default(false) @map("ks_tin_qua_thu_ky") // bật: tin ERP cho KS chỉ vào hàng chờ thư ký (ks_tin_cho), ERP không gửi Zalo thẳng
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -4330,6 +4331,28 @@ model ZaloRetry {
   @@index([status, nextAt])
   @@index([kind, refId])
   @@map("zalo_retries")
+}
+
+/// Hàng chờ tin ERP cho KS → THƯ KÝ KỸ SƯ đọc (văn phòng AI, chỉ đọc) và nhắn KS (lệnh sếp 05/11/2026, lib/ks-tin-cho.ts).
+/// loai: so_tho, so_tho_nhac, cuoi_ngay, cuoi_ngay_nhac, nhat_ky, nghiem_thu (nhắc 16h30, 1 dòng/mốc),
+///       ks_link, ks_link_tra_ve, ks_xong (BB ký online, refId = acceptance_esigns.id), chu_de (trao đổi dự án).
+/// erpGuiThang = lúc ghi KS chưa bật ksTinQuaThuKy → ERP vẫn gửi Zalo thẳng (thư ký chỉ cần biết, không nhắn trùng).
+model KsTinCho {
+  id          String    @id @default(uuid()) @db.Uuid
+  ksId        String    @map("ks_id") @db.Uuid
+  loai        String    @db.VarChar(32)
+  projectId   String?   @map("project_id") @db.Uuid
+  duAn        String?   @map("du_an")
+  moc         String?
+  link        String?   @db.Text
+  noiDung     String    @map("noi_dung") @db.Text
+  refId       String?   @map("ref_id") @db.Uuid
+  hanLuc      DateTime? @map("han_luc")
+  erpGuiThang Boolean   @default(false) @map("erp_gui_thang")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([ksId, createdAt])
+  @@map("ks_tin_cho")
 }
 
 enum AcceptanceMilestoneStatus {
