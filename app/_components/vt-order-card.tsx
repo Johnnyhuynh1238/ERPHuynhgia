@@ -5,7 +5,8 @@ import { Package } from "lucide-react";
 
 // Card "ĐẶT VẬT TƯ" (SOP-26, kênh dự phòng khi Zalo hỏng): mở màn /vt/ks/ do máy vật tư
 // (ai-office vt-web, nginx /vt/) phục vụ — ngoài Next.js nên dùng <a>, không dùng <Link>.
-// Ẩn khi tài khoản không có dự án đặt vật tư (api trả 401/403) hoặc máy vật tư không chạy.
+// Card hiện ngay; số "N việc" hiện thêm khi api trả về. Chỉ ẩn khi tài khoản không có
+// dự án đặt vật tư (api trả 401/403).
 export function VtOrderCard({
   projectId,
   variant = "dashboard",
@@ -14,11 +15,18 @@ export function VtOrderCard({
   variant?: "dashboard" | "ksql";
 }) {
   const [so, setSo] = useState<number | null>(null);
+  const [an, setAn] = useState(false);
 
   useEffect(() => {
     let huy = false;
     fetch("/vt/ks/api/dem", { credentials: "same-origin", cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401 || r.status === 403) {
+          if (!huy) setAn(true);
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then((d) => {
         if (!huy && d && typeof d.so === "number") setSo(d.so);
       })
@@ -28,10 +36,10 @@ export function VtOrderCard({
     };
   }, []);
 
-  if (so === null) return null;
+  if (an) return null;
   const href = projectId ? `/vt/ks/#da=${projectId}` : "/vt/ks/";
   const badge =
-    so > 0 ? (
+    so ? (
       <span className="rounded-full bg-[#ff8a3d] px-2 py-0.5 text-xs font-bold text-[#1a1d2e]">
         {so} việc
       </span>
@@ -49,7 +57,7 @@ export function VtOrderCard({
               ĐẶT VẬT TƯ
               {badge}
             </div>
-            <div className="mt-1 text-sm text-[#8892b0]">Nhập đề xuất · AI lên đơn · Tải PO · Nhận hàng</div>
+            <div className="mt-1 text-sm text-[#8892b0]">Đề xuất · KH tuần · Tải PO · Nhận hàng</div>
           </div>
         </div>
       </a>
@@ -66,7 +74,7 @@ export function VtOrderCard({
           ĐẶT VẬT TƯ
           {badge}
         </div>
-        <div className="text-sm text-slate-600">Nhập đề xuất · AI lên đơn · Tải PO · Nhận hàng</div>
+        <div className="text-sm text-slate-600">Đề xuất · KH tuần · Tải PO · Nhận hàng</div>
       </div>
     </a>
   );
