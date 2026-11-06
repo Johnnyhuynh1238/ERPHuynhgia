@@ -931,8 +931,8 @@ ${(() => {
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
-              onReturn={setReturning}
-              onRefund={refundReceipt}
+              onReturn={isKeToan ? undefined : setReturning}
+              onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn hàng nào chờ nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -943,8 +943,8 @@ ${(() => {
               onEdit={openEdit}
               onDel={delOrder}
               onPO={setPoOrder}
-              onReturn={setReturning}
-              onRefund={refundReceipt}
+              onReturn={isKeToan ? undefined : setReturning}
+              onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn nào đã nhận."
               hideDel={(o) => isKeToan && isReceived(o.status)}
             />
@@ -1495,8 +1495,8 @@ function OrdersList({
   onEdit: (o: Order) => void;
   onDel: (o: Order) => void;
   onPO: (o: Order) => void;
-  onReturn?: (o: Order) => void; // admin + KT: mở sheet trả hàng (undefined = ẩn)
-  onRefund?: (o: Order) => void; // admin + KT: lập lệnh thu NCC hoàn tiền cho đơn trả (undefined = ẩn)
+  onReturn?: (o: Order) => void; // chỉ admin (SOP-06 luật 22): mở sheet trả hàng (undefined = ẩn)
+  onRefund?: (o: Order) => void; // chỉ admin (SOP-06 luật 22): lập lệnh thu NCC hoàn tiền cho đơn trả (undefined = ẩn)
   emptyText?: string;
   hideDel?: (o: Order) => boolean;
 }) {
@@ -1525,7 +1525,7 @@ function OrdersList({
         const isRefundRet = isRet && o.status === "paid";
         const rcStatus = o.refundReceiptStatus; // null = chưa lập lệnh thu
         const rcCollected = rcStatus === "received";
-        // Nút "Lập lệnh thu": đơn hoàn tiền chưa có lệnh thu (chưa huỷ). Admin + KT.
+        // Nút "Lập lệnh thu": đơn hoàn tiền chưa có lệnh thu (chưa huỷ). Chỉ admin.
         const canRefund = !!onRefund && isRefundRet && !rcStatus;
         const showDeposit = canDeposit(o);
         const showPay = canPayNow(o) && !o.hasInflightExpense;

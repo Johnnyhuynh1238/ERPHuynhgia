@@ -24,13 +24,16 @@ async function nextReceiptCode() {
 //  Đơn trả refund = mh_orders total < 0, status 'paid', returnOfOrderId != null.
 //  Tạo Receipt supplier_refund (pending, điền sẵn số tiền + NCC) gắn qua mhOrderId.
 //  KT thu trên màn Lệnh thu → tiền vào quỹ. Chặn tạo trùng.
-//  Admin + kế toán (02/11/2026 sếp cấp quyền KT).
+//  Chỉ admin (SOP-06 luật 22, chốt QT 06/11/2026: kế toán không lập lệnh thu trả hàng).
 export async function POST(
   _req: Request,
   { params }: { params: { id: string; orderId: string } },
 ) {
-  const { user, error } = await requireMuaHang();
+  const { user, isKeToan, error } = await requireMuaHang();
   if (error) return error;
+  if (isKeToan) {
+    return NextResponse.json({ message: "Chỉ admin được lập lệnh thu trả hàng." }, { status: 403 });
+  }
 
   const order = await prisma.mhOrder.findFirst({
     where: { id: params.orderId, projectId: params.id },
