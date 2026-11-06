@@ -73,6 +73,19 @@
 .sndoc td.rowact button { background: none; border: none; cursor: pointer; font-size: 12.5px; padding: 3px 4px; border-radius: 6px; opacity: .65; }
 .sndoc td.rowact button:hover { opacity: 1; background: var(--sn-hi); }
 
+/* SOP-26: bảng giá duyệt — hiệu lực / chờ duyệt / NCC chính-dự phòng */
+.sndoc td.valid, .sndoc td.pend { white-space: nowrap; font-size: 12.5px; }
+.sndoc .sn-tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-left: 4px; }
+.sndoc td.valid .sn-tag { margin-left: 0; }
+.sndoc .sn-tag.ok { color: var(--sn-ok); background: rgba(91,122,82,.13); }
+.sndoc .sn-tag.red { color: var(--sn-red); background: rgba(192,85,63,.14); }
+.sndoc .sn-tag.wait { color: var(--sn-orange); background: rgba(227,97,34,.12); }
+.sndoc .sn-rank { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 6px; color: var(--sn-gold); background: var(--sn-hi); }
+.sndoc .sn-rank.chinh { color: var(--sn-terra); }
+.sndoc tr.me td { background: var(--sn-hi); }
+.sn-modal.wide { max-width: 640px; }
+.sn-mnote { font-size: 12px; color: #8a6a52; line-height: 1.45; }
+
 .sndoc .sn-foot { padding: 14px 32px 26px; font-size: 11px; color: var(--sn-mut2); text-align: center; }
 
 /* modal */

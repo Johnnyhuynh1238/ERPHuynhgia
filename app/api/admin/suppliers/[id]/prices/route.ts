@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { isExpired, pctChange, priceLevel } from "@/lib/supplier-price";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ const upsertSchema = z.object({
   unitPrice: z.coerce.number().positive(),
   groupId: z.string().uuid().nullable().optional(),
   note: z.string().trim().max(500).optional(),
+  supplierRank: z.enum(["chinh", "du_phong"]).nullable().optional(),
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -45,35 +47,97 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!g) return NextResponse.json({ error: "invalid_group" }, { status: 400 });
   }
 
-  const price = await prisma.supplierMaterialPrice.upsert({
-    where: {
-      supplierId_materialName_unit: {
-        supplierId: supplier.id,
-        materialName: parsed.data.materialName,
-        unit: parsed.data.unit,
-      },
+  // SOP-26 3.8: giá mới KHÔNG thay giá đang dùng ngay — vào pending_* chờ đúng cấp duyệt.
+  const newPrice = parsed.data.unitPrice;
+  const key = {
+    supplierId: supplier.id,
+    materialName: parsed.data.materialName,
+    unit: parsed.data.unit,
+  };
+  const existing = await prisma.supplierMaterialPrice.findUnique({
+    where: { supplierId_materialName_unit: key },
+    select: {
+      id: true,
+      unitPrice: true,
+      supplierRank: true,
+      approvedAt: true,
+      validUntil: true,
+      pendingPrice: true,
+      pendingRank: true,
+      pendingLevel: true,
     },
-    create: {
-      supplierId: supplier.id,
-      materialName: parsed.data.materialName,
-      unit: parsed.data.unit,
-      supplierItemCode: parsed.data.supplierItemCode || null,
-      unitPrice: new Prisma.Decimal(parsed.data.unitPrice),
-      groupId: parsed.data.groupId ?? null,
-      note: parsed.data.note || null,
-      updatedBy: user.id,
-    },
-    update: {
-      supplierItemCode: parsed.data.supplierItemCode || null,
-      unitPrice: new Prisma.Decimal(parsed.data.unitPrice),
-      groupId: parsed.data.groupId ?? null,
-      note: parsed.data.note || null,
-      updatedBy: user.id,
-    },
-    select: { id: true, materialName: true, unit: true, unitPrice: true },
+  });
+
+  // Không gửi supplierRank → giữ nguyên hạng NCC đang có.
+  const newRank =
+    parsed.data.supplierRank === undefined ? existing?.supplierRank ?? null : parsed.data.supplierRank;
+  const approvedPrice = existing?.approvedAt ? Number(existing.unitPrice) : null;
+  const unchanged =
+    !!existing &&
+    approvedPrice === newPrice &&
+    (existing.supplierRank ?? null) === newRank &&
+    !isExpired(existing.validUntil);
+  const level = priceLevel(approvedPrice, newPrice, newRank === "chinh" && existing?.supplierRank !== "chinh");
+  // Chỉ sửa ghi chú/mã/nhóm khi đang có đề xuất y hệt → giữ đề xuất cũ, không ghi lịch sử lại.
+  const samePending =
+    !!existing?.pendingLevel &&
+    existing.pendingPrice !== null &&
+    Number(existing.pendingPrice) === newPrice &&
+    (existing.pendingRank ?? null) === newRank;
+  const pending = samePending
+    ? {}
+    : unchanged
+    ? { pendingPrice: null, pendingRank: null, pendingLevel: null, pendingAt: null, pendingBy: null }
+    : {
+        pendingPrice: new Prisma.Decimal(newPrice),
+        pendingRank: newRank,
+        pendingLevel: level,
+        pendingAt: new Date(),
+        pendingBy: user.id,
+      };
+  const common = {
+    supplierItemCode: parsed.data.supplierItemCode || null,
+    groupId: parsed.data.groupId ?? null,
+    note: parsed.data.note || null,
+    updatedBy: user.id,
+  };
+
+  const price = await prisma.$transaction(async (tx) => {
+    const p = existing
+      ? await tx.supplierMaterialPrice.update({
+          where: { id: existing.id },
+          data: { ...common, ...pending },
+          select: { id: true, materialName: true, unit: true, unitPrice: true },
+        })
+      : await tx.supplierMaterialPrice.create({
+          // VT mới: unit_price bắt buộc có → ghi giá nhập, nhưng approved_at trống = CHƯA duyệt.
+          data: { ...key, ...common, ...pending, unitPrice: new Prisma.Decimal(newPrice) },
+          select: { id: true, materialName: true, unit: true, unitPrice: true },
+        });
+    if (!unchanged && !samePending) {
+      const pct = pctChange(approvedPrice, newPrice);
+      await tx.supplierPriceLog.create({
+        data: {
+          priceId: p.id,
+          supplierId: supplier.id,
+          materialName: key.materialName,
+          unit: key.unit,
+          action: "de_xuat",
+          oldPrice: approvedPrice === null ? null : new Prisma.Decimal(approvedPrice),
+          newPrice: new Prisma.Decimal(newPrice),
+          pct: pct === null ? null : new Prisma.Decimal(pct),
+          level,
+          rank: newRank,
+          actor: user.name ?? user.email ?? null,
+          userId: user.id,
+        },
+      });
+    }
+    return p;
   });
   return NextResponse.json({
     price: { ...price, unitPrice: Number(price.unitPrice) },
+    pendingLevel: samePending ? existing?.pendingLevel ?? null : unchanged ? null : level,
   });
 }
 

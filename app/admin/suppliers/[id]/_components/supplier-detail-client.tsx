@@ -5,6 +5,15 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { plexSans } from "@/lib/fonts";
+import {
+  LEVEL_LABEL,
+  PRICE_VALID_DAYS,
+  RANK_LABEL,
+  isExpired,
+  pctChange,
+  type PriceLevel,
+  type SupplierRank,
+} from "@/lib/supplier-price";
 import "./supplier-detail.css";
 
 type Group = { id: string; name: string; sortOrder: number; _count: { prices: number } };
@@ -17,6 +26,36 @@ type Price = {
   unitPrice: number;
   note: string | null;
   updatedAt: string;
+  supplierRank: SupplierRank | null;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  validUntil: string | null;
+  pendingPrice: number | null;
+  pendingRank: SupplierRank | null;
+  pendingLevel: PriceLevel | null;
+  pendingAt: string | null;
+};
+type PriceLog = {
+  id: string;
+  action: "de_xuat" | "duyet" | "tu_choi";
+  oldPrice: number | null;
+  newPrice: number | null;
+  pct: number | null;
+  level: PriceLevel | null;
+  rank: SupplierRank | null;
+  note: string | null;
+  actor: string | null;
+  createdAt: string;
+};
+type PricePeer = {
+  id: string;
+  supplierName: string;
+  supplierActive: boolean;
+  unitPrice: number;
+  pendingPrice: number | null;
+  supplierRank: SupplierRank | null;
+  approvedAt: string | null;
+  validUntil: string | null;
 };
 type Supplier = {
   id: string;
@@ -70,12 +109,17 @@ export function SupplierDetailClient({
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [newPriceGroup, setNewPriceGroup] = useState<string | "" | null>(null); // groupId ("" = chưa nhóm), null = đóng
   const [editPrice, setEditPrice] = useState<Price | null>(null);
+  const [historyPrice, setHistoryPrice] = useState<Price | null>(null);
+  const [canApprove, setCanApprove] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/suppliers/${supplierId}`, { cache: "no-store" });
     const j = await res.json().catch(() => ({}));
     setLoading(false);
-    if (res.ok) setSupplier(j.supplier);
+    if (res.ok) {
+      setSupplier(j.supplier);
+      setCanApprove(!!j.canApprove);
+    }
   }, [supplierId]);
 
   useEffect(() => {
@@ -103,6 +147,28 @@ export function SupplierDetailClient({
     if (!supplier?.prices.length) return null;
     return supplier.prices.reduce<string | null>((m, p) => (!m || p.updatedAt > m ? p.updatedAt : m), null);
   }, [supplier]);
+
+  const pendingCount = supplier?.prices.filter((p) => p.pendingLevel).length ?? 0;
+  const expiredCount = supplier?.prices.filter((p) => p.approvedAt && isExpired(p.validUntil)).length ?? 0;
+
+  async function decidePrice(p: Price, action: "duyet" | "tu_choi") {
+    const msg =
+      action === "duyet"
+        ? `Duyệt giá "${p.materialName}" ${fmtVnd(p.pendingPrice ?? 0)}đ/${p.unit}? Giá có hiệu lực ${PRICE_VALID_DAYS} ngày.`
+        : `Từ chối giá đề xuất "${p.materialName}" ${fmtVnd(p.pendingPrice ?? 0)}đ? Giá đang dùng giữ nguyên.`;
+    if (!(await confirmDialog(msg))) return;
+    const res = await fetch(`/api/admin/suppliers/${supplierId}/prices/${p.id}/duyet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      return toast.error(j.message || "Lỗi duyệt");
+    }
+    toast.success(action === "duyet" ? "Đã duyệt giá" : "Đã từ chối");
+    load();
+  }
 
   async function deleteGroup(g: Group) {
     if (g._count.prices > 0) return toast.error("Xoá hết vật tư trong nhóm trước");
@@ -223,6 +289,18 @@ export function SupplierDetailClient({
           <div className="v">{fmtDate(lastUpdate)}</div>
         </div>
         <div className="sn-st">
+          <div className="k">Giá chờ duyệt</div>
+          <div className="v num" style={pendingCount ? { color: "var(--sn-orange)" } : undefined}>
+            {pendingCount}
+          </div>
+        </div>
+        <div className="sn-st">
+          <div className="k">Giá hết hạn</div>
+          <div className="v num" style={expiredCount ? { color: "var(--sn-red)" } : undefined}>
+            {expiredCount}
+          </div>
+        </div>
+        <div className="sn-st">
           <div className="k">Thanh toán</div>
           <div className="v">{termText(supplier)}</div>
         </div>
@@ -280,22 +358,72 @@ export function SupplierDetailClient({
                     <tr>
                       <th>Vật tư</th>
                       <th>ĐVT</th>
-                      <th className="r">Đơn giá</th>
+                      <th className="r">Đơn giá dùng</th>
+                      <th>Hiệu lực</th>
+                      <th>Chờ duyệt</th>
                       <th>Ghi chú</th>
                       <th className="r" />
                     </tr>
                   </thead>
                   <tbody>
-                    {sec.prices.map((p) => (
+                    {sec.prices.map((p) => {
+                      const expired = isExpired(p.validUntil);
+                      const pct = p.pendingPrice === null ? null : pctChange(p.approvedAt ? p.unitPrice : null, p.pendingPrice);
+                      return (
                       <tr key={p.id}>
                         <td className="mname">
                           {p.materialName}
                           {p.supplierItemCode && <span className="mcode"> · {p.supplierItemCode}</span>}
+                          {p.supplierRank && (
+                            <span className={`sn-rank ${p.supplierRank}`}>{RANK_LABEL[p.supplierRank]}</span>
+                          )}
                         </td>
                         <td className="unit">{p.unit}</td>
                         <td className="r price num">{fmtVnd(p.unitPrice)}</td>
+                        <td className="valid">
+                          {!p.approvedAt ? (
+                            <span className="sn-tag red">Chưa duyệt</span>
+                          ) : expired ? (
+                            <span className="sn-tag red">Hết hạn {fmtDate(p.validUntil)}</span>
+                          ) : (
+                            <span className="sn-tag ok">Đến {fmtDate(p.validUntil)}</span>
+                          )}
+                        </td>
+                        <td className="pend">
+                          {p.pendingLevel && p.pendingPrice !== null ? (
+                            <>
+                              <span className="num">{fmtVnd(p.pendingPrice)}</span>
+                              {pct !== null && (
+                                <span className="mcode">
+                                  {" "}
+                                  ({pct > 0 ? "+" : ""}
+                                  {pct}%)
+                                </span>
+                              )}
+                              {p.pendingRank !== p.supplierRank && p.pendingRank && (
+                                <span className="mcode"> · {RANK_LABEL[p.pendingRank]}</span>
+                              )}
+                              <span className="sn-tag wait">{LEVEL_LABEL[p.pendingLevel]}</span>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="note">{p.note || "—"}</td>
                         <td className="r rowact">
+                          {canApprove && p.pendingLevel && (
+                            <>
+                              <button type="button" onClick={() => decidePrice(p, "duyet")} title="Duyệt giá">
+                                ✅
+                              </button>
+                              <button type="button" onClick={() => decidePrice(p, "tu_choi")} title="Từ chối giá">
+                                ✖️
+                              </button>
+                            </>
+                          )}
+                          <button type="button" onClick={() => setHistoryPrice(p)} title="Lịch sử + so giá NCC khác">
+                            📜
+                          </button>
                           <button type="button" onClick={() => setEditPrice(p)} title="Sửa">
                             ✏️
                           </button>
@@ -304,7 +432,8 @@ export function SupplierDetailClient({
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -345,6 +474,135 @@ export function SupplierDetailClient({
           onSaved={load}
         />
       )}
+      {historyPrice && (
+        <PriceHistoryModal supplierId={supplierId} price={historyPrice} onClose={() => setHistoryPrice(null)} />
+      )}
+    </div>
+  );
+}
+
+const ACTION_LABEL: Record<PriceLog["action"], string> = {
+  de_xuat: "Đề xuất",
+  duyet: "Duyệt",
+  tu_choi: "Từ chối",
+};
+
+function PriceHistoryModal({
+  supplierId,
+  price,
+  onClose,
+}: {
+  supplierId: string;
+  price: Price;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{ logs: PriceLog[]; peers: PricePeer[] } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/admin/suppliers/${supplierId}/prices/${price.id}/lich-su`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setData({ logs: j.logs ?? [], peers: j.peers ?? [] }))
+      .catch(() => setData({ logs: [], peers: [] }));
+  }, [supplierId, price.id]);
+
+  return (
+    <div className="sn-mscrim" onClick={onClose}>
+      <div className={`sn-modal wide ${plexSans.variable}`} onClick={(e) => e.stopPropagation()}>
+        <div className="sn-mtitle">
+          {price.materialName} · {price.unit}
+        </div>
+        <div className="sn-mbody">
+          {!data ? (
+            <div className="sn-fl">Đang tải…</div>
+          ) : (
+            <>
+              <div className="sn-fl">So giá NCC khác (cùng tên vật tư + ĐVT)</div>
+              {data.peers.length === 0 ? (
+                <div className="sn-mnote">Chưa có NCC khác báo giá vật tư này.</div>
+              ) : (
+                <div className="sn-tablewrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>NCC</th>
+                        <th className="r">Đơn giá dùng</th>
+                        <th>Hiệu lực</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="me">
+                        <td className="mname">NCC này</td>
+                        <td className="r price num">{fmtVnd(price.unitPrice)}</td>
+                        <td className="unit">{price.approvedAt ? `Đến ${fmtDate(price.validUntil)}` : "Chưa duyệt"}</td>
+                      </tr>
+                      {data.peers.map((p) => (
+                        <tr key={p.id}>
+                          <td className="mname">
+                            {p.supplierName}
+                            {!p.supplierActive && <span className="mcode"> · ngưng</span>}
+                            {p.supplierRank && <span className={`sn-rank ${p.supplierRank}`}>{RANK_LABEL[p.supplierRank]}</span>}
+                          </td>
+                          <td className="r price num">{fmtVnd(p.unitPrice)}</td>
+                          <td className="unit">
+                            {!p.approvedAt ? "Chưa duyệt" : isExpired(p.validUntil) ? "Hết hạn" : `Đến ${fmtDate(p.validUntil)}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="sn-fl" style={{ marginTop: 14 }}>
+                Lịch sử giá NCC này
+              </div>
+              {data.logs.length === 0 ? (
+                <div className="sn-mnote">Chưa có lịch sử (giá nhập trước 06/11/2026).</div>
+              ) : (
+                <div className="sn-tablewrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ngày</th>
+                        <th>Việc</th>
+                        <th className="r">Giá</th>
+                        <th>Người</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.logs.map((l) => (
+                        <tr key={l.id}>
+                          <td className="unit">{fmtDate(l.createdAt)}</td>
+                          <td>
+                            {ACTION_LABEL[l.action]}
+                            {l.action === "de_xuat" && l.level && <span className="mcode"> · {LEVEL_LABEL[l.level]}</span>}
+                            {l.note && <div className="mcode">{l.note}</div>}
+                          </td>
+                          <td className="r price num">
+                            {l.newPrice === null ? "—" : fmtVnd(l.newPrice)}
+                            {l.pct !== null && (
+                              <span className="mcode">
+                                {" "}
+                                ({l.pct > 0 ? "+" : ""}
+                                {l.pct}%)
+                              </span>
+                            )}
+                          </td>
+                          <td className="unit">{l.actor || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="sn-macts">
+          <button type="button" className="sn-btn" onClick={onClose}>
+            Đóng
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -511,9 +769,10 @@ function PriceModal({
   const [materialName, setMaterialName] = useState(price?.materialName || "");
   const [unit, setUnit] = useState(price?.unit || "");
   const [supplierItemCode, setSupplierItemCode] = useState(price?.supplierItemCode || "");
-  const [unitPrice, setUnitPrice] = useState(String(price?.unitPrice ?? ""));
+  const [unitPrice, setUnitPrice] = useState(String(price?.pendingPrice ?? price?.unitPrice ?? ""));
   const [groupId, setGroupId] = useState<string>(price?.groupId ?? defaultGroupId ?? "");
   const [note, setNote] = useState(price?.note || "");
+  const [rank, setRank] = useState<SupplierRank | "">(price?.pendingRank ?? price?.supplierRank ?? "");
   const [busy, setBusy] = useState(false);
   const isEdit = !!price;
 
@@ -533,11 +792,14 @@ function PriceModal({
           unitPrice: num,
           groupId: groupId || null,
           note: note.trim() || undefined,
+          supplierRank: rank || null,
         }),
     });
     setBusy(false);
     if (!res.ok) return toast.error("Lỗi lưu");
-    toast.success("Đã lưu");
+    const j = await res.json().catch(() => ({}));
+    const lv = j.pendingLevel as PriceLevel | null | undefined;
+    toast.success(lv ? `Đã lưu · ${LEVEL_LABEL[lv]} — PO dùng giá cũ tới khi duyệt` : "Đã lưu");
     onClose();
     onSaved();
   }
@@ -550,6 +812,18 @@ function PriceModal({
       <label className="sn-flabel">
         <div className="sn-fl">Đơn giá (VNĐ) *</div>
         <input className="sn-fin" inputMode="decimal" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+      </label>
+      <div className="sn-mnote">
+        Giá mới chờ duyệt (SOP-26): đổi ≤ 3% → TP Mua hàng · 3–10% → CEO · trên 10%, giá lần đầu hoặc đổi NCC chính →
+        sếp. Chưa duyệt thì đơn mua vẫn dùng giá cũ. Giá duyệt có hiệu lực {PRICE_VALID_DAYS} ngày.
+      </div>
+      <label className="sn-flabel">
+        <div className="sn-fl">Vai trò NCC cho vật tư này</div>
+        <select className="sn-fin" value={rank} onChange={(e) => setRank(e.target.value as SupplierRank | "")}>
+          <option value="">— Không xếp —</option>
+          <option value="chinh">{RANK_LABEL.chinh}</option>
+          <option value="du_phong">{RANK_LABEL.du_phong}</option>
+        </select>
       </label>
       <label className="sn-flabel">
         <div className="sn-fl">Nhóm hàng</div>

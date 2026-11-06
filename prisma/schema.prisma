@@ -3049,14 +3049,51 @@ model SupplierMaterialPrice {
   note             String?
   updatedAt        DateTime @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
+  // SOP-26 mục 3.8 / 3.10 #6: unit_price = giá ĐANG DÙNG cho PO; giá mới chờ duyệt nằm ở pending_*.
+  // Chưa duyệt → PO giữ giá cũ. Hiệu lực 30 ngày tính từ lúc duyệt. approved_at trống = chưa từng duyệt.
+  supplierRank     String?   @map("supplier_rank") @db.VarChar(20) // chinh | du_phong
+  approvedAt       DateTime? @map("approved_at")
+  approvedBy       String?   @map("approved_by") @db.VarChar(100)
+  validUntil       DateTime? @map("valid_until") @db.Date
+  pendingPrice     Decimal?  @map("pending_price") @db.Decimal(18, 2)
+  pendingRank      String?   @map("pending_rank") @db.VarChar(20)
+  pendingLevel     String?   @map("pending_level") @db.VarChar(20) // truong_mh | ceo | sep
+  pendingAt        DateTime? @map("pending_at")
+  pendingBy        String?   @map("pending_by") @db.Uuid
 
   supplier Supplier               @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   group    SupplierMaterialGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   updater  User?                  @relation("SupplierMaterialPriceUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  logs     SupplierPriceLog[]
 
   @@unique([supplierId, materialName, unit])
   @@index([supplierId, groupId])
   @@map("supplier_material_prices")
+}
+
+// Lịch sử giá NCC (SOP-26 3.8): mỗi lần đề xuất / duyệt / từ chối giá 1 dòng — để so giá theo thời gian.
+model SupplierPriceLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  priceId      String?  @map("price_id") @db.Uuid
+  supplierId   String   @map("supplier_id") @db.Uuid
+  materialName String   @map("material_name")
+  unit         String   @db.VarChar(50)
+  action       String   @db.VarChar(20) // de_xuat | duyet | tu_choi
+  oldPrice     Decimal? @map("old_price") @db.Decimal(18, 2)
+  newPrice     Decimal? @map("new_price") @db.Decimal(18, 2)
+  pct          Decimal? @db.Decimal(8, 2)
+  level        String?  @db.VarChar(20)
+  rank         String?  @db.VarChar(20)
+  note         String?  @db.Text
+  actor        String?  @db.VarChar(100)
+  userId       String?  @map("user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  price SupplierMaterialPrice? @relation(fields: [priceId], references: [id], onDelete: SetNull)
+
+  @@index([supplierId, materialName])
+  @@index([priceId, createdAt])
+  @@map("supplier_price_logs")
 }
 
 model BaogiaLead {

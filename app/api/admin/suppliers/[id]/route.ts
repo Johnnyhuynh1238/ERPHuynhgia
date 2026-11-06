@@ -70,6 +70,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           unitPrice: true,
           note: true,
           updatedAt: true,
+          supplierRank: true,
+          approvedAt: true,
+          approvedBy: true,
+          validUntil: true,
+          pendingPrice: true,
+          pendingRank: true,
+          pendingLevel: true,
+          pendingAt: true,
         },
       },
     },
@@ -82,8 +90,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       prices: supplier.prices.map((p) => ({
         ...p,
         unitPrice: Number(p.unitPrice),
+        pendingPrice: p.pendingPrice === null ? null : Number(p.pendingPrice),
       })),
     },
+    // SOP-26 3.8: chỉ admin (sếp) bấm duyệt giá trên ERP.
+    canApprove: user.role === UserRole.admin,
   });
 }
 
