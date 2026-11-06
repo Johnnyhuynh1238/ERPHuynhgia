@@ -500,6 +500,13 @@
 .mhdoc .cart-hm > label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
 .mhdoc .cart-hm select { width: 100%; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; -webkit-appearance: none; }
 .mhdoc .cart-hm select:focus { border-color: var(--orange); }
+.mhdoc .free-ed { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.mhdoc .free-ed > label { margin-bottom: 0; }
+.mhdoc .free-ed input { width: 100%; min-width: 0; font-family: inherit; font-size: 13.5px; color: var(--text); background: var(--card); border: 1.5px solid var(--line2); border-radius: 10px; padding: 9px 11px; outline: none; }
+.mhdoc .free-ed input:focus { border-color: var(--orange); }
+.mhdoc .free-ed .free-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+.mhdoc .free-ed .free-row .num { text-align: right; }
+.mhdoc .free-ed .cacts { margin-top: 4px; }
 .mhdoc .cart-hm-hint { margin-top: 5px; font-size: 11px; color: var(--mut2); }
 
 /* phân bổ NHIỀU hạng mục theo số tiền (dùng chung giỏ hàng + sửa đơn) */

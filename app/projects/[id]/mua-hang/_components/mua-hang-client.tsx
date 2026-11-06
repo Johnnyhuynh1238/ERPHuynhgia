@@ -531,6 +531,27 @@ export function MuaHangClient({
       body: JSON.stringify({ key: it.key, name: it.name, unit: it.unit, qty, price: p, hm }),
     }).catch(() => {});
   };
+  // Dòng giỏ tay (VT phụ ngoài danh sách): server tự sinh key tên|đvt, nạp lại giỏ từ kết quả.
+  const addFreeToCart = async (row: { name: string; unit: string; qty: number; price: number; hm: string | null }) => {
+    try {
+      const r = await fetch(`/api/projects/${projectId}/mua-hang/cart`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        toast(j.message || "Thêm vật tư lỗi");
+        return false;
+      }
+      await loadCart();
+      toast(`Đã thêm ${row.name} vào giỏ`);
+      return true;
+    } catch {
+      toast("Thêm vật tư lỗi");
+      return false;
+    }
+  };
   const removeFromCart = (key: string) => {
     setCartMap((c) => {
       const n = { ...c };
@@ -923,6 +944,7 @@ ${(() => {
               onRemove={removeFromCart}
               onClear={clearCart}
               onOrder={() => createOrder(orderAlloc)}
+              onAddFree={addFreeToCart}
             />
           ) : tab === "orders" ? (
             <OrdersList
@@ -1366,6 +1388,93 @@ function BudgetAllocEditor({
   );
 }
 
+// Ô nhập dòng giỏ tay: vật tư phụ ngoài danh sách dự toán (SOP-06 v4, việc V261106-053520 điểm 6).
+// Tên, đvt, SL, đơn giá (số nguyên > 0), hạng mục ngân sách (bắt buộc khi dự án đã lập ngân sách).
+function FreeItemForm({
+  budgetLines,
+  onAdd,
+}: {
+  budgetLines: BudgetLine[];
+  onAdd: (row: { name: string; unit: string; qty: number; price: number; hm: string | null }) => Promise<boolean>;
+}) {
+  const needHm = budgetLines.length > 0;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState("");
+  const [qtyS, setQtyS] = useState("");
+  const [priceS, setPriceS] = useState("");
+  const [hm, setHm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const qty = Number(qtyS.replace(",", ".")) || 0;
+  const price = Number(priceS.replace(/[^\d]/g, "")) || 0;
+  const ok = !!name.trim() && !!unit.trim() && qty > 0 && price > 0 && (!needHm || !!hm);
+
+  if (!open)
+    return (
+      <button type="button" className="alloc-add" onClick={() => setOpen(true)}>
+        + Thêm vật tư ngoài danh sách
+      </button>
+    );
+  const submit = async () => {
+    if (!ok || saving) return;
+    setSaving(true);
+    const done = await onAdd({ name: name.trim(), unit: unit.trim(), qty, price, hm: hm || null });
+    setSaving(false);
+    if (done) {
+      setName("");
+      setUnit("");
+      setQtyS("");
+      setPriceS("");
+      setHm("");
+      setOpen(false);
+    }
+  };
+  return (
+    <div className="cart-hm free-ed">
+      <label>Vật tư ngoài danh sách dự toán</label>
+      <input placeholder="Tên vật tư *" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="free-row">
+        <input placeholder="Đvt *" value={unit} onChange={(e) => setUnit(e.target.value)} />
+        <input
+          className="num"
+          inputMode="decimal"
+          placeholder="SL *"
+          value={qtyS}
+          onChange={(e) => setQtyS(e.target.value.replace(/[^\d.,]/g, ""))}
+        />
+        <input
+          className="num"
+          inputMode="numeric"
+          placeholder="Đơn giá *"
+          value={price ? fmt(price) : ""}
+          onChange={(e) => setPriceS(e.target.value.replace(/[^\d]/g, ""))}
+        />
+      </div>
+      {needHm && (
+        <select value={hm} onChange={(e) => setHm(e.target.value)}>
+          <option value="">— Chọn hạng mục ngân sách * —</option>
+          {budgetLines.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="cart-hm-hint">
+        {qty > 0 && price > 0 ? `Thành tiền ${fmt(Math.round(qty * price))} đ` : "Đơn giá là số nguyên > 0"}
+      </div>
+      <div className="cacts">
+        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
+          Huỷ
+        </button>
+        <button type="button" className="btn" disabled={!ok || saving} onClick={submit}>
+          {saving ? "Đang thêm…" : "Thêm vào giỏ"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Tab Giỏ hàng: chọn hạng mục (nhiều, theo số tiền) cho CẢ ĐƠN rồi Đặt hàng → tạo 1 đơn.
 function CartPanel({
   entries,
@@ -1377,8 +1486,10 @@ function CartPanel({
   onRemove,
   onClear,
   onOrder,
+  onAddFree,
   lineIdByGroup,
 }: {
+  onAddFree: (row: { name: string; unit: string; qty: number; price: number; hm: string | null }) => Promise<boolean>;
   entries: { it: MhListItem; qty: number; price: number; hm: string | null }[];
   total: number;
   budgetLines: BudgetLine[];
@@ -1406,6 +1517,7 @@ function CartPanel({
       <div className="empty">
         <div className="ic">🛒</div>
         Giỏ trống. Qua tab Mua hàng chọn vật tư.
+        <FreeItemForm budgetLines={budgetLines} onAdd={onAddFree} />
       </div>
     );
   return (
@@ -1428,6 +1540,7 @@ function CartPanel({
         <span>Tổng {entries.length} vật tư</span>
         <b className="num">{fmt(total)} đ</b>
       </div>
+      <FreeItemForm budgetLines={budgetLines} onAdd={onAddFree} />
       {needHm && (
         <BudgetAllocEditor budgetLines={budgetLines} alloc={alloc} total={total} onChange={onAlloc} />
       )}
