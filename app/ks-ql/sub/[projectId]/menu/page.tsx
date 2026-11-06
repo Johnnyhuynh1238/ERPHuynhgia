@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { SubLayout, BigCard } from "@/app/ks-ql/sub/_components/sub-layout";
 import { UpcomingAcceptance } from "@/app/ks-ql/sub/_components/upcoming-acceptance";
 import { ProjectTopics } from "@/components/project-topics";
+import { VtOrderCard } from "@/app/_components/vt-order-card";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function SubMenuPage({
         subtitle="Đánh dấu xong từng khối lượng theo hạng mục"
         href={`/ks-ql/sub/${project.id}/tien-do`}
       />
+      <VtOrderCard projectId={project.id} variant="ksql" />
       <BigCard
         icon={<FileSignature className="h-8 w-8" />}
         title="NGHIỆM THU CHỦ NHÀ"

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { VtOrderCard } from "@/app/_components/vt-order-card";
 import { TreasuryClient } from "@/app/treasury/_components/treasury-client";
 import { ExpensesClient } from "@/app/expenses/_components/expenses-client";
 import {
@@ -513,6 +514,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
 
       {data.role === "engineer" ? (
         <div className="space-y-4">
+          <VtOrderCard />
           <div className="grid gap-4">
             <Card>
               <CardHeader>
