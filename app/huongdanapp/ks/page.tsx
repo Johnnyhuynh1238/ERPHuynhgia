@@ -59,7 +59,7 @@ const modules: Module[] = [
       "Kiểm tra tổng số việc đã chọn → bấm Check-in.",
     ],
     notes: [
-      "Check-in muộn vẫn được trong ngày, nhưng KPI có thể bị trừ điểm đúng giờ.",
+      "Từ 06/11/2026 (SOP-27) KS không phải check-in sáng: máy không nhắc, không tính KPI. Màn này chỉ còn dùng khi KS muốn mở Nhiệm Vụ cũ.",
       "Sau check-in mới sang được màn Nhiệm Vụ.",
     ],
   },

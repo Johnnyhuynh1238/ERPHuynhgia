@@ -9,6 +9,9 @@ import { flushWaitingDiaryLinks } from "@/lib/customer-diary-link";
 
 type Stage = "r30" | "r15" | "overdue";
 
+/** Check-in sáng đã bỏ hẳn (SOP-27 v3, sếp 06/11/2026): không nhắc push "chưa check-in sáng" nữa. */
+const MORNING_CHECKIN_TAT = true;
+
 function stageForMinutes(minutesToDeadline: number): Stage | null {
   if (minutesToDeadline >= 29.5 && minutesToDeadline <= 30.5) return "r30";
   if (minutesToDeadline >= 14.5 && minutesToDeadline <= 15.5) return "r15";
@@ -77,7 +80,8 @@ export async function POST(request: Request) {
 
   // 1) Morning check-in deadline: 08:00 VN = 01:00 UTC of reportDate.
   // Chủ Nhật mặc định công trường nghỉ → bỏ qua push check-in sáng.
-  if (!isSundayDefaultRest) {
+  // SOP-27 v3 mục 2 · 9 · 10 việc 4 (SOP-23 GĐ-30): KS không check-in sáng nữa → tắt hẳn nhắc check-in.
+  if (!MORNING_CHECKIN_TAT && !isSundayDefaultRest) {
     const deadline = new Date(today);
     deadline.setUTCHours(1, 0, 0, 0);
     const minutes = (deadline.getTime() - now.getTime()) / 60000;

@@ -426,9 +426,9 @@ async function calcKpiBaoCao(input: { ksUserId: string; projectId?: string | nul
   });
 
   let requiredDays = 0;
-  let totalCheckins = 0;
-  let morningOnTimeDays = 0;
-  let morningCompleteDays = 0;
+  const totalCheckins = 0;
+  const morningOnTimeDays = 0;
+  const morningCompleteDays = 0;
   let totalEvening = 0;
   let eveningOnTimeDays = 0;
   let eveningCompleteDays = 0;
@@ -439,66 +439,25 @@ async function calcKpiBaoCao(input: { ksUserId: string; projectId?: string | nul
     const activeDaySet = new Set(activeDays.map((day) => formatUtcYmd(day)));
     requiredDays += activeDays.length;
 
-    const [morningCheckins, eveningReports] = await Promise.all([
-      prisma.morningCheckin.findMany({
-        where: {
-          projectId: project.id,
-          userId: input.ksUserId,
-          reportDate: { gte: input.from, lte: rangeTo },
-        },
-        select: {
-          reportDate: true,
-          isLate: true,
-          tasks: { select: { taskId: true } },
-        },
-      }),
-      prisma.eveningReport.findMany({
-        where: {
-          projectId: project.id,
-          reporterId: input.ksUserId,
-          reportDate: { gte: input.from, lte: rangeTo },
-        },
-        select: {
-          reportDate: true,
-          isOnTime: true,
-          taskReports: { select: { taskId: true } },
-        },
-      }),
-    ]);
+    // SOP-27 v3 mục 2 · 10 việc 4 (sếp 06/11/2026): bỏ hẳn check-in sáng → chỉ tính báo cáo cuối ngày, không đọc morning_checkins.
+    const eveningReports = await prisma.eveningReport.findMany({
+      where: {
+        projectId: project.id,
+        reporterId: input.ksUserId,
+        reportDate: { gte: input.from, lte: rangeTo },
+      },
+      select: { reportDate: true, isOnTime: true },
+    });
 
-    const eveningByDate = new Map(eveningReports.map((report) => [formatUtcYmd(report.reportDate), report]));
-
-    for (const checkin of morningCheckins) {
-      const dateKey = formatUtcYmd(checkin.reportDate);
-      if (!activeDaySet.has(dateKey)) continue;
-
-      const pickedTaskIds = checkin.tasks.map((task) => task.taskId);
-      const eveningReport = eveningByDate.get(dateKey);
-      totalCheckins += 1;
+    for (const eveningReport of eveningReports) {
+      if (!activeDaySet.has(formatUtcYmd(eveningReport.reportDate))) continue;
       totalEvening += 1;
-
-      if (!checkin.isLate) {
-        morningOnTimeDays += 1;
-      }
-
-      if (pickedTaskIds.length > 0) {
-        morningCompleteDays += 1;
-      }
-
-      if (eveningReport?.isOnTime) {
-        eveningOnTimeDays += 1;
-      }
-
-      if (eveningReport) {
-        const reportedTaskIds = new Set(eveningReport.taskReports.map((task) => task.taskId));
-        if (pickedTaskIds.length === 0 || pickedTaskIds.every((taskId) => reportedTaskIds.has(taskId))) {
-          eveningCompleteDays += 1;
-        }
-      }
+      eveningCompleteDays += 1;
+      if (eveningReport.isOnTime) eveningOnTimeDays += 1;
     }
   }
 
-  if (totalCheckins === 0) {
+  if (totalEvening === 0) {
     return {
       score: DEFAULT_SCORE,
       detail: emptyReportDetail(true, requiredDays),
@@ -506,14 +465,14 @@ async function calcKpiBaoCao(input: { ksUserId: string; projectId?: string | nul
   }
 
   const components = {
-    morningOnTime: round2(ratioToPercent(morningOnTimeDays, requiredDays)),
-    morningComplete: round2(ratioToPercent(morningCompleteDays, totalCheckins)),
+    morningOnTime: 0,
+    morningComplete: 0,
     eveningOnTime: round2(ratioToPercent(eveningOnTimeDays, totalEvening)),
-    eveningComplete: round2(ratioToPercent(eveningCompleteDays, totalEvening)),
+    eveningComplete: round2(ratioToPercent(eveningCompleteDays, requiredDays)),
   };
 
   return {
-    score: round2(mean(Object.values(components))),
+    score: round2(mean([components.eveningOnTime, components.eveningComplete])),
     detail: {
       defaultApplied: false,
       requiredDays,
