@@ -130,6 +130,18 @@ export async function PATCH(
           },
           { status: 400 },
         );
+      // Kế hoạch dòng tiền khoá ngay sau khi sếp duyệt GĐ 5 (SOP-22 v8 bước 8, GĐ-24) — chưa khoá chưa sang Thi công.
+      const cashPlan = current.projectId
+        ? await prisma.projectCashPlan.findUnique({
+            where: { projectId: current.projectId },
+            select: { status: true },
+          })
+        : null;
+      if (cashPlan?.status !== "locked")
+        return NextResponse.json(
+          { message: "Chưa khoá kế hoạch dòng tiền — chưa được sang Thi công (màn Kế hoạch dòng tiền → Khoá)" },
+          { status: 400 },
+        );
       // Chưa thu đợt 1 vẫn làm GĐ 5 nhưng KHÔNG sang GĐ 6 (sếp duyệt 01/11/2026, V261101-231540bb).
       const first = current.projectId
         ? await prisma.paymentSchedule.findFirst({

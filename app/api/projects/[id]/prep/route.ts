@@ -27,7 +27,7 @@ export async function GET(
   if (!project)
     return NextResponse.json({ message: "Không tìm thấy dự án" }, { status: 404 });
 
-  const [pipe, gvRows, plan, subs, adjusts, docs, cashPlan] = await Promise.all([
+  const [pipe, gvRows, plan, subs, adjusts, docs, cashPlan, tdRows] = await Promise.all([
     prisma.projectPipeline.findUnique({
       where: { projectId: params.id },
       select: { prepDone: true },
@@ -66,10 +66,24 @@ export async function GET(
       where: { projectId: params.id },
       select: { status: true, generatedAt: true, lines: { select: { amount: true } } },
     }),
+    // Mục 6 Tiến độ chi tiết + Gán mốc (SOP-22 GĐ-4, GĐ-10): chỉ để xem nhanh, chốt sau phiếu soát ĐẠT.
+    prisma.$queryRaw<{ cong_tac: number; ky_hieu: number; phan: number; phan_ngay: number; dot: number; dot_gan: number }[]>`
+      SELECT
+        (SELECT count(*) FROM estimate_works WHERE project_id = ${params.id}::uuid)::int AS cong_tac,
+        (SELECT count(*) FROM estimate_works WHERE project_id = ${params.id}::uuid
+           AND coalesce(btrim(location), '') <> '')::int AS ky_hieu,
+        (SELECT count(*) FROM project_sections WHERE project_id = ${params.id}::uuid)::int AS phan,
+        (SELECT count(*) FROM project_sections WHERE project_id = ${params.id}::uuid
+           AND plan_start IS NOT NULL)::int AS phan_ngay,
+        (SELECT count(*) FROM payment_schedules WHERE project_id = ${params.id}::uuid
+           AND type = 'contract')::int AS dot,
+        (SELECT count(*) FROM payment_schedules WHERE project_id = ${params.id}::uuid
+           AND type = 'contract' AND cardinality(work_ids) > 0)::int AS dot_gan`,
   ]);
 
   const money = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
   const gv = gvRows[0];
+  const td = tdRows[0];
   const pm = project.projectManager;
   const ks = project.mainEngineer;
   const staffTemp = pm.role === "admin" || ks.role === "admin";
@@ -87,10 +101,15 @@ export async function GET(
       : { text: "Chưa lập ngân sách", warn: true },
     dong_tien: cashPlan?.lines.length
       ? {
-          text: `${cashPlan.lines.length} dòng · chi dự kiến ${money(cashPlan.lines.reduce((s, l) => s + Number(l.amount), 0))}${cashPlan.status === "locked" ? " · đã khoá" : " · nháp"}`,
-          warn: cashPlan.status !== "locked",
+          text: `${cashPlan.lines.length} dòng · chi dự kiến ${money(cashPlan.lines.reduce((s, l) => s + Number(l.amount), 0))}${cashPlan.status === "locked" ? " · đã khoá" : " · nháp (khoá sau khi sếp duyệt GĐ 5)"}`,
         }
       : { text: "Chưa lập kế hoạch dòng tiền (tạo từ dự toán + tiến độ)", warn: true },
+    tien_do: td?.cong_tac
+      ? {
+          text: `${td.cong_tac} công tác (${td.ky_hieu} có ký hiệu bản vẽ) · ${td.phan_ngay}/${td.phan} PHẦN có ngày dự kiến · đợt thu đã gán ${td.dot_gan}/${td.dot}`,
+          warn: td.ky_hieu < td.cong_tac || td.phan_ngay < td.phan,
+        }
+      : { text: "Chưa có công tác dự toán → chưa lập được tiến độ chi tiết", warn: true },
     hd_mua_hang: {
       text: adjusts ? `Theo HĐ · ${adjusts} điều chỉnh` : "Theo hợp đồng (chưa điều chỉnh)",
     },
@@ -167,20 +186,23 @@ export async function PATCH(
       );
   }
 
-  // Kế hoạch dòng tiền phải có dòng + KHOÁ (đã rà ngày trả NCC / đợt thu) mới chốt.
+  // Mục 8 Kế hoạch dòng tiền (SOP-22 v8, GĐ-24): chốt khi Kiểm toán viên soát ĐẠT + kế hoạch có dòng.
+  // Khoá kế hoạch làm SAU khi sếp duyệt GĐ 5 (bước 8) — chặn ở lúc sang Thi công, không chặn ở đây.
   if (parsed.data.step === "dong_tien" && parsed.data.done) {
-    const cp = await prisma.projectCashPlan.findUnique({
-      where: { projectId: params.id },
-      select: { status: true, _count: { select: { lines: true } } },
-    });
-    if (!cp || cp._count.lines === 0)
+    const lines = await prisma.projectCashLine.count({ where: { projectId: params.id } });
+    if (lines === 0)
       return NextResponse.json(
         { message: "Chưa có kế hoạch dòng tiền (màn Kế hoạch dòng tiền → Tạo từ dự toán)" },
         { status: 400 },
       );
-    if (cp.status !== "locked")
+  }
+
+  // Mục 6 Tiến độ chi tiết: chưa có công tác dự toán thì chưa có tiến độ để chốt.
+  if (parsed.data.step === "tien_do" && parsed.data.done) {
+    const works = await prisma.estimateWork.count({ where: { projectId: params.id } });
+    if (works === 0)
       return NextResponse.json(
-        { message: "Khoá kế hoạch dòng tiền trước khi chốt (màn Kế hoạch dòng tiền → Khoá)" },
+        { message: "Chưa có công tác dự toán → chưa lập được tiến độ chi tiết" },
         { status: 400 },
       );
   }
