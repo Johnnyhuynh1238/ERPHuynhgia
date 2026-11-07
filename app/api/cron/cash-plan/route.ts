@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CashPlanDirection, CashPlanSourceType, Prisma, UserRole } from "@prisma/client";
+import { BudgetPlanStatus, CashPlanDirection, CashPlanSourceType, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { setItemDate, setLineDate, setNativeDate } from "@/lib/cash-plan-ops";
@@ -20,6 +20,9 @@ export const runtime = "nodejs";
  *   POST {op:"chunk", direction, sourceType, sourceId, projectId?, amount, date, title?}
  *                                                          lên kế hoạch phần "chưa có ngày" của 1 khoản
  *   POST {op:"regen", projectId}                          tạo lại dòng dự báo kế hoạch dòng tiền dự án (bỏ qua khi đã khoá)
+ *   POST {op:"lock", projectId, locked}                   khoá / mở khoá kế hoạch dòng tiền dự án (SOP-16 GĐ-1)
+ *   POST {op:"line_amount", id, amount}                   giảm số tiền 1 dòng dự báo (về 0 hoặc một phần, SOP-16 A6b);
+ *                                                          chỉ cho giảm, không tăng — tăng thì sửa trên màn dự án
  */
 function ok(req: Request) {
   const key = req.headers.get("x-cron-key");
@@ -49,6 +52,8 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("item"), id: z.string().uuid(), date: dateStr.nullable() }),
   z.object({ op: z.literal("line"), id: z.string().uuid(), date: dateStr }),
   z.object({ op: z.literal("regen"), projectId: z.string().uuid() }),
+  z.object({ op: z.literal("lock"), projectId: z.string().uuid(), locked: z.boolean() }),
+  z.object({ op: z.literal("line_amount"), id: z.string().uuid(), amount: z.coerce.number().min(0, "Số tiền không được âm") }),
   z.object({
     op: z.literal("chunk"),
     direction: z.enum(["out", "in"]),
@@ -87,6 +92,31 @@ export async function POST(req: Request) {
       if (plan?.status === "locked") return NextResponse.json({ error: "Kế hoạch đã khoá, mở khoá trên ERP trước" }, { status: 400 });
       const r = await generateProjectCashLines(b.projectId);
       return NextResponse.json({ ok: true, lines: r.lines, warnings: r.warnings });
+    }
+    if (b.op === "lock") {
+      const plan = await prisma.projectCashPlan.findUnique({ where: { projectId: b.projectId }, select: { status: true } });
+      if (b.locked) {
+        const cnt = await prisma.projectCashLine.count({ where: { projectId: b.projectId } });
+        if (!cnt) return NextResponse.json({ error: "Chưa có dòng nào — lập kế hoạch trước" }, { status: 400 });
+      }
+      const status = b.locked ? BudgetPlanStatus.locked : BudgetPlanStatus.draft;
+      const lockedAt = b.locked ? new Date() : null;
+      await prisma.projectCashPlan.upsert({
+        where: { projectId: b.projectId },
+        create: { projectId: b.projectId, status, lockedAt },
+        update: { status, lockedAt },
+      });
+      return NextResponse.json({ ok: true, old: plan?.status ?? "none", status });
+    }
+    if (b.op === "line_amount") {
+      const line = await prisma.projectCashLine.findUnique({ where: { id: b.id }, select: { amount: true } });
+      if (!line) return NextResponse.json({ error: "Không thấy dòng dự báo" }, { status: 404 });
+      const cu = Number(line.amount);
+      const moi = Math.round(b.amount);
+      if (moi > cu)
+        return NextResponse.json({ error: `Chỉ được giảm: số mới ${moi} lớn hơn số đang có ${cu}` }, { status: 400 });
+      await prisma.projectCashLine.update({ where: { id: b.id }, data: { amount: new Prisma.Decimal(moi) } });
+      return NextResponse.json({ ok: true, old: cu, amount: moi });
     }
     // chunk: cần người tạo → lấy admin đầu tiên (bản ghi ghi chú rõ nguồn là bản tin dòng tiền).
     const admin = await prisma.user.findFirst({
