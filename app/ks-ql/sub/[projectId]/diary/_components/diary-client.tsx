@@ -113,16 +113,19 @@ type GridItem = { id: string; src: string; isNew?: boolean };
 
 const MAX_PHOTOS_PER_KIND = 20;
 
-function photoSrc(projectId: string, key: string) {
-  return `/api/ks-ql/projects/${projectId}/diary/photos/file?key=${encodeURIComponent(key)}`;
+// apiBase: /api/ks-ql/projects/<id>/diary (đăng nhập) hoặc /ks-nk/<mã>/api (link ngày, không đăng nhập).
+function photoSrc(apiBase: string, key: string) {
+  return `${apiBase}/photos/file?key=${encodeURIComponent(key)}`;
 }
 
 export function DiaryClient({
   projectId,
   todayYmd,
+  apiBase = `/api/ks-ql/projects/${projectId}/diary`,
 }: {
   projectId: string;
   todayYmd: string;
+  apiBase?: string;
 }) {
   const [data, setData] = useState<DiaryResponse | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -147,8 +150,8 @@ export function DiaryClient({
     setLoading(true);
     try {
       const [r1, r2] = await Promise.all([
-        fetch(`/api/ks-ql/projects/${projectId}/diary?date=${activeYmd}`, { cache: "no-store" }),
-        fetch(`/api/ks-ql/projects/${projectId}/diary/list?take=14`, { cache: "no-store" }),
+        fetch(`${apiBase}?date=${activeYmd}`, { cache: "no-store" }),
+        fetch(`${apiBase}/list?take=14`, { cache: "no-store" }),
       ]);
       if (r1.ok) {
         const d: DiaryResponse = await r1.json();
@@ -175,7 +178,7 @@ export function DiaryClient({
     } finally {
       setLoading(false);
     }
-  }, [projectId, activeYmd]);
+  }, [apiBase, activeYmd]);
 
   useEffect(() => {
     loadAll();
@@ -198,7 +201,7 @@ export function DiaryClient({
       fd.append("removeSite", JSON.stringify(removed.site));
       pending.task.forEach((p, i) => fd.append("taskFiles", p.blob, `hangmuc-${i + 1}.jpg`));
       pending.site.forEach((p, i) => fd.append("siteFiles", p.blob, `toancanh-${i + 1}.jpg`));
-      const res = await fetch(`/api/ks-ql/projects/${projectId}/diary`, {
+      const res = await fetch(`${apiBase}`, {
         method: "POST",
         body: fd,
       });
@@ -260,7 +263,7 @@ export function DiaryClient({
     return [
       ...saved
         .filter((p) => !removed[kind].includes(p.key))
-        .map((p) => ({ id: p.key, src: photoSrc(projectId, p.key) })),
+        .map((p) => ({ id: p.key, src: photoSrc(apiBase, p.key) })),
       ...pending[kind].map((p) => ({ id: p.id, src: p.url, isNew: true })),
     ];
   };
@@ -603,7 +606,7 @@ export function DiaryClient({
 
       {detailDate ? (
         <HistoryDetailModal
-          projectId={projectId}
+          apiBase={apiBase}
           date={detailDate}
           onClose={() => setDetailDate(null)}
         />
@@ -683,11 +686,11 @@ function TodayCard({
 }
 
 function HistoryDetailModal({
-  projectId,
+  apiBase,
   date,
   onClose,
 }: {
-  projectId: string;
+  apiBase: string;
   date: string;
   onClose: () => void;
 }) {
@@ -697,7 +700,7 @@ function HistoryDetailModal({
   useEffect(() => {
     let cancel = false;
     setLoading(true);
-    fetch(`/api/ks-ql/projects/${projectId}/diary?date=${date}`, { cache: "no-store" })
+    fetch(`${apiBase}?date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: DiaryResponse | null) => {
         if (cancel) return;
@@ -709,7 +712,7 @@ function HistoryDetailModal({
     return () => {
       cancel = true;
     };
-  }, [projectId, date]);
+  }, [apiBase, date]);
 
   return (
     <DiaryModal onClose={onClose} title={`Nhật ký ${fmtDateVn(date)}`}>
@@ -770,13 +773,13 @@ function HistoryDetailModal({
           />
 
           <DetailPhotos
-            projectId={projectId}
+            apiBase={apiBase}
             title="Ảnh hạng mục"
             icon={<Camera className="h-4 w-4" />}
             photos={diary.taskPhotos}
           />
           <DetailPhotos
-            projectId={projectId}
+            apiBase={apiBase}
             title="Ảnh toàn cảnh"
             icon={<Building2 className="h-4 w-4" />}
             photos={diary.sitePhotos}
@@ -818,12 +821,12 @@ function DetailRow({
 }
 
 function DetailPhotos({
-  projectId,
+  apiBase,
   title,
   icon,
   photos,
 }: {
-  projectId: string;
+  apiBase: string;
   title: string;
   icon: React.ReactNode;
   photos: Photo[];
@@ -844,13 +847,13 @@ function DetailPhotos({
           {photos.map((p) => (
             <a
               key={p.key}
-              href={photoSrc(projectId, p.key)}
+              href={photoSrc(apiBase, p.key)}
               target="_blank"
               rel="noreferrer"
               className="relative block aspect-square overflow-hidden rounded-lg border border-[#252840] bg-[#0f1015]"
             >
               <Image
-                src={photoSrc(projectId, p.key)}
+                src={photoSrc(apiBase, p.key)}
                 alt=""
                 fill
                 sizes="33vw"

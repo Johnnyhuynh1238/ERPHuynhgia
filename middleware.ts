@@ -122,6 +122,12 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
+  // Nhật ký thi công KS mở từ link ngày "Việc của tôi" (/ks-nk/<mã> + /api/*): mã 8 ký tự ngẫu nhiên
+  // máy vật tư cấp mỗi ngày (bảng ks_day_links), chỉ hợp lệ trong ngày cấp — không gắn session.
+  if (pathname.startsWith("/ks-nk/")) {
+    return applySecurityHeaders(NextResponse.next(), true);
+  }
+
   // File HĐ thầu phụ công khai cho bên B đọc (/hd/<fileId>.<hmac>), CHỈ ĐỌC, không gắn user.
   if (pathname.startsWith("/hd/")) {
     return applySecurityHeaders(NextResponse.next(), true);

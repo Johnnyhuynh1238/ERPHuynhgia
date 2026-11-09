@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-helpers";
-import { AUTO_APPROVER_NAME, isDiaryAutoApproved } from "@/lib/diary-approval";
+import { diaryList } from "@/lib/ks-diary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,40 +22,5 @@ export async function GET(
   });
   if (!allowed) return NextResponse.json({ message: "forbidden" }, { status: 403 });
 
-  const take = Math.max(1, Math.min(30, Number(req.nextUrl.searchParams.get("take")) || 14));
-
-  const diaries = await prisma.constructionDiary.findMany({
-    where: { projectId: params.projectId, ksId: user.id },
-    orderBy: { entryDate: "desc" },
-    take,
-    select: {
-      id: true,
-      entryDate: true,
-      workerCount: true,
-      tasksDone: true,
-      issues: true,
-      taskPhotos: true,
-      sitePhotos: true,
-      savedAt: true,
-      approvedAt: true,
-      approvedById: true,
-      approvedBy: { select: { fullName: true } },
-    },
-  });
-
-  return NextResponse.json({
-    items: diaries.map((d) => ({
-      id: d.id,
-      entryDate: d.entryDate.toISOString().slice(0, 10),
-      workerCount: d.workerCount,
-      tasksDone: d.tasksDone,
-      issues: d.issues,
-      taskCount: ((d.taskPhotos as unknown as unknown[]) || []).length,
-      siteCount: ((d.sitePhotos as unknown as unknown[]) || []).length,
-      savedAt: d.savedAt?.toISOString() ?? null,
-      approvedAt: d.approvedAt?.toISOString() ?? null,
-      approvedByName: isDiaryAutoApproved(d) ? AUTO_APPROVER_NAME : d.approvedBy?.fullName ?? null,
-      autoApproved: isDiaryAutoApproved(d),
-    })),
-  });
+  return diaryList(req, params.projectId, { id: user.id });
 }
