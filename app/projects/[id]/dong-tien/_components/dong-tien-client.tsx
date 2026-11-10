@@ -346,7 +346,7 @@ export function DongTienClient({
               ) : null}
 
               {/* Lịch tháng → tuần → chi tiết */}
-              <section className="dt-cal">
+              <section className="dt-calsec">
                 <div className="dt-cal-head">
                   <span>Lịch dòng tiền theo tháng</span>
                   <small>
