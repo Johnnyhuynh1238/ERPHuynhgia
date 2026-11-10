@@ -1,9 +1,10 @@
-import { SubPaymentStatus } from "@prisma/client";
+import { SubContractStatus, SubPaymentStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { fmtMoney, logProjectActivity } from "@/lib/project-activity-log";
+import { DRAFT_SUB_CONTRACT_MSG } from "@/lib/sub-payment-utils";
 
 const schema = z.object({
   note: z.string().trim().max(3000).nullable().optional(),
@@ -26,7 +27,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const row = await prisma.subPayment.findUnique({
     where: { id: params.id },
     include: {
-      subContract: { select: { projectId: true, code: true, title: true } },
+      subContract: { select: { projectId: true, code: true, title: true, status: true } },
     },
   });
 
@@ -37,6 +38,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const access = await canUserAccessSubContract(row.subContractId, { id: user.id, role: user.role });
   if (!access.canAccess) {
     return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  }
+
+  if (row.subContract.status === SubContractStatus.draft) {
+    return NextResponse.json({ message: DRAFT_SUB_CONTRACT_MSG }, { status: 400 });
   }
 
   if (row.status !== SubPaymentStatus.requested) {

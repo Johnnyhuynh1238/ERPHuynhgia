@@ -1,11 +1,11 @@
-import { ExpenseStatus, Prisma, UserRole } from "@prisma/client";
+import { ExpenseStatus, Prisma, SubContractStatus, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessSubContract, requireSubContractReadUser } from "@/lib/sub-contract-auth";
 import { fireAndForget, notifyExpenseCreated, notifyExpenseKtRequest } from "@/lib/notifications";
 import { findBankByName } from "@/lib/vn-banks";
-import { getSubContractPaidTotal } from "@/lib/sub-payment-utils";
+import { DRAFT_SUB_CONTRACT_MSG, getSubContractPaidTotal } from "@/lib/sub-payment-utils";
 
 export const runtime = "nodejs";
 
@@ -53,6 +53,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       code: true,
       projectId: true,
       contractValue: true,
+      status: true,
       subcontractor: {
         select: { name: true, phone: true, bankName: true, bankAccount: true, bankAccountName: true },
       },
@@ -62,6 +63,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const access = await canUserAccessSubContract(contract.id, { id: user.id, role: user.role });
   if (!access.canAccess) return NextResponse.json({ message: "Không có quyền" }, { status: 403 });
+  if (contract.status === SubContractStatus.draft) {
+    return NextResponse.json({ message: DRAFT_SUB_CONTRACT_MSG }, { status: 400 });
+  }
 
   // Chặn tạo lệnh chi khi CÒN lệnh chi chờ xử lý cho HĐ này (tránh gửi trùng).
   const pendingExisting = await prisma.expense.findFirst({

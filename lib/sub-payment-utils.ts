@@ -291,3 +291,8 @@ export async function recomputeSubContractPayments(
 
   return { paidTotal: await getSubContractPaidTotal(tx, contractId) };
 }
+
+/** HĐ thầu phụ còn NHÁP thì không được đề xuất/duyệt/gửi lệnh chi — phải kích hoạt trước
+ *  (10/11/2026: HDNC0023 nháp mà đã chi 2 đợt → dòng tiền + kiểm soát bỏ sót HĐ). */
+export const DRAFT_SUB_CONTRACT_MSG =
+  "Hợp đồng còn NHÁP — bấm \"Kích hoạt HĐ\" (sau khi ký) rồi mới đề xuất / duyệt / chi đợt.";

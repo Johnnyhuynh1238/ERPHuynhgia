@@ -155,6 +155,25 @@ export async function PATCH(
           { message: "Chưa thu đợt 1 — chưa được sang Thi công (ghi nhận đã thu ở Lịch thu trước)" },
           { status: 400 },
         );
+      // HĐ khoán nhân công / thầu phụ phải KÍCH HOẠT trước khi thi công — nháp thì dòng tiền + Ban Kiểm soát
+      // không đọc được (10/11/2026: HDNC0023 nháp suốt GĐ 6, đã chi 2 đợt).
+      if (current.projectId) {
+        const subs = await prisma.subContract.findMany({
+          where: { projectId: current.projectId, status: { not: "cancelled" } },
+          select: { code: true, status: true },
+        });
+        const nhap = subs.filter((x) => x.status === "draft").map((x) => x.code);
+        if (nhap.length)
+          return NextResponse.json(
+            { message: `HĐ khoán còn NHÁP: ${nhap.join(", ")} — ký xong bấm "Kích hoạt HĐ" rồi mới sang Thi công` },
+            { status: 400 },
+          );
+        if (!subs.some((x) => x.status === "active"))
+          return NextResponse.json(
+            { message: "Chưa có HĐ khoán nhân công đang hiệu lực — lập + ký + kích hoạt HĐ khoán trước khi sang Thi công" },
+            { status: 400 },
+          );
+      }
     }
     // Giai đoạn < stage mới = đã chốt (giữ ngày cũ, thiếu thì ghi lúc này); từ stage mới trở đi = bỏ ngày chốt.
     // Lùi giai đoạn KHÔNG xoá mô tả / báo giá của các phiên bản.
