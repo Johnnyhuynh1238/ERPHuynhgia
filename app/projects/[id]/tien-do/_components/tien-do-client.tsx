@@ -101,6 +101,7 @@ export function TienDoClient({
   projectAddress,
   backHref,
   ks = false,
+  apiBase,
 }: {
   projectId: string;
   projectCode: string;
@@ -108,7 +109,9 @@ export function TienDoClient({
   projectAddress?: string | null;
   backHref?: string;
   ks?: boolean; // màn KS (/ks-ql/sub): ko khung app, ko sửa ngày
+  apiBase?: string; // mặc định /api/projects/<id>/tien-do; link ngày KS: /ks-td/<mã>/api (không đăng nhập)
 }) {
+  const api = apiBase ?? `/api/projects/${projectId}/tien-do`;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [uncataloged, setUncataloged] = useState(0);
   const [hideMoney, setHideMoney] = useState(ks); // KS ko thấy tiền (server cũng che)
@@ -157,7 +160,7 @@ export function TienDoClient({
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/projects/${projectId}/tien-do`, { cache: "no-store" });
+        const r = await fetch(api, { cache: "no-store" });
         if (!r.ok) throw new Error("Không đọc được tiến độ");
         const j = await r.json();
         setTasks(Array.isArray(j.tasks) ? j.tasks : []);
@@ -169,7 +172,7 @@ export function TienDoClient({
         setLoading(false);
       }
     })();
-  }, [projectId]);
+  }, [api]);
 
   // Tổng earned value (tính tại client cho mượt).
   const total = useMemo(() => {
@@ -240,7 +243,7 @@ export function TienDoClient({
   // Lưu mark done (KL hoặc cả hạng mục). Lỗi → trả local về trạng thái cũ.
   const save = useCallback(
     async (ref: { refType: "work" | "line" | "section"; refId: string }, done: boolean, rollback: () => void) => {
-      const r = await fetch(`/api/projects/${projectId}/tien-do`, {
+      const r = await fetch(api, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...ref, done }),
@@ -251,7 +254,7 @@ export function TienDoClient({
         toast(j.message || "Lưu lỗi");
       }
     },
-    [projectId],
+    [api],
   );
 
   // Lưu ngày DỰ KIẾN của 1 PHẦN (chỉ refType 'section'), qua API sections.
@@ -357,7 +360,7 @@ export function TienDoClient({
           <div className="ttl">
             <div className="ey">Báo cáo tiến độ</div>
             <h1 title={projectAddress ?? undefined}>
-              {projectName} · {projectCode}
+              {ks ? projectName : `${projectName} · ${projectCode}`}
             </h1>
           </div>
           <button

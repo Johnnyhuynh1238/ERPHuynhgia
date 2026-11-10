@@ -29,7 +29,7 @@ export async function ensureKsProject(projectId: string, userId: string) {
       id: projectId,
       memberAssignments: { some: { userId, role: "pm_engineer" } },
     },
-    select: { id: true, name: true },
+    select: { id: true, code: true, name: true, address: true },
   });
 }
 

@@ -122,9 +122,9 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
-  // Nhật ký thi công KS mở từ link ngày "Việc của tôi" (/ks-nk/<mã> + /api/*): mã 8 ký tự ngẫu nhiên
+  // Nhật ký (/ks-nk/<mã>) + báo cáo tiến độ (/ks-td/<mã>) KS mở từ link ngày "Việc của tôi" (+ /api): mã 8 ký tự ngẫu nhiên
   // máy vật tư cấp mỗi ngày (bảng ks_day_links), chỉ hợp lệ trong ngày cấp — không gắn session.
-  if (pathname.startsWith("/ks-nk/")) {
+  if (pathname.startsWith("/ks-nk/") || pathname.startsWith("/ks-td/")) {
     return applySecurityHeaders(NextResponse.next(), true);
   }
 
