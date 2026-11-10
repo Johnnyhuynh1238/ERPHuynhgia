@@ -47,6 +47,14 @@ const STATUS: { k: Order["status"]; l: string }[] = [
 ];
 const stLabel = (k: string) => STATUS.find((s) => s.k === k)?.l || "Đã đặt NCC";
 
+// KS đã nhận hàng (máy vật tư ghi receivedAt) nhưng KT/sếp chưa chốt → status vẫn 'ordered',
+// chưa ghi công nợ. Hiện ở tab "Đã nhận" với nhãn "Chưa duyệt".
+const chuaDuyet = (o: { status: string; receivedAt?: string | null }) =>
+  o.status === "ordered" && !!o.receivedAt;
+// Tab "Đã nhận" = received/paid + đơn KS đã nhận chờ KT/sếp duyệt.
+const inRecvTab = (o: { status: string; receivedAt?: string | null }) =>
+  o.status === "received" || o.status === "paid" || chuaDuyet(o);
+
 // Badge suy từ (status + có NCC hay không). received khác nghĩa tuỳ có công nợ.
 const stBadge = (
   status: string,
@@ -487,12 +495,12 @@ export function MuaHangClient({
     deepDone.current = true;
     const o = orders.find((x) => x.id === deepOrderId);
     if (!o) return;
-    setTab(isReceived(o.status) ? "received" : "orders");
+    setTab(inRecvTab(o) ? "received" : "orders");
     setEditing(o);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, deepOrderId]);
-  const ordersPending = useMemo(() => orders.filter((o) => !isReceived(o.status)), [orders]);
-  const ordersReceived = useMemo(() => orders.filter((o) => isReceived(o.status)), [orders]);
+  const ordersPending = useMemo(() => orders.filter((o) => !inRecvTab(o)), [orders]);
+  const ordersReceived = useMemo(() => orders.filter((o) => inRecvTab(o)), [orders]);
 
   // Tra nhanh dòng danh sách theo key vật tư (dòng đầu tiên) để dựng giỏ.
   const itemByKey = useMemo(() => {
@@ -616,7 +624,7 @@ export function MuaHangClient({
 
   const delOrder = async (o: Order) => {
     // Kế toán không được xoá đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
-    if (isKeToan && isReceived(o.status)) {
+    if (isKeToan && inRecvTab(o)) {
       toast("Đơn đã nhận — kế toán không được xoá. Liên hệ admin.");
       return;
     }
@@ -956,7 +964,7 @@ ${(() => {
               onReturn={isKeToan ? undefined : setReturning}
               onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn hàng nào chờ nhận."
-              hideDel={(o) => isKeToan && isReceived(o.status)}
+              hideDel={(o) => isKeToan && inRecvTab(o)}
             />
           ) : (
             <OrdersList
@@ -968,7 +976,7 @@ ${(() => {
               onReturn={isKeToan ? undefined : setReturning}
               onRefund={isKeToan ? undefined : refundReceipt}
               emptyText="Chưa có đơn nào đã nhận."
-              hideDel={(o) => isKeToan && isReceived(o.status)}
+              hideDel={(o) => isKeToan && inRecvTab(o)}
             />
           )}
         </div>
@@ -1682,7 +1690,9 @@ function OrdersList({
                   ))}
               </>
             ) : (() => {
-              const b = stBadge(o.status, o.supplierName);
+              const b = chuaDuyet(o)
+                ? { label: "Chưa duyệt", cls: "await" }
+                : stBadge(o.status, o.supplierName);
               return <span className={`chip ${b.cls}`}>{b.label}</span>;
             })()}
             <span className="tot num">{fmt(o.total)} đ</span>
@@ -2140,6 +2150,8 @@ function EditSheet({
   const isReceivedOrder = order.status === "received";
   // KT xem đơn đã nhận = khoá vật tư/giá/ngày (nhưng vẫn sửa NCC ở dưới). Đơn đã trả = khoá hết.
   const readOnly = lockedPaid || (isKeToan && isReceivedOrder);
+  // KS đã nhận, chờ KT/sếp duyệt trên link Kế toán → khoá ô trạng thái (máy tự ghi công nợ khi chốt).
+  const lockStatus = readOnly || chuaDuyet(order);
   // Admin sửa RIÊNG hạng mục kể cả đơn đã trả (dropdown mở dù readOnly).
   const canEditHm = needHm && isAdmin;
   const [show, setShow] = useState(false);
@@ -2318,13 +2330,14 @@ function EditSheet({
             <button
               type="button"
               className="spill"
-              onClick={() => !readOnly && setStatusOpen((o) => !o)}
-              disabled={readOnly}
+              onClick={() => !lockStatus && setStatusOpen((o) => !o)}
+              disabled={lockStatus}
+              title={chuaDuyet(order) ? "KS đã nhận — chờ Kế toán/sếp duyệt trên link Kế toán" : undefined}
             >
-              {STATUS.find((s) => s.k === status)?.l ?? status}
-              {!readOnly && <span className="cv">▾</span>}
+              {chuaDuyet(order) ? "Chưa duyệt" : (STATUS.find((s) => s.k === status)?.l ?? status)}
+              {!lockStatus && <span className="cv">▾</span>}
             </button>
-            {statusOpen && !readOnly && (
+            {statusOpen && !lockStatus && (
               <>
                 <div className="spill-scrim" onClick={() => setStatusOpen(false)} />
                 <div className="spill-menu">

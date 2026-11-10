@@ -76,6 +76,20 @@ export async function PATCH(
     );
   }
 
+  // KS đã nhận qua máy vật tư (receivedAt có, status còn 'ordered') = chờ KT/sếp chốt trên
+  // link Kế toán. Máy tự ghi công nợ khi chốt → ERP không cho đổi trạng thái tay (kể cả admin).
+  if (
+    order.status === "ordered" &&
+    order.receivedAt &&
+    typeof body.status === "string" &&
+    body.status !== "ordered"
+  ) {
+    return NextResponse.json(
+      { message: "Đơn KS đã nhận, đang chờ duyệt trên link Kế toán — không đổi trạng thái ở ERP." },
+      { status: 409 },
+    );
+  }
+
   // Kế toán với đơn đã nhận (received — công nợ / chờ thanh toán): CHỈ được sửa NCC
   // (đổi ghi công nợ ↔ thanh toán ngay), không được đụng vật tư / giá / ngày. Admin sửa mọi thứ.
   const ktNccOnly = isKeToan && order.status === "received";
@@ -226,12 +240,12 @@ export async function DELETE(
 
   const order = await prisma.mhOrder.findFirst({
     where: { id: params.orderId, projectId: params.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, receivedAt: true },
   });
   if (!order) return NextResponse.json({ message: "Không thấy đơn" }, { status: 404 });
 
   // Kế toán KHÔNG được xoá đơn đã nhận / đã thanh toán (đã ghi công nợ NCC).
-  if (isKeToan && (order.status === "received" || order.status === "paid")) {
+  if (isKeToan && (order.status === "received" || order.status === "paid" || order.receivedAt)) {
     return NextResponse.json(
       { message: "Đơn đã nhận — kế toán không được xoá. Liên hệ admin." },
       { status: 403 },
