@@ -2,6 +2,7 @@ import { BudgetPlanStatus, CashLineKind, CashTerm, MhOrderStatus, Prisma, Projec
 import { prisma } from "@/lib/prisma";
 import { buildCashPlan, type CashRow } from "@/lib/cash-plan";
 import { buildBudgetPlan } from "@/lib/budget-plan";
+import { computeEstimateProgress } from "@/lib/estimate-progress";
 
 /**
  * Kế hoạch dòng tiền DỰ ÁN + lịch dòng tiền CÔNG TY (sếp chốt 05/11/2026).
@@ -88,6 +89,7 @@ export type CashLineView = {
   dueDate: string;
   dateManual: boolean;
   amount: number;
+  doneCut: number; // phần vật tư dự toán của công tác KS đã tick xong → bỏ, không dự báo nữa
   consumed: number; // đã có đơn thật trừ vào
   remaining: number;
   note: string | null;
@@ -335,43 +337,135 @@ const LINE_SELECT = {
 } as const;
 
 /**
- * Trừ đơn thật vào dự báo: mỗi dự án, nhóm `sup:<ncc>` bị trừ Σ đơn mua (mọi trạng thái trừ nháp) của NCC đó;
- * nhóm `nc` bị trừ Σ giá trị HĐ khoán. Dòng sớm nhất trừ trước.
+ * Phần vật tư dự toán ĐÃ LÀM XONG theo tick tiến độ của KS (sếp 11/11/2026): công tác xong thì vật tư
+ * thật đã mua nằm ở đơn hàng, máy không dự báo vật tư dự toán của công tác đó nữa.
+ *  - VT gắn công tác (work_id) → xong khi công tác đó tick xong.
+ *  - VT không gắn công tác (dự toán cũ) → theo tick "Xong cả hạng mục" của PHẦN: tỉ lệ ngân sách các
+ *    hạng mục đã xong trong phần (phần nhiều hạng mục mà mới xong 1 → bỏ đúng tỉ lệ đó).
+ * Trả `${projectId}|${sectionId}|sup:${ncc}` → {tot, done} (tiền dự toán, khớp nhóm dòng dự báo) và
+ * `${projectId}|${sectionId}` → dự toán VT phần đã xong (để trừ đơn thật theo PHẦN).
+ */
+async function estimateDone(projectIds: string[]) {
+  const [mats, doneWorks, progs] = await Promise.all([
+    prisma.estimateDbMaterial.findMany({
+      where: { projectId: { in: projectIds } },
+      select: { projectId: true, sectionId: true, workId: true, supplierId: true, quantity: true, unitPrice: true, work: { select: { sectionId: true } } },
+    }),
+    prisma.estimateTaskProgress.findMany({
+      where: { projectId: { in: projectIds }, refType: "work", done: true },
+      select: { refId: true },
+    }),
+    Promise.all(projectIds.map(async (pid) => ({ pid, prog: await computeEstimateProgress(pid) }))),
+  ]);
+  const workDone = new Set(doneWorks.map((w) => w.refId));
+  // Tỉ lệ xong của PHẦN cho VT không gắn công tác (chỉ tính hạng mục không có khối lượng con).
+  const secFrac = new Map<string, number>();
+  for (const { pid, prog } of progs) {
+    const agg = new Map<string, { tot: number; done: number; nTot: number; nDone: number }>();
+    for (const t of prog.tasks) {
+      if (!t.sectionId || t.works.length) continue;
+      const a = agg.get(t.sectionId) ?? { tot: 0, done: 0, nTot: 0, nDone: 0 };
+      a.tot += t.amount; a.nTot++;
+      if (t.done) { a.done += t.amount; a.nDone++; }
+      agg.set(t.sectionId, a);
+    }
+    for (const [sid, a] of Array.from(agg.entries()))
+      secFrac.set(`${pid}|${sid}`, a.tot > EPS ? a.done / a.tot : a.nTot ? a.nDone / a.nTot : 0);
+  }
+  const bySec = new Map<string, { tot: number; done: number }>();
+  const doneBySec = new Map<string, number>();
+  for (const m of mats) {
+    const amt = n(m.quantity) * n(m.unitPrice);
+    if (amt <= EPS) continue;
+    const sectionId = m.sectionId ?? m.work?.sectionId ?? null;
+    const frac = m.workId ? (workDone.has(m.workId) ? 1 : 0) : sectionId ? secFrac.get(`${m.projectId}|${sectionId}`) ?? 0 : 0;
+    const g = `sup:${m.supplierId ?? "none"}`;
+    const k = `${m.projectId}|${sectionId ?? ""}|${g}`;
+    const cur = bySec.get(k) ?? { tot: 0, done: 0 };
+    cur.tot += amt; cur.done += amt * frac;
+    bySec.set(k, cur);
+    const sk = `${m.projectId}|${sectionId ?? ""}`;
+    doneBySec.set(sk, (doneBySec.get(sk) ?? 0) + amt * frac);
+  }
+  return { bySec, doneBySec };
+}
+
+/**
+ * Đối chiếu dòng dự báo với thực tế, theo thứ tự:
+ *  1. Bỏ vật tư dự toán của công tác KS đã tick xong (estimateDone) — trừ vào dòng sớm nhất của nhóm PHẦN × NCC.
+ *  2. Trừ đơn thật THEO PHẦN, không theo NCC (sếp 11/11/2026: NCC dự toán chỉ là nguồn đơn giá, công trình mua
+ *     NCC khác được): đơn mua (mọi trạng thái trừ nháp) gắn hạng mục → PHẦN; phần đơn VƯỢT dự toán VT phần đã xong
+ *     của PHẦN đó trừ vào dòng VT chưa làm của chính PHẦN đó. Đơn chưa gắn PHẦN → trừ dòng VT sớm nhất cả dự án.
+ *     Nhóm `nc` bị trừ Σ giá trị HĐ khoán. Dòng sớm nhất trừ trước.
  */
 async function reconcileLines(projectIds: string[]): Promise<CashLineView[]> {
   if (!projectIds.length) return [];
-  const [lines, orders, subs] = await Promise.all([
+  const [lines, orders, subs, est] = await Promise.all([
     prisma.projectCashLine.findMany({
       where: { projectId: { in: projectIds } },
       orderBy: [{ dueDate: "asc" }, { sortOrder: "asc" }],
       select: LINE_SELECT,
     }),
-    prisma.mhOrder.groupBy({
-      by: ["projectId", "supplierId"],
+    prisma.mhOrder.findMany({
       where: { projectId: { in: projectIds }, status: { not: MhOrderStatus.draft } },
-      _sum: { total: true },
+      select: { projectId: true, total: true, budgetLineId: true },
     }),
     prisma.subContract.groupBy({
       by: ["projectId"],
       where: { projectId: { in: projectIds }, status: { in: ["active", "completed"] } },
       _sum: { contractValue: true },
     }),
+    estimateDone(projectIds),
   ]);
-  const used = new Map<string, number>();
-  for (const o of orders) used.set(`${o.projectId}|sup:${o.supplierId ?? "none"}`, n(o._sum.total));
+  // 1. Tiền cần bỏ mỗi nhóm PHẦN × NCC = tỉ lệ dự toán đã xong × tổng dòng dự báo của nhóm.
+  const lineSum = new Map<string, number>();
+  for (const l of lines as LineRow[])
+    if (l.kind === CashLineKind.vat_tu) {
+      const k = `${l.projectId}|${l.sectionId ?? ""}|${l.groupKey}`;
+      lineSum.set(k, (lineSum.get(k) ?? 0) + n(l.amount));
+    }
+  const cut = new Map<string, number>();
+  for (const [k, sum] of Array.from(lineSum.entries())) {
+    const e = est.bySec.get(k);
+    if (e && e.tot > EPS && e.done > EPS) cut.set(k, sum * Math.min(1, e.done / e.tot));
+  }
+  // 2. Đơn thật trừ vào phần chưa làm = đơn của PHẦN − dự toán VT phần đã xong của PHẦN đó (không xét NCC).
+  const blIds = Array.from(new Set(orders.map((o) => o.budgetLineId).filter((x): x is string => !!x)));
+  const bls = blIds.length
+    ? await prisma.projectBudgetPlanLine.findMany({ where: { id: { in: blIds } }, select: { id: true, sectionId: true } })
+    : [];
+  const secOfLine = new Map(bls.map((b) => [b.id, b.sectionId]));
+  const ordSec = new Map<string, number>();
+  for (const o of orders) {
+    const k = `${o.projectId}|${(o.budgetLineId && secOfLine.get(o.budgetLineId)) || ""}`;
+    ordSec.set(k, (ordSec.get(k) ?? 0) + n(o.total));
+  }
+  const used = new Map<string, number>(); // `${projectId}|${sectionId}` (VT, "" = chưa gắn PHẦN → cả dự án) · `${projectId}|nc`
+  for (const [k, tot] of Array.from(ordSec.entries()))
+    used.set(k, k.endsWith("|") ? tot : Math.max(0, tot - (est.doneBySec.get(k) ?? 0)));
   for (const s of subs) used.set(`${s.projectId}|nc`, n(s._sum.contractValue));
   const views: CashLineView[] = [];
   for (const l of lines as LineRow[]) {
-    const key = `${l.projectId}|${l.groupKey}`;
     const amount = n(l.amount);
-    const left = used.get(key) ?? 0;
-    const consumed = Math.min(amount, Math.max(0, left));
-    used.set(key, left - consumed);
+    const ck = `${l.projectId}|${l.sectionId ?? ""}|${l.groupKey}`;
+    const cutLeft = l.kind === CashLineKind.vat_tu ? cut.get(ck) ?? 0 : 0;
+    const doneCut = Math.min(amount, Math.max(0, cutLeft));
+    if (doneCut > 0) cut.set(ck, cutLeft - doneCut);
+    let consumed = 0;
+    const take = (key: string) => {
+      const left = used.get(key) ?? 0;
+      const c = Math.min(amount - doneCut - consumed, Math.max(0, left));
+      if (c > 0) { used.set(key, left - c); consumed += c; }
+    };
+    if (l.kind === CashLineKind.vat_tu) {
+      if (l.sectionId) take(`${l.projectId}|${l.sectionId}`);
+      take(`${l.projectId}|`);
+    } else if (l.groupKey === "nc") take(`${l.projectId}|nc`);
     views.push({
       id: l.id, kind: l.kind, sectionId: l.sectionId, sectionName: l.section?.name ?? null,
       supplierId: l.supplierId, supplierName: l.supplier?.name ?? null, groupKey: l.groupKey, seq: l.seq,
       title: l.title, term: l.term, baseDate: iso(l.baseDate)!, dueDate: iso(l.dueDate)!, dateManual: l.dateManual,
-      amount, consumed, remaining: Math.max(0, amount - consumed), note: l.note,
+      amount, doneCut, consumed, remaining: Math.max(0, amount - doneCut - consumed), note: l.note,
     });
   }
   return views;
@@ -511,13 +605,17 @@ async function orderedDebtItems(projectIds: string[] | null, ctx: Ctx, projLabel
 function lineItems(lines: CashLineView[], projLabel: Map<string, string>, projectIdOf: Map<string, string>, today: string): CashItem[] {
   return lines
     .filter((l) => l.remaining > EPS)
+    // Dự phòng phát sinh của tuần đã qua: phát sinh thật đã nằm ở đơn / lệnh chi → bỏ, không dồn về hôm nay.
+    .filter((l) => !(l.kind === CashLineKind.du_phong && !l.dateManual && l.dueDate < today))
     .map((l) => {
-      // Dòng máy ước tính mà ngày đã qua = phần chưa mua/chưa trả → dồn về hôm nay, không tính là quá hạn.
+      // Dòng máy ước tính mà ngày đã qua = phần CHƯA LÀM (việc đã tick xong đã bị bỏ ở reconcileLines), chưa mua
+      // → dồn về hôm nay, không tính là quá hạn.
       const don = !l.dateManual && l.dueDate < today;
       return {
         k: `line:${l.id}`, loai: "line" as const, huong: "out" as const,
         ten: `${KIND_LABEL[l.kind]} · ${l.title}`,
-        phu: [TERM_LABEL[l.term], l.consumed > EPS ? `đã có đơn ${Math.round(l.consumed).toLocaleString("vi-VN")} đ` : null, l.note,
+        phu: [TERM_LABEL[l.term], l.doneCut > EPS ? `KS đã tick xong ${Math.round(l.doneCut).toLocaleString("vi-VN")} đ (bỏ dự toán)` : null,
+          l.consumed > EPS ? `đã có đơn ${Math.round(l.consumed).toLocaleString("vi-VN")} đ` : null, l.note,
           don ? `kế hoạch ${l.dueDate.slice(8, 10)}/${l.dueDate.slice(5, 7)} chưa mua → dồn về hôm nay` : null]
           .filter(Boolean).join(" · ") || null,
         du_an: projLabel.get(projectIdOf.get(l.id) ?? "") ?? null, projectId: projectIdOf.get(l.id) ?? null,
@@ -670,7 +768,7 @@ export async function buildProjectCashFlow(projectId: string): Promise<ProjectCa
 // ── Lịch công ty (bản tin dòng tiền) ─────────────────────────────────────────
 
 export type CompanyCashCalendar = CashCalendar & {
-  projects: { id: string; code: string; name: string; endDate: string; planStatus: BudgetPlanStatus | "none"; lines: number }[];
+  projects: { id: string; code: string; name: string; endDate: string; planStatus: BudgetPlanStatus | "none"; lines: number; chuaThiCong: boolean }[];
   overheadMonthly: number;
 };
 
@@ -680,13 +778,17 @@ export async function buildCashCalendar(): Promise<CompanyCashCalendar> {
     buildCashPlan(),
     prisma.project.findMany({
       where: { status: { not: ProjectStatus.completed } },
-      select: { id: true, code: true, name: true, expectedEndDate: true },
+      select: { id: true, code: true, name: true, status: true, expectedEndDate: true, pipeline: { select: { stage: true } } },
       orderBy: { expectedEndDate: "asc" },
     }),
     prisma.companyOverheadItem.aggregate({ _sum: { monthlyAmount: true } }),
     prisma.projectCashPlan.findMany({ select: { projectId: true, status: true, _count: { select: { lines: true } } } }),
   ]);
-  const projectIds = projects.map((p) => p.id);
+  // SOP-16 (sếp 10/11/2026): dự án chưa sang GĐ 6 Thi công → máy KHÔNG tính kế hoạch (dòng dự báo + cục ngân sách).
+  // Nguồn thật (đợt thu, đơn hàng, đợt thầu phụ, nợ) vẫn tính. Không có pipeline → theo status (planning = chưa thi công).
+  const chuaThiCong = (p: (typeof projects)[number]) =>
+    p.pipeline ? p.pipeline.stage <= 5 : p.status === ProjectStatus.planning;
+  const projectIds = projects.filter((p) => !chuaThiCong(p)).map((p) => p.id);
   const projLabel = new Map(projects.map((p) => [p.id, `${p.code} · ${p.name}`]));
   const planMap = new Map(plans.map((p) => [p.projectId, p]));
   const [lines, ctx] = await Promise.all([reconcileLines(projectIds), loadCtx(null)]);
@@ -704,6 +806,7 @@ export async function buildCashCalendar(): Promise<CompanyCashCalendar> {
   // Dự án chưa lập kế hoạch dòng tiền (dự toán cũ / chưa GĐ 5) → vẫn 1 cục "còn phải chi theo ngân sách" ở ngày bàn giao.
   let horizon = today;
   for (const p of projects) {
+    if (chuaThiCong(p)) continue;
     const end = iso(p.expectedEndDate)!;
     horizon = maxIso(horizon, end)!;
     const pl = planMap.get(p.id);
@@ -745,7 +848,7 @@ export async function buildCashCalendar(): Promise<CompanyCashCalendar> {
     overheadMonthly: monthly,
     projects: projects.map((p) => {
       const pl = planMap.get(p.id);
-      return { id: p.id, code: p.code, name: p.name, endDate: iso(p.expectedEndDate)!, planStatus: pl?.status ?? "none", lines: pl?._count.lines ?? 0 };
+      return { id: p.id, code: p.code, name: p.name, endDate: iso(p.expectedEndDate)!, planStatus: pl?.status ?? "none", lines: pl?._count.lines ?? 0, chuaThiCong: chuaThiCong(p) };
     }),
   };
 }

@@ -34,6 +34,7 @@ type Line = {
   dueDate: string;
   dateManual: boolean;
   amount: number;
+  doneCut: number;
   consumed: number;
   remaining: number;
   note: string | null;
@@ -606,7 +607,8 @@ function LineSheet({
             <span>Số tiền dự báo</span>
             <input type="number" className="num" min={0} step={1000} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={locked} />
             <small>
-              {line.consumed > 0 ? `Đã có đơn thật ${fmt(line.consumed)} · còn ${fmt(line.remaining)}` : "Chưa có đơn thật trừ vào"}
+              {line.doneCut > 0 ? `KS đã tick xong ${fmt(line.doneCut)} (bỏ dự toán) · ` : ""}
+              {line.consumed > 0 ? `Đã có đơn thật ${fmt(line.consumed)} · còn ${fmt(line.remaining)}` : line.doneCut > 0 ? `còn ${fmt(line.remaining)}` : "Chưa có đơn thật trừ vào"}
             </small>
           </div>
           <div className="dt-field">
