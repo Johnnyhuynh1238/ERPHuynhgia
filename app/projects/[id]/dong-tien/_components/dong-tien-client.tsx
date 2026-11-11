@@ -247,7 +247,7 @@ export function DongTienClient({
 
               {!data.plan.exists || data.lines.length === 0 ? (
                 <div className="dt-note warn">
-                  Chưa có kế hoạch dòng tiền. Bấm <b>Tạo từ dự toán</b>: vật tư theo PHẦN × NCC × điều khoản thanh toán,
+                  Chưa có kế hoạch dòng tiền. Bấm <b>Tạo từ dự toán</b>: vật tư theo PHẦN × tiến độ (NCC dự toán chỉ để ước ngày trả),
                   khoán NC trả khi xong phần, thu theo đợt HĐ.
                 </div>
               ) : null}
@@ -529,7 +529,7 @@ export function DongTienClient({
               ) : null}
               <p className="dt-foot">
                 Nguyên tắc: vật tư NCC công nợ → trả sau khi giao N ngày (mặc định 14); vật tư mua 1 lần (tôn, sắt kèo…) trả ngay;
-                NCC hoàn thiện (thạch cao, cửa nhôm, lan can…) trả sau khi làm xong. Đơn mua thật của NCC nào trừ dần vào dự báo NCC đó.
+                NCC hoàn thiện (thạch cao, cửa nhôm, lan can…) trả sau khi làm xong. Dòng dự báo theo PHẦN, không theo NCC; điều khoản lấy của NCC nhiều tiền nhất trong PHẦN, chỉ để ước ngày. Đơn mua thật (NCC nào cũng được) trừ theo PHẦN.
                 {data.hasSubContracts ? " Nhân công theo đợt HĐ thầu phụ." : " Nhân công khoán: trả khi xong phần (chưa có HĐ khoán)."}
               </p>
             </>

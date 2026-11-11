@@ -8,7 +8,7 @@ import { computeEstimateProgress } from "@/lib/estimate-progress";
  * Kế hoạch dòng tiền DỰ ÁN + lịch dòng tiền CÔNG TY (sếp chốt 05/11/2026).
  *
  * Nguyên tắc:
- *  - GĐ 5 Chuẩn bị: lập kế hoạch dòng tiền dự án TRƯỚC khi thi công = dự toán (vật tư theo PHẦN × NCC,
+ *  - GĐ 5 Chuẩn bị: lập kế hoạch dòng tiền dự án TRƯỚC khi thi công = dự toán (vật tư theo PHẦN — không theo NCC,
  *    khoán NC theo PHẦN) × tiến độ dự kiến (project_sections.plan_start/plan_end) × điều khoản thanh toán NCC
  *    (nợ N ngày / trả ngay / trả sau khi làm xong). Thu = đợt thu HĐ, ngày theo công tác gán + số ngày khách trễ.
  *  - Trong thi công: đơn mua thật của NCC nào trừ dần vào phần dự báo của NCC đó (dòng dự báo sớm nhất trừ trước);
@@ -179,18 +179,21 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
     : [];
   const supMap = new Map(sups.map((s) => [s.id, s]));
 
-  // Vật tư: gom theo PHẦN × NCC.
-  const vt = new Map<string, { sectionId: string | null; supplierId: string | null; amount: number }>();
+  // Vật tư: gom theo PHẦN (sếp 11/11/2026: NCC trong dự toán chỉ là nguồn đơn giá, công trình mua NCC khác được
+  // → dòng dự báo KHÔNG ghi tên NCC). Điều khoản trả tiền tạm lấy của NCC chiếm nhiều tiền nhất trong PHẦN, chỉ để ước ngày.
+  const vt = new Map<string, { sectionId: string | null; amount: number; bySup: Map<string, number> }>();
   let totalVt = 0;
   for (const m of mats) {
     const sectionId = m.sectionId ?? m.work?.sectionId ?? null;
     const amt = n(m.quantity) * n(m.unitPrice);
     if (amt <= EPS) continue;
     totalVt += amt;
-    const key = `${sectionId ?? "none"}|${m.supplierId ?? "none"}`;
-    const cur = vt.get(key);
-    if (cur) cur.amount += amt;
-    else vt.set(key, { sectionId, supplierId: m.supplierId ?? null, amount: amt });
+    const key = sectionId ?? "none";
+    const cur = vt.get(key) ?? { sectionId, amount: 0, bySup: new Map<string, number>() };
+    cur.amount += amt;
+    const sk = m.supplierId ?? "none";
+    cur.bySup.set(sk, (cur.bySup.get(sk) ?? 0) + amt);
+    vt.set(key, cur);
   }
 
   type NewLine = Omit<Prisma.ProjectCashLineCreateManyInput, "planId" | "projectId">;
@@ -200,15 +203,17 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
   const groups = Array.from(vt.values()).sort((a, b) => orderOf(a.sectionId) - orderOf(b.sectionId));
   for (const g of groups) {
     const sec = (g.sectionId && secInfo.get(g.sectionId)) || noSection;
-    const sup = g.supplierId ? supMap.get(g.supplierId) : undefined;
+    const mainSup = Array.from(g.bySup.entries())
+      .filter(([id]) => id !== "none")
+      .sort((a, b) => b[1] - a[1])[0]?.[0];
+    const sup = mainSup ? supMap.get(mainSup) : undefined;
     const term = sup?.paymentTerm ?? CashTerm.no_ngay;
     const credit = sup?.creditDays ?? 14;
-    const supName = sup?.name ?? "Chưa có NCC";
-    const groupKey = `sup:${g.supplierId ?? "none"}`;
+    const groupKey = "vt";
     if (term === CashTerm.sau_nghiem_thu) {
       out.push({
-        kind: CashLineKind.vat_tu, sectionId: g.sectionId, supplierId: g.supplierId, groupKey, seq: 1,
-        title: `${sec.name} · ${supName}`, term, baseDate: toDb(sec.end), dueDate: toDb(sec.end),
+        kind: CashLineKind.vat_tu, sectionId: g.sectionId, supplierId: null, groupKey, seq: 1,
+        title: sec.name, term, baseDate: toDb(sec.end), dueDate: toDb(sec.end),
         amount: new Prisma.Decimal(Math.round(g.amount)), sortOrder: sort++,
         note: "Trả sau khi làm xong phần này",
       });
@@ -221,11 +226,11 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
     for (let k = 0; k < weeks; k++) {
       const base = addDays(sec.start, 7 * k);
       out.push({
-        kind: CashLineKind.vat_tu, sectionId: g.sectionId, supplierId: g.supplierId, groupKey, seq: k + 1,
-        title: `${sec.name} · ${supName}${weeks > 1 ? ` · đợt ${k + 1}/${weeks}` : ""}`,
+        kind: CashLineKind.vat_tu, sectionId: g.sectionId, supplierId: null, groupKey, seq: k + 1,
+        title: `${sec.name}${weeks > 1 ? ` · đợt ${k + 1}/${weeks}` : ""}`,
         term, baseDate: toDb(base), dueDate: toDb(dueFor(term, base, credit)),
         amount: new Prisma.Decimal(Math.round(each)), sortOrder: sort++,
-        note: term === CashTerm.no_ngay ? `Giao ${base.slice(8, 10)}/${base.slice(5, 7)}, trả sau ${credit} ngày` : `Trả ngay khi giao`,
+        note: term === CashTerm.no_ngay ? `Giao ${base.slice(8, 10)}/${base.slice(5, 7)}, trả sau ${credit} ngày (ước)` : `Trả ngay khi giao (ước)`,
       });
     }
   }
@@ -342,8 +347,7 @@ const LINE_SELECT = {
  *  - VT gắn công tác (work_id) → xong khi công tác đó tick xong.
  *  - VT không gắn công tác (dự toán cũ) → theo tick "Xong cả hạng mục" của PHẦN: tỉ lệ ngân sách các
  *    hạng mục đã xong trong phần (phần nhiều hạng mục mà mới xong 1 → bỏ đúng tỉ lệ đó).
- * Trả `${projectId}|${sectionId}|sup:${ncc}` → {tot, done} (tiền dự toán, khớp nhóm dòng dự báo) và
- * `${projectId}|${sectionId}` → dự toán VT phần đã xong (để trừ đơn thật theo PHẦN).
+ * Trả `${projectId}|${sectionId}` → {tot, done} (tiền dự toán VT của PHẦN) và dự toán VT phần đã xong (để trừ đơn thật).
  */
 async function estimateDone(projectIds: string[]) {
   const [mats, doneWorks, progs] = await Promise.all([
@@ -379,20 +383,18 @@ async function estimateDone(projectIds: string[]) {
     if (amt <= EPS) continue;
     const sectionId = m.sectionId ?? m.work?.sectionId ?? null;
     const frac = m.workId ? (workDone.has(m.workId) ? 1 : 0) : sectionId ? secFrac.get(`${m.projectId}|${sectionId}`) ?? 0 : 0;
-    const g = `sup:${m.supplierId ?? "none"}`;
-    const k = `${m.projectId}|${sectionId ?? ""}|${g}`;
+    const k = `${m.projectId}|${sectionId ?? ""}`;
     const cur = bySec.get(k) ?? { tot: 0, done: 0 };
     cur.tot += amt; cur.done += amt * frac;
     bySec.set(k, cur);
-    const sk = `${m.projectId}|${sectionId ?? ""}`;
-    doneBySec.set(sk, (doneBySec.get(sk) ?? 0) + amt * frac);
+    doneBySec.set(k, (doneBySec.get(k) ?? 0) + amt * frac);
   }
   return { bySec, doneBySec };
 }
 
 /**
  * Đối chiếu dòng dự báo với thực tế, theo thứ tự:
- *  1. Bỏ vật tư dự toán của công tác KS đã tick xong (estimateDone) — trừ vào dòng sớm nhất của nhóm PHẦN × NCC.
+ *  1. Bỏ vật tư dự toán của công tác KS đã tick xong (estimateDone) — trừ vào dòng VT sớm nhất của PHẦN đó.
  *  2. Trừ đơn thật THEO PHẦN, không theo NCC (sếp 11/11/2026: NCC dự toán chỉ là nguồn đơn giá, công trình mua
  *     NCC khác được): đơn mua (mọi trạng thái trừ nháp) gắn hạng mục → PHẦN; phần đơn VƯỢT dự toán VT phần đã xong
  *     của PHẦN đó trừ vào dòng VT chưa làm của chính PHẦN đó. Đơn chưa gắn PHẦN → trừ dòng VT sớm nhất cả dự án.
@@ -417,11 +419,11 @@ async function reconcileLines(projectIds: string[]): Promise<CashLineView[]> {
     }),
     estimateDone(projectIds),
   ]);
-  // 1. Tiền cần bỏ mỗi nhóm PHẦN × NCC = tỉ lệ dự toán đã xong × tổng dòng dự báo của nhóm.
+  // 1. Tiền cần bỏ mỗi PHẦN = tỉ lệ dự toán VT đã xong × tổng dòng dự báo VT của PHẦN.
   const lineSum = new Map<string, number>();
   for (const l of lines as LineRow[])
     if (l.kind === CashLineKind.vat_tu) {
-      const k = `${l.projectId}|${l.sectionId ?? ""}|${l.groupKey}`;
+      const k = `${l.projectId}|${l.sectionId ?? ""}`;
       lineSum.set(k, (lineSum.get(k) ?? 0) + n(l.amount));
     }
   const cut = new Map<string, number>();
@@ -447,7 +449,7 @@ async function reconcileLines(projectIds: string[]): Promise<CashLineView[]> {
   const views: CashLineView[] = [];
   for (const l of lines as LineRow[]) {
     const amount = n(l.amount);
-    const ck = `${l.projectId}|${l.sectionId ?? ""}|${l.groupKey}`;
+    const ck = `${l.projectId}|${l.sectionId ?? ""}`;
     const cutLeft = l.kind === CashLineKind.vat_tu ? cut.get(ck) ?? 0 : 0;
     const doneCut = Math.min(amount, Math.max(0, cutLeft));
     if (doneCut > 0) cut.set(ck, cutLeft - doneCut);
