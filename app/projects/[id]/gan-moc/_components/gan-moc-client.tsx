@@ -46,7 +46,19 @@ type Payment = {
   suggest: { workIds: string[]; milestoneIds: string[]; workPctRequired: number };
 };
 
-type Tab = "thau_phu" | "chu_nha" | "payment";
+type SubPay = {
+  id: string;
+  stage: number;
+  description: string;
+  contract: string;
+  amount: number;
+  date: string;
+  status: string;
+  workIds: string[];
+};
+
+type Tab = "thau_phu" | "chu_nha" | "payment" | "sub";
+type EditKind = "milestone" | "payment" | "sub_payment";
 
 const MS_LABEL: Record<MsState, string> = {
   da_ky: "Đã ký",
@@ -89,9 +101,10 @@ export function GanMocClient({
   const [works, setWorks] = useState<Work[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [subPays, setSubPays] = useState<SubPay[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("thau_phu");
-  const [edit, setEdit] = useState<{ kind: "milestone" | "payment"; id: string } | null>(null);
+  const [edit, setEdit] = useState<{ kind: EditKind; id: string } | null>(null);
   const [selWorks, setSelWorks] = useState<string[]>([]);
   const [selMs, setSelMs] = useState<string[]>([]);
   const [pctReq, setPctReq] = useState(100);
@@ -124,6 +137,7 @@ export function GanMocClient({
     setWorks(j.works);
     setMilestones(j.milestones);
     setPayments(j.payments);
+    setSubPays(j.subPayments ?? []);
     setLoading(false);
   }, [projectId]);
   useEffect(() => {
@@ -141,10 +155,12 @@ export function GanMocClient({
     return out;
   }, [works]);
   const chuNha = milestones.filter((m) => m.kind === "chu_nha");
-  const rows = tab === "payment" ? [] : milestones.filter((m) => m.kind === tab);
+  const rows = tab === "payment" || tab === "sub" ? [] : milestones.filter((m) => m.kind === tab);
 
   const count = (t: Tab) =>
-    t === "payment"
+    t === "sub"
+      ? { tot: subPays.length, gan: subPays.filter((p) => p.workIds.length).length }
+      : t === "payment"
       ? { tot: payments.length, gan: payments.filter((p) => p.workIds.length || p.milestoneIds.length).length }
       : {
           tot: milestones.filter((m) => m.kind === t).length,
@@ -163,6 +179,12 @@ export function GanMocClient({
     setPctReq(empty ? p.suggest.workPctRequired : p.workPctRequired);
   };
 
+  const openSub = (p: SubPay) => {
+    if (p.status === "paid") return;
+    setEdit({ kind: "sub_payment", id: p.id });
+    setSelWorks(p.workIds);
+  };
+
   const put = async (body: object) => {
     const r = await fetch(`/api/projects/${projectId}/gan-moc`, {
       method: "PUT",
@@ -177,8 +199,8 @@ export function GanMocClient({
     setSaving(true);
     try {
       await put(
-        edit.kind === "milestone"
-          ? { target: "milestone", id: edit.id, workIds: selWorks }
+        edit.kind === "milestone" || edit.kind === "sub_payment"
+          ? { target: edit.kind, id: edit.id, workIds: selWorks }
           : { target: "payment", id: edit.id, workIds: selWorks, milestoneIds: selMs, workPctRequired: pctReq },
       );
       toast.success("Đã lưu");
@@ -193,6 +215,10 @@ export function GanMocClient({
 
   // Áp gợi ý cho các mốc/đợt CHƯA gán ở tab đang xem (không đụng mốc đã gán).
   const applySuggestAll = async () => {
+    if (tab === "sub") {
+      toast.info("Đợt khoán chưa có gợi ý — bấm từng đợt chọn công tác theo PL03 HĐ khoán");
+      return;
+    }
     const jobs =
       tab === "payment"
         ? payments
@@ -231,9 +257,15 @@ export function GanMocClient({
       ? milestones.find((m) => m.id === edit.id)
       : edit?.kind === "payment"
         ? payments.find((p) => p.id === edit.id)
-        : undefined;
+        : edit?.kind === "sub_payment"
+          ? subPays.find((p) => p.id === edit.id)
+          : undefined;
   const editSuggest =
-    edit?.kind === "milestone" ? (editing as Milestone | undefined)?.suggest : (editing as Payment | undefined)?.suggest.workIds;
+    edit?.kind === "milestone"
+      ? (editing as Milestone | undefined)?.suggest
+      : edit?.kind === "payment"
+        ? (editing as Payment | undefined)?.suggest.workIds
+        : undefined;
 
   return (
     <div className={`gmdoc -mx-4 -mt-4 md:-mx-6 md:-mt-6 ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
@@ -262,15 +294,16 @@ export function GanMocClient({
         </div>
         <p className="lead">
           Mỗi mốc chọn các công tác tiến độ mà <b>xong hết</b> thì mốc <b>đến hạn nghiệm thu</b>. Đợt thu: công tác
-          xong đủ % + mốc NT chủ nhà đã ký → <b>đủ điều kiện thu</b>. KS tick tiến độ hằng ngày, ERP tự báo.
+          xong đủ % + mốc NT chủ nhà đã ký → <b>đủ điều kiện thu</b>. KS tick tiến độ hằng ngày, ERP tự báo. Đợt thu +
+          đợt khoán NC đã gán: <b>ngày dự kiến tự tính theo tiến độ</b> (công tác xong trễ nhất), muốn đổi ngày → đổi ở Tiến độ.
         </p>
 
         <div className="tabs">
-          {(["thau_phu", "chu_nha", "payment"] as Tab[]).map((t) => {
+          {(["thau_phu", "chu_nha", "payment", "sub"] as Tab[]).map((t) => {
             const c = count(t);
             return (
               <button key={t} type="button" className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-                {t === "thau_phu" ? "NT đội khoán" : t === "chu_nha" ? "NT chủ nhà" : "Đợt thu"}
+                {t === "thau_phu" ? "NT đội khoán" : t === "chu_nha" ? "NT chủ nhà" : t === "payment" ? "Đợt thu" : "Đợt khoán NC"}
                 <span className={`num ${c.gan < c.tot ? "warn" : ""}`}>
                   {c.gan}/{c.tot}
                 </span>
@@ -290,7 +323,7 @@ export function GanMocClient({
           <div className="empty">Dự án chưa có công tác tiến độ (Dự toán → công tác). Lập tiến độ trước rồi mới gán mốc.</div>
         ) : null}
 
-        {!loading && tab !== "payment" ? (
+        {!loading && (tab === "thau_phu" || tab === "chu_nha") ? (
           <table className="tbl">
             <thead>
               <tr>
@@ -376,6 +409,49 @@ export function GanMocClient({
             </tbody>
           </table>
         ) : null}
+
+        {!loading && tab === "sub" ? (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Đợt khoán</th>
+                <th>Chi khi xong công tác</th>
+                <th>Ngày chi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subPays.map((p, i) => {
+                const names = workNames(p.workIds);
+                const head = i === 0 || subPays[i - 1].contract !== p.contract;
+                return [
+                  head ? (
+                    <tr key={`g-${p.id}`} className="grp">
+                      <td colSpan={3}>{p.contract}</td>
+                    </tr>
+                  ) : null,
+                  <tr key={p.id} onClick={() => openSub(p)} className="row">
+                    <td className="mc">
+                      <b>
+                        Đợt {p.stage} · {p.description}
+                      </b>
+                      <small className="num">{fmtMoney(p.amount)}</small>
+                    </td>
+                    <td className="wc">
+                      {names.length ? names.join(" · ") : <i className="mut">— bấm để chọn (ngày nhập tay) —</i>}
+                    </td>
+                    <td>
+                      {p.status === "paid" ? <span className="st ok">Đã chi</span> : null}
+                      <small className="num">
+                        {fmtDay(p.date)}
+                        {p.workIds.length && p.status !== "paid" ? " · theo tiến độ" : ""}
+                      </small>
+                    </td>
+                  </tr>,
+                ];
+              })}
+            </tbody>
+          </table>
+        ) : null}
       </div>
 
       {edit && editing
@@ -388,16 +464,20 @@ export function GanMocClient({
               <b>
                 {edit.kind === "milestone"
                   ? (editing as Milestone).title
-                  : `Đợt ${(editing as Payment).phaseNumber} · ${(editing as Payment).milestoneDescription}`}
+                  : edit.kind === "sub_payment"
+                    ? `${(editing as SubPay).contract} · Đợt ${(editing as SubPay).stage}`
+                    : `Đợt ${(editing as Payment).phaseNumber} · ${(editing as Payment).milestoneDescription}`}
               </b>
               <button type="button" className="iconbtn" onClick={() => setEdit(null)} aria-label="Đóng">
                 ✕
               </button>
             </div>
             <div className="sh-acts">
-              <button type="button" className="btn" onClick={() => setSelWorks(editSuggest ?? [])}>
-                ✨ Gợi ý
-              </button>
+              {editSuggest ? (
+                <button type="button" className="btn" onClick={() => setSelWorks(editSuggest)}>
+                  ✨ Gợi ý
+                </button>
+              ) : null}
               <button type="button" className="btn" onClick={() => setSelWorks([])}>
                 Bỏ hết
               </button>
@@ -456,6 +536,7 @@ export function GanMocClient({
                 disabled={
                   saving ||
                   (edit.kind === "milestone" && sameSet(selWorks, (editing as Milestone).workIds)) ||
+                  (edit.kind === "sub_payment" && sameSet(selWorks, (editing as SubPay).workIds)) ||
                   (edit.kind === "payment" &&
                     sameSet(selWorks, (editing as Payment).workIds) &&
                     sameSet(selMs, (editing as Payment).milestoneIds) &&

@@ -1,5 +1,6 @@
 import { BudgetPlanStatus, CashLineKind, CashTerm, MhOrderStatus, Prisma, ProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { computeSchedule, syncNativeDates, type ProjectSched } from "@/lib/tien-do-thuc-te";
 import { buildCashPlan, type CashRow } from "@/lib/cash-plan";
 import { buildBudgetPlan } from "@/lib/budget-plan";
 import { computeEstimateProgress } from "@/lib/estimate-progress";
@@ -137,7 +138,10 @@ export const dueFor = (term: CashTerm, base: string, creditDays: number) =>
  * Sinh lại dòng dự báo của dự án. Dòng cũ sếp đã sửa ngày tay (date_manual) cùng nhóm+đợt → giữ ngày + ghi chú.
  * Trả về số dòng + cảnh báo.
  */
-export async function generateProjectCashLines(projectId: string): Promise<{ lines: number; warnings: string[] }> {
+export async function generateProjectCashLines(
+  projectId: string,
+  schedArg?: ProjectSched,
+): Promise<{ lines: number; warnings: string[] }> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, startDate: true, expectedEndDate: true },
@@ -171,12 +175,14 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
   const projStart = iso(project.startDate)!;
   const projEnd = maxIso(iso(project.expectedEndDate), addDays(projStart, 7))!;
 
-  // Thời gian mỗi PHẦN: thiếu lịch → dùng cả dự án (cảnh báo).
+  // Thời gian mỗi PHẦN = DỰ BÁO theo tiến độ thực tế (KS tick, chậm/nhanh dời theo); thiếu lịch → dùng cả dự án (cảnh báo).
+  const sched = schedArg ?? (await computeSchedule(projectId));
+  const fc = new Map(sched.sections.map((s) => [s.id, s]));
   const secInfo = new Map<string, { name: string; start: string; end: string; order: number }>();
   const missing: string[] = [];
   sections.forEach((s, i) => {
-    const start = iso(s.planStart);
-    const end = iso(s.planEnd);
+    const start = fc.get(s.id)?.fStart ?? iso(s.planStart);
+    const end = fc.get(s.id)?.fEnd ?? iso(s.planEnd);
     if (!start || !end) missing.push(s.name);
     const st = start ?? projStart;
     secInfo.set(s.id, { name: s.name, start: st, end: maxIso(end, st)!, order: i });
@@ -306,39 +312,11 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
     prisma.projectCashPlan.update({ where: { id: plan.id }, data: { generatedAt: new Date() } }),
   ]);
 
-  // Đợt thu chưa có ngày: suy từ công tác gán (phần chứa công tác xong trễ nhất) + số ngày khách trễ.
-  await fillScheduleDates(projectId, plan.receiptDelayDays, secInfo);
+  // Đợt thu + đợt thầu phụ gắn công tác: ngày = công tác xong trễ nhất (dự báo) [+ số ngày khách trễ].
+  await syncNativeDates(projectId, sched);
 
   if (!out.length) warnings.push("Dự toán chưa có vật tư / công tác → không sinh được dòng nào");
   return { lines: out.length, warnings };
-}
-
-/** Điền expected_date cho đợt thu CHƯA có ngày theo công tác gán + ngày trễ. Không đè ngày đã có. */
-async function fillScheduleDates(
-  projectId: string,
-  delayDays: number,
-  secInfo: Map<string, { end: string }>,
-) {
-  const schedules = await prisma.paymentSchedule.findMany({
-    where: { projectId, expectedDate: null, dueDate: null, status: { in: ["not_collected", "pending"] } },
-    select: { id: true, workIds: true },
-  });
-  if (!schedules.length) return;
-  const workIds = Array.from(new Set(schedules.flatMap((s) => s.workIds)));
-  if (!workIds.length) return;
-  const works = await prisma.estimateWork.findMany({ where: { id: { in: workIds } }, select: { id: true, sectionId: true } });
-  const wSec = new Map(works.map((w) => [w.id, w.sectionId]));
-  for (const s of schedules) {
-    let end: string | null = null;
-    for (const wid of s.workIds) {
-      const sid = wSec.get(wid);
-      const e = sid ? secInfo.get(sid)?.end ?? null : null;
-      end = maxIso(end, e);
-    }
-    if (!end) continue;
-    const d = toDb(addDays(end, Math.max(0, delayDays)));
-    await prisma.paymentSchedule.update({ where: { id: s.id }, data: { expectedDate: d, dueDate: d } });
-  }
 }
 
 // ── Đối chiếu dòng dự báo với đơn thật ──────────────────────────────────────
@@ -590,8 +568,7 @@ function rowsToItems(rows: CashRow[], huong: "in" | "out", ctx: Ctx): CashItem[]
         if (od) { ngay = addDays(od, 7); loai = "native"; src = { op: "native", sourceType: "mh_order", sourceId: r.sourceId }; }
       }
       else if (r.sourceType === "payment_schedule" && r.sourceId) {
-        ngay = ctx.schedDerived.get(r.sourceId) ?? null;
-        if (ngay) { loai = "native"; src = { op: "native", sourceType: "payment_schedule", sourceId: r.sourceId }; }
+        ngay = ctx.schedDerived.get(r.sourceId) ?? null; // gắn công tác → ngày theo tiến độ, chỉ xem
       }
       if (!ngay) uoc = false;
     }

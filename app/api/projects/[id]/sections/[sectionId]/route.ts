@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { BudgetPlanGroup } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/estimate";
+import { queueTienDoSync, rescaleWorkDates } from "@/lib/tien-do-thuc-te";
 
 export const runtime = "nodejs";
 
@@ -52,11 +53,20 @@ export async function PATCH(
   const pe = parseDate(b.planEnd);
   if (pe !== undefined) data.planEnd = pe;
 
-  const res = await prisma.projectSection.updateMany({
+  const old = await prisma.projectSection.findFirst({
     where: { id: params.sectionId, projectId: params.id },
-    data,
+    select: { planStart: true, planEnd: true },
   });
-  if (res.count === 0) return NextResponse.json({ message: "Không tìm thấy phần" }, { status: 404 });
+  if (!old) return NextResponse.json({ message: "Không tìm thấy phần" }, { status: 404 });
+  await prisma.projectSection.update({ where: { id: params.sectionId }, data });
+  // Đổi ngày PHẦN → ngày riêng từng công tác co giãn theo, rồi tính lại đợt chi/thu + dòng tiền.
+  if (data.planStart !== undefined || data.planEnd !== undefined) {
+    await rescaleWorkDates(params.sectionId, old, {
+      planStart: data.planStart !== undefined ? data.planStart : old.planStart,
+      planEnd: data.planEnd !== undefined ? data.planEnd : old.planEnd,
+    });
+    queueTienDoSync(params.id);
+  }
   return NextResponse.json({ ok: true });
 }
 

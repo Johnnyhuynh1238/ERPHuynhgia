@@ -41,6 +41,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       description: true,
       status: true,
       expectedDate: true,
+      workIds: true,
       actualPaidDate: true,
       actualPaidAmount: true,
       notes: true,
@@ -88,6 +89,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (expectedDate !== undefined) {
     const parsedExpected = normalizeDate(expectedDate);
+    if (row.workIds.length && +(parsedExpected ?? 0) !== +(row.expectedDate ?? 0)) {
+      return NextResponse.json({ message: "Ngày theo tiến độ — đổi ở Tiến độ" }, { status: 409 });
+    }
     updateData.expectedDate = parsedExpected;
     updateData.dueDate = parsedExpected;
     if (parsedExpected && row.project?.startDate) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { queueTienDoSync } from "@/lib/tien-do-thuc-te";
 import {
   loadGmWorks,
   milestoneReadiness,
@@ -26,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const { error } = await requireAdmin(params.id);
   if (error) return error;
 
-  const [worksByProject, ms, ps] = await Promise.all([
+  const [worksByProject, ms, ps, sp] = await Promise.all([
     loadGmWorks([params.id]),
     prisma.acceptanceMilestone.findMany({
       where: { projectId: params.id },
@@ -47,6 +48,20 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         workIds: true,
         milestoneIds: true,
         workPctRequired: true,
+      },
+    }),
+    prisma.subPayment.findMany({
+      where: { subContract: { projectId: params.id }, status: { not: "cancelled" } },
+      orderBy: [{ subContract: { createdAt: "asc" } }, { stage: "asc" }],
+      select: {
+        id: true,
+        stage: true,
+        description: true,
+        expectedAmount: true,
+        expectedDate: true,
+        status: true,
+        workIds: true,
+        subContract: { select: { title: true, subcontractor: { select: { name: true } } } },
       },
     }),
   ]);
@@ -81,11 +96,22 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       readiness: paymentReadiness(p, worksById, msById),
       suggest: suggestPayment(p, works, chuNha),
     })),
+    // Đợt khoán NC (thầu phụ): gắn công tác → ngày chi = ngày công tác xong trễ nhất theo tiến độ thực tế.
+    subPayments: sp.map((p) => ({
+      id: p.id,
+      stage: p.stage,
+      description: p.description,
+      contract: p.subContract.subcontractor?.name ?? p.subContract.title,
+      amount: Number(p.expectedAmount),
+      date: p.expectedDate.toISOString().slice(0, 10),
+      status: p.status,
+      workIds: p.workIds,
+    })),
   });
 }
 
 const putSchema = z.object({
-  target: z.enum(["milestone", "payment"]),
+  target: z.enum(["milestone", "payment", "sub_payment"]),
   id: z.string().uuid(),
   workIds: z.array(z.string().uuid()).max(500),
   milestoneIds: z.array(z.string().uuid()).max(100).optional(),
@@ -104,6 +130,16 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const workIds = Array.from(new Set(b.workIds));
   const okWorks = await prisma.estimateWork.count({ where: { projectId: params.id, id: { in: workIds } } });
   if (okWorks !== workIds.length) return NextResponse.json({ message: "Có công tác không thuộc dự án" }, { status: 400 });
+
+  if (b.target === "sub_payment") {
+    const r = await prisma.subPayment.updateMany({
+      where: { id: b.id, subContract: { projectId: params.id } },
+      data: { workIds },
+    });
+    if (!r.count) return NextResponse.json({ message: "Không thấy đợt khoán" }, { status: 404 });
+    queueTienDoSync(params.id);
+    return NextResponse.json({ ok: true });
+  }
 
   if (b.target === "milestone") {
     const r = await prisma.acceptanceMilestone.updateMany({
@@ -124,5 +160,6 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     data: { workIds, milestoneIds, workPctRequired: b.workPctRequired ?? 100 },
   });
   if (!r.count) return NextResponse.json({ message: "Không thấy đợt thu" }, { status: 404 });
+  queueTienDoSync(params.id);
   return NextResponse.json({ ok: true });
 }

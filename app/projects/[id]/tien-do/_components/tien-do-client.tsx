@@ -34,6 +34,19 @@ type Task = {
   works: Work[]; // khối lượng con — mark done từng dòng; rỗng → Xong cả hạng mục
 };
 
+// Tiến độ thực tế (lib/tien-do-thuc-te qua API): ngày kế hoạch + dự báo từng công tác, chậm/nhanh N ngày.
+type WDate = { own: boolean; planStart: string | null; planEnd: string | null; fStart: string | null; fEnd: string | null };
+type Schedule = {
+  today: string;
+  hasPlan: boolean;
+  slip: number;
+  actualPct: number;
+  plannedPct: number;
+  planFinish: string | null;
+  forecastFinish: string | null;
+  works: Record<string, WDate>;
+};
+
 const fmt = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
 
 const DAY_MS = 86400000;
@@ -113,6 +126,8 @@ export function TienDoClient({
 }) {
   const api = apiBase ?? `/api/projects/${projectId}/tien-do`;
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [sched, setSched] = useState<Schedule | null>(null);
+  const [wEdit, setWEdit] = useState<string | null>(null); // hạng mục đang sửa ngày công tác
   const [uncataloged, setUncataloged] = useState(0);
   const [hideMoney, setHideMoney] = useState(ks); // KS ko thấy tiền (server cũng che)
   const [open, setOpen] = useState<Record<string, boolean>>({}); // hạng mục đang mở KL
@@ -166,6 +181,7 @@ export function TienDoClient({
         setTasks(Array.isArray(j.tasks) ? j.tasks : []);
         setUncataloged(j.uncataloged || 0);
         setHideMoney(!!j.hideMoney);
+        setSched(j.schedule ?? null);
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Lỗi tải");
       } finally {
@@ -240,6 +256,29 @@ export function TienDoClient({
     return Array.from(map.values());
   }, [tasks]);
 
+  // Tải lại tiến độ thực tế (sau tick / sửa ngày) — server tính từ DB, không chờ máy đồng bộ.
+  const reloadSched = useCallback(async () => {
+    const r = await fetch(api, { cache: "no-store" }).catch(() => null);
+    if (!r || !r.ok) return;
+    const j = await r.json().catch(() => null);
+    if (j?.schedule) setSched(j.schedule);
+  }, [api]);
+
+  // Kỹ sư Dự toán / admin đặt ngày riêng cho 1 công tác. Trống cả 2 → bỏ ngày riêng (máy rải theo PHẦN).
+  const saveWorkDate = async (workId: string, planStart: string | null, planEnd: string | null) => {
+    if ((planStart === null) !== (planEnd === null)) return;
+    const r = await fetch(`/api/projects/${projectId}/tien-do/ngay`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ works: [{ id: workId, planStart, planEnd }] }),
+    }).catch(() => null);
+    if (!r || !r.ok) {
+      const j = r ? await r.json().catch(() => ({})) : {};
+      toast(j.message || "Lưu ngày lỗi");
+    }
+    await reloadSched();
+  };
+
   // Lưu mark done (KL hoặc cả hạng mục). Lỗi → trả local về trạng thái cũ.
   const save = useCallback(
     async (ref: { refType: "work" | "line" | "section"; refId: string }, done: boolean, rollback: () => void) => {
@@ -252,9 +291,11 @@ export function TienDoClient({
         const j = r ? await r.json().catch(() => ({})) : {};
         rollback();
         toast(j.message || "Lưu lỗi");
+        return;
       }
+      void reloadSched();
     },
-    [api],
+    [api, reloadSched],
   );
 
   // Lưu ngày DỰ KIẾN của 1 PHẦN (chỉ refType 'section'), qua API sections.
@@ -396,6 +437,19 @@ export function TienDoClient({
               {!loading && total.hasPlan && (
                 <div className={`hbadge ${diff > 0 ? "ahead" : diff < 0 ? "behind" : "ontime"}`}>
                   {diff > 0 ? `▲ Sớm ${diff}% so kế hoạch` : diff < 0 ? `▼ Trễ ${-diff}% so kế hoạch` : "● Đúng kế hoạch"}
+                </div>
+              )}
+              {!loading && sched?.hasPlan && (
+                <div className={`hslip ${sched.slip > 0 ? "behind" : sched.slip < 0 ? "ahead" : "ontime"}`}>
+                  {sched.slip > 0 ? `Đang chậm ${sched.slip} ngày` : sched.slip < 0 ? `Đang nhanh ${-sched.slip} ngày` : "Đúng tiến độ"}
+                  {sched.forecastFinish ? (
+                    <>
+                      {" "}· xong dự báo <b className="num">{fmtDM(sched.forecastFinish)}</b>
+                      {sched.planFinish && sched.planFinish !== sched.forecastFinish ? (
+                        <small> (KH {fmtDM(sched.planFinish)})</small>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               )}
               {!loading && total.hasPlan && (
@@ -645,10 +699,61 @@ export function TienDoClient({
                                 <div className="kl-h">
                                   <span>Khối lượng</span>
                                   <span className="num">
+                                    {!ks ? (
+                                      <button
+                                        type="button"
+                                        className={`wedit-b${wEdit === keyOf(t) ? " on" : ""}`}
+                                        onClick={() => setWEdit(wEdit === keyOf(t) ? null : keyOf(t))}
+                                      >
+                                        {wEdit === keyOf(t) ? "Xong sửa ngày" : "📅 Ngày công tác"}
+                                      </button>
+                                    ) : null}
                                     {wDone}/{t.works.length} xong
                                   </span>
                                 </div>
-                                {t.works.map((w) => (
+                                {wEdit === keyOf(t)
+                                  ? t.works.map((w) => {
+                                      const d = sched?.works[w.id];
+                                      const ps = d?.own ? d.planStart : null;
+                                      const pe = d?.own ? d.planEnd : null;
+                                      return (
+                                        <div key={w.id} className="wedit">
+                                          <span className="t">
+                                            <b>{w.name}</b>
+                                            <i>
+                                              {d?.own
+                                                ? "Ngày riêng"
+                                                : d?.planStart
+                                                  ? `Máy rải: ${fmtDM(d.planStart)} → ${fmtDM(d.planEnd as string)}`
+                                                  : "Chưa có ngày"}
+                                            </i>
+                                          </span>
+                                          <input
+                                            type="date"
+                                            value={ps ?? ""}
+                                            aria-label={`Bắt đầu ${w.name}`}
+                                            onChange={(e) => {
+                                              const v = e.target.value || null;
+                                              if (!v) return void saveWorkDate(w.id, null, null);
+                                              const dur = ps && pe ? durationDays(ps, pe) : d?.planStart && d.planEnd ? durationDays(d.planStart, d.planEnd) : 1;
+                                              void saveWorkDate(w.id, v, isoAddDays(v, (typeof dur === "number" ? dur : 1) - 1));
+                                            }}
+                                          />
+                                          <input
+                                            type="date"
+                                            value={pe ?? ""}
+                                            min={ps ?? undefined}
+                                            aria-label={`Kết thúc ${w.name}`}
+                                            onChange={(e) => {
+                                              const v = e.target.value || null;
+                                              if (!v) return void saveWorkDate(w.id, null, null);
+                                              void saveWorkDate(w.id, ps ?? v, v);
+                                            }}
+                                          />
+                                        </div>
+                                      );
+                                    })
+                                  : t.works.map((w) => (
                                   <button
                                     key={w.id}
                                     type="button"
@@ -665,6 +770,7 @@ export function TienDoClient({
                                     <span className="q num">
                                       {fmtQty(w.quantity)} {w.unit}
                                       {w.done && w.doneAt ? <span className="lock">🔒 {fmtDM(w.doneAt)}</span> : null}
+                                      {!w.done ? <WorkDate d={sched?.works[w.id]} /> : null}
                                     </span>
                                   </button>
                                 ))}
@@ -735,6 +841,18 @@ export function TienDoClient({
 }
 
 // Vòng % (SVG) — tâm hiển thị children.
+// Ngày KH công tác + dự báo nếu lệch (trễ đỏ / sớm xanh).
+function WorkDate({ d }: { d?: WDate }) {
+  if (!d?.planEnd) return null;
+  const late = !!d.fEnd && d.fEnd > d.planEnd;
+  return (
+    <span className={`wd${late ? " late" : ""}`}>
+      KH {fmtDM(d.planEnd)}
+      {d.fEnd && d.fEnd !== d.planEnd ? ` → ${fmtDM(d.fEnd)}` : ""}
+    </span>
+  );
+}
+
 function Ring({ pct, size, sw, color, children }: { pct: number; size: number; sw: number; color: string; children: ReactNode }) {
   const r = (size - sw) / 2;
   const c = 2 * Math.PI * r;

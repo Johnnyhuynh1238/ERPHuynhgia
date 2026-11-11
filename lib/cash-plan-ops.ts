@@ -69,6 +69,13 @@ export async function setNativeDate(
   offsetDays = 0,
 ): Promise<string | null> {
   const value = date ? new Date(new Date(`${date}T00:00:00Z`).getTime() - offsetDays * 86_400_000) : null;
+  if (sourceType === "sub_payment" || sourceType === "payment_schedule") {
+    const linked =
+      sourceType === "sub_payment"
+        ? await prisma.subPayment.findUnique({ where: { id: sourceId }, select: { workIds: true } })
+        : await prisma.paymentSchedule.findUnique({ where: { id: sourceId }, select: { workIds: true } });
+    if (linked?.workIds.length) return "Ngày theo tiến độ — đổi ở Tiến độ";
+  }
   if (sourceType === "sub_payment") {
     if (!value) return "Đợt thầu phụ bắt buộc có ngày";
     await prisma.subPayment.update({ where: { id: sourceId }, data: { expectedDate: value } });

@@ -2353,6 +2353,8 @@ model SubPayment {
   stage          Int
   description    String
   linkedTaskId   String?          @map("linked_task_id") @db.Uuid
+  // Công tác tiến độ (estimate_works) gắn đợt (màn Gán mốc). Có gắn → ngày dự kiến do tiến độ tính, khoá sửa tay.
+  workIds        String[]         @default([]) @map("work_ids") @db.Uuid
   expectedAmount Decimal          @map("expected_amount") @db.Decimal(15, 2)
   expectedDate   DateTime         @map("expected_date") @db.Date
   percentage     Decimal?         @db.Decimal(5, 2)
@@ -4777,6 +4779,9 @@ model EstimateWork {
   laborPrice BigInt   @default(0) @map("labor_price") // đơn giá khoán NC / đơn vị
   note       String?  @db.Text // GIẢ ĐỊNH, nguồn giá NC…
   sortOrder  Int      @default(0) @map("sort_order")
+  // Ngày KẾ HOẠCH riêng của công tác (Kỹ sư Dự toán đặt, sếp 11/11/2026). Trống → máy rải theo ngày PHẦN.
+  planStart  DateTime? @map("plan_start") @db.Date
+  planEnd    DateTime? @map("plan_end") @db.Date
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 

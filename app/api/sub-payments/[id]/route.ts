@@ -102,6 +102,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
   }
 
+  // Đợt gắn công tác (Gán mốc) → ngày do tiến độ tính, không sửa tay.
+  if (payload.expectedDate !== undefined && row.workIds.length && payload.expectedDate !== row.expectedDate.toISOString().slice(0, 10)) {
+    return NextResponse.json({ message: "Ngày theo tiến độ — đổi ở Tiến độ" }, { status: 409 });
+  }
   const expectedDate = payload.expectedDate ? normalizeSubPaymentDate(payload.expectedDate) : row.expectedDate;
   if (!expectedDate) {
     return NextResponse.json({ message: "Ngày dự kiến không hợp lệ" }, { status: 400 });

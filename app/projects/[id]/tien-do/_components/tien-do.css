@@ -379,3 +379,20 @@
 .tddoc[data-theme="dark"].tdportal .btns .yes { color: #2a1206; }
 @keyframes tdup { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes tdfade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Tiến độ thực tế: chậm/nhanh N ngày + ngày từng công tác (sếp 11/11/2026) */
+.tddoc .hslip { font-size: 12px; margin-top: 5px; color: var(--mut); }
+.tddoc .hslip.behind { color: #d1503f; }
+.tddoc .hslip.ahead { color: var(--ok); }
+.tddoc .hslip small { color: var(--mut2); }
+.tddoc[data-theme="dark"] .hslip.behind { color: #f0876f; }
+.tddoc .kl .wd { font-size: 10px; color: var(--mut2); display: block; margin-top: 1px; }
+.tddoc .kl .wd.late { color: #d1503f; }
+.tddoc[data-theme="dark"] .kl .wd.late { color: #f0876f; }
+.tddoc .wedit-b { border: 1px solid var(--line2); background: none; color: var(--mut); font: inherit; font-size: 11px; border-radius: 7px; padding: 2px 7px; margin-right: 8px; cursor: pointer; }
+.tddoc .wedit-b.on { border-color: var(--orange); color: var(--orange); }
+.tddoc .wedit { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.tddoc .wedit .t { flex: 1 1 140px; min-width: 0; }
+.tddoc .wedit .t b { display: block; font-size: 13px; font-weight: 500; }
+.tddoc .wedit .t i { display: block; font-style: normal; font-size: 11px; color: var(--mut); }
+.tddoc .wedit input { font: inherit; font-size: 12px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--line2); background: var(--card, transparent); color: var(--text); width: 132px; }

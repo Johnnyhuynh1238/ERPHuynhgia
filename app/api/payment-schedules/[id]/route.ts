@@ -58,6 +58,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const payload = parsed.data;
   const dueDate = payload.dueDate ? atUtcDate(payload.dueDate) : undefined;
+  if (dueDate && before.workIds.length && +dueDate !== +(before.dueDate ?? 0)) {
+    return NextResponse.json({ message: "Ngày theo tiến độ — đổi ở Tiến độ" }, { status: 409 });
+  }
   const percent = payload.amount && access.project.contractValue && Number(access.project.contractValue) > 0
     ? (payload.amount / Number(access.project.contractValue)) * 100
     : undefined;

@@ -120,6 +120,7 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         expectedAmount: true,
         actualAmount: true,
         expectedDate: true,
+        workIds: true,
         subContract: {
           select: {
             projectId: true,
@@ -180,6 +181,7 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         amount: true,
         expectedDate: true,
         dueDate: true,
+        workIds: true,
         projectId: true,
         project: { select: { code: true, name: true } },
       },
@@ -314,12 +316,13 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         projectId: sp.subContract.projectId,
         projectLabel: projLabel(sp.subContract.project),
         title: `Thầu phụ · ${sp.subContract.subcontractor.name}`,
-        subtitle: `Đợt ${sp.stage} · ${sp.description}`,
+        subtitle: `Đợt ${sp.stage} · ${sp.description}${sp.workIds.length ? " · ngày theo tiến độ" : ""}`,
         // Còn phải trả = đợt (expected) − đã trả cộng dồn (actualAmount, tạm ứng).
         // Đợt trả đủ → status 'paid' (không nằm SUBPAY_OPEN) nên còn lại luôn > 0.
         total: Math.max(0, num(sp.expectedAmount) - num(sp.actualAmount)),
         nativeDate: toDate(sp.expectedDate),
-        nativeEditable: true,
+        // Gắn công tác → ngày do tiến độ tính, khoá sửa tay (đổi ở Tiến độ).
+        nativeEditable: !sp.workIds.length,
         canSplit: false,
       }),
     );
@@ -431,10 +434,10 @@ export async function buildCashPlan(opts?: { projectId?: string | null }): Promi
         projectId: ps.projectId,
         projectLabel: projLabel(ps.project),
         title: `Thu HĐ · Đợt ${ps.phaseNumber}`,
-        subtitle: ps.milestoneDescription,
+        subtitle: ps.milestoneDescription + (ps.workIds.length ? " · ngày theo tiến độ" : ""),
         total: num(ps.amount),
         nativeDate: toDate(ps.expectedDate ?? ps.dueDate),
-        nativeEditable: true,
+        nativeEditable: !ps.workIds.length,
         canSplit: false,
       }),
     );

@@ -739,7 +739,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
 
       const payments = await tx.paymentSchedule.findMany({
-        where: { projectId: params.id },
+        // Đợt gắn công tác: ngày theo tiến độ, không dời theo ngày khởi công.
+        where: { projectId: params.id, workIds: { isEmpty: true } },
         select: { id: true, dayOffset: true },
       });
 

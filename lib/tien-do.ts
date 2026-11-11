@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { computeSchedule, queueTienDoSync, type ProjectSched } from "@/lib/tien-do-thuc-te";
 import { computeEstimateProgress, type EstimateProgress } from "@/lib/estimate-progress";
 
 // Báo cáo tiến độ — logic dùng chung cho 2 lối vào:
@@ -24,8 +25,29 @@ export function maskMoney(prog: EstimateProgress) {
 
 // GET: danh sách hạng mục + khối lượng con + tổng tiến độ. Chỉ admin thấy tiền.
 export async function tienDoGet(projectId: string, isAdmin: boolean) {
-  const prog = await computeEstimateProgress(projectId);
-  return NextResponse.json(isAdmin ? { ...prog, hideMoney: false } : maskMoney(prog));
+  const [prog, sched] = await Promise.all([computeEstimateProgress(projectId), computeSchedule(projectId)]);
+  const schedule = schedView(sched);
+  return NextResponse.json(isAdmin ? { ...prog, hideMoney: false, schedule } : { ...maskMoney(prog), schedule });
+}
+
+// Tiến độ thực tế (ngày kế hoạch + dự báo từng công tác/PHẦN) — không có tiền, KS xem được.
+export type ScheduleView = ReturnType<typeof schedView>;
+function schedView(s: ProjectSched) {
+  return {
+    today: s.today,
+    hasPlan: s.hasPlan,
+    slip: s.slip,
+    actualPct: s.actualPct,
+    plannedPct: s.plannedPct,
+    planFinish: s.planFinish,
+    forecastFinish: s.forecastFinish,
+    works: Object.fromEntries(
+      s.works.map((w) => [w.id, { own: w.own, planStart: w.planStart, planEnd: w.planEnd, fStart: w.fStart, fEnd: w.fEnd }]),
+    ),
+    sections: Object.fromEntries(
+      s.sections.map((x) => [x.id, { planStart: x.planStart, planEnd: x.planEnd, fStart: x.fStart, fEnd: x.fEnd }]),
+    ),
+  };
 }
 
 // PATCH: mark done (1 chiều — đã xong không mở lại). Body { refType:'work'|'line'|'section', refId, done:true }.
@@ -80,5 +102,7 @@ export async function tienDoPatch(req: Request, projectId: string, userId: strin
     update: { percent, done, updatedBy: userId },
   });
 
+  // KS tick → tính lại tiến độ thực tế → ngày đợt chi/thu + dự báo dòng tiền (chạy nền, gom tick liền nhau).
+  queueTienDoSync(projectId);
   return NextResponse.json({ ok: true });
 }
