@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ");
-const termEnum = z.enum(["no_ngay", "tra_ngay", "sau_nghiem_thu"]);
+const termEnum = z.enum(["no_ngay", "tra_ngay", "sau_nghiem_thu", "ky_15_30"]);
 const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("regen") }),
   z.object({

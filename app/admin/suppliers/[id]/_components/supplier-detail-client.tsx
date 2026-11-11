@@ -71,7 +71,7 @@ type Supplier = {
   bankAccountName: string | null;
   notes: string | null;
   isActive: boolean;
-  paymentTerm: "no_ngay" | "tra_ngay" | "sau_nghiem_thu";
+  paymentTerm: "no_ngay" | "tra_ngay" | "sau_nghiem_thu" | "ky_15_30";
   creditDays: number;
   createdAt: string;
   groups: Group[];
@@ -83,6 +83,7 @@ const TERM_LABEL = {
   no_ngay: "Công nợ",
   tra_ngay: "Trả ngay",
   sau_nghiem_thu: "Trả sau khi xong",
+  ky_15_30: "Trả ngày 15 & 30",
 } as const;
 const termText = (s: Pick<Supplier, "paymentTerm" | "creditDays">) =>
   s.paymentTerm === "no_ngay" ? `Công nợ ${s.creditDays} ngày` : TERM_LABEL[s.paymentTerm] ?? "Công nợ";
@@ -682,6 +683,7 @@ function EditSupplierModal({
           <option value="no_ngay">Công nợ — trả sau khi giao N ngày (vật tư thường)</option>
           <option value="tra_ngay">Trả ngay khi giao — không nợ (tôn, sắt kèo…)</option>
           <option value="sau_nghiem_thu">Trả sau khi làm xong (thạch cao, cửa nhôm, lan can…)</option>
+          <option value="ky_15_30">Trả ngày 15 &amp; 30 hằng tháng (vật liệu thô VLXD)</option>
         </select>
       </label>
       {paymentTerm === "no_ngay" ? (

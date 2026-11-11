@@ -20,6 +20,7 @@ export const TERM_LABEL: Record<CashTerm, string> = {
   no_ngay: "Công nợ (trả sau khi giao)",
   tra_ngay: "Trả ngay khi giao",
   sau_nghiem_thu: "Trả sau khi làm xong",
+  ky_15_30: "Trả ngày 15 & 30",
 };
 export const KIND_LABEL: Record<CashLineKind, string> = {
   vat_tu: "Vật tư",
@@ -118,8 +119,19 @@ export type ProjectCashFlow = {
 
 // ── Sinh dòng dự báo từ dự toán + tiến độ ───────────────────────────────────
 
-const dueFor = (term: CashTerm, base: string, creditDays: number) =>
-  term === CashTerm.no_ngay ? addDays(base, Math.max(0, creditDays)) : base;
+/** Ngày 15 / 30 gần nhất kể từ `s` (tính cả chính ngày đó); tháng thiếu ngày 30 → ngày cuối tháng. */
+export function ky1530(s: string): string {
+  const [y, m, d] = s.split("-").map(Number);
+  const ym = s.slice(0, 8);
+  if (d <= 15) return `${ym}15`;
+  const end = Math.min(30, new Date(Date.UTC(y, m, 0)).getUTCDate());
+  if (d <= end) return `${ym}${end}`;
+  return `${new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 8)}15`; // ngày 31 → 15 tháng sau
+}
+
+/** Ngày trả theo điều khoản NCC kể từ ngày giao. */
+export const dueFor = (term: CashTerm, base: string, creditDays: number) =>
+  term === CashTerm.no_ngay ? addDays(base, Math.max(0, creditDays)) : term === CashTerm.ky_15_30 ? ky1530(base) : base;
 
 /**
  * Sinh lại dòng dự báo của dự án. Dòng cũ sếp đã sửa ngày tay (date_manual) cùng nhóm+đợt → giữ ngày + ghi chú.
@@ -230,7 +242,10 @@ export async function generateProjectCashLines(projectId: string): Promise<{ lin
         title: `${sec.name}${weeks > 1 ? ` · đợt ${k + 1}/${weeks}` : ""}`,
         term, baseDate: toDb(base), dueDate: toDb(dueFor(term, base, credit)),
         amount: new Prisma.Decimal(Math.round(each)), sortOrder: sort++,
-        note: term === CashTerm.no_ngay ? `Giao ${base.slice(8, 10)}/${base.slice(5, 7)}, trả sau ${credit} ngày (ước)` : `Trả ngay khi giao (ước)`,
+        note:
+          term === CashTerm.no_ngay ? `Giao ${base.slice(8, 10)}/${base.slice(5, 7)}, trả sau ${credit} ngày (ước)`
+          : term === CashTerm.ky_15_30 ? `Giao ${base.slice(8, 10)}/${base.slice(5, 7)}, trả kỳ ngày 15 & 30 (ước)`
+          : `Trả ngay khi giao (ước)`,
       });
     }
   }
@@ -477,6 +492,7 @@ async function reconcileLines(projectIds: string[]): Promise<CashLineView[]> {
 
 type Ctx = {
   creditDays: Map<string, number>; // supplierId → ngày nợ
+  term: Map<string, CashTerm>; // supplierId → điều khoản
   lastReceived: Map<string, string>; // `${projectId}|${supplierId}` → ngày nhận cuối
   subEnd: Map<string, string>; // subContractId → expectedEndDate
   loanDue: Map<string, string>;
@@ -487,7 +503,7 @@ type Ctx = {
 async function loadCtx(projectIds: string[] | null): Promise<Ctx> {
   const pFilter = projectIds ? { projectId: { in: projectIds } } : {};
   const [sups, recv, subs, loans, scheds, noDelivery] = await Promise.all([
-    prisma.supplier.findMany({ select: { id: true, creditDays: true } }),
+    prisma.supplier.findMany({ select: { id: true, creditDays: true, paymentTerm: true } }),
     prisma.mhOrder.groupBy({
       by: ["projectId", "supplierId"],
       where: { ...pFilter, status: { in: [MhOrderStatus.received, MhOrderStatus.paid] }, supplierId: { not: null } },
@@ -504,9 +520,9 @@ async function loadCtx(projectIds: string[] | null): Promise<Ctx> {
       select: { id: true, orderDate: true },
     }),
   ]);
-  const ctx: Ctx = { creditDays: new Map(), lastReceived: new Map(), subEnd: new Map(), loanDue: new Map(), schedDerived: new Map(), orderDate: new Map() };
+  const ctx: Ctx = { creditDays: new Map(), term: new Map(), lastReceived: new Map(), subEnd: new Map(), loanDue: new Map(), schedDerived: new Map(), orderDate: new Map() };
   noDelivery.forEach((o) => ctx.orderDate.set(o.id, iso(o.orderDate)!));
-  sups.forEach((s) => ctx.creditDays.set(s.id, s.creditDays));
+  sups.forEach((s) => { ctx.creditDays.set(s.id, s.creditDays); ctx.term.set(s.id, s.paymentTerm); });
   recv.forEach((r) => {
     const d = iso(r._max.receivedAt);
     if (d && r.supplierId) ctx.lastReceived.set(`${r.projectId}|${r.supplierId}`, d);
@@ -565,7 +581,8 @@ function rowsToItems(rows: CashRow[], huong: "in" | "out", ctx: Ctx): CashItem[]
       uoc = true;
       if (r.sourceType === "ncc_congno" && r.projectId && r.sourceId) {
         const last = ctx.lastReceived.get(`${r.projectId}|${r.sourceId}`);
-        if (last) ngay = addDays(last, ctx.creditDays.get(r.sourceId) ?? 14);
+        // NCC trả ngày 15 & 30 → kỳ gần nhất sau lần giao cuối; còn lại → giao cuối + số ngày nợ.
+        if (last) ngay = ctx.term.get(r.sourceId) === CashTerm.ky_15_30 ? ky1530(last) : addDays(last, ctx.creditDays.get(r.sourceId) ?? 14);
       } else if (r.sourceType === "sub_debt" && r.sourceId) ngay = ctx.subEnd.get(r.sourceId) ?? null;
       else if (r.sourceType === "loan_principal" && r.sourceId) ngay = ctx.loanDue.get(r.sourceId) ?? null;
       else if (r.sourceType === "mh_order" && r.sourceId) {
@@ -592,13 +609,15 @@ async function orderedDebtItems(projectIds: string[] | null, ctx: Ctx, projLabel
   return orders
     .filter((o) => n(o.total) > EPS)
     .map((o) => {
-      const credit = ctx.creditDays.get(o.supplierId!) ?? 14;
       const giao = iso(o.deliveryDate) ?? addDays(iso(o.orderDate)!, 7);
+      const ky = ctx.term.get(o.supplierId!) === CashTerm.ky_15_30;
+      const ngay = ky ? ky1530(giao) : addDays(giao, ctx.creditDays.get(o.supplierId!) ?? 14);
+      const credit = diffDays(giao, ngay);
       return {
         k: `mh_ordered:${o.id}`, loai: "native" as const, huong: "out" as const,
         ten: `Mua hàng · Đơn #${o.seq}${o.supplierName ? ` · ${o.supplierName}` : ""}`,
-        phu: `Đã đặt, giao ${giao.slice(8, 10)}/${giao.slice(5, 7)} · công nợ ${credit} ngày`,
-        du_an: projLabel.get(o.projectId) ?? null, projectId: o.projectId, ngay: addDays(giao, credit), uoc: !o.deliveryDate,
+        phu: `Đã đặt, giao ${giao.slice(8, 10)}/${giao.slice(5, 7)} · ${ky ? "trả ngày 15 & 30" : `công nợ ${credit} ngày`}`,
+        du_an: projLabel.get(o.projectId) ?? null, projectId: o.projectId, ngay, uoc: !o.deliveryDate,
         tien: n(o.total), src: { op: "native", sourceType: "mh_order", sourceId: o.id, offsetDays: credit },
       };
     });

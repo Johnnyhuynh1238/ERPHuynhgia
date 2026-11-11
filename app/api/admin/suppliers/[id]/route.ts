@@ -22,7 +22,7 @@ const patchSchema = z.object({
   notes: z.string().trim().max(2000).nullable().optional(),
   isActive: z.boolean().optional(),
   // Điều khoản thanh toán → kế hoạch dòng tiền dự án (lib/cash-forecast)
-  paymentTerm: z.enum(["no_ngay", "tra_ngay", "sau_nghiem_thu"]).optional(),
+  paymentTerm: z.enum(["no_ngay", "tra_ngay", "sau_nghiem_thu", "ky_15_30"]).optional(),
   creditDays: z.coerce.number().int().min(0).max(180).optional(),
 });
 

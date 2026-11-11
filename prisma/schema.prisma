@@ -4205,6 +4205,7 @@ enum CashTerm {
   no_ngay        // công nợ: trả sau khi giao N ngày (suppliers.credit_days, mặc định 14)
   tra_ngay       // trả ngay khi giao (tôn, sắt kèo, VT mua 1 lần)
   sau_nghiem_thu // trả sau khi làm xong / nghiệm thu (thạch cao, cửa nhôm, lan can…)
+  ky_15_30       // trả ngày 15 / 30 hằng tháng gần nhất kể từ ngày giao (NCC vật liệu thô VLXD, sếp 11/11/2026)
 }
 
 enum CashLineKind {

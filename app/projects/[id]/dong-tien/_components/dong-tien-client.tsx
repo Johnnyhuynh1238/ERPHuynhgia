@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "./dong-tien.css";
 
-type Term = "no_ngay" | "tra_ngay" | "sau_nghiem_thu";
+type Term = "no_ngay" | "tra_ngay" | "sau_nghiem_thu" | "ky_15_30";
 type Item = {
   k: string;
   loai: "native" | "item" | "chunk" | "line" | "ro";
@@ -71,6 +71,7 @@ const TERM_LABEL: Record<Term, string> = {
   no_ngay: "Công nợ",
   tra_ngay: "Trả ngay",
   sau_nghiem_thu: "Trả sau khi xong",
+  ky_15_30: "Trả ngày 15 & 30",
 };
 const fmt = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
 const fmtK = (n: number) => {
@@ -528,7 +529,7 @@ export function DongTienClient({
                 </section>
               ) : null}
               <p className="dt-foot">
-                Nguyên tắc: vật tư NCC công nợ → trả sau khi giao N ngày (mặc định 14); vật tư mua 1 lần (tôn, sắt kèo…) trả ngay;
+                Nguyên tắc: vật liệu thô (VLXD) → trả ngày 15 &amp; 30 hằng tháng; vật tư NCC công nợ khác → trả sau khi giao N ngày (mặc định 14); vật tư mua 1 lần (tôn, sắt kèo…) trả ngay;
                 NCC hoàn thiện (thạch cao, cửa nhôm, lan can…) trả sau khi làm xong. Dòng dự báo theo PHẦN, không theo NCC; điều khoản lấy của NCC nhiều tiền nhất trong PHẦN, chỉ để ước ngày. Đơn mua thật (NCC nào cũng được) trừ theo PHẦN.
                 {data.hasSubContracts ? " Nhân công theo đợt HĐ thầu phụ." : " Nhân công khoán: trả khi xong phần (chưa có HĐ khoán)."}
               </p>
