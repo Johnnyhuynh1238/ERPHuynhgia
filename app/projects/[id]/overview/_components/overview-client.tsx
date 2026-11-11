@@ -3,7 +3,6 @@
 import { plexSans, plexMono } from "@/lib/fonts";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
 import "./overview.css";
 import { ProjectTopics } from "@/components/project-topics";
@@ -60,22 +59,8 @@ export function OverviewClient({
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [data, setData] = useState<Overview | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [aiOn, setAiOn] = useState(false);
-  const [aiSrc, setAiSrc] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => setMounted(true), []);
-
-  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
-  useEffect(() => {
-    function onMsg(e: MessageEvent) {
-      if (e.origin !== "https://huynhgia6.com") return;
-      if (e.data && e.data.type === "hg-ai-closed") setAiOn(false);
-    }
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
 
   useEffect(() => {
     const saved = (typeof localStorage !== "undefined" && localStorage.getItem("overview-theme")) as "light" | "dark" | null;
@@ -119,11 +104,6 @@ export function OverviewClient({
     addEventListener("resize", fit);
     return () => removeEventListener("resize", fit);
   }, [data]);
-
-  const openAi = useCallback(() => {
-    setAiSrc((s) => s ?? `https://huynhgia6.com/claude/chat?arg=duan-${data?.project.code ?? projectId}`);
-    setAiOn(true);
-  }, [data, projectId]);
 
   // Tile "Cổng chủ nhà": sao chép link tuyệt đối để gửi khách, không mở tab.
   const copyLink = useCallback(async (path: string) => {
@@ -212,12 +192,6 @@ export function OverviewClient({
             <div><b>HUỲNH GIA</b><span>Dự án</span></div>
           </div>
           <div className="tbtns">
-            <button className="aibtn" onClick={openAi} type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 2.2l1.7 5.7c.2.6.6 1 1.2 1.2l5.7 1.7-5.7 1.7c-.6.2-1 .6-1.2 1.2L12 19.4l-1.7-5.7c-.2-.6-.6-1-1.2-1.2L3.4 10.8l5.7-1.7c.6-.2 1-.6 1.2-1.2L12 2.2z" />
-                <path d="M18.6 14.3l.7 2.4c.1.3.3.5.6.6l2.4.7-2.4.7c-.3.1-.5.3-.6.6l-.7 2.4-.7-2.4c-.1-.3-.3-.5-.6-.6l-2.4-.7 2.4-.7c.3-.1.5-.3.6-.6l.7-2.4z" opacity=".55" />
-              </svg> AI
-            </button>
             <button className="iconbtn" onClick={toggleTheme} type="button" aria-label="Đổi nền">◑</button>
           </div>
         </div>
@@ -365,18 +339,6 @@ export function OverviewClient({
 
         <div className="foot">TỔNG QUAN · {p.code}</div>
       </div>
-
-      {aiOn && mounted
-        ? createPortal(
-            <div className={`ovdoc ${plexSans.variable} ${plexMono.variable}`} data-theme={theme}>
-              <div className="aiov show">
-                <div className="aihd"><b>🤖 Trợ lý dự án · {p.name}</b><button className="x" onClick={() => setAiOn(false)} type="button" aria-label="Đóng">✕</button></div>
-                {aiSrc ? <iframe src={aiSrc} title="Trợ lý AI" allow="clipboard-write; clipboard-read" /> : null}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
     </div>
   );
 }

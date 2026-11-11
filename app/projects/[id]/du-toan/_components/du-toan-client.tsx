@@ -127,18 +127,7 @@ export function DuToanClient({
   const [err, setErr] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ kind: "work" | "loose" | "vt" | "kh"; id: string } | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null); // null = theo hệ thống
-
-  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup + tải lại số AI vừa ghi.
-  useEffect(() => {
-    function onMsg(e: MessageEvent) {
-      if (e.origin !== "https://huynhgia6.com") return;
-      if (e.data && e.data.type === "hg-ai-closed") setAiOpen(false);
-    }
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
 
   const loadAll = async () => {
     try {
@@ -162,12 +151,6 @@ export function DuToanClient({
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
-
-  // AI ghi DB trong lúc popup mở → đóng popup thì tải lại.
-  const closeAi = () => {
-    setAiOpen(false);
-    void loadAll();
-  };
 
   const matTotal = useMemo(() => materials.reduce((s, m) => s + amountOf(m), 0), [materials]);
   const laborTotal = useMemo(() => works.reduce((s, w) => s + w.laborAmount, 0), [works]);
@@ -326,9 +309,6 @@ export function DuToanClient({
             ← Dự án
           </Link>
           <div className="dt-acts">
-            <button type="button" className="dt-ibtn ai" onClick={() => setAiOpen(true)}>
-              🤖 AI bóc dự toán
-            </button>
             <button
               type="button"
               className="dt-ibtn"
@@ -342,7 +322,7 @@ export function DuToanClient({
 
         <div className="dt-eyebrow">Dự toán · {projectCode}</div>
         <h1 className="dt-h1">{projectName}</h1>
-        <div className="dt-meta">Khối lượng → khoán nhân công + vật tư tiêu hao · AI bóc &amp; ghi</div>
+        <div className="dt-meta">Khối lượng → khoán nhân công + vật tư tiêu hao</div>
 
         {err && (
           <div className="dt-formula" style={{ marginTop: 12, color: "#b91c1c" }}>
@@ -493,27 +473,6 @@ export function DuToanClient({
           </div>,
           document.body,
         )}
-
-      {/* AI drawer */}
-      {aiOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div className="dt-ai-scrim" onClick={closeAi}>
-            <div className="dt-ai-box" onClick={(e) => e.stopPropagation()}>
-              <div className="dt-ai-head">
-                <b>🤖 AI bóc dự toán — {projectCode}</b>
-                <button type="button" className="x" onClick={closeAi} aria-label="Đóng">
-                  ✕
-                </button>
-              </div>
-              <iframe
-                src={`https://huynhgia6.com/claude/chat?arg=dutoan-${encodeURIComponent(projectCode)}`}
-                title="AI bóc dự toán"
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }
@@ -550,7 +509,7 @@ function CongTacPanel({
     return (
       <div>
         {manageBtn}
-        <div className="dt-empty">Chưa có PHẦN nào. Bấm “Quản lý phần” để tạo theo HĐTK, rồi dùng 🤖 AI bóc công tác.</div>
+        <div className="dt-empty">Chưa có PHẦN nào. Bấm “Quản lý phần” để tạo theo HĐTK.</div>
       </div>
     );
 
@@ -658,7 +617,7 @@ function NhanCongPanel({
   return (
     <div>
       {withWorks.length === 0 ? (
-        <div className="dt-empty">Chưa có công tác. Dùng 🤖 AI bóc khối lượng + đơn giá khoán.</div>
+        <div className="dt-empty">Chưa có công tác.</div>
       ) : (
         <table className="dt-t dt-nc">
           <thead>
@@ -758,7 +717,7 @@ function VatTuPanel({
   onOpen: (id: string) => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  if (superGroups.length === 0) return <div className="dt-empty">Chưa có vật tư. Dùng 🤖 AI để bóc vật tư.</div>;
+  if (superGroups.length === 0) return <div className="dt-empty">Chưa có vật tư.</div>;
   return (
     <div>
       {superGroups.map((sg) => {
@@ -799,7 +758,7 @@ function KhoanPanel({
   total: number;
   onOpen: (id: string) => void;
 }) {
-  if (rows.length === 0) return <div className="dt-empty">Chưa có hạng mục khoán. Dùng 🤖 AI để nhập.</div>;
+  if (rows.length === 0) return <div className="dt-empty">Chưa có hạng mục khoán.</div>;
   return (
     <div>
       {rows.map((k, i) => (

@@ -288,22 +288,11 @@ export function MuaHangClient({
   const poRef = useRef<HTMLDivElement>(null);
   const poScrollRef = useRef<HTMLDivElement>(null);
   const poFitRef = useRef<HTMLDivElement>(null);
-  const [aiOpen, setAiOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => setMounted(true), []);
-
-  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
-  useEffect(() => {
-    function onMsg(e: MessageEvent) {
-      if (e.origin !== "https://huynhgia6.com") return;
-      if (e.data && e.data.type === "hg-ai-closed") setAiOpen(false);
-    }
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("muahang-theme");
@@ -405,16 +394,9 @@ export function MuaHangClient({
     if (tab === "cart") loadCart();
   }, [tab, loadCart]);
 
-  // AI (popup) ghi giỏ ở server → đóng popup thì nạp lại giỏ để thấy hàng AI vừa thêm.
-  // Đang mở AI thì poll nhẹ để giỏ cập nhật gần realtime.
   useEffect(() => {
-    if (!aiOpen) {
-      loadCart();
-      return;
-    }
-    const t = setInterval(loadCart, 3000);
-    return () => clearInterval(t);
-  }, [aiOpen, loadCart]);
+    loadCart();
+  }, [loadCart]);
 
   // Danh mục NCC (admin+kế toán đều xem được) → combobox chọn NCC. Lỗi thì im, gõ tay như cũ.
   useEffect(() => {
@@ -851,9 +833,6 @@ ${(() => {
             <Link href={`/projects/${projectId}`} className="mhback">
               ← Dự án
             </Link>
-            <button type="button" className="iconbtn ai" onClick={() => setAiOpen(true)} title="AI quản lý đơn hàng">
-              🤖
-            </button>
             <button type="button" className="iconbtn" onClick={toggleTheme} aria-label="Sáng/tối">
               {theme === "dark" ? "☀" : "☾"}
             </button>
@@ -1063,27 +1042,6 @@ ${(() => {
       )}
 
       <div className={`toast${toastMsg ? " show" : ""}`}>{toastMsg}</div>
-
-      {/* AI drawer — portal ra body (pattern proven của du-toan) */}
-      {aiOpen &&
-        mounted &&
-        createPortal(
-          <div className="mh-ai-scrim" onClick={() => setAiOpen(false)}>
-            <div className="mh-ai-box" onClick={(e) => e.stopPropagation()}>
-              <div className="mh-ai-head">
-                <b>🤖 {isKeToan ? "AI mua hàng (kế toán)" : "AI đơn mua hàng"} — {projectCode}</b>
-                <button type="button" className="x" onClick={() => setAiOpen(false)} aria-label="Đóng">
-                  ✕
-                </button>
-              </div>
-              <iframe
-                src={`https://huynhgia6.com/claude/chat?arg=${isKeToan ? "muahangkt" : "muahang"}-${encodeURIComponent(projectCode)}`}
-                title="AI mua hàng"
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
 
       {/* PO modal — portal ra body: xem PO, ✕ đóng, 📷 gửi ảnh Zalo, in/PDF */}
       {poOrder &&

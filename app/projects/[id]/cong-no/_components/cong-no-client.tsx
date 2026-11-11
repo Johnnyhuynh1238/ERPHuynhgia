@@ -95,27 +95,11 @@ export function CongNoClient({
   const [err, setErr] = useState<string | null>(null);
   const [openSid, setOpenSid] = useState<string | null>(null);
   const [editing, setEditing] = useState<Order | null>(null);
-  const [aiOpen, setAiOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => setMounted(true), []);
 
-  // SSO webterminal: xin cookie claude_code_session để iframe AI (huynhgia6.com/claude)
-  // nhận diện admin/kế toán — khỏi mật khẩu webterminal riêng, tránh iframe trắng.
-  useEffect(() => {
-    fetch("/api/webterminal-cookie", { credentials: "include", cache: "no-store" }).catch(() => {});
-  }, []);
-
-  // Nút "Đóng session" trong iframe chat.html báo về -> đóng popup.
-  useEffect(() => {
-    function onMsg(e: MessageEvent) {
-      if (e.origin !== "https://huynhgia6.com") return;
-      if (e.data && e.data.type === "hg-ai-closed") setAiOpen(false);
-    }
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
   useEffect(() => {
     const saved = localStorage.getItem("congno-theme");
     if (saved === "dark" || saved === "light") setTheme(saved);
@@ -239,9 +223,6 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
             <Link href={`/projects/${projectId}`} className="cnback">
               ← Dự án
             </Link>
-            <button type="button" className="iconbtn ai" onClick={() => setAiOpen(true)} title="AI công nợ">
-              🤖
-            </button>
             <button type="button" className="iconbtn" onClick={toggleTheme} aria-label="Sáng/tối">
               {theme === "dark" ? "☀" : "☾"}
             </button>
@@ -409,27 +390,6 @@ ${o.note ? `<div class="note"><b>Ghi chú:</b> ${esc(o.note)}</div>` : ""}
           <div className="ncc-sheet-scrim" onClick={() => setOpenAllSid(null)}>
             <div className="ncc-sheet" onClick={(e) => e.stopPropagation()}>
               <SupplierDetailClient supplierId={openAllSid} onClose={() => setOpenAllSid(null)} />
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {/* AI drawer — portal ra body */}
-      {aiOpen &&
-        mounted &&
-        createPortal(
-          <div className="cn-ai-scrim" onClick={() => setAiOpen(false)}>
-            <div className="cn-ai-box" onClick={(e) => e.stopPropagation()}>
-              <div className="cn-ai-head">
-                <b>🤖 AI công nợ NCC — {projectCode}</b>
-                <button type="button" className="x" onClick={() => setAiOpen(false)} aria-label="Đóng">
-                  ✕
-                </button>
-              </div>
-              <iframe
-                src={`https://huynhgia6.com/claude/chat?arg=muahang-${encodeURIComponent(projectCode)}`}
-                title="AI công nợ NCC"
-              />
             </div>
           </div>,
           document.body,
