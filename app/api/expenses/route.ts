@@ -37,7 +37,8 @@ const createSchema = z.object({
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   payee: z.string().trim().max(255).optional().nullable(),
   payeePhone: z.string().trim().max(20).optional().nullable(),
-  paymentMethod: z.enum(["cash", "transfer"]).optional(),
+  // Bắt buộc: chỉ Tiền mặt hoặc Chuyển khoản → bill Zalo trừ đúng quỹ (sếp 11/11/2026).
+  paymentMethod: z.enum(["cash", "transfer"], { message: "Chọn hình thức thanh toán: Tiền mặt hoặc Chuyển khoản" }),
   note: z.string().trim().max(2000).optional().nullable(),
   attachmentUrl: z.string().trim().max(500).optional().nullable(),
   attachmentUrls: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
@@ -184,7 +185,7 @@ export async function POST(request: Request) {
         amount: new Prisma.Decimal(data.amount),
         payee: data.payee?.trim() || null,
         payeePhone: data.payeePhone?.trim() || null,
-        paymentMethod: data.paymentMethod || null,
+        paymentMethod: data.paymentMethod,
         note: data.note?.trim() || null,
         attachmentUrl: urls[0] ?? null,
         attachmentUrls: urls,

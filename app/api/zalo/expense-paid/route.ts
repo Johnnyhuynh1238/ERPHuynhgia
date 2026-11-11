@@ -128,12 +128,26 @@ export async function POST(request: Request) {
   if (!bot) {
     return NextResponse.json({ status: "no_bot", reply: `⚠️ Chưa cấu hình user Zalo Bot, không ghi được.` }, { status: 500 });
   }
-  const account = await prisma.cashAccount.findFirst({
+  // Quỹ theo hình thức lệnh: cash → Tiền mặt, transfer → ngân hàng; thiếu hình thức → không ghi (sếp 11/11/2026).
+  const cashAccount = await prisma.cashAccount.findFirst({
     where: { code: "CASH", active: true },
     select: { id: true, name: true },
   });
-  if (!account) {
-    return NextResponse.json({ status: "no_account", reply: `⚠️ Không tìm thấy tài khoản Tiền mặt, không ghi được.` }, { status: 500 });
+  const bankAccount = await prisma.cashAccount.findFirst({
+    where: { kind: "bank", active: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { id: true, name: true },
+  });
+  const noMethod = pending.filter((e) => e.paymentMethod !== "cash" && e.paymentMethod !== "transfer");
+  if (noMethod.length) {
+    return NextResponse.json({
+      status: "no_method",
+      reply: `⚠️ Lệnh ${noMethod.map((e) => e.code).join(", ")} chưa có hình thức thanh toán (Tiền mặt / Chuyển khoản). Chưa ghi sổ — vào ERP sửa lệnh rồi gửi lại bill.`,
+    });
+  }
+  const accountFor = (e: { paymentMethod: string | null }) => (e.paymentMethod === "cash" ? cashAccount : bankAccount);
+  if (pending.some((e) => !accountFor(e))) {
+    return NextResponse.json({ status: "no_account", reply: `⚠️ Không tìm thấy tài khoản quỹ (Tiền mặt / Ngân hàng), không ghi được.` }, { status: 500 });
   }
 
   const billUrl = await persistBill(imageUrl);
@@ -143,13 +157,13 @@ export async function POST(request: Request) {
       : new Date();
 
   try {
-    const { paid, balanceAfter } = await prisma.$transaction(async (tx) => {
-      const paid: Array<{ code: string; amount: number }> = [];
-      let balanceAfter = 0;
+    const { paid } = await prisma.$transaction(async (tx) => {
+      const paid: Array<{ code: string; amount: number; accountName: string; balanceAfter: number }> = [];
       for (const e of pending) {
         const amount = Number(e.amount);
+        const account = accountFor(e)!;
         // ⚠️ ĐỒNG BỘ: hộp phiếu sếp (ai-office/bin/_phieu.py → da_chi_tien_mat, nút "🔒 Đã chi tiền mặt" qua Zalo)
-        // CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH + nguồn mua_hang_order / ncc_congno /
+        // CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH/ngân hàng theo payment_method + nguồn mua_hang_order / ncc_congno /
         // sub_contract recompute / sub_payment settle). Sửa logic ở đây → sửa cả hàm đó (sếp dặn 11/11/2026).
         // Guard atomic: chỉ ghi nếu VẪN pending → webhook lặp không trừ quỹ 2 lần.
         const upd = await tx.expense.updateMany({
@@ -178,7 +192,7 @@ export async function POST(request: Request) {
           note: `${e.code} — ${e.category.name}${e.payee ? ` / ${e.payee}` : ""} — Zalo Bot`,
           createdBy: bot.id,
         });
-        balanceAfter = Number(res.balanceAfter);
+        const balanceAfter = Number(res.balanceAfter);
         // Cập nhật ngược nguồn phát sinh (sao y luồng mark-paid tay). Guard upd.count===0
         // ở trên đảm bảo chỉ chạy khi lần này mới flip pending→paid → không ghi lặp.
         if (e.sourceType === "mua_hang_order" && e.sourceId) {
@@ -204,9 +218,9 @@ export async function POST(request: Request) {
             userId: bot.id,
           });
         }
-        paid.push({ code: e.code, amount });
+        paid.push({ code: e.code, amount, accountName: account.name, balanceAfter });
       }
-      return { paid, balanceAfter };
+      return { paid };
     });
 
     if (paid.length === 0) {
@@ -229,13 +243,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Số dư cuối của từng quỹ bị trừ (thứ tự ghi trong transaction → lần cuối = số dư cuối).
+    const lastByAccount = new Map<string, number>();
+    for (const p of paid) lastByAccount.set(p.accountName, p.balanceAfter);
+    const balances = Array.from(lastByAccount.entries())
+      .map(([name, bal]) => `số dư ${name} còn ${fmtVnd(bal)}`)
+      .join(", ");
     let reply: string;
     if (paid.length === 1) {
-      reply = `✅ Đã cập nhật ${paid[0].code} → Đã chi\nChi ${fmtVnd(paid[0].amount)} vào tài khoản ${account.name}, số dư còn lại ${fmtVnd(balanceAfter)}.`;
+      reply = `✅ Đã cập nhật ${paid[0].code} → Đã chi\nChi ${fmtVnd(paid[0].amount)} từ tài khoản ${paid[0].accountName}, ${balances}.`;
     } else {
-      const lines = paid.map((p) => ` • ${p.code}: ${fmtVnd(p.amount)}`).join("\n");
+      const lines = paid.map((p) => ` • ${p.code}: ${fmtVnd(p.amount)} (${p.accountName})`).join("\n");
       const sum = paid.reduce((s, p) => s + p.amount, 0);
-      reply = `✅ Đã cập nhật ${paid.length} lệnh → Đã chi:\n${lines}\nTổng ${fmtVnd(sum)} vào tài khoản ${account.name}, số dư còn lại ${fmtVnd(balanceAfter)}.`;
+      reply = `✅ Đã cập nhật ${paid.length} lệnh → Đã chi:\n${lines}\nTổng ${fmtVnd(sum)}, ${balances}.`;
     }
     if (already.length) reply += `\n(Lệnh ${already.map((e) => e.code).join(", ")} đã chi từ trước.)`;
 
