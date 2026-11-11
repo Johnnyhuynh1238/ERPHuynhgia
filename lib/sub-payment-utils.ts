@@ -166,6 +166,9 @@ export class SubPaymentOverpayError extends Error {
 // Cộng dồn 1 lần chi (tạm ứng) vào đợt trong 1 transaction.
 // Đủ dự kiến → status=paid (ghi paidBy/paidAt). Chưa đủ → giữ 'approved' (đợt mở,
 // nút gửi lệnh chi vẫn hiện). Vượt tổng đợt → ném SubPaymentOverpayError (rollback).
+// ⚠️ ĐỒNG BỘ: hộp phiếu sếp (ai-office/bin/_phieu.py → da_chi_tien_mat, nút "🔒 Đã chi tiền mặt" qua Zalo)
+// CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH + nguồn mua_hang_order / ncc_congno /
+// sub_contract recompute / sub_payment settle). Sửa logic ở đây → sửa cả hàm đó (sếp dặn 11/11/2026).
 export async function settleSubPaymentInstallment(
   tx: Prisma.TransactionClient,
   opts: {
@@ -243,6 +246,9 @@ export async function getSubContractPaidTotals(
 // Đợt = tham khảo (chia sẵn từ hợp đồng). Duyệt theo thứ tự stage: đổ dần tổng đã trả
 // vào từng đợt — đủ dự kiến → 'paid', đang dở → 'approved' (đang trả), chưa tới → 'pending'.
 // Gọi TRONG transaction sau mỗi lần lệnh chi HĐ chuyển sang 'paid' (hoặc bị huỷ/hoàn).
+// ⚠️ ĐỒNG BỘ: hộp phiếu sếp (ai-office/bin/_phieu.py → da_chi_tien_mat, nút "🔒 Đã chi tiền mặt" qua Zalo)
+// CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH + nguồn mua_hang_order / ncc_congno /
+// sub_contract recompute / sub_payment settle). Sửa logic ở đây → sửa cả hàm đó (sếp dặn 11/11/2026).
 export async function recomputeSubContractPayments(
   tx: Prisma.TransactionClient,
   contractId: string,

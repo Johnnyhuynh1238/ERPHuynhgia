@@ -148,6 +148,9 @@ export async function POST(request: Request) {
       let balanceAfter = 0;
       for (const e of pending) {
         const amount = Number(e.amount);
+        // ⚠️ ĐỒNG BỘ: hộp phiếu sếp (ai-office/bin/_phieu.py → da_chi_tien_mat, nút "🔒 Đã chi tiền mặt" qua Zalo)
+        // CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH + nguồn mua_hang_order / ncc_congno /
+        // sub_contract recompute / sub_payment settle). Sửa logic ở đây → sửa cả hàm đó (sếp dặn 11/11/2026).
         // Guard atomic: chỉ ghi nếu VẪN pending → webhook lặp không trừ quỹ 2 lần.
         const upd = await tx.expense.updateMany({
           where: { id: e.id, status: ExpenseStatus.pending },

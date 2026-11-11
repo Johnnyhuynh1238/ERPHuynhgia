@@ -83,6 +83,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         createdBy: user.id,
       });
 
+      // ⚠️ ĐỒNG BỘ: hộp phiếu sếp (ai-office/bin/_phieu.py → da_chi_tien_mat, nút "🔒 Đã chi tiền mặt" qua Zalo)
+      // CHÉP Y logic ghi "đã chi" này bằng SQL (status paid + sổ quỹ CASH + nguồn mua_hang_order / ncc_congno /
+      // sub_contract recompute / sub_payment settle). Sửa logic ở đây → sửa cả hàm đó (sếp dặn 11/11/2026).
       // Cập nhật ngược nguồn phát sinh (nếu lệnh chi gắn nguồn từ Mua hàng / Công nợ NCC).
       // Dùng paidAmount thực chi (admin có thể sửa) chứ không phải số dự kiến.
       if (expense.sourceType === "mua_hang_order" && expense.sourceId) {
